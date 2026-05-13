@@ -21,7 +21,7 @@ coverage/
 .vitest-cache/
 .tsc-cache/
 
-# Environment + secrets — see .claude/rules/20-security.md
+# Environment + secrets — credentials, env files, certificates.
 .env
 .env.*
 !.env.example

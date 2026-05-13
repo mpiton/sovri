@@ -18,8 +18,11 @@
 *.sh        text eol=lf
 *.toml      text eol=lf
 
-# Lockfile + generated artifacts: mark linguist-generated so GitHub diffs hide them.
-pnpm-lock.yaml          linguist-generated=true -diff
+# Lockfile + generated artifacts: marked linguist-generated so GitHub collapses
+# the diff by default and excludes them from language stats. Textual diffs stay
+# enabled — reviewers must be able to read dependency changes to catch
+# malicious or unexpected modifications.
+pnpm-lock.yaml          linguist-generated=true
 sbom.json               linguist-generated=true
 *.sbom.json             linguist-generated=true
 *.cyclonedx.json        linguist-generated=true
