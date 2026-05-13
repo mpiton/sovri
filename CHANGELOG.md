@@ -21,6 +21,28 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- Pre-commit guard `scripts/no-manual-deps.sh` (#8) rejecting commits that
+  modify any `dependencies`, `devDependencies`, `peerDependencies`, or
+  `optionalDependencies` block in a staged `package.json` (root or nested,
+  e.g. `apps/x/package.json`) without staging the corresponding
+  `pnpm-lock.yaml` update, forcing the use of
+  `pnpm add` / `pnpm update` / `pnpm remove`. Edits limited to the
+  `scripts`, `name`, `version`, or any other non-dependency field pass
+  through unchanged, satisfying the issue #8 acceptance criterion that
+  "editing only `scripts` field is allowed". The guard also rejects any
+  staged `package-lock.json`, `yarn.lock`, or `bun.lockb` accompanying a
+  `package.json` edit, per `docs/adr/002-monorepo-pnpm-turborepo.md` (pnpm
+  is the only accepted package manager). Dependency-block comparison is
+  performed by an inline `node -e` snippet that canonicalises and
+  JSON-stringifies the four blocks read from `HEAD:<file>` and `:<file>`
+  via `git show`, falling back to a fail-closed `"yes"` outcome if `node`
+  is unavailable or errors — including on malformed `package.json` whose
+  `JSON.parse` would otherwise be swallowed. Companion
+  `scripts/no-manual-deps.test.sh` runner exercises 25 acceptance scenarios
+  (12 PASS + 13 BLOCK) in isolated temporary git repositories, covering
+  every dependency block, scripts-only edits, brand-new and deleted
+  `package.json` files, nested workspace packages, version bumps,
+  removals, malformed JSON, and each foreign lockfile family.
 - Pre-commit guard `scripts/no-secrets.sh` (#7) rejecting staged files that
   match known secret-file patterns (`.env`, `.env.<suffix>` except
   `.env.example`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.secret`, `*.creds`,
