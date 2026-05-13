@@ -21,6 +21,74 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- CI coverage gate `scripts/check-coverage.mjs` (#11) — Node ESM script
+  intended to be invoked by the `backend-checks` CI job
+  (`docs/adr/012-lefthook-ci-gates.md`) after
+  `pnpm exec vitest run --coverage` once the workflow wiring lands in a
+  follow-up PR. This change ships the script and its test runner only;
+  no `.github/workflows/` files are modified. Reads an
+  Istanbul `json-summary` file (emitted by `@vitest/coverage-v8` with
+  the `json-summary` reporter), aggregates `lines` and `branches`
+  counts across every per-file entry whose path contains the requested
+  workspace package directory, then exits non-zero when either metric
+  falls below the declared integer threshold. Contract is
+  `node scripts/check-coverage.mjs <coverage-summary.json> <package-path> <threshold>`
+  with the four documented thresholds: `packages/core ≥ 90 %`,
+  `packages/review-engine ≥ 85 %`, `packages/config ≥ 85 %`,
+  `apps/community-bot ≥ 70 %`. Exit codes follow the convention shared
+  with the other `scripts/` guards: `0` on success (both metrics at or
+  above threshold) with a one-line `OK: <package-path> lines XX.XX % |
+  branches XX.XX % | N files | >= T %` written to stderr so CI logs
+  show what the gate actually scanned, `1` on a threshold violation
+  with a `BLOCKED:` stderr message naming the package, the threshold,
+  the failed metric(s) with observed `pct` and `covered/(total - skipped)`
+  raw counts, the JSON source path, and the file count, and `2` on an
+  infrastructure error (wrong argc, non-integer or out-of-range
+  threshold, absolute or `..`-containing `<package-path>`, unreadable
+  file, malformed JSON, `null` or array root, zero per-file entries
+  matching the requested package — the `"total"` sentinel is filtered
+  out before matching — or every matched entry having zero countable
+  units across both `lines.total` and `branches.total`, which signals a
+  Vitest misconfiguration where the package was scanned but nothing was
+  instrumented and that the gate refuses to silently pass).
+  Per-file matching accepts both the absolute paths Istanbul emits by
+  default (`/.../packages/core/src/foo.ts`) and workspace-relative
+  paths (`packages/core/src/foo.ts`) for bespoke fixtures, and the
+  trailing slash on the path segment guards against sibling-directory
+  false positives — `packages/core` never pulls in entries from
+  `packages/core-extras`. Aggregation works on raw integer counts
+  rather than per-file `pct`, so Istanbul's `"Unknown"` string
+  (emitted when a file has zero countable units) is ignored naturally.
+  A package with zero branchable units overall
+  (`branches.total - branches.skipped === 0`) is treated as 100 %
+  for that metric, mirroring Istanbul's vacuous-true semantics. The
+  threshold comparison itself runs in integer arithmetic
+  (`covered * 100 < threshold * denom`) rather than on the displayed
+  `pct` float, so IEEE 754 boundary surprises such as
+  `(29 / 100) * 100 === 28.999999999999996` cannot produce a
+  false-fail at exactly-on-threshold inputs. No runtime dependencies —
+  `node:fs` plus `node:process` only, ESM via `.mjs`, runs on the
+  Node 24 pinned in `.nvmrc`. Companion `scripts/check-coverage.test.sh`
+  runner exercises 32 acceptance scenarios in isolated `mktemp -d`
+  directories with synthetic `coverage-summary.json` fixtures: twelve
+  PASS cases (both metrics well above threshold with absolute keys, the
+  same with workspace-relative keys, metrics exactly at the threshold,
+  a package with zero branchable units, a per-file `pct === "Unknown"`
+  ignored by aggregation, threshold 0 with 0 % coverage, threshold 100
+  with full coverage, weighted multi-file aggregation reaching the
+  bound, a `packages/core-extras` sibling correctly excluded from
+  `packages/core`, an `apps/community-bot` path variant, an
+  IEEE 754 boundary regression at `covered=29, denom=100, T=29`, and a
+  success-line assertion confirming the `OK:` summary appears), four
+  FAIL cases (lines below, branches below, both below, and threshold
+  100 not reached by 99 %), and sixteen ERROR cases (missing
+  package-path or threshold or extra arg, non-numeric / decimal /
+  negative / out-of-range threshold, absolute or `..` package-path,
+  missing summary file, invalid JSON, `null` or array root, no
+  entries matching the package path, a summary with only the
+  `"total"` sentinel, and every matched entry having zero countable
+  units). Tests are independent of pnpm and Vitest so the script can
+  be validated in any bash + node environment.
 - Pre-commit guard `scripts/check-boundary.sh` (#10) rejecting staged
   TypeScript files under `packages/` or `apps/community-bot/` that import
   from the proprietary `apps/cloud-api/` surface, enforcing the
