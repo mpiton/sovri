@@ -207,6 +207,15 @@ setup_parent_sibling_cloud_api_name() {
   stage_file packages/core/src/uses_parent_mock.ts 'import { fake } from "../cloud-api-mock";'
 }
 
+setup_segment_suffix_cloud_api() {
+  # PR #73 review (Codex P2): `../mock-cloud-api/x` embeds `cloud-api`
+  # as a suffix of a path segment, not as a segment of its own. The
+  # `(.*/)?` anchor before `cloud-api` requires every preceding
+  # character on this side of the `../` to end with `/`, so the `mock-`
+  # prefix breaks the match.
+  stage_file packages/core/src/uses_segment_suffix.ts 'import { x } from "../mock-cloud-api/x";'
+}
+
 setup_dynamic_tokens_in_comment_and_string() {
   # Regression guard for the PR #73 review feedback (CodeRabbit, Codex,
   # cubic-dev-ai): `import("...")` and `require("...")` shown as text
@@ -341,6 +350,14 @@ setup_unary_minus_dynamic_import() {
   stage_file packages/core/src/breach.ts 'export const X = -import("@sovri/cloud-api");'
 }
 
+setup_conditional_dynamic_import() {
+  # PR #73 review (Codex P1): `if (ok) import("...")` puts `)` directly
+  # before the keyword. The dynamic punctuation whitelist must include
+  # `)` for the boundary to fire.
+  stage_file packages/core/src/breach.ts 'const ok = true;
+if (ok) import("@sovri/cloud-api");'
+}
+
 # Cases.
 
 run_case "PASS-1  empty staged set"                       setup_empty                            0 ""
@@ -359,6 +376,7 @@ run_case "PASS-13 coreImport()/myRequire() identifiers"   setup_similar_identifi
 run_case "PASS-14 empty .ts file ok"                      setup_empty_ts_file                    0 ""
 run_case "PASS-15 dynamic tokens in comment/string"       setup_dynamic_tokens_in_comment_and_string 0 ""
 run_case "PASS-16 ../cloud-api-mock parent sibling"       setup_parent_sibling_cloud_api_name    0 ""
+run_case "PASS-17 ../mock-cloud-api/x segment suffix"     setup_segment_suffix_cloud_api         0 ""
 
 run_case "BLOCK-1  packages/core @sovri/cloud"            setup_at_sovri_cloud_in_core           1 "BLOCKED: Cloud import"
 run_case "BLOCK-2  @sovri/cloud-internals"                setup_at_sovri_cloud_internals         1 "BLOCKED: Cloud import"
@@ -377,6 +395,7 @@ run_case "BLOCK-12 multiple breaches in one commit"       setup_multiple_breache
   "packages/core/src/a.ts" "apps/community-bot/src/b.ts" "ADR-010"
 run_case "BLOCK-20 concat: \"x\" + import(cloud)"         setup_concat_dynamic_import            1 "BLOCKED: Cloud import"
 run_case "BLOCK-21 unary -: -import(cloud)"               setup_unary_minus_dynamic_import       1 "BLOCKED: Cloud import"
+run_case "BLOCK-22 if (ok) import(cloud)"                 setup_conditional_dynamic_import       1 "BLOCKED: Cloud import"
 
 run_case "BLOCK-13 reports line number prefix"            setup_at_sovri_cloud_in_core_at_line_3 1 "BLOCKED: Cloud import" \
   "3:import { X } from \"@sovri/cloud-api\";"

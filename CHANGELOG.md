@@ -74,14 +74,19 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   enumerates each offending file plus the offending line with line
   number, and reminds contributors of the only permitted direction
   (`apps/cloud-api/` may import from `packages/*`, never the reverse).
-  The relative-climb alternative requires a path-component boundary
-  (`/` or the closing quote) after `cloud-api` so a local sibling
-  `../cloud-api-mock` is not mistaken for a breach (PR #73 review,
-  Codex). `+` and `-` are added to the dynamic punctuation whitelist
-  so `"prefix" + import("...")` and `-import("...")` expression
-  contexts are caught (PR #73 review, cubic-dev-ai).
-  Companion `scripts/check-boundary.test.sh` runner exercises 37
-  acceptance scenarios (16 PASS + 21 BLOCK) in isolated temporary git
+  The relative-climb alternative requires `cloud-api` to be a full
+  path segment: a `(.*/)?` anchor demands every character preceding
+  `cloud-api` on this side of the `../` to be either nothing or end
+  with `/`, and a trailing `[/'"]` requires a path or quote boundary
+  after the segment. This rejects both `../cloud-api-mock` (trailing
+  suffix) and `../mock-cloud-api/x` (leading prefix) as parent-sibling
+  imports while still catching `../../apps/cloud-api/y` and
+  `../cloud-api/y` (PR #73 review, Codex). `+`, `-` and `)` are added
+  to the dynamic punctuation whitelist so `"prefix" + import("...")`,
+  `-import("...")` and `if (ok) import("...")` expression contexts
+  are caught (PR #73 review, cubic-dev-ai and Codex).
+  Companion `scripts/check-boundary.test.sh` runner exercises 39
+  acceptance scenarios (17 PASS + 22 BLOCK) in isolated temporary git
   repositories with `commit.gpgsign=false`, covering each `@sovri/cloud`
   variant (bare scope, `-internals`, `-api`, single-quote, `.tsx`,
   multiple Apache 2.0 packages, `export * from` re-export,
