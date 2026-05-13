@@ -74,8 +74,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   enumerates each offending file plus the offending line with line
   number, and reminds contributors of the only permitted direction
   (`apps/cloud-api/` may import from `packages/*`, never the reverse).
-  Companion `scripts/check-boundary.test.sh` runner exercises 34
-  acceptance scenarios (15 PASS + 19 BLOCK) in isolated temporary git
+  The relative-climb alternative requires a path-component boundary
+  (`/` or the closing quote) after `cloud-api` so a local sibling
+  `../cloud-api-mock` is not mistaken for a breach (PR #73 review,
+  Codex). `+` and `-` are added to the dynamic punctuation whitelist
+  so `"prefix" + import("...")` and `-import("...")` expression
+  contexts are caught (PR #73 review, cubic-dev-ai).
+  Companion `scripts/check-boundary.test.sh` runner exercises 37
+  acceptance scenarios (16 PASS + 21 BLOCK) in isolated temporary git
   repositories with `commit.gpgsign=false`, covering each `@sovri/cloud`
   variant (bare scope, `-internals`, `-api`, single-quote, `.tsx`,
   multiple Apache 2.0 packages, `export * from` re-export,
@@ -92,7 +98,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   fixture for the PR #73 review feedback that combines whole-line and
   trailing `//` comments, inline `/* ... */`, JSDoc body continuation,
   and an escaped string literal — all referencing `import(...)` /
-  `require(...)` as text and all expected to PASS. The "multiple breaches in
+  `require(...)` as text and all expected to PASS. A second
+  regression fixture covers the codex / cubic-dev-ai feedback
+  (`../cloud-api-mock` parent-sibling import must pass, `"foo" +
+  import("@sovri/cloud-api")` and `-import("@sovri/cloud-api")` must
+  block). The empty-placeholder fixture now uses shell redirection
+  to produce a genuinely zero-byte file (CodeRabbit). The "multiple breaches in
   one commit" scenario additionally asserts that every offending path
   and the `ADR-010` marker all appear in stdout, and a dedicated case
   asserts the `grep -n` line-number prefix (`3:import { X } from ...`)

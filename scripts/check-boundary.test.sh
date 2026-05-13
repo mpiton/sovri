@@ -190,9 +190,21 @@ export { r };'
 }
 
 setup_empty_ts_file() {
-  # A genuinely empty `.ts` file (placeholder module) must pass. It has no
-  # imports of any kind.
-  stage_file packages/core/src/placeholder.ts ''
+  # A genuinely empty (zero-byte) `.ts` file must pass. `stage_file`
+  # cannot produce a zero-byte file because `printf '%s\n'` always
+  # writes at least one newline, so the fixture is created directly
+  # here via shell-redirection truncation.
+  mkdir -p packages/core/src
+  : > packages/core/src/placeholder.ts
+  git add packages/core/src/placeholder.ts
+}
+
+setup_parent_sibling_cloud_api_name() {
+  # PR #73 review: `../cloud-api-mock` is a parent-sibling import that
+  # does NOT cross into `apps/cloud-api/` and must pass. The relative
+  # alternative now requires a path-component boundary (`/` or quote)
+  # after `cloud-api`, so the `-mock` suffix breaks the match.
+  stage_file packages/core/src/uses_parent_mock.ts 'import { fake } from "../cloud-api-mock";'
 }
 
 setup_dynamic_tokens_in_comment_and_string() {
@@ -317,6 +329,18 @@ setup_multiple_breaches() {
   stage_file apps/community-bot/src/b.ts 'import { Y } from "../../apps/cloud-api/y";'
 }
 
+setup_concat_dynamic_import() {
+  # PR #73 review (cubic-dev-ai): `+` is a real expression-context
+  # boundary; `"prefix" + import("@sovri/cloud-api")` must block.
+  stage_file packages/core/src/breach.ts 'export const X = "foo" + import("@sovri/cloud-api");'
+}
+
+setup_unary_minus_dynamic_import() {
+  # `-import("...")` is exotic but legal — keep `-` in the boundary
+  # whitelist alongside `+` for symmetry.
+  stage_file packages/core/src/breach.ts 'export const X = -import("@sovri/cloud-api");'
+}
+
 # Cases.
 
 run_case "PASS-1  empty staged set"                       setup_empty                            0 ""
@@ -334,6 +358,7 @@ run_case "PASS-12 comment mentions @sovri/cloud-api"      setup_comment_mentions
 run_case "PASS-13 coreImport()/myRequire() identifiers"   setup_similar_identifier_call          0 ""
 run_case "PASS-14 empty .ts file ok"                      setup_empty_ts_file                    0 ""
 run_case "PASS-15 dynamic tokens in comment/string"       setup_dynamic_tokens_in_comment_and_string 0 ""
+run_case "PASS-16 ../cloud-api-mock parent sibling"       setup_parent_sibling_cloud_api_name    0 ""
 
 run_case "BLOCK-1  packages/core @sovri/cloud"            setup_at_sovri_cloud_in_core           1 "BLOCKED: Cloud import"
 run_case "BLOCK-2  @sovri/cloud-internals"                setup_at_sovri_cloud_internals         1 "BLOCKED: Cloud import"
@@ -350,6 +375,8 @@ run_case "BLOCK-11 ../../../apps/cloud-api deep"          setup_relative_climb_d
 
 run_case "BLOCK-12 multiple breaches in one commit"       setup_multiple_breaches                1 "BLOCKED: Cloud import" \
   "packages/core/src/a.ts" "apps/community-bot/src/b.ts" "ADR-010"
+run_case "BLOCK-20 concat: \"x\" + import(cloud)"         setup_concat_dynamic_import            1 "BLOCKED: Cloud import"
+run_case "BLOCK-21 unary -: -import(cloud)"               setup_unary_minus_dynamic_import       1 "BLOCKED: Cloud import"
 
 run_case "BLOCK-13 reports line number prefix"            setup_at_sovri_cloud_in_core_at_line_3 1 "BLOCKED: Cloud import" \
   "3:import { X } from \"@sovri/cloud-api\";"

@@ -54,7 +54,13 @@ STAGED=$(git diff --cached --diff-filter=d --name-only \
 # Turbo target (ARCHI.md §15.3) is the AST-aware enforcement; this
 # pre-commit gate is a fast defense-in-depth layer that catches the
 # common breaches in <50 ms.
-PATTERN="^[[:space:]]*(import|export)[[:space:]].*from[[:space:]]+['\"](@sovri/cloud|\\.\\./.*cloud-api)|^[[:space:]]*(import|from)[[:space:]]+['\"](@sovri/cloud|\\.\\./.*cloud-api)|(^[[:space:]]*((await|return|yield|throw|new)[[:space:]]+)?|[(,;=?:{}!&|>\\[][[:space:]]*((await|return|yield|throw|new)[[:space:]]+)?|[[:space:]](await|return|yield|throw|new)[[:space:]]+)(import|require)[[:space:]]*\\([[:space:]]*['\"](@sovri/cloud|\\.\\./.*cloud-api)"
+# `cloud-api` in the relative-climb alternative requires a trailing
+# path-component boundary (`/` or the closing quote) so a local sibling
+# import such as `../cloud-api-mock` is not flagged. `+` and `-` are
+# added to the punctuation whitelist so the dynamic alternative also
+# catches expression contexts like `"prefix" + import("...")` and
+# `-import("...")`.
+PATTERN="^[[:space:]]*(import|export)[[:space:]].*from[[:space:]]+['\"](@sovri/cloud|\\.\\./.*cloud-api[/'\"])|^[[:space:]]*(import|from)[[:space:]]+['\"](@sovri/cloud|\\.\\./.*cloud-api[/'\"])|(^[[:space:]]*((await|return|yield|throw|new)[[:space:]]+)?|[(,;=?:{}!&|>+\\[\\-][[:space:]]*((await|return|yield|throw|new)[[:space:]]+)?|[[:space:]](await|return|yield|throw|new)[[:space:]]+)(import|require)[[:space:]]*\\([[:space:]]*['\"](@sovri/cloud|\\.\\./.*cloud-api[/'\"])"
 
 # Strip comments before scanning so commented-out example code that
 # happens to embed `import(...)` / `require(...)` / `from "..."` text
