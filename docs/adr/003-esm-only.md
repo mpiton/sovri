@@ -22,7 +22,7 @@ All `package.json` files have:
 All TypeScript imports use the `.js` extension at the end (TS ESM convention):
 
 ```typescript
-import { Logger } from './logger.js';  // not './logger'
+import { Logger } from "./logger.js"; // not './logger'
 ```
 
 ## Rationale

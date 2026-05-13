@@ -1,0 +1,30 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/**/*.{ts,js,mjs}", "*.config.{ts,js,mjs}"],
+      "project": ["**/*.{ts,tsx,mts,cts,js,mjs,cjs}!"],
+      "ignoreBinaries": ["oxlint", "oxfmt", "knip", "turbo", "tsc"]
+    },
+    "packages/*": {
+      "entry": ["src/index.ts!", "src/{cli,bin,server,worker}.ts!"],
+      "project": ["src/**/*.{ts,tsx,mts}!"]
+    },
+    "apps/*": {
+      "entry": ["src/index.ts!", "src/{server,main,bin,worker}.ts!"],
+      "project": ["src/**/*.{ts,tsx,mts}!"]
+    }
+  },
+  "ignore": [
+    "**/dist/**",
+    "**/build/**",
+    "**/out/**",
+    "**/coverage/**",
+    "**/.turbo/**",
+    "**/.cache/**",
+    "**/.worktrees/**",
+    "**/node_modules/**"
+  ],
+  "ignoreDependencies": [],
+  "ignoreExportsUsedInFile": true
+}

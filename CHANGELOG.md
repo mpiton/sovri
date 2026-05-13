@@ -42,6 +42,22 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `module: NodeNext`), root scripts `build` / `test` / `lint` / `typecheck`
   delegating to Turborepo, and `turbo@2.9.12` + `typescript@5.9.3` pinned as
   root devDependencies.
+- Lint, format and dead-code toolchain (#3): `.oxlintrc.json` enabling the
+  `typescript`, `unicorn`, `oxc` and `import` plugins with `correctness` and
+  `suspicious` categories at `error`, hard bans on `any`
+  (`typescript/no-explicit-any`), `@ts-ignore` and `@ts-expect-error`
+  (`typescript/ban-ts-comment`), `!` non-null assertions and loose equality;
+  test files override relaxes non-null and `no-console`. `.oxfmtrc.json` at
+  root with default formatting and ignore patterns for build outputs, caches,
+  worktrees, `pnpm-lock.yaml` and `CHANGELOG.md`. `knip.json` declaring the
+  monorepo workspaces, production-only entries for `packages/*` and `apps/*`
+  (`src/{index,cli,bin,server,worker}.ts`), and `ignoreExportsUsedInFile` to
+  match the bundle granularity. Root scripts `lint`
+  (`oxlint . --max-warnings=0 --no-error-on-unmatched-pattern`, matches the
+  ADR-011 CI gate while tolerating an empty TypeScript repo on v0.1),
+  `lint:fix`, `format`, `format:check` and `knip` (`--reporter compact`).
+  `oxlint@1.64.0`, `oxfmt@0.49.0` and `knip@6.13.1` pinned as root
+  devDependencies. `.worktrees/` + `.claude/worktrees/` ignored from VCS.
 
 ---
 
