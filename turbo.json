@@ -11,6 +11,7 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": [
+        "$TURBO_DEFAULT$",
         "src/**",
         "tsconfig*.json",
         "package.json"
@@ -24,6 +25,7 @@
     "test": {
       "dependsOn": ["^build"],
       "inputs": [
+        "$TURBO_DEFAULT$",
         "src/**",
         "test/**",
         "tests/**",
@@ -35,6 +37,7 @@
     },
     "lint": {
       "inputs": [
+        "$TURBO_DEFAULT$",
         "src/**",
         "test/**",
         "tests/**",
@@ -46,6 +49,7 @@
     "typecheck": {
       "dependsOn": ["^build"],
       "inputs": [
+        "$TURBO_DEFAULT$",
         "src/**",
         "test/**",
         "tests/**",
