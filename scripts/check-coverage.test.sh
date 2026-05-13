@@ -9,8 +9,11 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$SCRIPT_DIR/check-coverage.mjs"
 
-if [ ! -x "$SCRIPT" ]; then
-  echo "ERROR: $SCRIPT is missing or not executable" >&2
+# Invocation matches the documented CLI contract from issue #11
+# (`node scripts/check-coverage.mjs ...`), so the runner does not depend
+# on the executable bit being set — a file-existence check is enough.
+if [ ! -f "$SCRIPT" ]; then
+  echo "ERROR: $SCRIPT is missing" >&2
   exit 2
 fi
 
@@ -32,7 +35,14 @@ FAILURES=""
 #   arguments to the script (package-path and threshold), space-separated.
 #   expect_substring may be empty to skip stderr assertion. Any further
 #   arguments are additional substrings that must all be present in
-#   stderr — used to verify failed metrics list every offending line.
+#   stderr.
+#
+#   stdout and stderr are captured separately so assertions target the
+#   stream the script actually writes to. `check-coverage.mjs` never
+#   prints to stdout (success summaries, BLOCKED, and ERROR messages all
+#   go to stderr), so the runner also asserts stdout stays empty for
+#   every case — a regression that switches any message to stdout would
+#   surface immediately.
 run_case() {
   local label="$1"
   local fixture_fn="$2"
@@ -41,7 +51,7 @@ run_case() {
   local expect_substring="$5"
   shift 5
   local extra_substrings=("$@")
-  local tmp summary out ec extra
+  local tmp summary stdout stderr stderr_file ec extra
 
   tmp=$(mktemp -d 2>/dev/null || mktemp -d -t 'check-coverage')
   if [ -z "$tmp" ] || [ ! -d "$tmp" ]; then
@@ -59,11 +69,14 @@ run_case() {
     return
   }
 
-  # Combine fixture path + extra positional args. An empty $summary is
-  # passed through verbatim so missing-file tests can probe the script's
-  # usage-error path.
+  # Capture stdout and stderr into distinct buffers. `stderr_file` lives
+  # inside the per-case tmp dir so concurrent test runs cannot stomp on
+  # each other's streams. An empty $summary is passed through verbatim
+  # so missing-file tests can probe the script's usage-error path.
+  stderr_file="$tmp/.stderr"
   # shellcheck disable=SC2086
-  out=$(cd "$tmp" && "$SCRIPT" "$summary" $extra_args 2>&1) && ec=0 || ec=$?
+  stdout=$(cd "$tmp" && node "$SCRIPT" "$summary" $extra_args 2>"$stderr_file") && ec=0 || ec=$?
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
 
   rm -rf "$tmp"
 
@@ -71,24 +84,35 @@ run_case() {
     FAIL=$((FAIL + 1))
     FAILURES="${FAILURES}
   ✗ ${label}: expected exit ${expect_exit}, got ${ec}
-$(printf '%s\n' "$out" | sed 's/^/      /')"
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
     return
   fi
 
-  if [ -n "$expect_substring" ] && ! printf '%s\n' "$out" | grep -Fq -- "$expect_substring"; then
+  if [ -n "$stdout" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ ${label}: stdout must be empty, got:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    return
+  fi
+
+  if [ -n "$expect_substring" ] && ! printf '%s\n' "$stderr" | grep -Fq -- "$expect_substring"; then
     FAIL=$((FAIL + 1))
     FAILURES="${FAILURES}
   ✗ ${label}: stderr missing substring '${expect_substring}'
-$(printf '%s\n' "$out" | sed 's/^/      /')"
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
     return
   fi
 
   for extra in "${extra_substrings[@]}"; do
-    if ! printf '%s\n' "$out" | grep -Fq -- "$extra"; then
+    if ! printf '%s\n' "$stderr" | grep -Fq -- "$extra"; then
       FAIL=$((FAIL + 1))
       FAILURES="${FAILURES}
   ✗ ${label}: stderr missing extra substring '${extra}'
-$(printf '%s\n' "$out" | sed 's/^/      /')"
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
       return
     fi
   done

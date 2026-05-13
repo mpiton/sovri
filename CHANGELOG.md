@@ -22,9 +22,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Added
 
 - CI coverage gate `scripts/check-coverage.mjs` (#11) — Node ESM script
-  invoked by the `backend-checks` CI job
+  intended to be invoked by the `backend-checks` CI job
   (`docs/adr/012-lefthook-ci-gates.md`) after
-  `pnpm exec vitest run --coverage`. Reads an
+  `pnpm exec vitest run --coverage` once the workflow wiring lands in a
+  follow-up PR. This change ships the script and its test runner only;
+  no `.github/workflows/` files are modified. Reads an
   Istanbul `json-summary` file (emitted by `@vitest/coverage-v8` with
   the `json-summary` reporter), aggregates `lines` and `branches`
   counts across every per-file entry whose path contains the requested

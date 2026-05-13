@@ -19,10 +19,11 @@
 //   2   Infrastructure error (usage, unreadable file, malformed JSON,
 //       no coverage entries match the package path).
 //
-// Invoked by the `backend-checks` CI job (`docs/adr/012-lefthook-ci-gates.md`)
-// after `pnpm exec vitest run --coverage`. No npm dependencies; node:fs +
-// node:process only. ESM via `.mjs` so it runs without a wrapping
-// `package.json` declaring `"type": "module"`.
+// Intended for the `backend-checks` CI job
+// (`docs/adr/012-lefthook-ci-gates.md`) after `pnpm exec vitest run
+// --coverage`; the workflow wiring lands in a follow-up PR. No npm
+// dependencies; node:fs + node:process only. ESM via `.mjs` so it runs
+// without a wrapping `package.json` declaring `"type": "module"`.
 
 import { readFileSync } from "node:fs";
 import { argv, exit, stderr } from "node:process";
