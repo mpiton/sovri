@@ -74,7 +74,7 @@ The repository builds today, even though the bot is not yet feature-complete.
 ### Prerequisites
 
 - **Node.js 24 LTS** — version pinned in [`.nvmrc`](.nvmrc). Use `nvm use` or `fnm use`.
-- **pnpm 10** — enable through Corepack: `corepack enable && corepack prepare pnpm@latest --activate`.
+- **pnpm 10** — enable through Corepack: `corepack enable && corepack prepare pnpm@10 --activate`.
 - **Docker** (optional) — only required for the integration tests and the bot image.
 
 ### Steps
