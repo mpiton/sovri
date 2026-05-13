@@ -96,9 +96,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   packages classifies each unique license string exactly once. No runtime dependencies — `node:fs` + `node:child_process`
   (for `spawnSync` on the no-argument form) + `node:process` only,
   ESM via `.mjs`, runs on the Node 24 pinned in `.nvmrc`. Companion
-  `scripts/check-licenses.test.sh` runner exercises 38 acceptance
+  `scripts/check-licenses.test.sh` runner exercises 41 acceptance
   scenarios in isolated `mktemp -d` directories with synthetic
-  pnpm-licenses JSON fixtures: eleven PASS cases (single MIT
+  pnpm-licenses JSON fixtures: twelve PASS cases (single MIT
   bucket; multiple allowed buckets aggregated; every allowlist
   licence as a singleton bucket — covering the count of "9 license
   bucket(s)"; `(MIT OR Apache-2.0)` dual licence; `MIT OR
@@ -107,7 +107,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   WITH-exception ignored on the allowed atom; nested parentheses
   `(MIT AND (Apache-2.0 OR BSD-3-Clause))`; empty JSON object;
   `No licenses in packages found` plain-text sentinel; empty file
-  treated as no packages), eighteen FAIL cases (`GPL-3.0-only`,
+  treated as no packages; `Apache-2.0 WITH Classpath-exception-2.0`
+  honours the SPDX-registered exception list and passes on the
+  `Apache-2.0` atom), twenty FAIL cases (`GPL-3.0-only`,
   `AGPL-3.0-or-later`, `LGPL-2.1-only`, legacy `LGPL-2.1+` suffix,
   `MIT AND GPL-2.0-only` AND-with-one-denied-branch,
   `GPL-2.0-only OR AGPL-3.0-only` OR-with-no-allowed-branch,
@@ -125,7 +127,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   surfaces the disagreement and denies with reason
   `entry license disagrees with bucket`; trailing `MIT OR` denied as
   a parse error so the OR short-circuit cannot hide a malformed
-  right branch; unbalanced `(MIT` denied as a parse error),
+  right branch; unbalanced `(MIT` denied as a parse error;
+  `MIT WITH totally-made-up` denied with reason
+  `unknown SPDX exception after WITH` — the parser now validates the
+  exception token against the SPDX exceptions allowlist instead of
+  stripping any token blindly, closing a bypass where a malformed
+  WITH clause would pass as the bare licence atom — and
+  `MIT WITH OR` similarly denied because the operator collides with
+  what would have to be an exception identifier),
   and seven ERROR cases (invalid JSON, `null` root, array root,
   bucket value that is not an array, missing `--input` target,
   `--input` with no path argument, and an unknown `--bogus`

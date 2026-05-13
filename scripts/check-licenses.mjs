@@ -92,6 +92,84 @@ const COPYLEFT_FAMILY = /^(?:A?GPL|LGPL)/i;
 // these tokens is untouched.
 const NON_DECLARED_LICENSE = /^(?:Unknown|UNLICENSED|SEE LICENSE IN |Custom|UNDEFINED)\b/i;
 
+// SPDX-registered exception identifiers (SPDX License List 3.x). A
+// `WITH <exception>` clause is only honoured when the exception token
+// is a member of this set; otherwise the bucket is denied as a parse
+// error. Without this check, `MIT WITH totally-made-up` (or
+// `MIT WITH OR`) would parse as the bare `MIT` atom and pass the gate
+// — the fail-closed contract requires us to reject the whole compound.
+// Source: https://spdx.org/licenses/exceptions.html — keep alphabetised
+// for diff legibility.
+const SPDX_EXCEPTIONS = new Set([
+  "389-exception",
+  "Asterisk-exception",
+  "Asterisk-linking-protocols-exception",
+  "Autoconf-exception-2.0",
+  "Autoconf-exception-3.0",
+  "Autoconf-exception-generic",
+  "Autoconf-exception-generic-3.0",
+  "Autoconf-exception-macro",
+  "Bison-exception-1.24",
+  "Bison-exception-2.2",
+  "Bootloader-exception",
+  "CLISP-exception-2.0",
+  "Classpath-exception-2.0",
+  "DigiRule-FOSS-exception",
+  "FLTK-exception",
+  "Fawkes-Runtime-exception",
+  "Font-exception-2.0",
+  "GCC-exception-2.0",
+  "GCC-exception-2.0-note",
+  "GCC-exception-3.1",
+  "GNAT-exception",
+  "GNU-compiler-exception",
+  "GPL-3.0-interface-exception",
+  "GPL-3.0-linking-exception",
+  "GPL-3.0-linking-source-exception",
+  "GPL-CC-1.0",
+  "GStreamer-exception-2005",
+  "GStreamer-exception-2008",
+  "KiCad-libraries-exception",
+  "LGPL-3.0-linking-exception",
+  "LLGPL",
+  "LLVM-exception",
+  "LZMA-exception",
+  "Libtool-exception",
+  "Linux-syscall-note",
+  "Nokia-Qt-exception-1.1",
+  "OCCT-exception-1.0",
+  "OCaml-LGPL-linking-exception",
+  "OpenJDK-assembly-exception-1.0",
+  "PS-or-PDF-font-exception-20170817",
+  "QPL-1.0-INRIA-2004-exception",
+  "Qt-GPL-exception-1.0",
+  "Qt-LGPL-exception-1.1",
+  "Qwt-exception-1.0",
+  "SHL-2.0-extension",
+  "SHL-2.1",
+  "SWI-exception",
+  "Swift-exception",
+  "Texinfo-exception",
+  "UBDL-exception",
+  "Universal-FOSS-exception-1.0",
+  "WxWindows-exception-3.1",
+  "cryptsetup-OpenSSL-exception",
+  "eCos-exception-2.0",
+  "erlang-otp-linking-exception",
+  "fmt-exception",
+  "freertos-exception-2.0",
+  "gnu-javamail-exception",
+  "i2p-gpl-java-exception",
+  "libpri-OpenH323-exception",
+  "mif-exception",
+  "openvpn-openssl-exception",
+  "romic-exception",
+  "stunnel-exception",
+  "u-boot-exception-2.0",
+  "vsftpd-openssl-exception",
+  "x11vnc-openssl-exception",
+]);
+
 // Maximum size of the `pnpm licenses list --json` stdout buffer. The
 // real-world output for a large monorepo is well under 5 MiB; 64 MiB
 // is a generous ceiling that surfaces overflow as a clean
@@ -283,15 +361,25 @@ const parseAtom = (state) => {
   if (tok === ")") {
     return { type: "fail", reason: 'unexpected ")"' };
   }
-  // `WITH <exception>` keeps the licence atom and drops the exception
-  // identifier — exceptions modify allocation terms but never the
-  // licence allowlist decision.
+  // `WITH <exception>` keeps the licence atom for the allowlist
+  // decision (exceptions modify allocation terms but cannot promote a
+  // permissive licence to copyleft), but only when the exception token
+  // is a known SPDX-registered identifier. Without the membership
+  // check, `MIT WITH totally-made-up` and `MIT WITH OR` would parse as
+  // the bare `MIT` atom and pass the gate — the fail-closed contract
+  // requires denying any unrecognised exception.
   const next = peek(state);
   if (next !== undefined && next.toUpperCase() === "WITH") {
     advance(state);
     const exception = advance(state);
     if (exception === undefined) {
       return { type: "fail", reason: `dangling WITH after "${tok}"` };
+    }
+    if (!SPDX_EXCEPTIONS.has(exception)) {
+      return {
+        type: "fail",
+        reason: `unknown SPDX exception after WITH: ${exception}`,
+      };
     }
     return { type: "atom", value: tok };
   }

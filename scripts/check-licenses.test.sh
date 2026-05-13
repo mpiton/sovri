@@ -526,6 +526,48 @@ JSON
   echo "--input licenses.json"
 }
 
+fx_with_unknown_exception() {
+  # PR #75 Codex P1: an unknown exception token after WITH must be
+  # denied as a parse error, not silently treated as the bare licence
+  # atom. `MIT WITH totally-made-up` previously passed because the
+  # parser stripped any exception identifier without validating it.
+  cat > licenses.json <<'JSON'
+{
+  "MIT WITH totally-made-up": [
+    { "name": "sneaky-with", "versions": ["1.0.0"], "paths": ["/store/sneaky-with"], "license": "MIT WITH totally-made-up" }
+  ]
+}
+JSON
+  echo "--input licenses.json"
+}
+
+fx_with_operator_as_exception() {
+  # Edge of the same Codex P1: `MIT WITH OR` would tokenise the
+  # operator as the exception. Must deny.
+  cat > licenses.json <<'JSON'
+{
+  "MIT WITH OR": [
+    { "name": "with-or-pkg", "versions": ["1.0.0"], "paths": ["/store/with-or-pkg"], "license": "MIT WITH OR" }
+  ]
+}
+JSON
+  echo "--input licenses.json"
+}
+
+fx_with_classpath_allowed() {
+  # Classpath-exception-2.0 is a real SPDX-registered exception, so a
+  # compound like `Apache-2.0 WITH Classpath-exception-2.0` must still
+  # pass.
+  cat > licenses.json <<'JSON'
+{
+  "Apache-2.0 WITH Classpath-exception-2.0": [
+    { "name": "classpath-pkg", "versions": ["1.0.0"], "paths": ["/store/classpath-pkg"], "license": "Apache-2.0 WITH Classpath-exception-2.0" }
+  ]
+}
+JSON
+  echo "--input licenses.json"
+}
+
 # Cases.
 
 # PASS scenarios (exit 0).
@@ -589,6 +631,11 @@ run_case "FAIL-17 trailing OR denied as parse error"       fx_trailing_or_malfor
   "parse error" "unexpected end"
 run_case "FAIL-18 unbalanced ( denied as parse error"      fx_unbalanced_paren           "" 1 "BLOCKED" \
   "parse error"
+run_case "FAIL-19 WITH unknown exception denied"           fx_with_unknown_exception     "" 1 "BLOCKED" \
+  "unknown SPDX exception after WITH" "totally-made-up"
+run_case "FAIL-20 WITH OR operator as exception denied"    fx_with_operator_as_exception "" 1 "BLOCKED" \
+  "unknown SPDX exception after WITH" "OR"
+run_case "PASS-12 WITH Classpath-exception-2.0 allowed"    fx_with_classpath_allowed     "" 0 "OK:"
 
 # Spawn-mode regression tests (no --input flag — exercise the
 # `spawnSync("pnpm", ...)` path). Each shadow-pnpms via PATH so we never
