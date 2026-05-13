@@ -52,8 +52,11 @@ if echo "$STAGED" | grep -qE '(^|/)package\.json$'; then
       # node helper's stdout must not silently disable the guard.
       # pnpm workspaces use a single root lockfile (ADR-002); nested
       # `pnpm-lock.yaml` files are not valid lockfile updates and must not
-      # satisfy this check.
-      if ! printf '%s\n' "$STAGED" | grep -qx 'pnpm-lock\.yaml'; then
+      # satisfy this check. A staged deletion (`git rm pnpm-lock.yaml`)
+      # also fails — the file must remain in the index after the commit
+      # for `pnpm install --frozen-lockfile` to keep working in CI.
+      if ! printf '%s\n' "$STAGED" | grep -qx 'pnpm-lock\.yaml' \
+         || ! git cat-file -e :pnpm-lock.yaml 2>/dev/null; then
         echo "BLOCKED: package.json dependency block changed without an updated pnpm-lock.yaml."
         echo ""
         echo "Correct procedure:"

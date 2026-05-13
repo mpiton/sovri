@@ -38,15 +38,18 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   via `git show`, falling back to a fail-closed `"yes"` outcome if `node`
   is unavailable or errors — including on malformed `package.json` whose
   `JSON.parse` would otherwise be swallowed. Companion
-  `scripts/no-manual-deps.test.sh` runner exercises 26 acceptance scenarios
-  (12 PASS + 14 BLOCK) in isolated temporary git repositories, covering
+  `scripts/no-manual-deps.test.sh` runner exercises 27 acceptance scenarios
+  (12 PASS + 15 BLOCK) in isolated temporary git repositories, covering
   every dependency block, scripts-only edits, brand-new and deleted
   `package.json` files, nested workspace packages, version bumps,
-  removals, malformed JSON, nested `pnpm-lock.yaml` bypass attempts, and
-  each foreign lockfile family. The lockfile satisfaction check is
-  pinned to the repository-root `pnpm-lock.yaml` (a nested
-  `apps/x/pnpm-lock.yaml` does not satisfy it — pnpm workspaces use a
-  single root lockfile per `docs/adr/002-monorepo-pnpm-turborepo.md`).
+  removals, malformed JSON, nested `pnpm-lock.yaml` bypass attempts,
+  staged lockfile deletions, and each foreign lockfile family. The
+  lockfile satisfaction check is pinned to the repository-root
+  `pnpm-lock.yaml` (a nested `apps/x/pnpm-lock.yaml` does not satisfy
+  it — pnpm workspaces use a single root lockfile per
+  `docs/adr/002-monorepo-pnpm-turborepo.md`), and a staged
+  `git rm pnpm-lock.yaml` is rejected via `git cat-file -e :pnpm-lock.yaml`
+  so dependency edits cannot be combined with a lockfile deletion.
 - Pre-commit guard `scripts/no-secrets.sh` (#7) rejecting staged files that
   match known secret-file patterns (`.env`, `.env.<suffix>` except
   `.env.example`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.secret`, `*.creds`,

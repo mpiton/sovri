@@ -376,6 +376,24 @@ setup_pkg_deleted_no_lockfile() {
   git rm -q package.json
 }
 
+setup_deps_added_lockfile_deleted() {
+  # Adversarial: stage a dep edit together with `git rm pnpm-lock.yaml`.
+  # The file name appears in STAGED but the index entry is gone, so any
+  # check that relies on path presence alone would let this through and
+  # break `pnpm install --frozen-lockfile` in CI.
+  write_pkg package.json '{ "name": "demo", "version": "0.0.0" }'
+  echo 'lockfileVersion: 9.0' > pnpm-lock.yaml
+  git add package.json pnpm-lock.yaml
+  git commit -q -m initial
+  write_pkg package.json '{
+  "name": "demo",
+  "version": "0.0.0",
+  "dependencies": { "left-pad": "1.3.0" }
+}'
+  git add package.json
+  git rm -q pnpm-lock.yaml
+}
+
 setup_nested_lockfile_only() {
   # pnpm workspaces use a single root lockfile (ADR-002). A nested
   # `apps/x/pnpm-lock.yaml` staged alongside a root package.json dep change
@@ -432,6 +450,7 @@ run_case "BLOCK-11 bun.lockb staged"              setup_bun_lock_alongside      
 run_case "BLOCK-12 package.json deleted no lock"  setup_pkg_deleted_no_lockfile     1 "BLOCKED: package.json dependency block changed"
 run_case "BLOCK-13 malformed package.json"        setup_malformed_pkg_json          1 "BLOCKED: package.json dependency block changed"
 run_case "BLOCK-14 nested lockfile bypass"        setup_nested_lockfile_only        1 "BLOCKED: package.json dependency block changed"
+run_case "BLOCK-15 deps + lockfile deleted"       setup_deps_added_lockfile_deleted 1 "BLOCKED: package.json dependency block changed"
 
 TOTAL=$((PASS + FAIL))
 echo ""
