@@ -1,0 +1,22 @@
+{
+  "name": "sovri",
+  "version": "0.0.0",
+  "description": "Sovri — EU-sovereign AI code review platform for regulated enterprises.",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=24.0.0 <25.0.0",
+    "pnpm": ">=10.0.0 <11.0.0"
+  },
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mpiton/sovri.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mpiton/sovri/issues"
+  },
+  "homepage": "https://github.com/mpiton/sovri#readme"
+}

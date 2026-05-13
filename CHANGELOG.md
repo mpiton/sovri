@@ -27,6 +27,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   Vitest + MSW testing, tsup bundling, multi-stage Docker on GHCR,
   Apache 2.0 licensing of the Community edition, oxlint + oxfmt for lint and
   format, and lefthook + non-negotiable CI gates.
+- Monorepo root bootstrap (#1): root `package.json` (`"type": "module"`,
+  `"private": true`, `packageManager: pnpm@10.33.2`, Node 24 LTS engines),
+  `.nvmrc` pinning Node `24.11.1`, `.npmrc` with `ignore-scripts=true` +
+  `engine-strict=true` + `auto-install-peers=true` + `save-exact=true` +
+  `strict-peer-dependencies=true`, `.gitignore` covering build artifacts,
+  caches, env files, credentials and foreign lockfiles, and `.gitattributes`
+  enforcing LF line endings on text files.
 
 ---
 

@@ -1,0 +1,73 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Test + coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Caches
+.turbo/
+.cache/
+.eslintcache
+.parcel-cache/
+.vitest-cache/
+.tsc-cache/
+
+# Environment + secrets — see .claude/rules/20-security.md
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.cer
+*.crt
+*.creds
+.npmrc.local
+.pypirc
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# Editor / OS
+.vscode/*
+!.vscode/settings.json.example
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Generated artifacts
+sbom.json
+*.sbom.json
+*.cyclonedx.json
+
+# Runtime / temp
+tmp/
+.tmp/
+*.pid
+*.seed
+*.pid.lock
+
+# Other package managers — refuse silently
+package-lock.json
+yarn.lock
+bun.lockb
+bun.lock
