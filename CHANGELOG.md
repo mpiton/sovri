@@ -21,6 +21,22 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- Pre-commit guard `scripts/no-secrets.sh` (#7) rejecting staged files that
+  match known secret-file patterns (`.env`, `.env.<suffix>` except
+  `.env.example`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.secret`, `*.creds`,
+  `*.aws` including the `.aws/credentials` path, `.netrc`, `.npmrc`,
+  `.pypirc`) and scanning the staged diff for seven API-key prefixes
+  (AWS `AKIA`, Anthropic `sk-ant-`, generic `sk-` permitting `_` and `-`
+  in the body to cover `sk-proj-` and `sk-svcacct-` keys, GitHub `ghp_` and
+  `github_pat_`, GitLab `glpat-`, Google `AIza`). Content matching is
+  case-sensitive on purpose — the prefixes are canonical case — and every
+  `pnpm-lock.yaml` and `package.json` across the monorepo is excluded from
+  the content scan to avoid false positives on lockfile integrity hashes,
+  in line with the local-hook / CI reciprocity rule from
+  `docs/adr/012-lefthook-ci-gates.md`. Portable bash, no GNU-only flags,
+  no Node.js dependency. Companion `scripts/no-secrets.test.sh` runner
+  exercises 34 acceptance scenarios in isolated temporary git
+  repositories.
 - Repository plumbing (#6): `.github/dependabot.yml` enabling weekly
   Dependabot updates for the npm (pnpm-workspace), Docker and GitHub Actions
   ecosystems, with `cooldown.default-days: 7` on each ecosystem (the
