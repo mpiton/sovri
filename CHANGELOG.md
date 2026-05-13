@@ -453,6 +453,93 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `lint:fix`, `format`, `format:check` and `knip` (`--reporter compact`).
   `oxlint@1.64.0`, `oxfmt@0.49.0` and `knip@6.13.1` pinned as root
   devDependencies. Local worktree directories ignored from VCS.
+- Onboarding installer `scripts/install-hooks.sh` (#13) — single-command
+  bash entry point for new contributors that resolves the
+  `pnpm install --frozen-lockfile && pnpm exec lefthook install` sequence
+  pinned in ARCHI §16.2 and prints the `--no-verify` forbidden reminder
+  required by the project rules. Sequence: (1) preflight checks via a
+  `require()` helper for `git`, `node` and `pnpm` — each missing tool
+  yields a `MISSING: <name>` line with an `Install:` hint and aborts the
+  whole script with a single `Missing tools. Install them then re-run`
+  summary so a fresh clone sees every gap at once instead of one error
+  per attempt; (2) repo-root anchoring via `git rev-parse
+  --show-toplevel` (with a `dirname "$0"` fallback when git cannot locate
+  a worktree, e.g. a tarball checkout) so the wrapper is correct under
+  symlinked invocations (`~/bin/sovri-install -> scripts/install-hooks.sh`)
+  and any cwd the caller happened to pick — the naive `cd "$(dirname
+  "$0")/.."` would land one directory above the symlink target and run
+  `pnpm install` against the wrong tree; (3) a Node major-version probe
+  that reads the pinned major from `.nvmrc` (`head -n 1 | cut -d. -f1`,
+  defaulting to `24` when the file is unreadable so a missing `.nvmrc`
+  does not silently disable the warning) and emits a non-blocking
+  warning when the local node is below it, leaving the call site free
+  to proceed under a recent-enough patch release while flagging the
+  drift for follow-up; the probe also tolerates non-numeric `node -p`
+  output (empty string, leading-`v` shims, `nvm` labels) by surfacing a
+  parse-warning and continuing — without this guard the arithmetic
+  `[ "$NODE_MAJOR" -lt 24 ]` would raise `integer expression expected`
+  and `set -euo pipefail` would turn a soft warning into a fatal abort;
+  (4) the install itself with `--frozen-lockfile` (CI parity per the
+  ALWAYS rule in CLAUDE.md) and `--ignore-scripts` (ADR-009 + the
+  mini-shai-hulud surface-reduction stance documented in §9), so a
+  compromised transitive `postinstall` cannot execute during onboarding
+  even though the same install runs unprivileged on a contributor laptop
+  — defence-in-depth on top of `.npmrc`'s global `ignore-scripts=true`
+  so the policy holds even if `.npmrc` is missing or modified; (5)
+  `pnpm exec lefthook install` to materialise the pre-commit + pre-push
+  hook files declared by `lefthook.yml`; (6) a verification step that
+  resolves the hooks directory via `git rev-parse --git-path hooks`
+  (worktree-safe — `.git` is a pointer file, not a directory, in any
+  worktree under `.worktrees/`, and a literal `.git/hooks/` check would
+  falsely fail even when lefthook installed the hooks correctly into
+  the linked gitdir) and then asserts `pre-commit` and `pre-push` both
+  exist by exact filename — `git init` always seeds `*.sample`
+  siblings, so the earlier `ls | grep` pattern from the ARCHI draft
+  would have silently passed even when lefthook installed nothing,
+  hence the swap to two explicit `[ -f ... ]` tests that are
+  POSIX-portable and immune to the false positive. The script is
+  idempotent (every command in the sequence tolerates a clean re-run:
+  `pnpm install --frozen-lockfile` is a no-op on an already-consistent
+  `node_modules/`, `lefthook install` overwrites identical hooks, and
+  the verification check makes no state changes), uses `set -euo
+  pipefail` for fail-fast semantics. No GNU-only flags (`ls -la`,
+  `grep -E`, `command -v`, `head -n 1`, `cut -d. -f1` are all POSIX or
+  POSIX.1-2008), no external dependencies beyond the tools whose
+  presence the script itself verifies. Companion
+  `scripts/install-hooks.test.sh` runner exercises 13 acceptance
+  scenarios in isolated `mktemp -d` git repos with a hermetic
+  `PATH=$repo/bin` built from symlinks to system utilities plus
+  per-case stubs for `pnpm`, `lefthook` and `node` and a real `git`
+  symlink (the wrapper now invokes `git rev-parse` so a noop stub no
+  longer suffices) — a missing tool truly fails `command -v` and a
+  stubbed tool deterministically controls behaviour without ever
+  running a real `pnpm install`. Each case also exports
+  `GIT_CONFIG_GLOBAL=/dev/null` and `GIT_CONFIG_NOSYSTEM=1` so a
+  contributor with `core.hooksPath` set globally (e.g. a personal hooks
+  dir like `~/.claude/git-hooks`) cannot leak into the temp repo and
+  mask a real verification failure — the script picked that path up
+  during initial development and silently exited 0 against an empty
+  `.git/hooks/`. The 13 cases break down as six PASS (happy path with
+  every tool present and `pnpm install --frozen-lockfile
+  --ignore-scripts` flag-forwarding asserted by a strict stub that
+  exits non-zero on a missing flag; idempotent double-run; future-major
+  node 99 with no warning; the install + verify substrings present in
+  stdout; non-numeric `node -p` output `v24` surfaces a
+  `WARNING: could not parse Node major version` and continues to
+  `==> Ready.` without aborting under `set -e`), three WARN (node 20
+  vs pinned-24 emits `WARNING: Node 20`; `.nvmrc` absent falls back to
+  default pin 24 and still warns on node 20; `.nvmrc` pinned to a
+  higher major than the local node — `26.0.0` vs node 24 — emits the
+  bump-ahead warning so a contributor preempting the next LTS bump
+  sees the drift), and four BLOCK (missing git, missing node, missing
+  pnpm each surface their `MISSING: <name>` line and the aggregated
+  `Missing tools. Install them then re-run this script.` summary
+  before exiting 1; a `pnpm exec lefthook install` no-op that leaves
+  the hooks directory empty trips the verification check with
+  `ERROR: hooks not installed`). The runner is bash-only and
+  independent of pnpm/Vitest so it runs anywhere bash + git are
+  available, matching the convention shared with the other
+  `scripts/*.test.sh` guards (#7, #10, #11, #12).
 
 ### Changed
 
