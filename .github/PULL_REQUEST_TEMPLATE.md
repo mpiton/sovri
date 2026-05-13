@@ -2,6 +2,10 @@
 
 <!-- Brief description of the changes -->
 
+## Why
+
+<!-- Explain the motivation: what problem does this solve, what business or technical context drives this change? -->
+
 ## Changes
 
 -
@@ -26,6 +30,9 @@
 - [ ] I have added tests that prove my fix/feature works
 - [ ] New and existing tests pass locally
 - [ ] I have updated the documentation accordingly
+- [ ] CHANGELOG.md updated under [Unreleased] (Keep a Changelog category)
+- [ ] Commit titles follow Conventional Commits with an allow-listed scope (see [CONTRIBUTING.md](../CONTRIBUTING.md))
+- [ ] No git hooks were bypassed (`--no-verify` was not used on commit or push)
 
 ## Screenshots (if applicable)
 

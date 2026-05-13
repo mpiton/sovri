@@ -21,6 +21,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- Repository plumbing (#6): `.github/dependabot.yml` enabling weekly
+  Dependabot updates for the npm (pnpm-workspace), Docker and GitHub Actions
+  ecosystems, with a 7-day cooldown on every semver level
+  (`default-days`, `semver-major-days`, `semver-minor-days`,
+  `semver-patch-days` all set to 7) to satisfy the project's supply-chain
+  delay rule; pull request template enriched with a `## Why` section
+  between Summary and Changes and an explicit `CHANGELOG.md updated under
+  [Unreleased]` checkbox in the contributor checklist.
 - Community health files (#5): root `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, and `CHANGELOG.md` covering contribution workflow,
   conduct expectations and release history, with README and `.github`
@@ -86,6 +94,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Fixed
 
 ### Security
+
+- Enforced a 7-day cooldown before any Dependabot version-update pull
+  request is opened (#6), mitigating the supply-chain timing window for
+  compromised packages highlighted by the May 2026 mini-shai-hulud
+  incident (TanStack, Mistral SDK and OpenSearch compromised). Note that
+  Dependabot security-update PRs bypass cooldown by design; merge-time
+  review remains enforced by branch protection and human approval.
 
 ---
 

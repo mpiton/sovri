@@ -1,0 +1,102 @@
+# GitHub Dependabot v2 configuration
+#
+# This file configures automated dependency updates for three ecosystems:
+# npm (including pnpm), Docker, and GitHub Actions.
+#
+# SUPPLY-CHAIN POLICY - 7-DAY COOLDOWN
+# Every version-update pull request is held back for at least 7 days before
+# Dependabot opens it. The cooldown gives the security community time to
+# detect compromised packages before they land in this codebase, mitigating
+# the supply-chain timing window highlighted by the May 2026
+# mini-shai-hulud incident (TanStack, Mistral SDK, and OpenSearch
+# compromised). See docs/adr/ for the project's supply-chain context.
+#
+# NOTE - cooldown does NOT apply to Dependabot security-update PRs
+# Per GitHub Dependabot v2 design, security advisory PRs bypass cooldown.
+# Merge-time review of security-update PRs is enforced by branch protection
+# and human approval (CODEOWNERS); never enable auto-merge on this repo.
+#
+# NOTE - pnpm uses the npm ecosystem
+# Dependabot does not have a native "pnpm" ecosystem entry. It reads
+# package.json and pnpm-lock.yaml via the "npm" ecosystem, which is correct
+# for monorepos managed with pnpm workspaces.
+#
+# All three ecosystems share the same weekly window (Mon 06:00 Europe/Paris)
+# so dependency updates land in a single triage session. Change all three
+# together or none.
+
+version: 2
+updates:
+  # ── npm (pnpm monorepo) ────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 10
+    # increase-if-necessary preserves exact pins (matches .npmrc save-exact=true);
+    # it bumps the existing exact value rather than widening it to a caret range.
+    versioning-strategy: "increase-if-necessary"
+    assignees:
+      - "mpiton"
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    cooldown:
+      default-days: 7
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      development-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ── Docker ─────────────────────────────────────────────────────────────────
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    assignees:
+      - "mpiton"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    cooldown:
+      default-days: 7
+
+  # ── GitHub Actions ─────────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    assignees:
+      - "mpiton"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    cooldown:
+      default-days: 7
