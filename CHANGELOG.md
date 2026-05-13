@@ -21,6 +21,134 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- License allowlist gate `scripts/check-licenses.mjs` (#12) — Node ESM
+  script intended to be invoked by the `supply-chain` CI job after
+  `pnpm audit --audit-level=high`, mirroring the `allow-licenses` /
+  `deny-licenses` arguments of the `dependency-review-action` step so
+  the same policy is enforced inside the workflow (where
+  `dependency-review-action` only runs on pull requests) as on the
+  default branch. This change ships the script and its test runner
+  only; no `.github/workflows/` files are modified. Reads
+  `pnpm licenses list --json` (or a pre-captured JSON file via the
+  `--input <path>` escape hatch the test harness uses), enumerates
+  every direct + transitive dependency, classifies each bucket key
+  against the allowlist (`Apache-2.0`, `MIT`, `BSD-2-Clause`,
+  `BSD-3-Clause`, `ISC`, `MPL-2.0`, `CC0-1.0`, `Unlicense`,
+  `BlueOak-1.0.0`) and the deny-list (every `AGPL-1.0/3.0-only`,
+  `AGPL-1.0/3.0-or-later`, `GPL-2.0/3.0-only`, `GPL-2.0/3.0-or-later`,
+  `LGPL-2.0/2.1/3.0-only` and `LGPL-2.0/2.1/3.0-or-later` SPDX
+  identifier), and exits non-zero on the first deny match. Contract is
+  `node scripts/check-licenses.mjs [--input <pnpm-licenses-list.json>]`.
+  Exit codes follow the convention shared with the other `scripts/`
+  guards: `0` on success with a one-line
+  `OK: N package(s) across M license bucket(s) — all on allowlist`
+  written to stderr (or `OK: pnpm reported no packages to audit` when
+  the input is the plain-text `No licenses in packages found` sentinel
+  that pnpm emits with `--prod` on an empty install — vacuous pass,
+  there is nothing to audit), `1` on a violation with a `BLOCKED:`
+  stderr message naming the offender count, the allowlist, the denied
+  family, then per-package the name, version, license bucket, reason
+  for denial and install path (issue #12 acceptance: "reports
+  offending packages with their license + path"), and `2` on an
+  infrastructure error (`pnpm licenses list --json` spawn failure or
+  non-zero exit, unreadable `--input` target, malformed JSON, `null`
+  or array root, a bucket value that is not an array, unknown CLI
+  flag, or `--input` with no path argument). The SPDX-expression
+  evaluator handles the subset of SPDX 2.3 Annex D syntax that
+  `pnpm licenses list` can plausibly emit — single SPDX identifiers,
+  `OR` (any allowed branch satisfies — §D.5 recipient-picks-one
+  semantics so `(MIT OR GPL-2.0-only)` passes the gate by selecting
+  MIT), `AND` (every branch must be allowed — §D.6 simultaneous
+  compliance so `MIT AND GPL-2.0-only` is denied), parenthesised
+  grouping (nested groups parsed recursively), `WITH` (exception
+  identifier consumed but ignored — exceptions modify allocation
+  terms, not the allowlist decision so `Apache-2.0 WITH LLVM-exception`
+  passes on the `Apache-2.0` atom), and the legacy `+` suffix from
+  SPDX 2.0 ("or any later version" — kept on the atom for denylist
+  matching so a stale `LGPL-2.1+` declaration still trips the
+  copyleft family guard even though SPDX 2.3 deprecated the operator
+  in favour of `-or-later`). The evaluator falls closed on anything
+  it cannot parse: an unrecognised token, an unbalanced parenthesis,
+  a dangling `WITH`, or trailing tokens after the expression all
+  yield a "cannot parse" denial rather than a vacuous pass. A
+  `collectParseFailure` walker traverses the full tree after the
+  parser returns so an OR short-circuit on a satisfied left branch
+  cannot hide a malformed right branch (`MIT OR <truncated>`
+  denies even though MIT alone would have satisfied — the header's
+  fail-closed promise is preserved end to end). Non-SPDX
+  free-form license strings (`Unknown`, `UNLICENSED`,
+  `SEE LICENSE IN <file>`, `Custom`, `UNDEFINED`) are denied
+  outright because compliance review cannot proceed without a
+  canonical identifier. A separate `COPYLEFT_FAMILY` regex catches
+  any `A?GPL` or `LGPL` prefix (case-insensitive, anchored at the
+  start of the string with no trailing word boundary so non-canonical
+  declarations such as `GPLv2`, `GPLv3`, `LGPLv3`, `GPL2`, `GPL3` and
+  `GPL-2.0-with-classpath-exception` are denied — older npm packages
+  predating SPDX 2.0 ship these forms and the `\b` variant of the
+  regex would let them slip past the family safety net). No
+  permissive identifier in the allowlist starts with the GPL/AGPL/LGPL
+  letters, so dropping the trailing word boundary is safe as defense
+  in depth even if the explicit allowlist is later edited. Per-entry
+  license fields are also classified against the bucket key so a
+  hypothetical pnpm misgrouping (entry's declared `license` disagrees
+  with the bucket it lives in) cannot smuggle a denied package
+  through; verdicts are memoised so a workspace with thousands of MIT
+  packages classifies each unique license string exactly once. No runtime dependencies — `node:fs` + `node:child_process`
+  (for `spawnSync` on the no-argument form) + `node:process` only,
+  ESM via `.mjs`, runs on the Node 24 pinned in `.nvmrc`. Companion
+  `scripts/check-licenses.test.sh` runner exercises 41 acceptance
+  scenarios in isolated `mktemp -d` directories with synthetic
+  pnpm-licenses JSON fixtures: twelve PASS cases (single MIT
+  bucket; multiple allowed buckets aggregated; every allowlist
+  licence as a singleton bucket — covering the count of "9 license
+  bucket(s)"; `(MIT OR Apache-2.0)` dual licence; `MIT OR
+  GPL-2.0-only` OR-picks-allowed-branch; `MIT AND BSD-3-Clause`
+  AND-with-two-allowed-atoms; `Apache-2.0 WITH LLVM-exception`
+  WITH-exception ignored on the allowed atom; nested parentheses
+  `(MIT AND (Apache-2.0 OR BSD-3-Clause))`; empty JSON object;
+  `No licenses in packages found` plain-text sentinel; empty file
+  treated as no packages; `Apache-2.0 WITH Classpath-exception-2.0`
+  honours the SPDX-registered exception list and passes on the
+  `Apache-2.0` atom), twenty FAIL cases (`GPL-3.0-only`,
+  `AGPL-3.0-or-later`, `LGPL-2.1-only`, legacy `LGPL-2.1+` suffix,
+  `MIT AND GPL-2.0-only` AND-with-one-denied-branch,
+  `GPL-2.0-only OR AGPL-3.0-only` OR-with-no-allowed-branch,
+  `Unknown`, `UNLICENSED`, `SEE LICENSE IN LICENSE.md`, a valid SPDX
+  identifier `OFL-1.1` that is simply not on the allowlist, a
+  metadata-completeness regression asserting the BLOCKED message
+  exposes `evil-pkg@1.2.3` + `license: GPL-2.0-only` +
+  `path   : /store/evil-pkg`, and a mixed bucket where two MIT
+  packages pass alongside a denied `GPL-3.0-or-later` package so
+  only the denied entry is counted in `BLOCKED: 1 package(s)`;
+  non-canonical `GPLv2` denied as copyleft family via the
+  no-word-boundary regex; same for `LGPLv3` and `GPL3` short forms;
+  a defense-in-depth case where the bucket key is `MIT` but an entry
+  declares `license: GPL-3.0-only` — the per-entry classification
+  surfaces the disagreement and denies with reason
+  `entry license disagrees with bucket`; trailing `MIT OR` denied as
+  a parse error so the OR short-circuit cannot hide a malformed
+  right branch; unbalanced `(MIT` denied as a parse error;
+  `MIT WITH totally-made-up` denied with reason
+  `unknown SPDX exception after WITH` — the parser now validates the
+  exception token against the SPDX exceptions allowlist instead of
+  stripping any token blindly, closing a bypass where a malformed
+  WITH clause would pass as the bare licence atom — and
+  `MIT WITH OR` similarly denied because the operator collides with
+  what would have to be an exception identifier),
+  and seven ERROR cases (invalid JSON, `null` root, array root,
+  bucket value that is not an array, missing `--input` target,
+  `--input` with no path argument, and an unknown `--bogus`
+  flag rejected), and two SPAWN-mode regression cases that shadow a
+  fake `pnpm` on the PATH to exercise the `spawnSync` branch the
+  `--input` cases cannot reach — one where the fake pnpm self-signals
+  with SIGTERM (asserting the gate refuses to claim a vacuous pass
+  when `status === null` and `signal !== null`, the PR #75 Codex
+  review feedback) and one where the fake pnpm exits non-zero with a
+  stderr message (asserting the existing numeric-status branch
+  surfaces both the exit code and the stderr body). Tests are
+  independent of the host's real pnpm install (the shadow PATH points
+  at the per-case tmp dir) and of `node_modules/` so the script can be
+  validated in any bash + node environment.
 - CI coverage gate `scripts/check-coverage.mjs` (#11) — Node ESM script
   intended to be invoked by the `backend-checks` CI job
   (`docs/adr/012-lefthook-ci-gates.md`) after
