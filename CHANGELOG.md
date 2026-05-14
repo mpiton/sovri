@@ -21,6 +21,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/observability`: `createLogger(name)` factory built on Pino v9 with structured JSON output; reads `LOG_LEVEL`, `LOG_PRETTY`, `SERVICE_NAME`, `SERVICE_VERSION`, `NODE_ENV`; attaches `{ service, version, env }` to every record and `{ component: name }` to child loggers. (#22)
+
 - `@sovri/observability` package scaffold (#21) — Apache 2.0 package that
   anchors the dependency graph entry point for the Pino logger landing in a
   follow-up task. Ships `package.json` (name `@sovri/observability`,
@@ -1138,6 +1140,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `pnpm-workspace.yaml`.
 
 ### Fixed
+
+- `@sovri/observability`: `NODE_ENV` is now compared case-insensitively against `"production"` so mixed-case values disable the pretty transport, and `pino-pretty` resolvability is probed before enabling the transport so production-pruned installs fall back to JSON instead of crashing the worker. (#85)
 
 - `knip.json` now treats `lefthook` as an intentional root tooling dependency,
   matching the hook-manager policy documented in `docs/adr/012-lefthook-ci-gates.md`
