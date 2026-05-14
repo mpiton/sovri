@@ -5,7 +5,8 @@
     "composite": true,
     "rootDir": "./src",
     "outDir": "./.tsbuild",
-    "emitDeclarationOnly": true
+    "emitDeclarationOnly": true,
+    "types": ["node"]
   },
   "include": ["src/**/*"],
   "exclude": ["dist", ".tsbuild", "node_modules", "**/*.test.ts", "**/*.spec.ts"]

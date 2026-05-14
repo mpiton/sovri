@@ -4,9 +4,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyIgnoreRules,
+  computeSeverityRank,
   DiffSchema,
   FileChangeSchema,
   FileChangeStatusSchema,
+  groupFindingsByFile,
   PullRequestSchema,
   ReviewSchema,
   z,
@@ -36,5 +39,20 @@ describe("@sovri/core", () => {
 
   it("exports FileChangeStatusSchema from the package barrel", () => {
     expect(typeof FileChangeStatusSchema.parse).toBe("function");
+  });
+
+  it("exports computeSeverityRank from the package barrel", () => {
+    expect(typeof computeSeverityRank).toBe("function");
+    expect(computeSeverityRank("blocker")).toBe(5);
+  });
+
+  it("exports groupFindingsByFile from the package barrel", () => {
+    expect(typeof groupFindingsByFile).toBe("function");
+    expect(groupFindingsByFile([])).toEqual({});
+  });
+
+  it("exports applyIgnoreRules from the package barrel", () => {
+    expect(typeof applyIgnoreRules).toBe("function");
+    expect(applyIgnoreRules([], [])).toEqual([]);
   });
 });

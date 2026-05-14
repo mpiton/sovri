@@ -25,3 +25,7 @@ export {
   type FileChangeStatus,
   type PullRequest,
 } from "./types/PullRequest.js";
+
+export { computeSeverityRank, type SeverityRank } from "./helpers/severity.js";
+export { groupFindingsByFile } from "./helpers/grouping.js";
+export { applyIgnoreRules } from "./helpers/ignore-rules.js";

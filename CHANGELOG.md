@@ -21,6 +21,66 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/core` domain helpers `computeSeverityRank`,
+  `groupFindingsByFile`, `applyIgnoreRules` (#20) — pure functions used by
+  the review engine and bot to rank, bucket, and filter findings prior to
+  walkthrough rendering. Materialises the three helpers listed in
+  `ARCHI.md` §4.1 as Apache 2.0 source colocated with the existing Zod
+  schemas under `packages/core/src/helpers/`, each paired with its own
+  test file that exercises every branch (vitest reports 100 %
+  statements/branches/functions/lines on the package).
+
+  `computeSeverityRank(severity)` returns a `SeverityRank` literal in the
+  closed interval `1..5` mapping `blocker → 5`, `major → 4`, `minor → 3`,
+  `info → 2`, `nitpick → 1`. The mapping is declared with
+  `as const satisfies Record<Severity, number>` so the compiler refuses
+  to build if a new severity is ever added to `SeveritySchema` without a
+  rank, and so the inferred return type is the literal union rather than
+  the wider `number`.
+
+  `groupFindingsByFile(findings)` returns
+  `Readonly<Record<string, readonly Finding[]>>` with keys in ascending
+  code-point order and findings preserving their original input order
+  within each bucket. Sorting goes through the small exported helper
+  `compareFilePaths(a, b)` so the three-way comparator contract (must
+  return `0` for equal pairs) stays exhaustively tested even though the
+  caller — backed by a `Map` — never actually feeds it duplicate keys.
+  The return type is deeply readonly to prevent downstream consumers
+  from mutating shared buckets, and a regression test pins that file
+  paths equal to `"__proto__"` land as own properties without polluting
+  `Object.prototype`.
+
+  `applyIgnoreRules(findings, ignores)` filters out findings whose
+  `file` matches at least one POSIX glob in `ignores`, returning
+  `readonly Finding[]`. The matcher is `node:path`'s
+  `path.posix.matchesGlob` (marked stable in Node v24.8.0 — the new
+  workspace `engines.node` floor lands in the same PR), which keeps the
+  package at zero runtime dependencies beyond Zod — the project rule
+  forbidding any non-Zod runtime dep is honoured. Surprising semantics
+  worth flagging to reviewers: glob metacharacters in the file path are
+  treated literally (only the second argument is parsed as a pattern),
+  malformed patterns like `[` are silently no-matches rather than
+  throwing, and `**` does not capture leading `../` traversal segments —
+  callers must normalise paths upstream. Each of these behaviours has a
+  dedicated test that pins it against future Node releases.
+
+  `packages/core/src/index.ts` re-exports the three helpers and the
+  `SeverityRank` type from the package barrel; the corresponding smoke
+  tests in `src/index.test.ts` confirm each export is reachable through
+  the public entrypoint after the tsup build.
+
+- `@sovri/core` declares `@types/node` 24.12.4 as a pinned devDependency
+  (#20) and the package `tsconfig.json` opts in to `"types": ["node"]`
+  so the new `node:path` import in `applyIgnoreRules` resolves under
+  TypeScript 6 with `NodeNext` module resolution. The dependency is
+  type-only (no shipped artifact, `files` still ships `dist/` and
+  `README.md` only) so the "Zod uniquement" rule for runtime
+  dependencies remains intact. A follow-up will narrow the type surface
+  via a project-level lint rule banning `node:fs`, `node:net`,
+  `node:http`, `node:os`, and `node:child_process` imports anywhere
+  under `packages/core/` so the compile-time I/O barrier the rule
+  enforces is preserved.
+
 - `@sovri/core` package scaffold (#16) — first real workspace member
   under `packages/*`, materialising the pure-domain layer described in
   `docs/adr/005-zod-runtime-validation.md` and
@@ -1022,6 +1082,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   package barrel.
 
 ### Changed
+
+- Tighten the workspace `engines.node` floor from `>=24.0.0 <25.0.0` to
+  `>=24.8.0 <25.0.0` (#20). The new `applyIgnoreRules` helper relies on
+  `path.posix.matchesGlob`, which the Node maintainers only marked stable
+  in v24.8.0 / v22.20.0 (still experimental on 24.0–24.7.x). Bumping the
+  floor avoids the experimental-API warning on officially supported
+  runtimes and keeps the package contract honest. The matching bump
+  lands in both the workspace root `package.json` and
+  `packages/core/package.json` so `engine-strict=true` in `.npmrc`
+  refuses to install under a pre-stable Node 24.
 
 ### Deprecated
 
