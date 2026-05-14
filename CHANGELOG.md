@@ -23,7 +23,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `@sovri/core` package scaffold (#16) — first real workspace member
   under `packages/*`, materialising the pure-domain layer described in
-  `ARCHI.md` §4.1, `docs/adr/005-zod-runtime-validation.md`, and
+  `docs/adr/005-zod-runtime-validation.md` and
   `docs/adr/008-tsup-bundler.md`. Seven files land together so the
   package is internally consistent on its first commit, and the legacy
   `packages/README.md` placeholder introduced by #15 is removed in the
@@ -160,7 +160,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   runtime dep except `zod`) is satisfied by the `dependencies` block
   containing only `zod@4.4.3`; AC3 (no fs/network/env access in
   source) is satisfied by the re-export-only `src/index.ts` plus the
-  pure-domain policy declared in `ARCHI.md` §4.1 — enforced going
+  pure-domain policy stated in the package README — enforced going
   forward by code review against any future PR that introduces a
   Node built-in import into this package.
 
@@ -175,28 +175,6 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   package; and `pnpm dedupe --check` + `pnpm audit
   --audit-level=high --ignore-registry-errors` continue to pass
   against the expanded lockfile.
-
-### Removed
-
-- Placeholder `packages/README.md` (#16) — closes the loop opened by the
-  same file's #15 introduction. The placeholder explicitly committed to
-  being deleted "in the PR that introduces the first real workspace
-  member" (its line 23 verbatim), and #16's `@sovri/core` scaffold is
-  that member. The deletion is safe because the conditions that made
-  the placeholder necessary in #15 no longer hold: `pnpm turbo build
-  --filter='./packages/*'` now resolves its filter to `@sovri/core`
-  rather than the empty set, so the "Directory ... specified in filter
-  does not exist" abort path is no longer reachable; the universal
-  Apache 2.0 header rule from `docs/adr/010-licence-apache-2.md` is
-  now satisfied by the per-file SPDX headers on every `.ts` source in
-  `packages/core/` and the HTML-comment header in
-  `packages/core/README.md`; and the `packages/` directory remains
-  tracked by `git` because it now contains real source files rather
-  than relying on a marker file. Subsequent package init tasks (#21
-  `observability`, #24 `config`, #27 `llm-providers`, #31
-  `review-engine`) add their own `package.json` under this directory
-  and join the workspace via the unchanged `packages/*` glob in
-  `pnpm-workspace.yaml`.
 
 - Placeholder `packages/README.md` (#15) — creates an empty `packages/`
   directory at the repo root so the pre-push `build` command (`pnpm
@@ -935,6 +913,26 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Deprecated
 
 ### Removed
+
+- Placeholder `packages/README.md` (#16) — closes the loop opened by the
+  same file's #15 introduction. The placeholder explicitly committed to
+  being deleted "in the PR that introduces the first real workspace
+  member" (its line 23 verbatim), and #16's `@sovri/core` scaffold is
+  that member. The deletion is safe because the conditions that made
+  the placeholder necessary in #15 no longer hold: `pnpm turbo build
+  --filter='./packages/*'` now resolves its filter to `@sovri/core`
+  rather than the empty set, so the "Directory ... specified in filter
+  does not exist" abort path is no longer reachable; the universal
+  Apache 2.0 header rule from `docs/adr/010-licence-apache-2.md` is
+  now satisfied by the per-file SPDX headers on every `.ts` source in
+  `packages/core/` and the HTML-comment header in
+  `packages/core/README.md`; and the `packages/` directory remains
+  tracked by `git` because it now contains real source files rather
+  than relying on a marker file. Subsequent package init tasks (#21
+  `observability`, #24 `config`, #27 `llm-providers`, #31
+  `review-engine`) add their own `package.json` under this directory
+  and join the workspace via the unchanged `packages/*` glob in
+  `pnpm-workspace.yaml`.
 
 ### Fixed
 

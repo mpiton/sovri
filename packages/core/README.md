@@ -31,7 +31,6 @@ pnpm symlink tree rather than a per-package devDep.
 
 ## References
 
-- `ARCHI.md` §4.1 — package boundary and dependency rule
 - `docs/adr/005-zod-runtime-validation.md` — runtime validation policy
 - `docs/adr/008-tsup-bundler.md` — bundler choice and tsup config shape
 - `docs/adr/010-licence-apache-2.md` — licensing model and header rule
