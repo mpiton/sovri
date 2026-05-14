@@ -1,0 +1,65 @@
+# lefthook.yml - Sovri Git hooks
+# Docs: https://github.com/evilmartians/lefthook
+# Install: pnpm exec lefthook install (or ./scripts/install-hooks.sh)
+#
+# If a hook blocks without a valid reason: fix the code, NEVER --no-verify.
+
+pre-commit:
+  parallel: true
+  commands:
+    ts-lint:
+      glob: "**/*.{ts,tsx,js,jsx,mjs,cjs}"
+      run: pnpm exec oxlint --no-error-on-unmatched-pattern {staged_files}
+      skip: [merge, rebase]
+      fail_text: "oxlint errors. Run: pnpm exec oxlint --fix . (no oxlint-disable)"
+
+    ts-format:
+      glob: "**/*.{ts,tsx,js,jsx,mjs,cjs,css,json,md,yaml,yml}"
+      run: pnpm exec oxfmt --check --no-error-on-unmatched-pattern {staged_files}
+      skip: [merge, rebase]
+      fail_text: "Format violation. Run: pnpm exec oxfmt ."
+
+    ts-typecheck:
+      glob: "**/*.{ts,tsx}"
+      run: pnpm exec tsc -b --noEmit
+      skip: [merge, rebase]
+      fail_text: "tsc -b fails. Fix type errors before commit (no @ts-ignore)."
+
+    no-secrets:
+      run: ./scripts/no-secrets.sh
+      fail_text: "Secret file or API key pattern detected. Remove before commit."
+
+    no-manual-deps:
+      glob: "{package.json,pnpm-workspace.yaml}"
+      run: ./scripts/no-manual-deps.sh
+      fail_text: "Manual dependency editing forbidden. Use: pnpm add / pnpm update / pnpm remove."
+
+    no-forbidden-tools:
+      run: ./scripts/no-forbidden-tools.sh
+      fail_text: "Forbidden lockfile (package-lock.json, yarn.lock, bun.lockb) or lint config (ESLint, Prettier, Biome) detected."
+
+    boundary-community-cloud:
+      glob: "{packages/**/*.{ts,tsx},apps/community-bot/**/*.{ts,tsx}}"
+      run: ./scripts/check-boundary.sh
+      skip: [merge, rebase]
+      fail_text: "Import from apps/cloud-api/ in public surface (ADR-010 breach)."
+
+    changelog-updated:
+      run: |
+        if git diff --cached --name-only | grep -qE '\.(ts|tsx)$'; then
+          if ! git diff --cached --name-only | grep -q '^CHANGELOG.md$'; then
+            echo "Code modified without CHANGELOG.md entry"
+            echo "Add a line to the [Unreleased] section"
+            exit 1
+          fi
+        fi
+      skip: [merge, rebase]
+      fail_text: "CHANGELOG.md must be updated when code changes."
+
+# Note: the pre-push block specified in ARCHI.md §16.1 (vitest run, tsc -b
+# project build, pnpm audit, pnpm dedupe, knip, turbo build packages) is
+# intentionally deferred. It depends on the TypeScript workspace setup
+# (root tsconfig with project references, vitest devDep, populated
+# packages/) which does not exist in the walking-skeleton state at the
+# time this file lands. It will be wired in a follow-up issue once the
+# upstream infra is in place, preserving the ADR-012 reciprocity rule.

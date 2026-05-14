@@ -21,6 +21,72 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `lefthook.yml` pre-commit wiring (#14) — single source of truth for
+  local Git hooks at the repo root, matching the spec in `ARCHI.md`
+  §16.1 and the ADR-012 reciprocity rule (every CI gate has a matching
+  local hook). Pre-commit declares eight commands running in parallel —
+  `ts-lint` (`pnpm exec oxlint --no-error-on-unmatched-pattern
+  {staged_files}`), `ts-format` (`pnpm exec oxfmt --check
+  --no-error-on-unmatched-pattern {staged_files}`), `ts-typecheck`
+  (`pnpm exec tsc -b --noEmit`), `no-secrets`, `no-manual-deps`,
+  `no-forbidden-tools`, `boundary-community-cloud`, and an inline
+  `changelog-updated` snippet that blocks any staged `.ts`/`.tsx` diff
+  unless `CHANGELOG.md` is staged in the same commit. Hooks that depend
+  on a working tree state (`ts-lint`, `ts-format`, `ts-typecheck`,
+  `boundary-community-cloud`, `changelog-updated`) declare
+  `skip: [merge, rebase]` so merge / rebase commits are not blocked by
+  intermediate states; the guards that scan the index itself
+  (`no-secrets`, `no-manual-deps`, `no-forbidden-tools`) run on every
+  commit. Each command carries an actionable `fail_text` pointing at the
+  exact recovery command. The configuration is loaded by the
+  `pnpm exec lefthook install` invocation already wired into
+  `scripts/install-hooks.sh` (#13), so an onboarding contributor running
+  the installer immediately picks up the new hook set. `lefthook@2.1.6`
+  is added to the root workspace as a `devDependency` via
+  `pnpm add -D -w lefthook` so `pnpm exec lefthook` resolves the binary
+  deterministically against the locked version rather than a
+  globally-installed copy. Note: `ARCHI.md` §16.1 was authored against
+  the lefthook 1.x line; lefthook 2.x ships the same YAML schema for
+  the keys we use (`parallel`, `commands`, `run`, `glob`, `skip`,
+  `fail_text`, `{staged_files}`), so the §16.1 spec is reproduced
+  verbatim and no §16 amendment is required. The pre-push block
+  specified in `ARCHI.md` §16.1 (`vitest run`, `tsc -b` project build,
+  `pnpm audit`, `pnpm dedupe --check`, `knip`, `turbo build packages`)
+  is intentionally deferred to a follow-up issue because it depends on
+  the TypeScript workspace setup (root `tsconfig.json` with project
+  references, `vitest` devDep, populated `packages/`) which does not
+  exist in the walking-skeleton state at the time this file lands; the
+  ADR-012 reciprocity guarantee will be restored once both the
+  pre-push wiring and the matching CI workflows (`backend-checks`,
+  `secrets-scan`, `forbidden-tools`, `forbidden-imports`,
+  `supply-chain`, `changelog-check`) ship in dedicated PRs.
+- Smoke test `scripts/lefthook.test.sh` (#14) — bash runner that asserts
+  the declared shape of `lefthook.yml` against issue #14 acceptance
+  criteria without depending on Vitest. The test fetches a normalised
+  view of the configuration via `pnpm exec lefthook dump`, then asserts:
+  the `pre-commit` block declares `parallel: true`; all eight required
+  `pre-commit` commands are present; every `pre-commit` command carries
+  a `fail_text` field; `skip: [merge, rebase]` is declared on the five
+  commands that need it; `ts-lint` and `ts-format` thread
+  `{staged_files}` into their `run:` line; and the `pre-push` block is
+  intentionally absent (its wiring is deferred to a follow-up issue, so
+  a partial accidental restoration must trip the test). Two functional
+  cases cover the acceptance criteria the declarative checks cannot
+  reach on their own — `oxlint` is invoked directly against a temp `.ts`
+  file containing an `any` annotation to confirm that
+  `typescript/no-explicit-any` is set to `error` in `.oxlintrc.json`
+  (the `ts-lint` hook would surface the same exit code), and the inline
+  `changelog-updated` snippet from `lefthook.yml` is replayed inside an
+  isolated `mktemp -d` git repo across three sub-cases: a staged `.ts`
+  file with no `CHANGELOG.md` staged (expects exit `1` plus the
+  `Code modified without CHANGELOG.md entry` message), the same with
+  `CHANGELOG.md` also staged (expects exit `0`), and a docs-only commit
+  staging just `CHANGELOG.md` (expects exit `0`) so the inverse path
+  cannot wrongly block docs-only diffs. Exit codes follow the project
+  convention shared with the other `scripts/` guards: `0` on full pass,
+  `1` on a policy / spec deviation with the failing assertions listed
+  on stderr, `2` on an infrastructure error (missing `git`/`pnpm`/
+  `node`, missing `lefthook.yml`, or `mktemp` failure).
 - License allowlist gate `scripts/check-licenses.mjs` (#12) — Node ESM
   script intended to be invoked by the `supply-chain` CI job after
   `pnpm audit --audit-level=high`, mirroring the `allow-licenses` /
