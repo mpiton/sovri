@@ -6,7 +6,7 @@
 // in follow-up tasks. v0.1 ships only the package shape so the workspace
 // graph and downstream type wiring are already in place.
 
-import { z } from "zod";
+import { z } from "@sovri/core";
 
 // Re-export the workspace `Severity` and `Logger` types so consumers can
 // already wire `@sovri/config` imports against the same shared types they

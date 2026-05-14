@@ -25,15 +25,19 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   the `.sovri.yml` parser surface landing in follow-up tasks. Ships
   `package.json` (name `@sovri/config`, exact-pinned runtime dependencies
   `zod@4.4.3` and `js-yaml@4.1.1` plus `workspace:*` links to `@sovri/core`
-  and `@sovri/observability`), `tsconfig.json` extending `tsconfig.base.json`,
-  `tsup.config.ts` mirroring the existing package shape, a barrel
-  `src/index.ts` exporting a permissive placeholder `SovriConfigSchema`
-  (`z.object({}).passthrough()`) plus type-only re-exports of `Severity`
-  and `Logger` from the workspace, and a README. Root `tsconfig.json`
-  gains a project reference so `tsc -b` walks the package; `knip.json`
-  gets a workspace block that scopes the entry to `src/index.ts` and
-  whitelists `js-yaml` / `@types/js-yaml` until the loader follow-up
-  consumes them.
+  and `@sovri/observability`), `tsconfig.json` extending `tsconfig.base.json`
+  with composite project references to `@sovri/core` and
+  `@sovri/observability` so `tsc -b` schedules dependency builds first in
+  a clean workspace, `tsup.config.ts` mirroring the existing package
+  shape, a barrel `src/index.ts` exporting a permissive placeholder
+  `SovriConfigSchema` (`z.object({}).passthrough()`) plus type-only
+  re-exports of `Severity` and `Logger` from the workspace, and a README.
+  The barrel imports `z` from `@sovri/core` (not `zod` directly) so the
+  package binds to the workspace's shared Zod instance. Root
+  `tsconfig.json` gains a project reference so `tsc -b` walks the
+  package; `knip.json` gets a workspace block that scopes the entry to
+  `src/index.ts` and whitelists `js-yaml` / `@types/js-yaml` / `zod`
+  (declared per issue requirements but consumed only in follow-up tasks).
 
 - `@sovri/observability`: `createLogger(name)` factory built on Pino v9 with structured JSON output; reads `LOG_LEVEL`, `LOG_PRETTY`, `SERVICE_NAME`, `SERVICE_VERSION`, `NODE_ENV`; attaches `{ service, version, env }` to every record and `{ component: name }` to child loggers. (#22)
 
