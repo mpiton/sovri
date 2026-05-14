@@ -68,7 +68,7 @@ pre-push:
       fail_text: "TypeScript type-check fails."
 
     audit:
-      run: pnpm audit --audit-level=high
+      run: pnpm audit --audit-level=high --ignore-registry-errors
       fail_text: "pnpm audit detected a high or critical vulnerability."
 
     dedupe:

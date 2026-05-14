@@ -417,7 +417,7 @@ assert_yml_run() {
 
 assert_yml_run "ts-test"      "pnpm exec vitest run --passWithNoTests --reporter=default"
 assert_yml_run "ts-typecheck" "pnpm exec tsc -b"
-assert_yml_run "audit"        "pnpm audit --audit-level=high"
+assert_yml_run "audit"        "pnpm audit --audit-level=high --ignore-registry-errors"
 assert_yml_run "dedupe"       "pnpm dedupe --check"
 assert_yml_run "knip"         "pnpm exec knip --reporter compact"
 assert_yml_run "build"        "pnpm turbo build --filter='./packages/*'"

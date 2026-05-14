@@ -44,7 +44,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   parallel — `ts-test` (`pnpm exec vitest run --passWithNoTests
   --reporter=default`), `ts-typecheck` (`pnpm exec tsc -b` — full project
   build, not the `--noEmit` variant used by the same-named pre-commit
-  command), `audit` (`pnpm audit --audit-level=high`), `dedupe` (`pnpm
+  command), `audit` (`pnpm audit --audit-level=high
+  --ignore-registry-errors`), `dedupe` (`pnpm
   dedupe --check`), `knip` (`pnpm exec knip --reporter compact`), and
   `build` (`pnpm turbo build --filter='./packages/*'`) — each carrying
   an actionable `fail_text` pointing at the exact recovery command. No
@@ -85,11 +86,21 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   metadata reads against the locked tree, `knip` against an empty
   workspace returns in well under a second, and `pnpm turbo build
   --filter='./packages/*'` no-ops with the empty filter set until
-  `packages/` is populated. The deferral wording from the #14 entry no
-  longer reflects the repo state once this PR lands; the historical
-  text is kept intact below so the [Unreleased] log reads as a
-  truthful sequence of intent → resolution rather than retroactive
-  rewriting.
+  `packages/` is populated. The `audit` command carries the
+  `--ignore-registry-errors` flag (added as a refinement of the
+  `ARCHI.md` §16.1 verbatim spec after a PR review caught the gap):
+  without it, a transient npm advisory registry outage would propagate
+  as a hard non-zero exit and block every contributor's `git push` for
+  the duration of the outage, even with a perfectly clean lockfile.
+  The pnpm CLI documents the flag as "use exit code 0 if the registry
+  responds with an error" so vulnerability findings still surface as
+  blocking exits while infrastructure failures degrade gracefully. The
+  same flag is applied to the matching CI `supply-chain` job spec in
+  `ARCHI.md` §15.3 so the reciprocity rule is preserved when #49
+  lands. The deferral wording from the #14 entry no longer reflects
+  the repo state once this PR lands; the historical text is kept
+  intact below so the [Unreleased] log reads as a truthful sequence of
+  intent → resolution rather than retroactive rewriting.
 - Smoke test extension `scripts/lefthook.test.sh` (#15) — replaces the
   Section 10 assertion that the `pre-push` block is absent (which #14
   introduced specifically so accidental partial wiring would trip the
