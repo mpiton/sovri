@@ -106,6 +106,7 @@ describe("createLogger", () => {
   });
 
   it("remains usable when LOG_PRETTY=true enables pretty transport", async () => {
+    vi.stubEnv("LOG_LEVEL", "info");
     vi.stubEnv("LOG_PRETTY", "true");
     const { createLogger } = await import("./logger.js");
     const log = createLogger("x");
@@ -145,5 +146,60 @@ describe("createLogger", () => {
     const { createLogger } = await import("./logger.js");
     const log = createLogger("review-engine.orchestrator");
     expect(log.bindings()["component"]).toBe("review-engine.orchestrator");
+  });
+});
+
+describe("buildLoggerOptions", () => {
+  it("includes pino-pretty transport when LOG_PRETTY=true and NODE_ENV is not production", async () => {
+    const { buildLoggerOptions } = await import("./logger.js");
+    const opts = buildLoggerOptions({ LOG_PRETTY: "true", NODE_ENV: "development" });
+    expect(opts.transport).toMatchObject({
+      target: "pino-pretty",
+      options: { colorize: true },
+    });
+  });
+
+  it("omits transport when NODE_ENV=production even with LOG_PRETTY=true", async () => {
+    const { buildLoggerOptions } = await import("./logger.js");
+    const opts = buildLoggerOptions({ LOG_PRETTY: "true", NODE_ENV: "production" });
+    expect(opts.transport).toBeUndefined();
+  });
+
+  it("treats NODE_ENV=Production (mixed case) as production", async () => {
+    const { buildLoggerOptions } = await import("./logger.js");
+    const opts = buildLoggerOptions({ LOG_PRETTY: "true", NODE_ENV: "Production" });
+    expect(opts.transport).toBeUndefined();
+  });
+
+  it("omits transport when LOG_PRETTY is unset", async () => {
+    const { buildLoggerOptions } = await import("./logger.js");
+    const opts = buildLoggerOptions({ NODE_ENV: "development" });
+    expect(opts.transport).toBeUndefined();
+  });
+
+  it("propagates LOG_LEVEL to options.level after lowercasing", async () => {
+    const { buildLoggerOptions } = await import("./logger.js");
+    const opts = buildLoggerOptions({ LOG_LEVEL: "DEBUG" });
+    expect(opts.level).toBe("debug");
+  });
+
+  it("falls back to info level for invalid LOG_LEVEL", async () => {
+    const { buildLoggerOptions } = await import("./logger.js");
+    const opts = buildLoggerOptions({ LOG_LEVEL: "garbage" });
+    expect(opts.level).toBe("info");
+  });
+
+  it("builds base bindings from SERVICE_NAME, SERVICE_VERSION, NODE_ENV", async () => {
+    const { buildLoggerOptions } = await import("./logger.js");
+    const opts = buildLoggerOptions({
+      SERVICE_NAME: "cloud-api",
+      SERVICE_VERSION: "2.0.0",
+      NODE_ENV: "staging",
+    });
+    expect(opts.base).toMatchObject({
+      service: "cloud-api",
+      version: "2.0.0",
+      env: "staging",
+    });
   });
 });
