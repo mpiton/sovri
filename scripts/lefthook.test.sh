@@ -151,10 +151,12 @@ assert_in_dump "ts-format uses {staged_files}" \
 
 # --- 8. AC2: oxlint flags `any` as error -------------------------------------
 
-tmpfile=$(mktemp --tmpdir lefthook-any.XXXXXX.ts) || {
-  echo "INFRA: mktemp failed" >&2
-  exit 2
-}
+# oxlint resolves `.oxlintrc.json` `ignorePatterns` relative to the repo
+# root and panics when handed a path outside the working tree, so the temp
+# `.ts` file must live inside the repo. Use a dot-prefixed name at the root
+# to keep it out of source globs and never conflict with a real file.
+tmpfile="$REPO_ROOT/.lefthook-test-any.ts"
+rm -f "$tmpfile"
 trap 'rm -f "$tmpfile"' EXIT
 
 cat >"$tmpfile" <<'EOF'
@@ -163,15 +165,21 @@ export function offending(input: any): unknown {
 }
 EOF
 
-if (cd "$REPO_ROOT" && pnpm exec oxlint --no-error-on-unmatched-pattern "$tmpfile" >/dev/null 2>&1); then
-  record_fail "AC2: oxlint did NOT flag 'any' (typescript/no-explicit-any must be error)"
-else
+# Assert BOTH non-zero exit AND that the failure mentions the responsible
+# rule (typescript/no-explicit-any) — otherwise a missing oxlint binary or
+# any unrelated lint error would masquerade as AC2 satisfaction.
+ac2_out=$(cd "$REPO_ROOT" && pnpm exec oxlint --no-error-on-unmatched-pattern .lefthook-test-any.ts 2>&1)
+ac2_ec=$?
+if [ "$ac2_ec" -ne 0 ] && printf '%s' "$ac2_out" | grep -q 'no-explicit-any'; then
   record_pass
+else
+  record_fail "AC2: oxlint must flag 'any' via typescript/no-explicit-any (ec=$ac2_ec, out=$(printf '%s' "$ac2_out" | head -1))"
 fi
+rm -f "$tmpfile"
 
 # --- 9. AC3: changelog-updated snippet blocks TS-only commits ----------------
 
-scratch=$(mktemp -d 2>/dev/null) || {
+scratch=$(mktemp -d 2>/dev/null || mktemp -d -t 'lefthook-changelog') || {
   echo "INFRA: mktemp -d failed" >&2
   exit 2
 }
