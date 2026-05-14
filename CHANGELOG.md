@@ -21,6 +21,18 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- Minimal root `tsconfig.json` (#14) extending `tsconfig.base.json`
+  with `files: []` and `references: []`. Acts as a placeholder
+  aggregator so `pnpm exec tsc -b --noEmit` invoked by the
+  `ts-typecheck` pre-commit hook exits `0` in the walking-skeleton
+  state. Without it, `tsc -b` looks for a root project file, falls
+  back through `tsconfig.base.json` resolution, and emits `TS5083:
+  Cannot read file '.../tsconfig.json'` the first time a contributor
+  stages a `.ts` file in a subdirectory after this PR lands. Each
+  package init task (#21, #24, #27, #31, #39) will extend this file by
+  appending a `{ "path": "<package>" }` entry to `references` as its
+  `tsconfig.json` lands, so the root file evolves into the real
+  project graph without further migration.
 - `lefthook.yml` pre-commit wiring (#14) — single source of truth for
   local Git hooks at the repo root, matching the spec in `ARCHI.md`
   §16.1 and the ADR-012 reciprocity rule (every CI gate has a matching
