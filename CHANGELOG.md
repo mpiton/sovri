@@ -908,6 +908,46 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   anywhere bash + git are available, matching the convention shared
   with the other `scripts/*.test.sh` guards (#7, #10, #11, #12).
 
+- `@sovri/core` exports `SeveritySchema`, `CategorySchema`, and `FindingSchema`
+  Zod schemas plus their inferred TypeScript types (`Severity`, `Category`,
+  `Finding`) (#17), implementing the pure-domain Finding shape described in
+  `ARCHI.md` §6.1. The schemas live in `packages/core/src/types/Finding.ts`
+  and are re-exported from the package barrel `packages/core/src/index.ts`.
+  `SeveritySchema` is a five-value enum (`blocker | major | minor | info |
+  nitpick`) ordered by impact; `CategorySchema` is a seven-value taxonomy
+  (`bug | security | performance | maintainability | style | documentation |
+  test-coverage`); `FindingSchema` validates the structured review output
+  shared between LLM-derived and SARIF-ingested findings — `id` is a UUID
+  (Zod 4 `z.uuid()` format, replacing the now-deprecated `z.string().uuid()`
+  chain shown verbatim in the ARCHI sample), `file` is a non-empty string,
+  `line_start`/`line_end` are positive integers, `title` is bounded at
+  1..200 characters, `body` at 1..2000, `source` is the `"llm" | "sarif"`
+  origin enum, `confidence` is a 0..1 inclusive float, and the optional
+  `suggestion` (`{ code, committable }`) and `cwe` (`/^CWE-\d+$/`) fields
+  cover patch suggestions and SARIF-security cross-references respectively.
+  Both `z.infer<typeof FindingSchema>` (the exported `Finding` type) and the
+  hand-written field shape are kept in sync by deriving the type from the
+  schema rather than declaring them independently, per the ADR-005 "Zod is
+  the runtime source of truth" rule. The accompanying
+  `packages/core/src/types/Finding.test.ts` file ships 77 Vitest cases that
+  cover each enum value end-to-end, every length and range boundary
+  (inclusive accept + 1-off reject), the optional/absent code paths for
+  `suggestion` and `cwe`, the regex anchoring of CWE identifiers (rejecting
+  lowercase prefixes, missing digits, and trailing garbage), each required
+  field omission, and the type-inference round-trip (`Finding` → parse →
+  equal). Coverage on `Finding.ts` is 100 % statements / 100 % lines /
+  100 % branches (the file declares only top-level schema constants, so
+  Istanbul counts 5/5 statements and 0/0 branches), satisfying issue #17's
+  acceptance criterion. The infrastructure change required to surface that
+  number — adding `@vitest/coverage-v8@4.1.6` and
+  `@vitest/coverage-istanbul@4.1.6` as workspace devDependencies pinned to
+  the same exact version as the `vitest@4.1.6` already at the root, so the
+  three packages share a single peer-dependency identity and `pnpm
+  --filter @sovri/core exec vitest run --coverage` resolves without a
+  `MISSING DEPENDENCY` failure — is covered in this same entry rather than
+  carved out separately because it has no value outside the schema test
+  suite it unblocks.
+
 ### Changed
 
 ### Deprecated
