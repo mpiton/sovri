@@ -21,6 +21,161 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/core` package scaffold (#16) — first real workspace member
+  under `packages/*`, materialising the pure-domain layer described in
+  `docs/adr/005-zod-runtime-validation.md` and
+  `docs/adr/008-tsup-bundler.md`. Seven files land together so the
+  package is internally consistent on its first commit, and the legacy
+  `packages/README.md` placeholder introduced by #15 is removed in the
+  same PR (see the matching `### Removed` entry below).
+
+  `packages/core/package.json` declares `name: "@sovri/core"`,
+  `version: "0.1.0"`, `private: true`, `license: "Apache-2.0"`,
+  `type: "module"`, `sideEffects: false` (per
+  `docs/adr/008-tsup-bundler.md` "Tree-shaking" rationale, so downstream
+  bundlers can prove the re-export is side-effect-free), an `exports`
+  map pointing at `./dist/index.js` + `./dist/index.d.ts` (the two
+  artifacts the issue #16 acceptance criteria require
+  `pnpm --filter @sovri/core build` to produce), `files: ["dist",
+  "README.md"]` so the published tarball stays minimal, `engines`
+  mirroring the root (`node >=24.0.0 <25.0.0`, `pnpm >=10.0.0 <11.0.0`),
+  and four scripts (`build` → `tsup`, `test` →
+  `vitest run --passWithNoTests`, `lint` →
+  `oxlint . --max-warnings=0 --no-error-on-unmatched-pattern`,
+  `typecheck` → `tsc -b --noEmit`) that match the four Turborepo
+  pipelines declared at `turbo.json` lines 5-44 so
+  `pnpm turbo build|test|lint|typecheck` resolve per-package without
+  further wiring. The legacy `main` and `types` top-level keys are
+  intentionally omitted — `exports."."` is the single source of truth
+  for both the JS and types resolutions, and any future shape change
+  there will not silently leave a stale duplicate behind.
+
+  `packages/core/tsconfig.json` extends `../../tsconfig.base.json` and
+  adds `composite: true` (required for TypeScript project references —
+  without it the new `{ "path": "./packages/core" }` entry added to the
+  root `tsconfig.json` `references` array is silently skipped by
+  `tsc -b` and the pre-commit `ts-typecheck` hook would pass against a
+  broken package), `rootDir: "./src"`, `outDir: "./.tsbuild"`, and
+  `emitDeclarationOnly: true`. The non-default `outDir` matters: the
+  pre-push lefthook block runs `tsc -b` (full emit) and
+  `pnpm turbo build` (which invokes tsup) in parallel, and if both
+  emitters share `./dist` they race on the same files. Pointing tsc at
+  `./.tsbuild` (added to `.gitignore` alongside the existing `dist/`
+  rule) leaves tsup as the sole writer to `./dist` and the package's
+  declared `exports` paths, eliminating the race entirely.
+  `emitDeclarationOnly: true` skips the unused tsc-side `.js` emit
+  since tsup owns the JS bundle. `exclude: ["dist", ".tsbuild",
+  "node_modules", "**/*.test.ts", "**/*.spec.ts"]` keeps tsc focused on
+  production sources (test files are still type-checked through
+  Vitest's runner-side TypeScript pass against the same compiler
+  options).
+
+  `packages/core/tsup.config.ts` matches the ADR-008 sample
+  (`format: ['esm']`, `dts: …`, `clean: true`, `sourcemap: true`,
+  `treeshake: true`) and adds two explicit overrides documented by the
+  current tsup 8.x docs — `splitting: false` (the ESM default is
+  `true`, which would emit chunk files alongside `index.js` and break
+  the single-artifact contract the `exports` map declares) and
+  `outDir: 'dist'` (defaulted but stated explicitly so Turborepo's
+  `outputs: ["dist/**"]` cache rule and the `package.json` `exports`
+  map agree without ambiguity). The `dts` option is itself an object
+  with `compilerOptions` overriding `composite`, `incremental`, and
+  `ignoreDeprecations` only for the dts pass: tsup's internal
+  declaration emit cannot share the workspace's composite/incremental
+  flags (the former would force a separate `.tsbuildinfo` write, the
+  latter would surface as a TS 6 deprecation error against the
+  `baseUrl` value tsup injects), so the override keeps those two
+  concerns scoped to the dts pass without leaking into the rest of the
+  workspace's `tsc -b` graph. An esbuild `target` is intentionally
+  not set at the tsup level — tsup picks up `target: "ES2023"` from
+  `tsconfig.base.json` automatically (visible as `CLI Target: es2023`
+  in the build log), which is the correct downlevel target for the
+  Node 24 LTS runtime declared in `engines`. A separate
+  `target: "node24"` override would be redundant. The current tsup
+  8.5.x build emits a benign duplicate `//# sourceMappingURL=`
+  directive at the end of `dist/index.js` (last-wins per V8 / Chrome
+  / Node source-map resolver behaviour, functionally a no-op);
+  tracked for cleanup against tsup upstream as a separate follow-up
+  before the first observability artifact ingests these source maps
+  in v0.5+.
+
+  `packages/core/src/index.ts` re-exports `z` from `zod` so every
+  Sovri workspace member (`@sovri/review-engine`, `@sovri/config`,
+  `@sovri/llm-providers`, `@sovri/observability`, the bot, and the
+  Cloud API once it exists) binds to the same Zod instance — this
+  removes a class of subtle bugs in which two copies of Zod treat
+  identically-shaped schemas as structurally unequal. The file is
+  otherwise empty: domain-specific types and schemas land in
+  subsequent issues against this package. The Apache 2.0 SPDX header
+  appears on lines 1-2 per the universal rule in
+  `docs/adr/010-licence-apache-2.md`.
+
+  `packages/core/src/index.test.ts` is a single Vitest assertion that
+  the re-exported `z` is a functional Zod instance — it checks the
+  identity of the namespace (`typeof z === "object"`) and the
+  callability of `z.string` (`typeof z.string === "function"`). The
+  test verifies the package's wiring without re-testing Zod's own
+  validation contract (that is owned upstream); it will grow into
+  real coverage when the first domain schema lands in a subsequent
+  issue.
+
+  `packages/core/README.md` documents the scope ("types and Zod
+  schemas only — zero I/O"), explains the workspace-relative script
+  invocation convention (`pnpm --filter @sovri/core <script>` rather
+  than direct `cd && tsc`), and links back to the public sources of
+  truth: `ARCHI.md` §4.1, `docs/adr/005-zod-runtime-validation.md`,
+  `docs/adr/008-tsup-bundler.md`, and
+  `docs/adr/010-licence-apache-2.md`.
+
+  Dependencies: the package's `devDependencies` block carries
+  `tsup@8.5.1` (build) and `vitest@4.1.6` (test runner — vitest is
+  imported by `index.test.ts` source, so it must be declared directly
+  in the package, not relied on via root hoisting since `.npmrc` does
+  not set `node-linker=hoisted`). The `dependencies` block carries
+  `zod@4.4.3` as the only runtime dep — matching the issue #16
+  acceptance criterion "no runtime dep except zod" and
+  `docs/adr/005-zod-runtime-validation.md` which establishes Zod as
+  the single runtime validation library. All three additions were
+  performed via `pnpm add --filter @sovri/core` (the only channel the
+  `no-manual-deps.sh` pre-commit hook from #14 accepts), with
+  `.npmrc save-exact=true` enforcing the exact pin (no `^` / `~`
+  range operators) that ADR-005 and ADR-008 require for SDK-class
+  dependencies in the post-mini-shai-hulud threat model.
+
+  `typescript` is intentionally not added as a per-package devDep:
+  the package's `typecheck` script invokes `tsc` via `pnpm exec`,
+  which walks the workspace symlink tree and resolves to the single
+  root `typescript@6.0.3` entry. Adding a per-package copy would
+  invite version drift that `pnpm dedupe --check` (a pre-push gate)
+  flags as a duplicate, and the binary-only usage does not require
+  resolvable imports the way `vitest` and `tsup` do. The same logic
+  applies to `oxlint` and `oxfmt`. The convention is documented in
+  the package README so future contributors do not invoke
+  `cd packages/core && tsc` directly and get confused by the
+  resolution failure.
+
+  Acceptance criteria coverage: AC1 (`pnpm --filter @sovri/core
+  build` produces `dist/index.js` + `dist/index.d.ts`) is satisfied
+  by the tsup config + scripts wiring described above; AC2 (no
+  runtime dep except `zod`) is satisfied by the `dependencies` block
+  containing only `zod@4.4.3`; AC3 (no fs/network/env access in
+  source) is satisfied by the re-export-only `src/index.ts` plus the
+  pure-domain policy stated in the package README — enforced going
+  forward by code review against any future PR that introduces a
+  Node built-in import into this package.
+
+  Walking-skeleton invariants from #15 still hold after this PR:
+  `pnpm turbo build --filter='./packages/*'` now resolves to a
+  non-empty filter set and executes a real `tsup` build that
+  completes in well under a second; `pnpm exec vitest run
+  --passWithNoTests` runs one passing test instead of no-opping;
+  `pnpm exec tsc -b` walks the new project reference graph and emits
+  a `.tsbuildinfo` for `packages/core`; `pnpm exec knip --reporter
+  compact` reports zero unused exports/files/deps against the new
+  package; and `pnpm dedupe --check` + `pnpm audit
+  --audit-level=high --ignore-registry-errors` continue to pass
+  against the expanded lockfile.
+
 - Placeholder `packages/README.md` (#15) — creates an empty `packages/`
   directory at the repo root so the pre-push `build` command (`pnpm
   turbo build --filter='./packages/*'`) resolves its filter to an
@@ -758,6 +913,26 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Deprecated
 
 ### Removed
+
+- Placeholder `packages/README.md` (#16) — closes the loop opened by the
+  same file's #15 introduction. The placeholder explicitly committed to
+  being deleted "in the PR that introduces the first real workspace
+  member" (its line 23 verbatim), and #16's `@sovri/core` scaffold is
+  that member. The deletion is safe because the conditions that made
+  the placeholder necessary in #15 no longer hold: `pnpm turbo build
+  --filter='./packages/*'` now resolves its filter to `@sovri/core`
+  rather than the empty set, so the "Directory ... specified in filter
+  does not exist" abort path is no longer reachable; the universal
+  Apache 2.0 header rule from `docs/adr/010-licence-apache-2.md` is
+  now satisfied by the per-file SPDX headers on every `.ts` source in
+  `packages/core/` and the HTML-comment header in
+  `packages/core/README.md`; and the `packages/` directory remains
+  tracked by `git` because it now contains real source files rather
+  than relying on a marker file. Subsequent package init tasks (#21
+  `observability`, #24 `config`, #27 `llm-providers`, #31
+  `review-engine`) add their own `package.json` under this directory
+  and join the workspace via the unchanged `packages/*` glob in
+  `pnpm-workspace.yaml`.
 
 ### Fixed
 
