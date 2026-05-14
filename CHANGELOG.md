@@ -32,9 +32,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   compile time (no runtime symbols yet — `unicorn/require-module-specifiers`
   rejects a bare `export {}` and the type-only re-export keeps the file a
   valid TS module under `isolatedModules`), an `src/index.test.ts` that
-  asserts the barrel resolves at runtime and that the exported `Logger`
-  type structurally equals `pino`'s `Logger`, and a README pointing at
-  ADR-006. Per ADR-006 no `@opentelemetry/*` dependency is introduced —
+  asserts the barrel resolves at runtime via `expect(...).toBeTypeOf` (the
+  runtime check `expectTypeOf` cannot provide without `vitest --typecheck`)
+  and that the exported `Logger` type structurally equals `pino`'s `Logger`
+  via `expectTypeOf`, and a README pointing at ADR-006. Per ADR-006 no `@opentelemetry/*` dependency is introduced —
   OpenTelemetry SDK 2.0 is intentionally deferred to v0.5 and lands
   alongside the `createLogger` factory described in `ARCHI.md` §4.5
   without breaking the package's public API. The root `tsconfig.json`

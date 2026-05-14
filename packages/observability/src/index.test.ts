@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { describe, expectTypeOf, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type { Logger as PinoLogger } from "pino";
 
@@ -10,7 +10,8 @@ import type { Logger } from "./index.js";
 
 describe("@sovri/observability", () => {
   it("barrel module resolves at runtime", () => {
-    expectTypeOf(observability).toBeObject();
+    expect(observability).toBeTypeOf("object");
+    expect(observability).not.toBeNull();
   });
 
   it("re-exports Pino's Logger type unchanged", () => {

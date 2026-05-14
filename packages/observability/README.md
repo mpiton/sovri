@@ -17,10 +17,13 @@ task.
 
 ## Scope
 
-- **v0.1** — Pino structured JSON logger, `LOG_LEVEL` env override, optional
-  pretty-print via `LOG_PRETTY=true`. Public export: `createLogger`.
-- **v0.5+** — OpenTelemetry SDK 2.0 auto-instrumentation, OTLP exporter, Pino
-  ↔ trace id correlation. Adds `initTelemetry` / `shutdownTelemetry` /
+- **v0.1 (current scaffold)** — package wiring and a type-only `Logger`
+  barrel re-export from `pino`. No runtime symbols yet.
+- **v0.1 (follow-up task)** — Pino structured JSON logger, `LOG_LEVEL` env
+  override, optional pretty-print via `LOG_PRETTY=true`. Adds the
+  `createLogger` runtime export described in `ARCHI.md` §4.5.
+- **v0.5+** — OpenTelemetry SDK 2.0 auto-instrumentation, OTLP exporter,
+  Pino ↔ trace id correlation. Adds `initTelemetry` / `shutdownTelemetry` /
   `withSpan` / `recordMetric` exports without changing `createLogger`.
 
 Out of scope: GitHub clients, LLM providers, file I/O outside the Pino
