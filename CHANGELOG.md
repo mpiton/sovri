@@ -19,6 +19,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Security
+
+- `@sovri/observability`: Pino `redact` option strips GitHub tokens, LLM API keys, webhook secrets, GitHub App private keys, and authorization headers from every log record (top-level + nested + wildcard one-level paths). Censor is the literal `[Redacted]`. Child loggers inherit the policy. Path source of truth: `REDACT_PATHS` in `packages/observability/src/logger.ts`. Closes #23. (`ARCHI.md` §9.2, CLAUDE.md NEVER rule on token logging.)
+
 ### Added
 
 - `@sovri/observability`: `createLogger(name)` factory built on Pino v9 with structured JSON output; reads `LOG_LEVEL`, `LOG_PRETTY`, `SERVICE_NAME`, `SERVICE_VERSION`, `NODE_ENV`; attaches `{ service, version, env }` to every record and `{ component: name }` to child loggers. (#22)

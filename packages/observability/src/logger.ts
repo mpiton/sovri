@@ -34,6 +34,38 @@ function isPinoPrettyAvailable(): boolean {
   }
 }
 
+// Pino redact path set. The list lives in source rather than env or config
+// because Pino compiles these paths once at logger creation and the
+// Enterprise audit story requires the redacted surface to be auditable in
+// a single grep. Grouped by secret family (auth header, API keys, GitHub
+// tokens, crypto material, generic secrets). Wildcard variants (`*.foo`)
+// catch the key one level deeper than the explicit nested path
+// (`headers.authorization`); the explicit form is kept for grep-auditability
+// even though `*.X` already covers it. Pino paths are CASE-SENSITIVE — see
+// the README "Limitations" section before logging objects from unknown
+// shapes.
+export const REDACT_PATHS = [
+  // HTTP authorization header
+  "authorization",
+  "*.authorization",
+  "headers.authorization",
+  // LLM provider API keys (BYOK)
+  "apiKey",
+  "*.apiKey",
+  "api_key",
+  // GitHub tokens
+  "token",
+  "*.token",
+  "installation.token",
+  // GitHub App crypto material
+  "pem",
+  "privateKey",
+  // Generic secrets and webhook signing keys
+  "secret",
+  "webhook_secret",
+  "*.webhook_secret",
+] as const;
+
 /**
  * Build the Pino options object from an environment snapshot.
  * Exported for direct unit testing of the option-building logic
@@ -58,11 +90,11 @@ export function buildLoggerOptions(env: NodeJS.ProcessEnv = process.env): Logger
       version: envOrDefault(env.SERVICE_VERSION, "0.0.0"),
       env: nodeEnvRaw,
     },
+    redact: { paths: [...REDACT_PATHS], censor: "[Redacted]" },
     ...(isPretty ? { transport: { target: "pino-pretty", options: { colorize: true } } } : {}),
   };
 }
 
-// TODO(#23): wire pino-redact for secret paths before any handler emits webhook payloads.
 const rootLogger = pino(buildLoggerOptions());
 
 export type Logger = PinoLogger;
