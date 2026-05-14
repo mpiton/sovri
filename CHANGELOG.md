@@ -463,12 +463,15 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   whole script with a single `Missing tools. Install them then re-run`
   summary so a fresh clone sees every gap at once instead of one error
   per attempt; (2) repo-root anchoring via `git rev-parse
-  --show-toplevel` (with a `dirname "$0"` fallback when git cannot locate
-  a worktree, e.g. a tarball checkout) so the wrapper is correct under
-  symlinked invocations (`~/bin/sovri-install -> scripts/install-hooks.sh`)
-  and any cwd the caller happened to pick — the naive `cd "$(dirname
-  "$0")/.."` would land one directory above the symlink target and run
-  `pnpm install` against the wrong tree; (3) a Node major-version probe
+  --show-toplevel` after resolving `BASH_SOURCE[0]` through any chain of
+  symlinks via a POSIX `readlink` loop (no GNU `readlink -f` dependency)
+  so a contributor PATH-shim like `~/bin/sovri-install ->
+  scripts/install-hooks.sh` lands on the real script directory — `dirname
+  "$0"` alone would have yielded the symlink's parent (`~/bin/`), git
+  rev-parse would then fail outside the repo and the fallback would run
+  `pnpm install` against the wrong tree; the `dirname "$SCRIPT_DIR"`
+  fallback only kicks in when git itself cannot locate a worktree (e.g.
+  running from a tarball checkout); (3) a Node major-version probe
   that reads the pinned major from `.nvmrc` (`head -n 1 | cut -d. -f1`,
   defaulting to `24` when the file is unreadable so a missing `.nvmrc`
   does not silently disable the warning) and emits a non-blocking
@@ -493,11 +496,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   worktree under `.worktrees/`, and a literal `.git/hooks/` check would
   falsely fail even when lefthook installed the hooks correctly into
   the linked gitdir) and then asserts `pre-commit` and `pre-push` both
-  exist by exact filename — `git init` always seeds `*.sample`
-  siblings, so the earlier `ls | grep` pattern from the ARCHI draft
-  would have silently passed even when lefthook installed nothing,
-  hence the swap to two explicit `[ -f ... ]` tests that are
-  POSIX-portable and immune to the false positive. The script is
+  exist by exact filename AND carry the executable bit — `git init`
+  always seeds `*.sample` siblings, so the earlier `ls | grep` pattern
+  from the ARCHI draft would have silently passed even when lefthook
+  installed nothing, hence the swap to four explicit `[ -f ... ]` +
+  `[ -x ... ]` tests that are POSIX-portable, immune to the false
+  positive, and catch the second-order regression where the files
+  exist but `git` silently skips them because the executable bit is
+  unset (umask collision, FUSE filesystem, etc.). The script is
   idempotent (every command in the sequence tolerates a clean re-run:
   `pnpm install --frozen-lockfile` is a no-op on an already-consistent
   `node_modules/`, `lefthook install` overwrites identical hooks, and
@@ -506,7 +512,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `grep -E`, `command -v`, `head -n 1`, `cut -d. -f1` are all POSIX or
   POSIX.1-2008), no external dependencies beyond the tools whose
   presence the script itself verifies. Companion
-  `scripts/install-hooks.test.sh` runner exercises 13 acceptance
+  `scripts/install-hooks.test.sh` runner exercises 15 acceptance
   scenarios in isolated `mktemp -d` git repos with a hermetic
   `PATH=$repo/bin` built from symlinks to system utilities plus
   per-case stubs for `pnpm`, `lefthook` and `node` and a real `git`
@@ -519,27 +525,34 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   dir like `~/.claude/git-hooks`) cannot leak into the temp repo and
   mask a real verification failure — the script picked that path up
   during initial development and silently exited 0 against an empty
-  `.git/hooks/`. The 13 cases break down as six PASS (happy path with
-  every tool present and `pnpm install --frozen-lockfile
+  `.git/hooks/`. The 15 cases break down as seven PASS (happy path
+  with every tool present and `pnpm install --frozen-lockfile
   --ignore-scripts` flag-forwarding asserted by a strict stub that
   exits non-zero on a missing flag; idempotent double-run; future-major
   node 99 with no warning; the install + verify substrings present in
   stdout; non-numeric `node -p` output `v24` surfaces a
   `WARNING: could not parse Node major version` and continues to
-  `==> Ready.` without aborting under `set -e`), three WARN (node 20
-  vs pinned-24 emits `WARNING: Node 20`; `.nvmrc` absent falls back to
-  default pin 24 and still warns on node 20; `.nvmrc` pinned to a
-  higher major than the local node — `26.0.0` vs node 24 — emits the
-  bump-ahead warning so a contributor preempting the next LTS bump
-  sees the drift), and four BLOCK (missing git, missing node, missing
-  pnpm each surface their `MISSING: <name>` line and the aggregated
-  `Missing tools. Install them then re-run this script.` summary
-  before exiting 1; a `pnpm exec lefthook install` no-op that leaves
-  the hooks directory empty trips the verification check with
-  `ERROR: hooks not installed`). The runner is bash-only and
-  independent of pnpm/Vitest so it runs anywhere bash + git are
-  available, matching the convention shared with the other
-  `scripts/*.test.sh` guards (#7, #10, #11, #12).
+  `==> Ready.` without aborting under `set -e`; an out-of-repo PATH-shim
+  symlink — `/tmp/.../sovri-install -> $repo/scripts/install-hooks.sh`
+  — invoked from outside the worktree still lands on the real repo
+  root via the `BASH_SOURCE`+`readlink` loop, proving the symlink fix
+  actually works rather than just being a comment), three WARN
+  (node 20 vs pinned-24 emits `WARNING: Node 20`; `.nvmrc` absent
+  falls back to default pin 24 and still warns on node 20; `.nvmrc`
+  pinned to a higher major than the local node — `26.0.0` vs node 24
+  — emits the bump-ahead warning so a contributor preempting the next
+  LTS bump sees the drift), and five BLOCK (missing git, missing node,
+  missing pnpm each surface their `MISSING: <name>` line and the
+  aggregated `Missing tools. Install them then re-run this script.`
+  summary before exiting 1; a `pnpm exec lefthook install` no-op that
+  leaves the hooks directory empty trips the verification check with
+  `ERROR: hooks not installed`; hook files written without the
+  executable bit trip the same check with the augmented `(or not
+  executable)` message — defends against umask/FS-driven regressions
+  where the files exist but git silently refuses to run them). The
+  runner is bash-only and independent of pnpm/Vitest so it runs
+  anywhere bash + git are available, matching the convention shared
+  with the other `scripts/*.test.sh` guards (#7, #10, #11, #12).
 
 ### Changed
 

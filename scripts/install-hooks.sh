@@ -29,11 +29,26 @@ if [ "$missing" -eq 1 ]; then
   exit 1
 fi
 
-# Anchor at the repo root via git rather than `dirname "$0"`: handles symlinked
-# invocations (e.g. `~/bin/sovri-install` PATH-shim) and any cwd the caller
-# happened to pick. Falls back to the directory containing this script when
-# git cannot locate a worktree (e.g. running from a tarball checkout).
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+# Anchor at the repo root via git rather than `dirname "$0"`: handles any cwd
+# the caller happened to pick. Falls back to the directory containing this
+# script when git cannot locate a worktree (e.g. running from a tarball
+# checkout). First resolve `BASH_SOURCE[0]` through any chain of symlinks so
+# a PATH-shim like `~/bin/sovri-install -> .../scripts/install-hooks.sh`
+# lands on the real script directory — `dirname "$0"` alone would yield the
+# symlink's parent (`~/bin/`), git rev-parse would then fail outside the
+# repo and the fallback would run `pnpm install` in the wrong tree. POSIX
+# `readlink` (no `-f`) is used so the resolution does not depend on GNU
+# coreutils.
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  LINK_DIR=$(cd -P "$(dirname "$SOURCE")" && pwd)
+  SOURCE=$(readlink "$SOURCE")
+  case "$SOURCE" in
+    /*) ;;
+    *) SOURCE="$LINK_DIR/$SOURCE" ;;
+  esac
+done
+SCRIPT_DIR=$(cd -P "$(dirname "$SOURCE")" && pwd)
 REPO_ROOT=$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || dirname "$SCRIPT_DIR")
 cd "$REPO_ROOT"
 
@@ -81,8 +96,12 @@ echo "==> Verifying hooks installation"
 # seeds `.git/hooks/*.sample` siblings — a pattern match would yield a
 # false positive when lefthook installed nothing.
 HOOKS_DIR=$(git rev-parse --git-path hooks 2>/dev/null || echo ".git/hooks")
-if [ ! -f "$HOOKS_DIR/pre-commit" ] || [ ! -f "$HOOKS_DIR/pre-push" ]; then
-  echo "ERROR: hooks not installed in $HOOKS_DIR/"
+# Check both existence and executability: git silently refuses to run a hook
+# file that is not executable, so a `-f`-only check would report success
+# while the hooks effectively do nothing on commit/push.
+if [ ! -f "$HOOKS_DIR/pre-commit" ] || [ ! -x "$HOOKS_DIR/pre-commit" ] || \
+   [ ! -f "$HOOKS_DIR/pre-push" ] || [ ! -x "$HOOKS_DIR/pre-push" ]; then
+  echo "ERROR: hooks not installed (or not executable) in $HOOKS_DIR/"
   exit 1
 fi
 

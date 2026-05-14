@@ -121,7 +121,7 @@ $(printf '%s\n' "$out" | sed 's/^/      /')"
 # from the shebang) does `execvp("bash", ...)` with the script's PATH.
 shim_utils() {
   local u p
-  for u in bash dirname ls grep mkdir chmod printf cat head sed tr cut; do
+  for u in bash dirname ls grep mkdir chmod printf cat head sed tr cut readlink; do
     p=$(command -v "$u" 2>/dev/null) || continue
     ln -sf "$p" "bin/$u"
   done
@@ -211,6 +211,37 @@ case "$1" in
     exit 0
     ;;
   exec) exit 0 ;;
+  *) exit 1 ;;
+esac
+EOF
+  chmod +x bin/pnpm
+}
+
+# stub_pnpm_not_executable: install + lefthook both report success and the
+# hook files are written, but the executable bit is deliberately NOT set —
+# git silently refuses to run a non-executable hook, so the wrapper must
+# treat a `-f`-only match as a false positive and require `-x` too.
+stub_pnpm_not_executable() {
+  cat > bin/pnpm <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  install)
+    shift
+    case " $* " in *" --frozen-lockfile "*) ;; *) exit 1 ;; esac
+    case " $* " in *" --ignore-scripts "*) ;; *) exit 1 ;; esac
+    exit 0
+    ;;
+  exec)
+    shift
+    if [ "$1" = "lefthook" ] && [ "$2" = "install" ]; then
+      mkdir -p .git/hooks
+      printf '#!/bin/sh\nexit 0\n' > .git/hooks/pre-commit
+      printf '#!/bin/sh\nexit 0\n' > .git/hooks/pre-push
+      # Deliberately do not chmod +x — exercises the `-x` verification branch.
+      exit 0
+    fi
+    exit 1
+    ;;
   *) exit 1 ;;
 esac
 EOF
@@ -339,6 +370,17 @@ setup_hooks_not_installed() {
   stub_pnpm_noop_lefthook
 }
 
+# pnpm exec lefthook writes hook files but without the executable bit set →
+# verification must still fail (git silently skips non-executable hooks).
+setup_hooks_not_executable() {
+  shim_utils
+  shim_real git
+  git init -q
+  write_nvmrc 24.11.1
+  stub_node_major 24
+  stub_pnpm_not_executable
+}
+
 # Cases.
 
 run_case "PASS-1  happy path: all tools, node 24"             setup_happy           0 "==> Ready." \
@@ -358,6 +400,77 @@ run_case "BLOCK-1 missing git → exit 1"                       setup_missing_gi
 run_case "BLOCK-2 missing node → exit 1"                      setup_missing_node    1 "MISSING: node"
 run_case "BLOCK-3 missing pnpm → exit 1"                      setup_missing_pnpm    1 "MISSING: pnpm"
 run_case "BLOCK-4 lefthook noop → hooks-verify fails"         setup_hooks_not_installed 1 "ERROR: hooks not installed"
+run_case "BLOCK-5 hook files not executable → exit 1"         setup_hooks_not_executable 1 "ERROR: hooks not installed (or not executable)"
+
+# Out-of-repo symlink: a contributor with a PATH-shim like
+# `~/bin/sovri-install -> .../scripts/install-hooks.sh` must land in the
+# real repo root, not the symlink's parent directory. The wrapper resolves
+# this via a BASH_SOURCE+readlink loop; the naive `dirname "$0"` approach
+# would have run `pnpm install` in the wrong tree. Done inline (not via
+# `run_case`) because the invocation path is outside $repo.
+run_symlink_case() {
+  local label="PASS-7  out-of-repo symlink resolves to real script"
+  local repo outside out ec
+  repo=$(mktemp -d 2>/dev/null || mktemp -d -t 'install-hooks')
+  outside=$(mktemp -d 2>/dev/null || mktemp -d -t 'install-hooks-bin')
+  if [ -z "$repo" ] || [ -z "$outside" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ ${label}: mktemp failed"
+    return
+  fi
+
+  (
+    set -e
+    cd "$repo"
+    mkdir -p scripts bin
+    cp "$SCRIPT" scripts/install-hooks.sh
+    chmod +x scripts/install-hooks.sh
+    unset GIT_TEMPLATE_DIR GIT_DIR GIT_WORK_TREE
+    export GIT_CONFIG_GLOBAL=/dev/null
+    export GIT_CONFIG_NOSYSTEM=1
+    setup_happy
+    ln -sf "$repo/scripts/install-hooks.sh" "$outside/sovri-install"
+  ) >"$repo/_setup.log" 2>&1
+  if [ $? -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ ${label}: setup failed
+$(sed 's/^/      /' "$repo/_setup.log")"
+    rm -rf "$repo" "$outside"
+    return
+  fi
+
+  # Invoke via the symlink, from the symlink's own directory (cwd outside
+  # the repo). Without the readlink loop, SCRIPT_DIR would land on $outside,
+  # git rev-parse would fail there, and the fallback would target the
+  # parent of $outside (e.g. `/tmp`) — running pnpm install in the wrong
+  # tree. The strict pnpm stub would also fail because no .git/hooks would
+  # be created where the wrapper expects them.
+  out=$(cd "$outside" && GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 PATH="$repo/bin" "$outside/sovri-install" 2>&1) && ec=0 || ec=$?
+
+  rm -rf "$repo" "$outside"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ ${label}: expected exit 0, got $ec
+$(printf '%s\n' "$out" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$out" | grep -Fq -- "==> Ready."; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ ${label}: stdout missing '==> Ready.'
+$(printf '%s\n' "$out" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_symlink_case
 
 TOTAL=$((PASS + FAIL))
 echo ""
