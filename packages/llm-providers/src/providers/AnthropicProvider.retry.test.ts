@@ -221,6 +221,28 @@ describe("AnthropicProvider retry and timeout handling", () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 
+  it.each([400, 401, 403, 404, 422])("does not retry non-transient HTTP %i", async (status) => {
+    // Given the Anthropic adapter is configured with max 3 total attempts
+    // And the first Anthropic response is HTTP <status>
+    const create = createMessageSequence([apiError(status)]);
+    const provider = new AnthropicProvider({
+      client: clientFromCreate(create),
+      model: TestModel,
+    });
+
+    // When the review engine calls Anthropic once
+    const result = provider.generateStructured(generateParams);
+    const capturedError = captureError(result);
+
+    // Then the adapter fails the call
+    // And exactly 1 Anthropic request is sent
+    await expect(capturedError).resolves.toMatchObject({
+      attemptDurationsMs: [expect.any(Number)],
+      status,
+    });
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
   it("aborts after the configured timeout without retrying", async () => {
     // Given the Anthropic adapter is configured with a timeout of 200 ms
     // And the Anthropic response would arrive after 1000 ms
