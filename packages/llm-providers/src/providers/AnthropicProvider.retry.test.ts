@@ -276,6 +276,7 @@ describe("AnthropicProvider retry and timeout handling", () => {
   it.each([
     {
       mode: "exhausted-503",
+      timeoutMs: 60_000,
       durations: [40, 55, 70],
       errorName: "AnthropicRetryError",
       message: "Anthropic failed after 3 attempts",
@@ -283,6 +284,7 @@ describe("AnthropicProvider retry and timeout handling", () => {
     },
     {
       mode: "immediate-401",
+      timeoutMs: 200,
       durations: [30],
       errorName: "AnthropicAuthError",
       message: "Anthropic request failed with HTTP 401",
@@ -290,6 +292,7 @@ describe("AnthropicProvider retry and timeout handling", () => {
     },
     {
       mode: "timeout",
+      timeoutMs: 200,
       durations: [200],
       errorName: "AnthropicTimeoutError",
       message: "Anthropic request timed out after 200 ms",
@@ -297,7 +300,7 @@ describe("AnthropicProvider retry and timeout handling", () => {
     },
   ])(
     "matches final failure error shape for $mode",
-    async ({ mode, durations, errorName, message, attemptCount }) => {
+    async ({ mode, timeoutMs, durations, errorName, message, attemptCount }) => {
       // Given the Anthropic adapter reaches terminal failure mode "<mode>"
       // And the recorded attempt durations are "<durations>"
       vi.useFakeTimers();
@@ -306,7 +309,7 @@ describe("AnthropicProvider retry and timeout handling", () => {
       const provider = new AnthropicProvider({
         client: clientFromCreate(create),
         model: TestModel,
-        timeoutMs: 200,
+        timeoutMs,
       });
 
       // When the review engine handles the Anthropic failure
@@ -327,6 +330,80 @@ describe("AnthropicProvider retry and timeout handling", () => {
       expectAttemptDurationCount(error, attemptCount);
     },
   );
+
+  it("enforces the configured timeout as an absolute deadline across retries", async () => {
+    // Given the Anthropic adapter is configured with a timeout of 800 ms
+    // And the first Anthropic response is HTTP 503 after 600 ms
+    // And the second Anthropic response would arrive after 1000 ms
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const create = vi
+      .fn<AnthropicCreate>()
+      .mockImplementationOnce(async () => {
+        await sleep(600);
+        throw apiError(503);
+      })
+      .mockImplementationOnce(async (_request, options) => waitForAbort(options));
+    const provider = new AnthropicProvider({
+      client: clientFromCreate(create),
+      model: TestModel,
+      timeoutMs: 800,
+    });
+
+    // When the review engine calls Anthropic once
+    const result = provider.generateStructured(generateParams);
+    const capturedError = captureError(result);
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(600);
+    await vi.advanceTimersByTimeAsync(500);
+
+    // Then the adapter aborts before issuing a second request that would exceed the budget
+    // And exactly 1 Anthropic request is sent
+    const error = await capturedError;
+    expect(error).toBeInstanceOf(AnthropicTimeoutError);
+    expect(error).toMatchObject({
+      name: "AnthropicTimeoutError",
+      message: "Anthropic request timed out after 800 ms",
+    });
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes the remaining deadline as the per-attempt timeout on retries", async () => {
+    // Given the Anthropic adapter is configured with a timeout of 5000 ms
+    // And the first Anthropic response is HTTP 503 after 800 ms
+    // And the second Anthropic response is a valid completion
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const captured: Array<number | undefined> = [];
+    const create = vi
+      .fn<AnthropicCreate>()
+      .mockImplementationOnce(async (_request, options) => {
+        captured.push(options.timeout);
+        await sleep(800);
+        throw apiError(503);
+      })
+      .mockImplementationOnce(async (_request, options) => {
+        captured.push(options.timeout);
+        return anthropicMessage();
+      });
+    const provider = new AnthropicProvider({
+      client: clientFromCreate(create),
+      model: TestModel,
+      timeoutMs: 5000,
+    });
+
+    // When the review engine calls Anthropic once
+    const result = provider.generateStructured(generateParams);
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(800);
+    await vi.advanceTimersByTimeAsync(500);
+
+    // Then the first attempt receives the full 5000 ms budget
+    // And the second attempt receives only the remaining budget after the first response and retry sleep
+    await expect(result).resolves.toEqual(validStructuredResponse);
+    expect(captured).toEqual([5000, 3700]);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
 
   it("maps Anthropic SDK timeout errors without retrying", async () => {
     // Given the Anthropic SDK reports a transport timeout

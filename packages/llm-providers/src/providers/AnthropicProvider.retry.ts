@@ -48,6 +48,7 @@ export async function createAnthropicMessageWithRetry(options: {
     ...options,
     attempt: 1,
     attemptDurationsMs: [],
+    deadlineMs: Date.now() + options.timeoutMs,
   });
 }
 
@@ -55,9 +56,19 @@ async function createMessageAttempt(options: {
   readonly attempt: number;
   readonly attemptDurationsMs: ReadonlyArray<number>;
   readonly client: AnthropicMessagesClient;
+  readonly deadlineMs: number;
   readonly request: MessageCreateParamsNonStreaming;
   readonly timeoutMs: number;
 }): Promise<unknown> {
+  const remainingMs = options.deadlineMs - Date.now();
+
+  if (remainingMs <= 0) {
+    throw new AnthropicTimeoutError(
+      `Anthropic request timed out after ${String(options.timeoutMs)} ms`,
+      { attemptDurationsMs: options.attemptDurationsMs },
+    );
+  }
+
   const controller = new AbortController();
   const startedAtMs = Date.now();
   let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -67,9 +78,9 @@ async function createMessageAttempt(options: {
       headers: { "anthropic-beta": STRUCTURED_OUTPUTS_BETA_HEADER },
       maxRetries: 0,
       signal: controller.signal,
-      timeout: options.timeoutMs,
+      timeout: remainingMs,
     });
-    timeout = setTimeout(() => controller.abort(), options.timeoutMs);
+    timeout = setTimeout(() => controller.abort(), remainingMs);
 
     return await response;
   } catch (cause) {
@@ -91,6 +102,7 @@ async function handleMessageFailure(options: {
   readonly attemptDurationsMs: ReadonlyArray<number>;
   readonly cause: unknown;
   readonly client: AnthropicMessagesClient;
+  readonly deadlineMs: number;
   readonly request: MessageCreateParamsNonStreaming;
   readonly timedOut: boolean;
   readonly timeoutMs: number;
@@ -113,7 +125,16 @@ async function handleMessageFailure(options: {
     );
   }
 
-  await sleep(retryDelayMs(options.attempt));
+  const delayMs = retryDelayMs(options.attempt);
+
+  if (options.deadlineMs - Date.now() <= delayMs) {
+    throw new AnthropicTimeoutError(
+      `Anthropic request timed out after ${String(options.timeoutMs)} ms`,
+      { cause: options.cause, attemptDurationsMs: options.attemptDurationsMs },
+    );
+  }
+
+  await sleep(delayMs);
 
   return createMessageAttempt({
     ...options,

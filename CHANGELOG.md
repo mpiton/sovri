@@ -80,6 +80,15 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `@sovri/llm-providers`: `createAnthropicMessageWithRetry` now enforces the
+  configured timeout as a single absolute deadline shared across retry attempts
+  (#123). Previously each attempt restarted the full per-call timeout budget,
+  so a 60 s timeout could hold the request open for ~3 × 60 s plus retry sleeps
+  before aborting. The deadline is computed once on entry; each attempt passes
+  the remaining budget to the SDK and the AbortController, and a retry sleep
+  that would push past the deadline now short-circuits to a typed
+  `AnthropicTimeoutError` instead of issuing a doomed extra request.
+
 - `@sovri/llm-providers`: normalize Anthropic HTTP 401 terminal failures with
   the same safe HTTP-status message shape used by other non-retryable provider
   responses while preserving the typed auth error and attempt metadata (#104).
