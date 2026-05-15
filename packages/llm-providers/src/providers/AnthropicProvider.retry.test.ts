@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { APIConnectionTimeoutError, APIError } from "@anthropic-ai/sdk";
+import { APIConnectionError, APIConnectionTimeoutError, APIError } from "@anthropic-ai/sdk";
 import { z } from "@sovri/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -113,6 +113,28 @@ describe("AnthropicProvider retry and timeout handling", () => {
       expect(create).toHaveBeenCalledTimes(2);
     },
   );
+
+  it("retries Anthropic SDK connection errors once and returns the valid completion", async () => {
+    // Given the Anthropic SDK reports a transient transport failure
+    // And the second Anthropic response is a valid completion
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const create = createMessageSequence([
+      new APIConnectionError({ message: "Connection reset." }),
+      anthropicMessage(),
+    ]);
+    const provider = new AnthropicProvider({ client: clientFromCreate(create), model: TestModel });
+
+    // When the review engine calls Anthropic once
+    const result = provider.generateStructured(generateParams);
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(500);
+
+    // Then the adapter retries the transport failure
+    // And returns the valid completion
+    await expect(result).resolves.toEqual(validStructuredResponse);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
 
   it("does not retry HTTP 401", async () => {
     // Given the Anthropic adapter is configured with max 3 total attempts
