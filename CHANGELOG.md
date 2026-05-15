@@ -80,6 +80,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `@sovri/llm-providers`: normalize Anthropic HTTP 401 terminal failures with
+  the same safe HTTP-status message shape used by other non-retryable provider
+  responses while preserving the typed auth error and attempt metadata (#104).
+
 - `lefthook`: drop `--noEmit` from the `ts-typecheck` pre-commit hook so
   the workspace `tsc -b` no longer trips TS6310 ("Referenced project may
   not disable emit") on composite project references. The flag was

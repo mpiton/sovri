@@ -124,7 +124,7 @@ async function handleMessageFailure(options: {
 function normalizeAnthropicError(cause: unknown, attemptDurationsMs: ReadonlyArray<number>): Error {
   if (cause instanceof AuthenticationError || (cause instanceof APIError && cause.status === 401)) {
     return new AnthropicAuthError(
-      "Anthropic authentication failed",
+      "Anthropic request failed with HTTP 401",
       anthropicErrorOptions(cause, attemptDurationsMs),
     );
   }
