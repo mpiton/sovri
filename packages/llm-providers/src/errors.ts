@@ -7,16 +7,26 @@ export interface AnthropicProviderErrorOptions {
   readonly cause?: unknown;
   readonly status?: number;
   readonly requestId?: string | null;
+  readonly attemptDurationsMs?: ReadonlyArray<number>;
 }
 
 export interface AnthropicResponseErrorOptions extends AnthropicProviderErrorOptions {
   readonly issues?: ReadonlyArray<z.core.$ZodIssue>;
 }
 
+type AnthropicResponseErrorName =
+  | "AnthropicResponseError"
+  | "AnthropicRetryError"
+  | "AnthropicTimeoutError";
+
 export class AnthropicAuthError extends Error {
-  override readonly name = "AnthropicAuthError";
   readonly status?: number;
   readonly requestId?: string | null;
+  readonly attemptDurationsMs?: ReadonlyArray<number>;
+
+  override get name(): "AnthropicAuthError" {
+    return "AnthropicAuthError";
+  }
 
   constructor(message: string, options: AnthropicProviderErrorOptions = {}) {
     super(message, errorOptions(options.cause));
@@ -27,14 +37,27 @@ export class AnthropicAuthError extends Error {
     if (options.requestId !== undefined) {
       this.requestId = options.requestId;
     }
+    if (options.attemptDurationsMs !== undefined) {
+      this.attemptDurationsMs = [...options.attemptDurationsMs];
+    }
   }
 }
 
-export class AnthropicResponseError extends Error {
-  override readonly name = "AnthropicResponseError";
+export class AnthropicResponseError<
+  Name extends AnthropicResponseErrorName = "AnthropicResponseError",
+> extends Error {
   readonly status?: number;
   readonly requestId?: string | null;
+  readonly attemptDurationsMs?: ReadonlyArray<number>;
   readonly issues?: ReadonlyArray<z.core.$ZodIssue>;
+
+  override get name(): Name {
+    return this.errorName;
+  }
+
+  protected get errorName(): Name {
+    return "AnthropicResponseError" as Name;
+  }
 
   constructor(message: string, options: AnthropicResponseErrorOptions = {}) {
     super(message, errorOptions(options.cause));
@@ -45,9 +68,24 @@ export class AnthropicResponseError extends Error {
     if (options.requestId !== undefined) {
       this.requestId = options.requestId;
     }
+    if (options.attemptDurationsMs !== undefined) {
+      this.attemptDurationsMs = [...options.attemptDurationsMs];
+    }
     if (options.issues !== undefined) {
       this.issues = options.issues;
     }
+  }
+}
+
+export class AnthropicRetryError extends AnthropicResponseError<"AnthropicRetryError"> {
+  protected override get errorName(): "AnthropicRetryError" {
+    return "AnthropicRetryError";
+  }
+}
+
+export class AnthropicTimeoutError extends AnthropicResponseError<"AnthropicTimeoutError"> {
+  protected override get errorName(): "AnthropicTimeoutError" {
+    return "AnthropicTimeoutError";
   }
 }
 

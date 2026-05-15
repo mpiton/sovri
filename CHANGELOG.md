@@ -59,6 +59,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Changed
 
+- `@sovri/llm-providers`: `AnthropicProvider` retry policy now mirrors the
+  Anthropic SDK's documented transient set — HTTP 408 (request timeout),
+  409 (lock timeout), 429 (rate limit), and any 5xx including 529 (overloaded
+  during capacity events). Previously only 429 and 503 retried, so capacity
+  events that surface as 529 or other 5xx failed immediately because the
+  adapter also forces `maxRetries: 0` on the SDK client. `resolveTimeoutMs`
+  now also rejects values above `MAX_ANTHROPIC_TIMEOUT_MS` (2,147,483,647 ms)
+  to stop Node's `setTimeout` from clamping oversized delays to ~1 ms and
+  aborting the request before it leaves the event loop.
+
 - `@sovri/llm-providers`: `zodToProviderJsonSchema` now pins `cycles: "ref"`
   and `unrepresentable: "throw"` explicitly in addition to the existing
   `target: "draft-2020-12"` and `reused: "inline"` (#28). The values match
@@ -84,6 +94,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   transports, BYO-auth wrappers) are not blocked by the env-var guard. Auth
   validation is unchanged when the SDK is constructed internally.
 
+- `@sovri/llm-providers`: preserve literal custom error `name` types for
+  discriminated narrowing and normalize Anthropic SDK transport timeouts as
+  `AnthropicTimeoutError` in the provider-owned retry path (#30).
+
+- `@sovri/llm-providers`: retry transient Anthropic SDK
+  `APIConnectionError` transport failures in the provider-owned retry path
+  now that SDK retries are disabled per request (#30).
+
 - `@sovri/llm-providers`: replace the raw NUL byte in
   `LLMResponseSchema.test.ts` (control-byte path test) with the
   ` ` escape sequence so Git classifies the file as UTF-8
@@ -98,6 +116,15 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   the new branch via a `vi.mock` factory.
 
 ### Added
+
+- `@sovri/llm-providers`: `AnthropicProvider` now applies provider-owned
+  retry and timeout controls for structured-output calls (#30). HTTP 429
+  and 503 retry only, with three total attempts, 500 ms / 1000 ms
+  exponential backoff, and bounded jitter to avoid retry bursts. Each
+  request uses an `AbortController` timeout defaulting to 60 s and disables
+  the Anthropic SDK's built-in retries so Sovri owns the retry contract.
+  Final failures now expose typed retry/timeout errors and attempt duration
+  metadata without logging raw provider payloads.
 
 - `@sovri/llm-providers`: `AnthropicProvider` now implements the shared
   `LLMProvider` contract for v0.1 (#29). It reads `ANTHROPIC_API_KEY` from

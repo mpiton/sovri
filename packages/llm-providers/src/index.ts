@@ -9,6 +9,8 @@ export type { LLMProvider, GenerateStructuredParams } from "./types/LLMProvider.
 export {
   AnthropicAuthError,
   AnthropicResponseError,
+  AnthropicRetryError,
+  AnthropicTimeoutError,
   type AnthropicProviderErrorOptions,
   type AnthropicResponseErrorOptions,
 } from "./errors.js";
@@ -17,6 +19,7 @@ export {
   AnthropicProvider,
   DEFAULT_ANTHROPIC_MAX_TOKENS,
   DEFAULT_ANTHROPIC_MODEL,
+  DEFAULT_ANTHROPIC_TIMEOUT_MS,
   MAX_ANTHROPIC_MAX_TOKENS,
   type AnthropicProviderOptions,
 } from "./providers/AnthropicProvider.js";

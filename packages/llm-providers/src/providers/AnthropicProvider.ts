@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import Anthropic, { APIError, AuthenticationError } from "@anthropic-ai/sdk";
+import Anthropic from "@anthropic-ai/sdk";
 import { jsonSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/json-schema";
 import type {
   JSONOutputFormat,
@@ -14,19 +14,26 @@ import type { z } from "@sovri/core";
 import { AnthropicAuthError, AnthropicResponseError } from "../errors.js";
 import { zodToProviderJsonSchema } from "../helpers/provider-json-schema.js";
 import type { GenerateStructuredParams, LLMProvider } from "../types/LLMProvider.js";
+import {
+  createAnthropicMessageWithRetry,
+  DEFAULT_ANTHROPIC_TIMEOUT_MS,
+  type AnthropicMessagesClient,
+} from "./AnthropicProvider.retry.js";
 
 export const DEFAULT_ANTHROPIC_MODEL: Model = "claude-sonnet-4-6";
 export const DEFAULT_ANTHROPIC_MAX_TOKENS = 4096;
 export const MAX_ANTHROPIC_MAX_TOKENS = 64_000;
+// Node's setTimeout caps delays at 2^31 - 1 ms (~24.8 days). Values above this
+// clamp to 1 ms and would fire the abort almost immediately.
+export const MAX_ANTHROPIC_TIMEOUT_MS = 2_147_483_647;
+export { DEFAULT_ANTHROPIC_TIMEOUT_MS } from "./AnthropicProvider.retry.js";
 
-const STRUCTURED_OUTPUTS_BETA_HEADER = "structured-outputs-2025-11-13";
-
-type AnthropicMessagesClient = Pick<Anthropic, "messages">;
 type AnthropicJsonSchema = Parameters<typeof jsonSchemaOutputFormat>[0];
 
 export interface AnthropicProviderOptions {
   readonly model?: Model;
   readonly maxTokens?: number;
+  readonly timeoutMs?: number;
   readonly env?: NodeJS.ProcessEnv;
   readonly client?: AnthropicMessagesClient;
 }
@@ -35,14 +42,21 @@ export class AnthropicProvider implements LLMProvider {
   readonly name = "anthropic";
   readonly model: Model;
   readonly maxTokens: number;
+  readonly timeoutMs: number;
 
   private readonly client: AnthropicMessagesClient;
 
   constructor(options: AnthropicProviderOptions = {}) {
     this.model = resolveModel(options.model);
     this.maxTokens = resolveMaxTokens(options.maxTokens);
+    this.timeoutMs = resolveTimeoutMs(options.timeoutMs);
     this.client =
-      options.client ?? new Anthropic({ apiKey: readAnthropicApiKey(options.env ?? process.env) });
+      options.client ??
+      new Anthropic({
+        apiKey: readAnthropicApiKey(options.env ?? process.env),
+        maxRetries: 0,
+        timeout: this.timeoutMs,
+      });
   }
 
   async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
@@ -80,13 +94,11 @@ export class AnthropicProvider implements LLMProvider {
   }
 
   private async createMessage(request: MessageCreateParamsNonStreaming): Promise<unknown> {
-    try {
-      return await this.client.messages.create(request, {
-        headers: { "anthropic-beta": STRUCTURED_OUTPUTS_BETA_HEADER },
-      });
-    } catch (cause) {
-      throw normalizeAnthropicError(cause);
-    }
+    return createAnthropicMessageWithRetry({
+      client: this.client,
+      request,
+      timeoutMs: this.timeoutMs,
+    });
   }
 }
 
@@ -124,6 +136,22 @@ function resolveMaxTokens(maxTokens: number | undefined): number {
   }
 
   return resolvedMaxTokens;
+}
+
+function resolveTimeoutMs(timeoutMs: number | undefined): number {
+  const resolvedTimeoutMs = timeoutMs ?? DEFAULT_ANTHROPIC_TIMEOUT_MS;
+
+  if (
+    !Number.isSafeInteger(resolvedTimeoutMs) ||
+    resolvedTimeoutMs <= 0 ||
+    resolvedTimeoutMs > MAX_ANTHROPIC_TIMEOUT_MS
+  ) {
+    throw new AnthropicResponseError(
+      `Anthropic timeoutMs must be a positive integer no greater than ${String(MAX_ANTHROPIC_TIMEOUT_MS)}`,
+    );
+  }
+
+  return resolvedTimeoutMs;
 }
 
 function createJsonSchemaFormat(schema: z.ZodType): JSONOutputFormat {
@@ -165,24 +193,6 @@ function parseJson(text: string): unknown {
   } catch (cause) {
     throw new AnthropicResponseError("Anthropic response was not valid JSON", { cause });
   }
-}
-
-function normalizeAnthropicError(cause: unknown): Error {
-  if (cause instanceof AuthenticationError || (cause instanceof APIError && cause.status === 401)) {
-    return new AnthropicAuthError("Anthropic authentication failed", anthropicErrorOptions(cause));
-  }
-
-  return new AnthropicResponseError("Anthropic API request failed", anthropicErrorOptions(cause));
-}
-
-function anthropicErrorOptions(cause: unknown) {
-  if (!(cause instanceof APIError)) return { cause };
-
-  return {
-    cause,
-    ...(cause.status !== undefined ? { status: cause.status } : {}),
-    ...(cause.requestID !== undefined ? { requestId: cause.requestID } : {}),
-  };
 }
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
