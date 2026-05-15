@@ -12,7 +12,11 @@ import {
   AnthropicRetryError,
   AnthropicTimeoutError,
 } from "../errors.js";
-import { AnthropicProvider, MAX_ANTHROPIC_MAX_TOKENS } from "./AnthropicProvider.js";
+import {
+  AnthropicProvider,
+  MAX_ANTHROPIC_MAX_TOKENS,
+  MAX_ANTHROPIC_TIMEOUT_MS,
+} from "./AnthropicProvider.js";
 
 const AnthropicMessagesUrl = "https://api.anthropic.com/v1/messages";
 const TestApiKey = "test-key";
@@ -73,6 +77,20 @@ describe("AnthropicProvider error handling", () => {
             env: { ANTHROPIC_API_KEY: TestApiKey },
             maxTokens,
             model: TestModel,
+          }),
+      ).toThrow(AnthropicResponseError);
+    },
+  );
+
+  it.each([0, -1, 1.5, Number.NaN, MAX_ANTHROPIC_TIMEOUT_MS + 1])(
+    "rejects invalid constructor timeoutMs: %s",
+    (timeoutMs) => {
+      expect(
+        () =>
+          new AnthropicProvider({
+            env: { ANTHROPIC_API_KEY: TestApiKey },
+            model: TestModel,
+            timeoutMs,
           }),
       ).toThrow(AnthropicResponseError);
     },

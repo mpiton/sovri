@@ -89,6 +89,31 @@ describe("AnthropicProvider retry and timeout handling", () => {
     expect(create).toHaveBeenCalledTimes(3);
   });
 
+  it.each([408, 409, 500, 502, 504, 529])(
+    "retries transient HTTP %i once and returns the valid completion",
+    async (status) => {
+      // Given the Anthropic adapter is configured with max 3 total attempts
+      // And the first Anthropic response is a documented transient status
+      vi.useFakeTimers();
+      vi.spyOn(Math, "random").mockReturnValue(0.5);
+      const create = createMessageSequence([apiError(status), anthropicMessage()]);
+      const provider = new AnthropicProvider({
+        client: clientFromCreate(create),
+        model: TestModel,
+      });
+
+      // When the review engine calls Anthropic once
+      const result = provider.generateStructured(generateParams);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(500);
+
+      // Then the adapter returns the valid completion
+      // And exactly 2 Anthropic requests are sent
+      await expect(result).resolves.toEqual(validStructuredResponse);
+      expect(create).toHaveBeenCalledTimes(2);
+    },
+  );
+
   it("does not retry HTTP 401", async () => {
     // Given the Anthropic adapter is configured with max 3 total attempts
     // And the first Anthropic response is HTTP 401
@@ -269,6 +294,11 @@ function anthropicMessage() {
 
 function waitForAbort(options: AnthropicCreateOptions): Promise<never> {
   return new Promise((_resolve, reject) => {
+    if (options?.signal?.aborted === true) {
+      reject(new DOMException("The operation was aborted.", "AbortError"));
+      return;
+    }
+
     options?.signal?.addEventListener(
       "abort",
       () => reject(new DOMException("The operation was aborted.", "AbortError")),

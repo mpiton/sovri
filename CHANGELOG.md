@@ -59,6 +59,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Changed
 
+- `@sovri/llm-providers`: `AnthropicProvider` retry policy now mirrors the
+  Anthropic SDK's documented transient set — HTTP 408 (request timeout),
+  409 (lock timeout), 429 (rate limit), and any 5xx including 529 (overloaded
+  during capacity events). Previously only 429 and 503 retried, so capacity
+  events that surface as 529 or other 5xx failed immediately because the
+  adapter also forces `maxRetries: 0` on the SDK client. `resolveTimeoutMs`
+  now also rejects values above `MAX_ANTHROPIC_TIMEOUT_MS` (2,147,483,647 ms)
+  to stop Node's `setTimeout` from clamping oversized delays to ~1 ms and
+  aborting the request before it leaves the event loop.
+
 - `@sovri/llm-providers`: `zodToProviderJsonSchema` now pins `cycles: "ref"`
   and `unrepresentable: "throw"` explicitly in addition to the existing
   `target: "draft-2020-12"` and `reused: "inline"` (#28). The values match

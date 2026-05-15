@@ -139,7 +139,13 @@ function anthropicErrorOptions(cause: unknown, attemptDurationsMs: ReadonlyArray
 }
 
 function isRetryableAnthropicError(cause: unknown): boolean {
-  return isAnthropicApiError(cause) && (cause.status === 429 || cause.status === 503);
+  if (!isAnthropicApiError(cause) || cause.status === undefined) return false;
+
+  // Mirror the Anthropic SDK retry policy: request timeout, lock timeout,
+  // rate limit, and any 5xx (including 529 overloaded during capacity events).
+  return (
+    cause.status === 408 || cause.status === 409 || cause.status === 429 || cause.status >= 500
+  );
 }
 
 function isAnthropicTimeoutError(cause: unknown): boolean {

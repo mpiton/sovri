@@ -23,6 +23,9 @@ import {
 export const DEFAULT_ANTHROPIC_MODEL: Model = "claude-sonnet-4-6";
 export const DEFAULT_ANTHROPIC_MAX_TOKENS = 4096;
 export const MAX_ANTHROPIC_MAX_TOKENS = 64_000;
+// Node's setTimeout caps delays at 2^31 - 1 ms (~24.8 days). Values above this
+// clamp to 1 ms and would fire the abort almost immediately.
+export const MAX_ANTHROPIC_TIMEOUT_MS = 2_147_483_647;
 export { DEFAULT_ANTHROPIC_TIMEOUT_MS } from "./AnthropicProvider.retry.js";
 
 type AnthropicJsonSchema = Parameters<typeof jsonSchemaOutputFormat>[0];
@@ -138,8 +141,14 @@ function resolveMaxTokens(maxTokens: number | undefined): number {
 function resolveTimeoutMs(timeoutMs: number | undefined): number {
   const resolvedTimeoutMs = timeoutMs ?? DEFAULT_ANTHROPIC_TIMEOUT_MS;
 
-  if (!Number.isSafeInteger(resolvedTimeoutMs) || resolvedTimeoutMs <= 0) {
-    throw new AnthropicResponseError("Anthropic timeoutMs must be a positive integer");
+  if (
+    !Number.isSafeInteger(resolvedTimeoutMs) ||
+    resolvedTimeoutMs <= 0 ||
+    resolvedTimeoutMs > MAX_ANTHROPIC_TIMEOUT_MS
+  ) {
+    throw new AnthropicResponseError(
+      `Anthropic timeoutMs must be a positive integer no greater than ${String(MAX_ANTHROPIC_TIMEOUT_MS)}`,
+    );
   }
 
   return resolvedTimeoutMs;
