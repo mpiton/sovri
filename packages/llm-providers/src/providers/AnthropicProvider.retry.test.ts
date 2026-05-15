@@ -496,6 +496,44 @@ describe("AnthropicProvider retry and timeout handling", () => {
     },
   );
 
+  it.each([
+    { firstRandomValue: 0, secondRandomValue: 1, firstDelayMs: 400, secondDelayMs: 1200 },
+    { firstRandomValue: 1, secondRandomValue: 0, firstDelayMs: 600, secondDelayMs: 800 },
+  ])(
+    "keeps both retry delays inside jitter bounds at $firstDelayMs ms and $secondDelayMs ms",
+    async ({ firstRandomValue, secondRandomValue, firstDelayMs, secondDelayMs }) => {
+      // Given the Anthropic adapter is configured with max 3 total attempts
+      // And the first two Anthropic responses are HTTP 503
+      // And the third Anthropic response is a valid completion
+      vi.useFakeTimers();
+      vi.spyOn(Math, "random")
+        .mockReturnValueOnce(firstRandomValue)
+        .mockReturnValueOnce(secondRandomValue);
+      const create = createMessageSequence([apiError(503), apiError(503), anthropicMessage()]);
+      const provider = new AnthropicProvider({
+        client: clientFromCreate(create),
+        model: TestModel,
+      });
+
+      // When the review engine calls Anthropic once
+      const result = provider.generateStructured(generateParams);
+      await flushPromises();
+
+      // Then the first retry delay is between 400 ms and 600 ms
+      await vi.advanceTimersByTimeAsync(firstDelayMs - 1);
+      expect(create).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(create).toHaveBeenCalledTimes(2);
+
+      // And the second retry delay is between 800 ms and 1200 ms
+      await vi.advanceTimersByTimeAsync(secondDelayMs - 1);
+      expect(create).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(result).resolves.toEqual(validStructuredResponse);
+      expect(create).toHaveBeenCalledTimes(3);
+    },
+  );
+
   it("spreads same-window transient failures across jittered retry delays", async () => {
     // Given three Anthropic calls receive HTTP 503 at 10:00:00.000 UTC
     // And retry jitter is bounded to plus or minus 20 percent

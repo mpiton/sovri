@@ -126,6 +126,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/llm-providers`: acceptance coverage confirms the first two
+  Anthropic retry delays remain inside their jitter windows: 400 ms to 600 ms
+  for the 500 ms base delay and 800 ms to 1200 ms for the 1000 ms second
+  retry delay (#110).
+
 - `@sovri/llm-providers`: acceptance coverage confirms the first Anthropic
   retry delay remains inside the configured 400 ms to 600 ms jitter window
   around the 500 ms base delay (#108).
