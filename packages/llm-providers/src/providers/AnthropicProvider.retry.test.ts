@@ -251,6 +251,61 @@ describe("AnthropicProvider retry and timeout handling", () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    {
+      mode: "exhausted-503",
+      durations: [40, 55, 70],
+      errorName: "AnthropicRetryError",
+      message: "Anthropic failed after 3 attempts",
+      attemptCount: 3,
+    },
+    {
+      mode: "immediate-401",
+      durations: [30],
+      errorName: "AnthropicAuthError",
+      message: "Anthropic request failed with HTTP 401",
+      attemptCount: 1,
+    },
+    {
+      mode: "timeout",
+      durations: [200],
+      errorName: "AnthropicTimeoutError",
+      message: "Anthropic request timed out after 200 ms",
+      attemptCount: 1,
+    },
+  ])(
+    "matches final failure error shape for $mode",
+    async ({ mode, durations, errorName, message, attemptCount }) => {
+      // Given the Anthropic adapter reaches terminal failure mode "<mode>"
+      // And the recorded attempt durations are "<durations>"
+      vi.useFakeTimers();
+      vi.spyOn(Math, "random").mockReturnValue(0.5);
+      const create = createTerminalFailure(mode);
+      const provider = new AnthropicProvider({
+        client: clientFromCreate(create),
+        model: TestModel,
+        timeoutMs: 200,
+      });
+
+      // When the review engine handles the Anthropic failure
+      const result = provider.generateStructured(generateParams);
+      const capturedError = captureError(result);
+      await flushPromises();
+      await advanceTerminalFailureTimers(mode);
+
+      // Then the thrown error type is "<error_type>"
+      // And the error message is "<message>"
+      // And the error records <attempt_count> attempt duration(s)
+      const error = await capturedError;
+      expect(error).toMatchObject({
+        name: errorName,
+        message,
+        attemptDurationsMs: durations,
+      });
+      expectAttemptDurationCount(error, attemptCount);
+    },
+  );
+
   it("maps Anthropic SDK timeout errors without retrying", async () => {
     // Given the Anthropic SDK reports a transport timeout
     // And the adapter timeout is configured to 200 ms
@@ -463,6 +518,41 @@ function createDelayedErrorSequence(
   });
 }
 
+type TerminalFailureMode = "exhausted-503" | "immediate-401" | "timeout";
+
+function createTerminalFailure(mode: TerminalFailureMode): AnthropicCreate {
+  switch (mode) {
+    case "exhausted-503":
+      return createDelayedErrorSequence([
+        { responseMs: 40, error: apiError(503) },
+        { responseMs: 55, error: apiError(503) },
+        { responseMs: 70, error: apiError(503) },
+      ]);
+    case "immediate-401":
+      return createDelayedErrorSequence([{ responseMs: 30, error: apiError(401) }]);
+    case "timeout":
+      return vi.fn<AnthropicCreate>(async (_request, options) => waitForAbort(options));
+  }
+}
+
+async function advanceTerminalFailureTimers(mode: TerminalFailureMode): Promise<void> {
+  switch (mode) {
+    case "exhausted-503":
+      await vi.advanceTimersByTimeAsync(40);
+      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(55);
+      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(70);
+      return;
+    case "immediate-401":
+      await vi.advanceTimersByTimeAsync(30);
+      return;
+    case "timeout":
+      await vi.advanceTimersByTimeAsync(200);
+      return;
+  }
+}
+
 function apiError(status: number): APIError {
   return APIError.generate(
     status,
@@ -540,4 +630,12 @@ async function captureError(promise: Promise<unknown>): Promise<Error> {
   }
 
   throw new Error("Expected promise to reject with an Error");
+}
+
+function expectAttemptDurationCount(error: Error, expectedCount: number): void {
+  if (!("attemptDurationsMs" in error) || !Array.isArray(error.attemptDurationsMs)) {
+    throw new Error("Expected error to include attempt durations");
+  }
+
+  expect(error.attemptDurationsMs).toHaveLength(expectedCount);
 }
