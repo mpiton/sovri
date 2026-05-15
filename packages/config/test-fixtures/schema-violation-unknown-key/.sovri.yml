@@ -1,0 +1,5 @@
+llm:
+  provider: anthropic
+  model: claude-3-5-sonnet-latest
+  apiKeySecret: ANTHROPIC_API_KEY
+unknownTopLevelKey: oops

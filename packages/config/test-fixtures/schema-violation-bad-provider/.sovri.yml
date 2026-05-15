@@ -1,0 +1,4 @@
+llm:
+  provider: mistral
+  model: mistral-large-2
+  apiKeySecret: MISTRAL_API_KEY

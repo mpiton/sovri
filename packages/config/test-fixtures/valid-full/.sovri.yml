@@ -1,0 +1,15 @@
+llm:
+  provider: anthropic
+  model: claude-3-5-sonnet-latest
+  baseUrl: https://api.anthropic.com
+  apiKeySecret: ANTHROPIC_API_KEY
+review:
+  mode: strict
+  autoReviewDrafts: true
+  severityThreshold: major
+ignores:
+  - "**/*.md"
+  - "dist/**"
+limits:
+  maxFilesPerReview: 100
+  maxLinesPerReview: 10000
