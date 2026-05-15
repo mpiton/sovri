@@ -107,7 +107,19 @@ export async function loadConfig(repoRoot: string): Promise<SovriConfig> {
     );
   }
 
-  const raw = await readFile(filePath, "utf8");
+  // The same fallback applies if the file disappears between `stat` and
+  // `readFile` (TOCTOU on a long-lived bot host where another process can
+  // delete `.sovri.yml` between the two syscalls).
+  let raw: string;
+  try {
+    raw = await readFile(filePath, "utf8");
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      logger.debug({ filePath }, "no .sovri.yml found during read, falling back to defaults");
+      return DEFAULT_CONFIG;
+    }
+    throw err;
+  }
 
   let parsed: unknown;
   try {

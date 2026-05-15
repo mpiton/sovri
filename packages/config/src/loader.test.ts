@@ -6,7 +6,18 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+// vi.mock is hoisted; wrapping `readFile` in `vi.fn(actual.readFile)` lets a
+// per-test `mockRejectedValueOnce(...)` simulate the TOCTOU race between
+// stat() and readFile() that motivated the second missing-file catch in
+// loader.ts, while every other test continues to hit the real filesystem.
+vi.mock("node:fs/promises", async () => {
+  const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+  return { ...actual, readFile: vi.fn(actual.readFile) };
+});
+
+import { readFile as mockedReadFile } from "node:fs/promises";
 
 import { DEFAULT_CONFIG, loadConfig } from "./loader.js";
 import { SovriConfigParseError, SovriConfigValidationError } from "./errors.js";
@@ -116,6 +127,26 @@ describe("loadConfig — malformed YAML", () => {
       expect(err.filePath).toContain("malformed");
       expect(err.cause).toBeDefined();
     }
+  });
+});
+
+describe("loadConfig — TOCTOU race between stat and readFile", () => {
+  it("returns DEFAULT_CONFIG if the file disappears (ENOENT) between stat and read", async () => {
+    const root = path.join(FIXTURES_ROOT, "valid-minimal");
+    const enoent = Object.assign(new Error("ENOENT: file vanished"), { code: "ENOENT" });
+    vi.mocked(mockedReadFile).mockRejectedValueOnce(enoent);
+
+    const cfg = await loadConfig(root);
+
+    expect(cfg).toEqual(DEFAULT_CONFIG);
+  });
+
+  it("propagates non-missing-file errors raised during read (e.g. EACCES)", async () => {
+    const root = path.join(FIXTURES_ROOT, "valid-minimal");
+    const eacces = Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
+    vi.mocked(mockedReadFile).mockRejectedValueOnce(eacces);
+
+    await expect(loadConfig(root)).rejects.toMatchObject({ code: "EACCES" });
   });
 });
 

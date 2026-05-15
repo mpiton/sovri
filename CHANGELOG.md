@@ -19,6 +19,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Fixed
+
+- `@sovri/config`: `loadConfig()` no longer throws when `.sovri.yml`
+  vanishes between the `fs.stat` and the `fs.readFile` syscalls (#26).
+  The read path now mirrors the stat-time fallback and returns
+  `DEFAULT_CONFIG` on `ENOENT`/`ENOTDIR`, with regression tests driving
+  the new branch via a `vi.mock` factory.
+
 ### Added
 
 - `@sovri/config`: `loadConfig(repoRoot)` — async reader/validator for
