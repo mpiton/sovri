@@ -122,6 +122,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/llm-providers`: acceptance coverage confirms exhausted transient
+  Anthropic failures preserve every attempt duration from the three total
+  HTTP 503 attempts and surface the typed retry error message (#101).
+
 - `@sovri/llm-providers`: acceptance coverage for the default Anthropic
   request timeout confirms that an adapter created without an explicit
   timeout passes the 60 s default to the SDK call while still returning a

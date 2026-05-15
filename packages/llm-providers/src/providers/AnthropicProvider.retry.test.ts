@@ -93,6 +93,43 @@ describe("AnthropicProvider retry and timeout handling", () => {
     expect(create).toHaveBeenCalledTimes(3);
   });
 
+  it("records every attempt duration when transient failures are exhausted", async () => {
+    // Given the Anthropic adapter is configured with max 3 total attempts
+    // And Anthropic returns HTTP 503 after 40 ms on the first request
+    // And Anthropic returns HTTP 503 after 55 ms on the second request
+    // And Anthropic returns HTTP 503 after 70 ms on the third request
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const create = createDelayedErrorSequence([
+      { responseMs: 40, error: apiError(503) },
+      { responseMs: 55, error: apiError(503) },
+      { responseMs: 70, error: apiError(503) },
+    ]);
+    const provider = new AnthropicProvider({ client: clientFromCreate(create), model: TestModel });
+
+    // When the review engine calls Anthropic once
+    const result = provider.generateStructured(generateParams);
+    const capturedError = captureError(result);
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(40);
+    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(55);
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(70);
+
+    // Then the adapter throws a typed provider retry error
+    // And the error records attempt durations of 40 ms, 55 ms, and 70 ms
+    // And the error message states that Anthropic failed after 3 attempts
+    const error = await capturedError;
+    expect(error).toBeInstanceOf(AnthropicRetryError);
+    expect(error).toMatchObject({
+      name: "AnthropicRetryError",
+      message: "Anthropic failed after 3 attempts",
+      attemptDurationsMs: [40, 55, 70],
+    });
+    expect(create).toHaveBeenCalledTimes(3);
+  });
+
   it.each([408, 409, 500, 502, 504, 529])(
     "retries transient HTTP %i once and returns the valid completion",
     async (status) => {
@@ -380,6 +417,23 @@ function createMessageSequence(outcomes: ReadonlyArray<unknown>): AnthropicCreat
     }
 
     return outcome;
+  });
+}
+
+function createDelayedErrorSequence(
+  outcomes: ReadonlyArray<{ readonly responseMs: number; readonly error: Error }>,
+): AnthropicCreate {
+  const pending = [...outcomes];
+
+  return vi.fn<AnthropicCreate>(async () => {
+    const outcome = pending.shift();
+
+    if (outcome === undefined) {
+      return anthropicMessage();
+    }
+
+    await sleep(outcome.responseMs);
+    throw outcome.error;
   });
 }
 
