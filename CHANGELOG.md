@@ -99,6 +99,15 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/llm-providers`: `AnthropicProvider` now applies provider-owned
+  retry and timeout controls for structured-output calls (#30). HTTP 429
+  and 503 retry only, with three total attempts, 500 ms / 1000 ms
+  exponential backoff, and bounded jitter to avoid retry bursts. Each
+  request uses an `AbortController` timeout defaulting to 60 s and disables
+  the Anthropic SDK's built-in retries so Sovri owns the retry contract.
+  Final failures now expose typed retry/timeout errors and attempt duration
+  metadata without logging raw provider payloads.
+
 - `@sovri/llm-providers`: `AnthropicProvider` now implements the shared
   `LLMProvider` contract for v0.1 (#29). It reads `ANTHROPIC_API_KEY` from
   the process environment, rejects missing or blank keys with
