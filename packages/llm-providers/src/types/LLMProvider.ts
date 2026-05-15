@@ -5,6 +5,7 @@ import type { z } from "@sovri/core";
 
 export interface LLMProvider {
   readonly name: string;
+  readonly model: string;
   readonly maxTokens: number;
   generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T>;
 }

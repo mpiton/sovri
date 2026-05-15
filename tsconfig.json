@@ -6,6 +6,7 @@
     { "path": "./packages/config" },
     { "path": "./packages/core" },
     { "path": "./packages/llm-providers" },
-    { "path": "./packages/observability" }
+    { "path": "./packages/observability" },
+    { "path": "./packages/review-engine" }
   ]
 }
