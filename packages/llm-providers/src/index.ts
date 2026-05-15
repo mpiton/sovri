@@ -7,6 +7,21 @@ export type { Logger } from "@sovri/observability";
 export type { LLMProvider, GenerateStructuredParams } from "./types/LLMProvider.js";
 
 export {
+  AnthropicAuthError,
+  AnthropicResponseError,
+  type AnthropicProviderErrorOptions,
+  type AnthropicResponseErrorOptions,
+} from "./errors.js";
+
+export {
+  AnthropicProvider,
+  DEFAULT_ANTHROPIC_MAX_TOKENS,
+  DEFAULT_ANTHROPIC_MODEL,
+  MAX_ANTHROPIC_MAX_TOKENS,
+  type AnthropicProviderOptions,
+} from "./providers/AnthropicProvider.js";
+
+export {
   LLMFindingSchema,
   LLMResponseSchema,
   type LLMFinding,

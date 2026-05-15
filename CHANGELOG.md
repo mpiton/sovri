@@ -70,6 +70,20 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `lefthook`: drop `--noEmit` from the `ts-typecheck` pre-commit hook so
+  the workspace `tsc -b` no longer trips TS6310 ("Referenced project may
+  not disable emit") on composite project references. The flag was
+  incompatible with the `composite: true` setup in `packages/*` and
+  blocked every commit that touched a referencing package. Aligned with
+  the pre-push `ts-typecheck` line which already runs the emitting form.
+
+- `@sovri/llm-providers`: `AnthropicProvider` no longer requires
+  `ANTHROPIC_API_KEY` when an explicit `client` is injected via constructor
+  options (#29, Codex/cubic-dev review on #92). The env read is deferred to
+  the `??`-right branch so injected SDK clients (unit tests, custom
+  transports, BYO-auth wrappers) are not blocked by the env-var guard. Auth
+  validation is unchanged when the SDK is constructed internally.
+
 - `@sovri/llm-providers`: replace the raw NUL byte in
   `LLMResponseSchema.test.ts` (control-byte path test) with the
   ` ` escape sequence so Git classifies the file as UTF-8
@@ -84,6 +98,21 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   the new branch via a `vi.mock` factory.
 
 ### Added
+
+- `@sovri/llm-providers`: `AnthropicProvider` now implements the shared
+  `LLMProvider` contract for v0.1 (#29). It reads `ANTHROPIC_API_KEY` from
+  the process environment, rejects missing or blank keys with
+  `AnthropicAuthError`, sends Claude Sonnet structured-output requests through
+  the official Anthropic SDK using the current `output_config.format`
+  `json_schema` API, applies Anthropic's JSON Schema transform to the shared
+  provider schema helper output, caps `maxTokens` overrides, parses the
+  returned text as JSON, and validates it against the caller's Zod schema
+  before returning. Malformed JSON, schema mismatches, bad provider response
+  shapes, and API failures are wrapped in `AnthropicResponseError` with safe
+  status/request metadata only; 401s are surfaced as `AnthropicAuthError`.
+  MSW-backed integration tests cover the happy path, missing key, rejected
+  key, malformed JSON, schema mismatch, invalid token limits, and transformed
+  schema shape without real network calls or real secrets.
 
 - `@sovri/llm-providers`: `LLMProvider` interface (`name`, `maxTokens`,
   `generateStructured<T>(...)`) per ARCHI.md §4.3, plus `LLMFindingSchema`

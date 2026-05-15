@@ -21,7 +21,7 @@ pre-commit:
 
     ts-typecheck:
       glob: "**/*.{ts,tsx}"
-      run: pnpm exec tsc -b --noEmit
+      run: pnpm exec tsc -b
       skip: [merge, rebase]
       fail_text: "tsc -b fails. Fix type errors before commit (no @ts-ignore)."
 
