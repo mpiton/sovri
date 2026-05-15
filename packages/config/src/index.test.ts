@@ -6,21 +6,20 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import type { Severity as CoreSeverity } from "@sovri/core";
 import type { Logger as ObservabilityLogger } from "@sovri/observability";
 
-import { SovriConfigSchema, type Logger, type Severity } from "./index.js";
+import {
+  SovriConfigSchema as SovriConfigSchemaFromTypes,
+  type SovriConfig as SovriConfigFromTypes,
+} from "./types/SovriConfig.js";
+
+import { SovriConfigSchema, type Logger, type Severity, type SovriConfig } from "./index.js";
 
 describe("@sovri/config barrel", () => {
-  it("scaffold schema accepts an empty object", () => {
-    expect(SovriConfigSchema.parse({})).toEqual({});
+  it("re-exports the same SovriConfigSchema symbol as ./types/SovriConfig.js", () => {
+    expect(SovriConfigSchema).toBe(SovriConfigSchemaFromTypes);
   });
 
-  it("scaffold schema preserves unknown keys (passthrough)", () => {
-    expect(SovriConfigSchema.parse({ foo: 1, bar: "x" })).toEqual({ foo: 1, bar: "x" });
-  });
-
-  it("scaffold schema rejects non-object input", () => {
-    expect(SovriConfigSchema.safeParse(null).success).toBe(false);
-    expect(SovriConfigSchema.safeParse("string").success).toBe(false);
-    expect(SovriConfigSchema.safeParse(42).success).toBe(false);
+  it("re-exports the SovriConfig type unchanged", () => {
+    expectTypeOf<SovriConfig>().toEqualTypeOf<SovriConfigFromTypes>();
   });
 
   it("Severity re-export matches @sovri/core", () => {

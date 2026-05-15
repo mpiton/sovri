@@ -21,6 +21,28 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/config`: `SovriConfigSchema` — v0.1 minimal `.sovri.yml` shape
+  (#25). Materialises the schema sketched in `ARCHI.md` §4.4 with strict
+  rejection of unknown keys at every nesting level (`z.strictObject`),
+  inferred `SovriConfig` type via `z.infer`, and named enum schemas
+  `ProviderSchema` / `ReviewModeSchema` / `SeverityThresholdSchema`. The
+  provider enum stays wide (`anthropic | mistral | openai |
+  openai-compatible`) so the inferred type is stable across releases; a
+  Zod refinement narrows runtime acceptance to `anthropic` in this
+  release. Boundary hardening: `apiKeySecret` enforces an
+  `UPPER_SNAKE_CASE` env-var-name regex so a real key pasted by mistake
+  is rejected before it can leak into logs, `baseUrl` is restricted to
+  `https` only (no `javascript:`, `data:`, `file:`, or `http:` schemes),
+  `model` is restricted to a safe character set blocking newlines, NUL
+  bytes, and Unicode bidi overrides, and every string / array field
+  carries an explicit `.max()` to neutralise the YAML-as-DoS vector.
+  Defaults: `review` and `limits` blocks may be omitted entirely and
+  resolve to `{ mode: "full", autoReviewDrafts: false, severityThreshold:
+  "minor" }` and `{ maxFilesPerReview: 50, maxLinesPerReview: 5000 }`
+  respectively via Zod 4's `.prefault({})`; `ignores` defaults to `[]`.
+  The `sarif` block from `ARCHI.md` §4.4 plus `loadConfig` /
+  `mergeWithOrgOverride` are intentionally deferred to v0.5.
+
 - `@sovri/config` package scaffold (#24) — Apache 2.0 package that anchors
   the `.sovri.yml` parser surface landing in follow-up tasks. Ships
   `package.json` (name `@sovri/config`, exact-pinned runtime dependencies
