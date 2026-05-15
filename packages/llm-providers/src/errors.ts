@@ -14,11 +14,19 @@ export interface AnthropicResponseErrorOptions extends AnthropicProviderErrorOpt
   readonly issues?: ReadonlyArray<z.core.$ZodIssue>;
 }
 
+type AnthropicResponseErrorName =
+  | "AnthropicResponseError"
+  | "AnthropicRetryError"
+  | "AnthropicTimeoutError";
+
 export class AnthropicAuthError extends Error {
-  override readonly name: string = "AnthropicAuthError";
   readonly status?: number;
   readonly requestId?: string | null;
   readonly attemptDurationsMs?: ReadonlyArray<number>;
+
+  override get name(): "AnthropicAuthError" {
+    return "AnthropicAuthError";
+  }
 
   constructor(message: string, options: AnthropicProviderErrorOptions = {}) {
     super(message, errorOptions(options.cause));
@@ -35,12 +43,21 @@ export class AnthropicAuthError extends Error {
   }
 }
 
-export class AnthropicResponseError extends Error {
-  override readonly name: string = "AnthropicResponseError";
+export class AnthropicResponseError<
+  Name extends AnthropicResponseErrorName = "AnthropicResponseError",
+> extends Error {
   readonly status?: number;
   readonly requestId?: string | null;
   readonly attemptDurationsMs?: ReadonlyArray<number>;
   readonly issues?: ReadonlyArray<z.core.$ZodIssue>;
+
+  override get name(): Name {
+    return this.errorName;
+  }
+
+  protected get errorName(): Name {
+    return "AnthropicResponseError" as Name;
+  }
 
   constructor(message: string, options: AnthropicResponseErrorOptions = {}) {
     super(message, errorOptions(options.cause));
@@ -60,12 +77,16 @@ export class AnthropicResponseError extends Error {
   }
 }
 
-export class AnthropicRetryError extends AnthropicResponseError {
-  override readonly name: string = "AnthropicRetryError";
+export class AnthropicRetryError extends AnthropicResponseError<"AnthropicRetryError"> {
+  protected override get errorName(): "AnthropicRetryError" {
+    return "AnthropicRetryError";
+  }
 }
 
-export class AnthropicTimeoutError extends AnthropicResponseError {
-  override readonly name: string = "AnthropicTimeoutError";
+export class AnthropicTimeoutError extends AnthropicResponseError<"AnthropicTimeoutError"> {
+  protected override get errorName(): "AnthropicTimeoutError" {
+    return "AnthropicTimeoutError";
+  }
 }
 
 function errorOptions(cause: unknown): ErrorOptions | undefined {

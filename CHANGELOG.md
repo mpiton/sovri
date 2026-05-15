@@ -84,6 +84,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   transports, BYO-auth wrappers) are not blocked by the env-var guard. Auth
   validation is unchanged when the SDK is constructed internally.
 
+- `@sovri/llm-providers`: preserve literal custom error `name` types for
+  discriminated narrowing and normalize Anthropic SDK transport timeouts as
+  `AnthropicTimeoutError` in the provider-owned retry path (#30).
+
 - `@sovri/llm-providers`: replace the raw NUL byte in
   `LLMResponseSchema.test.ts` (control-byte path test) with the
   ` ` escape sequence so Git classifies the file as UTF-8

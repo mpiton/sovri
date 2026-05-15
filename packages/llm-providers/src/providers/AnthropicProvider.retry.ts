@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { APIError, AuthenticationError } from "@anthropic-ai/sdk";
+import { APIConnectionTimeoutError, APIError, AuthenticationError } from "@anthropic-ai/sdk";
 import type { MessageCreateParamsNonStreaming } from "@anthropic-ai/sdk/resources/messages/messages";
 
 import {
@@ -85,7 +85,7 @@ async function handleMessageFailure(options: {
   readonly timedOut: boolean;
   readonly timeoutMs: number;
 }): Promise<unknown> {
-  if (options.timedOut) {
+  if (options.timedOut || isAnthropicTimeoutError(options.cause)) {
     throw new AnthropicTimeoutError(
       `Anthropic request timed out after ${String(options.timeoutMs)} ms`,
       { cause: options.cause, attemptDurationsMs: options.attemptDurationsMs },
@@ -140,6 +140,10 @@ function anthropicErrorOptions(cause: unknown, attemptDurationsMs: ReadonlyArray
 
 function isRetryableAnthropicError(cause: unknown): boolean {
   return isAnthropicApiError(cause) && (cause.status === 429 || cause.status === 503);
+}
+
+function isAnthropicTimeoutError(cause: unknown): boolean {
+  return cause instanceof APIConnectionTimeoutError;
 }
 
 function isAnthropicApiError(cause: unknown): cause is APIError {

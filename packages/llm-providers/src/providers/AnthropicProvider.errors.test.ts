@@ -6,7 +6,12 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { AnthropicAuthError, AnthropicResponseError } from "../errors.js";
+import {
+  AnthropicAuthError,
+  AnthropicResponseError,
+  AnthropicRetryError,
+  AnthropicTimeoutError,
+} from "../errors.js";
 import { AnthropicProvider, MAX_ANTHROPIC_MAX_TOKENS } from "./AnthropicProvider.js";
 
 const AnthropicMessagesUrl = "https://api.anthropic.com/v1/messages";
@@ -39,6 +44,20 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("AnthropicProvider error handling", () => {
+  it("preserves literal error names for discriminated narrowing", () => {
+    const authName: "AnthropicAuthError" = new AnthropicAuthError("test auth").name;
+    const responseName: "AnthropicResponseError" = new AnthropicResponseError("test response").name;
+    const retryName: "AnthropicRetryError" = new AnthropicRetryError("test retry").name;
+    const timeoutName: "AnthropicTimeoutError" = new AnthropicTimeoutError("test timeout").name;
+
+    expect([authName, responseName, retryName, timeoutName]).toEqual([
+      "AnthropicAuthError",
+      "AnthropicResponseError",
+      "AnthropicRetryError",
+      "AnthropicTimeoutError",
+    ]);
+  });
+
   it("throws a typed auth error when the API key is missing", () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "");
 

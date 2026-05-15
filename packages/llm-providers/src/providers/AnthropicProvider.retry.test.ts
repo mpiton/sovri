@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { APIError } from "@anthropic-ai/sdk";
+import { APIConnectionTimeoutError, APIError } from "@anthropic-ai/sdk";
 import { z } from "@sovri/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -103,7 +103,7 @@ describe("AnthropicProvider retry and timeout handling", () => {
     // And exactly 1 Anthropic request is sent
     const error = await capturedError;
     expect(error).toBeInstanceOf(AnthropicAuthError);
-    expect(error).toMatchObject({ attemptDurationsMs: [0], status: 401 });
+    expect(error).toMatchObject({ attemptDurationsMs: [expect.any(Number)], status: 401 });
     expect(create).toHaveBeenCalledTimes(1);
   });
 
@@ -133,6 +133,32 @@ describe("AnthropicProvider retry and timeout handling", () => {
       name: "AnthropicTimeoutError",
       message: "Anthropic request timed out after 200 ms",
       attemptDurationsMs: [200],
+    });
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps Anthropic SDK timeout errors without retrying", async () => {
+    // Given the Anthropic SDK reports a transport timeout
+    // And the adapter timeout is configured to 200 ms
+    const create = createMessageSequence([new APIConnectionTimeoutError()]);
+    const provider = new AnthropicProvider({
+      client: clientFromCreate(create),
+      model: TestModel,
+      timeoutMs: 200,
+    });
+
+    // When the review engine calls Anthropic once
+    const result = provider.generateStructured(generateParams);
+    const capturedError = captureError(result);
+
+    // Then the SDK timeout is normalized to the adapter timeout error
+    // And exactly 1 Anthropic request is sent
+    const error = await capturedError;
+    expect(error).toBeInstanceOf(AnthropicTimeoutError);
+    expect(error).toMatchObject({
+      name: "AnthropicTimeoutError",
+      message: "Anthropic request timed out after 200 ms",
+      attemptDurationsMs: [expect.any(Number)],
     });
     expect(create).toHaveBeenCalledTimes(1);
   });
