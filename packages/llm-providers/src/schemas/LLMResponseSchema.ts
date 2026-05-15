@@ -20,7 +20,7 @@ const MAX_FINDINGS_PER_RESPONSE = 100;
 function isSafeRelativeFilePath(path: string): boolean {
   if (path.startsWith("/")) return false;
   const segments = path.split("/");
-  return !segments.includes("..") && !segments.includes(".");
+  return segments.every((segment) => segment.length > 0 && segment !== "." && segment !== "..");
 }
 
 export const LLMFindingSchema = z

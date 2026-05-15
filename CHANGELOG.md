@@ -19,25 +19,6 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
-### Added
-
-- `@sovri/llm-providers`: `LLMProvider` interface (`name`, `maxTokens`,
-  `generateStructured<T>(...)`) per ARCHI.md §4.3, plus `LLMFindingSchema`
-  / `LLMResponseSchema` (the structured-output shape the LLM returns before
-  the review-engine assigns deterministic `id`/`source`/`confidence`) and
-  the internal `zodToProviderJsonSchema` helper that maps any Zod schema to
-  a JSON Schema draft 2020-12 payload usable in Anthropic
-  `tools[].input_schema` or Mistral / OpenAI-compatible
-  `response_format.json_schema.schema` (#28). The helper relies on Zod 4's
-  native `z.toJSONSchema()` and inlines reused subschemas
-  (`reused: "inline"`) because several providers fail to resolve `$ref`
-  reliably; provider-specific tweaks such as OpenAI strict mode's
-  recursive `additionalProperties: false` stay in the adapter layer. The
-  inline `LLMFindingSchema` reuses `@sovri/core`'s `SeveritySchema` and
-  `CategorySchema` so the LLM cannot drift the enum surface independently
-  of the domain. No concrete provider lands in this task — `AnthropicProvider`
-  ships in #29.
-
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency
@@ -96,6 +77,23 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   the new branch via a `vi.mock` factory.
 
 ### Added
+
+- `@sovri/llm-providers`: `LLMProvider` interface (`name`, `maxTokens`,
+  `generateStructured<T>(...)`) per ARCHI.md §4.3, plus `LLMFindingSchema`
+  / `LLMResponseSchema` (the structured-output shape the LLM returns before
+  the review-engine assigns deterministic `id`/`source`/`confidence`) and
+  the internal `zodToProviderJsonSchema` helper that maps any Zod schema to
+  a JSON Schema draft 2020-12 payload usable in Anthropic
+  `tools[].input_schema` or Mistral / OpenAI-compatible
+  `response_format.json_schema.schema` (#28). The helper relies on Zod 4's
+  native `z.toJSONSchema()` and inlines reused subschemas
+  (`reused: "inline"`) because several providers fail to resolve `$ref`
+  reliably; provider-specific tweaks such as OpenAI strict mode's
+  recursive `additionalProperties: false` stay in the adapter layer. The
+  inline `LLMFindingSchema` reuses `@sovri/core`'s `SeveritySchema` and
+  `CategorySchema` so the LLM cannot drift the enum surface independently
+  of the domain. No concrete provider lands in this task — `AnthropicProvider`
+  ships in #29.
 
 - `@sovri/llm-providers` package scaffold (#27) — Apache 2.0 package that
   anchors BYOK LLM adapter slot in the v0.1 sprint plan. Exposes the same
