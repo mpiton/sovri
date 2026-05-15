@@ -117,10 +117,15 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/llm-providers`: acceptance coverage for the default Anthropic
+  request timeout confirms that an adapter created without an explicit
+  timeout passes the 60 s default to the SDK call while still returning a
+  completion that arrives before the deadline (#97).
+
 - `@sovri/llm-providers`: `AnthropicProvider` now applies provider-owned
-  retry and timeout controls for structured-output calls (#30). HTTP 429
-  and 503 retry only, with three total attempts, 500 ms / 1000 ms
-  exponential backoff, and bounded jitter to avoid retry bursts. Each
+  retry and timeout controls for structured-output calls (#30). Documented
+  transient Anthropic failures retry with three total attempts, 500 ms /
+  1000 ms exponential backoff, and bounded jitter to avoid retry bursts. Each
   request uses an `AbortController` timeout defaulting to 60 s and disables
   the Anthropic SDK's built-in retries so Sovri owns the retry contract.
   Final failures now expose typed retry/timeout errors and attempt duration
