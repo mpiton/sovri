@@ -463,6 +463,39 @@ describe("AnthropicProvider retry and timeout handling", () => {
     expect(create).toHaveBeenCalledTimes(2);
   });
 
+  it.each([
+    { randomValue: 0, retryDelayMs: 400 },
+    { randomValue: 1, retryDelayMs: 600 },
+  ])(
+    "keeps first retry delay inside bounded jitter at $retryDelayMs ms",
+    async ({ randomValue, retryDelayMs }) => {
+      // Given the Anthropic adapter is configured with max 3 total attempts
+      // And the exponential backoff base delay is 500 ms
+      // And retry jitter is bounded to plus or minus 20 percent
+      // And the first Anthropic response is HTTP 503
+      // And the second Anthropic response is a valid completion
+      vi.useFakeTimers();
+      vi.spyOn(Math, "random").mockReturnValue(randomValue);
+      const create = createMessageSequence([apiError(503), anthropicMessage()]);
+      const provider = new AnthropicProvider({
+        client: clientFromCreate(create),
+        model: TestModel,
+      });
+
+      // When the review engine calls Anthropic once
+      const result = provider.generateStructured(generateParams);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(retryDelayMs - 1);
+
+      // Then the adapter waits between 400 ms and 600 ms before the second request
+      // And the adapter returns the valid completion
+      expect(create).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(result).resolves.toEqual(validStructuredResponse);
+      expect(create).toHaveBeenCalledTimes(2);
+    },
+  );
+
   it("spreads same-window transient failures across jittered retry delays", async () => {
     // Given three Anthropic calls receive HTTP 503 at 10:00:00.000 UTC
     // And retry jitter is bounded to plus or minus 20 percent
