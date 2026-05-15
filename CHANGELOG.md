@@ -70,6 +70,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `@sovri/llm-providers`: replace the raw NUL byte in
+  `LLMResponseSchema.test.ts` (control-byte path test) with the
+  ` ` escape sequence so Git classifies the file as UTF-8
+  text instead of binary (#28, Codex review on #91). Test semantics
+  unchanged — TypeScript still produces the same NUL-containing string
+  literal at runtime, but text-based diff/review tooling now works.
+
 - `@sovri/config`: `loadConfig()` no longer throws when `.sovri.yml`
   vanishes between the `fs.stat` and the `fs.readFile` syscalls (#26).
   The read path now mirrors the stat-time fallback and returns
