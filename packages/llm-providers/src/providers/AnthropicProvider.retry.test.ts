@@ -238,6 +238,34 @@ describe("AnthropicProvider retry and timeout handling", () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 
+  it("uses the configured timeout when provided", async () => {
+    // Given the Anthropic adapter is configured with a timeout of 1500 ms
+    // And the Anthropic response arrives after 1000 ms
+    vi.useFakeTimers();
+    let capturedOptions: AnthropicCreateOptions | undefined;
+    const create = vi.fn<AnthropicCreate>(async (_request, options) => {
+      capturedOptions = options;
+      await sleep(1000);
+      return anthropicMessage();
+    });
+    const provider = new AnthropicProvider({
+      client: clientFromCreate(create),
+      model: TestModel,
+      timeoutMs: 1500,
+    });
+
+    // When the review engine calls Anthropic once
+    const result = provider.generateStructured(generateParams);
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    // Then the request uses an AbortController timeout of 1500 ms
+    // And the adapter returns the valid completion
+    expect(capturedOptions?.timeout).toBe(1500);
+    await expect(result).resolves.toEqual(validStructuredResponse);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
   it("applies positive 20 percent jitter to the first retry delay", async () => {
     // Given the exponential backoff base delay is 500 ms
     // And retry jitter is bounded to plus or minus 20 percent

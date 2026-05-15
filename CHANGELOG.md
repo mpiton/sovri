@@ -122,6 +122,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   timeout passes the 60 s default to the SDK call while still returning a
   completion that arrives before the deadline (#97).
 
+- `@sovri/llm-providers`: acceptance coverage for custom Anthropic request
+  timeouts confirms that a configured 1500 ms timeout is passed to the SDK
+  call while still returning a completion that arrives at 1000 ms (#99).
+
 - `@sovri/llm-providers`: `AnthropicProvider` now applies provider-owned
   retry and timeout controls for structured-output calls (#30). Documented
   transient Anthropic failures retry with three total attempts, 500 ms /
