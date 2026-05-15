@@ -195,6 +195,32 @@ describe("AnthropicProvider retry and timeout handling", () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 
+  it("records one attempt duration for immediate non-retryable failures", async () => {
+    // Given the Anthropic adapter is configured with max 3 total attempts
+    // And Anthropic returns HTTP 401 after 30 ms on the first request
+    vi.useFakeTimers();
+    const create = createDelayedErrorSequence([{ responseMs: 30, error: apiError(401) }]);
+    const provider = new AnthropicProvider({ client: clientFromCreate(create), model: TestModel });
+
+    // When the review engine calls Anthropic once
+    const result = provider.generateStructured(generateParams);
+    const capturedError = captureError(result);
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(30);
+
+    // Then the adapter throws a typed provider error
+    // And the error records one attempt duration of 30 ms
+    // And exactly 1 Anthropic request is sent
+    const error = await capturedError;
+    expect(error).toBeInstanceOf(AnthropicAuthError);
+    expect(error).toMatchObject({
+      name: "AnthropicAuthError",
+      attemptDurationsMs: [30],
+      status: 401,
+    });
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
   it("aborts after the configured timeout without retrying", async () => {
     // Given the Anthropic adapter is configured with a timeout of 200 ms
     // And the Anthropic response would arrive after 1000 ms

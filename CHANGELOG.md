@@ -122,6 +122,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/llm-providers`: acceptance coverage confirms immediate
+  non-retryable Anthropic HTTP 401 failures record the single 30 ms attempt
+  duration and do not retry (#102).
+
 - `@sovri/llm-providers`: acceptance coverage confirms exhausted transient
   Anthropic failures preserve every attempt duration from the three total
   HTTP 503 attempts and surface the typed retry error message (#101).
