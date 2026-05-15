@@ -85,6 +85,21 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/llm-providers`: `AnthropicProvider` now implements the shared
+  `LLMProvider` contract for v0.1 (#29). It reads `ANTHROPIC_API_KEY` from
+  the process environment, rejects missing or blank keys with
+  `AnthropicAuthError`, sends Claude Sonnet structured-output requests through
+  the official Anthropic SDK using the current `output_config.format`
+  `json_schema` API, applies Anthropic's JSON Schema transform to the shared
+  provider schema helper output, caps `maxTokens` overrides, parses the
+  returned text as JSON, and validates it against the caller's Zod schema
+  before returning. Malformed JSON, schema mismatches, bad provider response
+  shapes, and API failures are wrapped in `AnthropicResponseError` with safe
+  status/request metadata only; 401s are surfaced as `AnthropicAuthError`.
+  MSW-backed integration tests cover the happy path, missing key, rejected
+  key, malformed JSON, schema mismatch, invalid token limits, and transformed
+  schema shape without real network calls or real secrets.
+
 - `@sovri/llm-providers`: `LLMProvider` interface (`name`, `maxTokens`,
   `generateStructured<T>(...)`) per ARCHI.md §4.3, plus `LLMFindingSchema`
   / `LLMResponseSchema` (the structured-output shape the LLM returns before

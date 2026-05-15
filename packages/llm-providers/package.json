@@ -2,7 +2,7 @@
   "name": "@sovri/llm-providers",
   "version": "0.1.0",
   "private": true,
-  "description": "Sovri LLM provider adapters — BYOK. v0.1 ships only the package scaffold; AnthropicProvider lands in follow-up tasks (ARCHI §4.3).",
+  "description": "Sovri LLM provider adapters — BYOK. v0.1 ships Anthropic structured-output support.",
   "homepage": "https://github.com/mpiton/sovri/tree/main/packages/llm-providers#readme",
   "bugs": {
     "url": "https://github.com/mpiton/sovri/issues"
@@ -42,6 +42,7 @@
   },
   "devDependencies": {
     "@types/node": "24.12.4",
+    "msw": "2.14.6",
     "tsup": "8.5.1",
     "vitest": "4.1.6"
   },
