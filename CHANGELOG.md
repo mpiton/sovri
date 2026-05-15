@@ -29,6 +29,20 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/llm-providers` package scaffold (#27) — Apache 2.0 package that
+  anchors BYOK LLM adapter slot in the v0.1 sprint plan. Exposes the same
+  `tsup`/`tsc -b`/`vitest`/`oxlint` quartet of scripts as the existing
+  packages and ships a placeholder `src/index.ts` until the
+  `LLMProvider` contract lands (#28). Runtime deps:
+  `@anthropic-ai/sdk@0.96.0` (PINNED EXACT per ADR-005 supply-chain
+  rule, post-dates the mini-shai-hulud incident of 2026-05-11),
+  `zod-to-json-schema@3.25.2` (also pinned via `.npmrc save-exact=true`),
+  `zod@4.4.3`, and workspace deps `@sovri/core` + `@sovri/observability`.
+  No Mistral or OpenAI SDK ships — those land in v0.5 alongside the
+  multi-provider scope. Root `tsconfig.json` references and `knip.json`
+  overrides updated; the dependency ignore-list in `knip.json` will be
+  removed in #28 once the imports become live.
+
 - `@sovri/config`: `loadConfig(repoRoot)` — async reader/validator for
   `.sovri.yml` (#26). Resolves the four documented outcomes from the issue
   contract: missing file (`ENOENT`/`ENOTDIR`) or YAML root of `null`/
