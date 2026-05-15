@@ -19,6 +19,74 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Added
+
+- `@sovri/llm-providers`: `LLMProvider` interface (`name`, `maxTokens`,
+  `generateStructured<T>(...)`) per ARCHI.md §4.3, plus `LLMFindingSchema`
+  / `LLMResponseSchema` (the structured-output shape the LLM returns before
+  the review-engine assigns deterministic `id`/`source`/`confidence`) and
+  the internal `zodToProviderJsonSchema` helper that maps any Zod schema to
+  a JSON Schema draft 2020-12 payload usable in Anthropic
+  `tools[].input_schema` or Mistral / OpenAI-compatible
+  `response_format.json_schema.schema` (#28). The helper relies on Zod 4's
+  native `z.toJSONSchema()` and inlines reused subschemas
+  (`reused: "inline"`) because several providers fail to resolve `$ref`
+  reliably; provider-specific tweaks such as OpenAI strict mode's
+  recursive `additionalProperties: false` stay in the adapter layer. The
+  inline `LLMFindingSchema` reuses `@sovri/core`'s `SeveritySchema` and
+  `CategorySchema` so the LLM cannot drift the enum surface independently
+  of the domain. No concrete provider lands in this task — `AnthropicProvider`
+  ships in #29.
+
+### Removed
+
+- `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency
+  introduced by the package scaffold (#27) is dropped in favour of Zod 4's
+  native `z.toJSONSchema()` (#28). The third-party converter still types
+  its `schema` parameter as the v3 `ZodSchema`, which would have forced an
+  unsafe cast to feed a Zod 4 schema and contravenes the strict-mode rule
+  banning unjustified `as` casts. Shrinking the transitive dependency
+  surface also reduces the supply-chain blast radius (mini-shai-hulud
+  rationale, ADR-005). The matching entry in `knip.json` for the package
+  is removed alongside the dependency.
+
+### Security
+
+- `@sovri/llm-providers`: `LLMFindingSchema` and `LLMResponseSchema` are
+  hardened against prompt-injected LLM output (#28). The diff entering the
+  prompt is untrusted; the response re-enters the bot as untrusted JSON
+  and is the canonical injection surface. Mitigations:
+  - `file` rejects absolute paths, `..` traversal segments, NUL/CR/LF, and
+    Windows drive separators via a strict regex — closing the
+    Octokit `createReviewComment({ path })` / local-fs-read path-traversal
+    sink class that affected similar review bots.
+  - `line_start` and `line_end` are capped at `1_000_000`, with a
+    `superRefine` enforcing `line_start <= line_end`, blocking 2-billion-row
+    expansions and nonsensical inline comments.
+  - `walkthrough_markdown` is bounded `[1, 50_000]` chars, staying under
+    GitHub's 65 536 PR-comment hard limit with headroom; empty values are
+    rejected so degenerate output fails loud at parse time.
+  - `findings` array is capped at 100 per response, blocking LLM-driven
+    GitHub API rate-limit exhaustion (each finding posts a separate inline
+    comment) and worker memory exhaustion in the stateless v0.1 bot.
+  - Both schemas switch to `z.strictObject(...)`: unknown keys from the
+    LLM are now rejected at parse time instead of silently stripped, which
+    surfaces prompt-template drift early and removes the key-smuggling
+    vector for downstream code that may later spread the parsed object.
+  - `CwePattern` tightened to `^CWE-\d{1,7}$` (CWE IDs are ≤ 6 digits today)
+    to cap string length on the optional `cwe` field.
+
+### Changed
+
+- `@sovri/llm-providers`: `zodToProviderJsonSchema` now pins `cycles: "ref"`
+  and `unrepresentable: "throw"` explicitly in addition to the existing
+  `target: "draft-2020-12"` and `reused: "inline"` (#28). The values match
+  Zod 4's current defaults but are documented in code so a future Zod
+  default change cannot silently relax the contract: recursive schemas
+  still emit `$ref` rather than looping forever, and unrepresentable
+  shapes (e.g. `z.function()`) still throw at build time instead of
+  producing `{}` that an LLM would silently honour.
+
 ### Fixed
 
 - `@sovri/config`: `loadConfig()` no longer throws when `.sovri.yml`

@@ -23,7 +23,7 @@
     "packages/llm-providers": {
       "entry": ["src/index.ts!", "src/{cli,bin,server,worker}.ts!"],
       "project": ["src/**/*.{ts,tsx,mts}!"],
-      "ignoreDependencies": ["@anthropic-ai/sdk", "zod-to-json-schema", "zod"]
+      "ignoreDependencies": ["@anthropic-ai/sdk", "zod"]
     },
     "apps/*": {
       "entry": ["src/index.ts!", "src/{server,main,bin,worker}.ts!"],
