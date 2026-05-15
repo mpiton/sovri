@@ -19,7 +19,41 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Fixed
+
+- `@sovri/config`: `loadConfig()` no longer throws when `.sovri.yml`
+  vanishes between the `fs.stat` and the `fs.readFile` syscalls (#26).
+  The read path now mirrors the stat-time fallback and returns
+  `DEFAULT_CONFIG` on `ENOENT`/`ENOTDIR`, with regression tests driving
+  the new branch via a `vi.mock` factory.
+
 ### Added
+
+- `@sovri/config`: `loadConfig(repoRoot)` — async reader/validator for
+  `.sovri.yml` (#26). Resolves the four documented outcomes from the issue
+  contract: missing file (`ENOENT`/`ENOTDIR`) or YAML root of `null`/
+  `undefined` (empty file, comments only) returns `DEFAULT_CONFIG`;
+  malformed YAML throws `SovriConfigParseError` with the underlying
+  `YAMLException` in `cause`; schema violations throw
+  `SovriConfigValidationError` carrying the full Zod issue list. Pino
+  debug logs at every branch via `@sovri/observability` so an operator
+  can trace which path fired without recompiling. Hardening: a 64 KiB
+  byte-size cap (`MAX_CONFIG_BYTES`) checked via `fs.stat` before the
+  parser ever sees the input, blocking trivially oversized payloads
+  during webhook processing; `DEFAULT_CONFIG` is deep-frozen so a misuse
+  in any downstream package cannot poison the shared singleton across
+  every subsequent review. `SovriConfigParseError` and
+  `SovriConfigValidationError` extend `Error` with the ES2022 `cause`
+  option and expose `filePath` plus (for the validation case) the parsed
+  Zod `issues` array, ready for a PR-comment renderer to surface
+  actionable diagnostics. Real `.sovri.yml` fixtures live under
+  `packages/config/test-fixtures/` (valid, empty, comments-only,
+  malformed, two distinct schema violations); the test suite exercises
+  every branch above 86 % including the v0.1 `.refine()` narrowing that
+  rejects non-`anthropic` providers. Residual YAML-bomb risk via deeply
+  nested anchors/aliases is acknowledged in the loader docstring and
+  deferred to a follow-up that swaps the parser or adds an alias-count
+  guard.
 
 - `@sovri/config`: `SovriConfigSchema` — v0.1 minimal `.sovri.yml` shape
   (#25). Materialises the schema sketched in `ARCHI.md` §4.4 with strict

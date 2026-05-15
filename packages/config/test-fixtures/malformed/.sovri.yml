@@ -1,0 +1,4 @@
+llm:
+  provider: anthropic
+  model: [unterminated array
+  apiKeySecret: ANTHROPIC_API_KEY
