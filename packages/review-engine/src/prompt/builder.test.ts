@@ -43,6 +43,44 @@ describe("buildUserPrompt", () => {
     expect(prompt).toContain("export const reviewed = true");
   });
 
+  it("includes pull request metadata and diff content in the user prompt", () => {
+    // Given the pull request description is "Reject expired and blocked card states."
+    // And the diff content is:
+    // """
+    // diff --git a/src/cards.ts b/src/cards.ts
+    // @@ -1,2 +1,3 @@
+    //  export const acceptedStates = ["active"];
+    // +export const rejectedStates = ["expired", "blocked"];
+    //  export const provider = "stripe";
+    // """
+    const diff = `diff --git a/src/cards.ts b/src/cards.ts
+@@ -1,2 +1,3 @@
+ export const acceptedStates = ["active"];
++export const rejectedStates = ["expired", "blocked"];
+ export const provider = "stripe";`;
+
+    // When the maintainer builds the user prompt.
+    const prompt = buildUserPrompt(diff, {
+      number: 42,
+      repoFullName: "acme/payments",
+      title: "Add card state validation",
+      description: "Reject expired and blocked card states.",
+    });
+
+    // Then the prompt contains repository "acme/payments".
+    expect(prompt).toContain("acme/payments");
+    // And the prompt contains pull request number 42.
+    expect(prompt).toContain("Pull request: #42");
+    // And the prompt contains title "Add card state validation".
+    expect(prompt).toContain("Add card state validation");
+    // And the prompt contains description "Reject expired and blocked card states."
+    expect(prompt).toContain("Reject expired and blocked card states.");
+    // And the prompt contains the diff path "src/cards.ts".
+    expect(prompt).toContain("src/cards.ts");
+    // And the prompt contains the added line "export const rejectedStates = [\"expired\", \"blocked\"];"
+    expect(prompt).toContain('export const rejectedStates = ["expired", "blocked"];');
+  });
+
   it("escapes directive markers in pull request metadata", () => {
     const diff = `diff --git a/src/payments.ts b/src/payments.ts
 @@ -1 +1,2 @@

@@ -195,6 +195,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: acceptance coverage now asserts `buildUserPrompt()`
+  includes pull request repository, number, title, description, diff path, and
+  added diff lines in the user prompt (#178).
+
 - `@sovri/review-engine`: acceptance coverage now asserts repeated full-mode
   system prompt builds return identical template strings without runtime pull
   request data (#165).
