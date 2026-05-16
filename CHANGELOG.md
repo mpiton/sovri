@@ -195,6 +195,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: acceptance coverage now asserts
+  `buildSystemPrompt({ mode: "full" })` returns the baseline static template,
+  requests code review and structured JSON findings, and excludes runtime pull
+  request data from the system prompt (#163).
+
 - `@sovri/review-engine`: acceptance coverage now asserts non-ASCII system
   prompt template content is measured by UTF-8 bytes, including `é` as a
   two-byte character (#161).
