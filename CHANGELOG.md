@@ -134,6 +134,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `@sovri/core`: `FindingSchema.id` now requires UUID v4 instead of accepting
+  any syntactically valid UUID version, so parser regressions that assign older
+  UUID versions are rejected before a `Finding` can be returned (#203).
+
 - `@sovri/review-engine`: `runReview` now routes prompt generation through
   `buildUserPrompt()` with validated pull request metadata, so the runtime
   provider request uses the same title, description, and diff prompt contract

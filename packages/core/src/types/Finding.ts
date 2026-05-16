@@ -25,7 +25,7 @@ const SuggestionSchema = z.object({
 const CwePattern = /^CWE-\d+$/;
 
 export const FindingSchema = z.object({
-  id: z.uuid(),
+  id: z.uuidv4(),
   severity: SeveritySchema,
   category: CategorySchema,
   file: z.string().min(1),
