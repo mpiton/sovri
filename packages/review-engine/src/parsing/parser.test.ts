@@ -419,6 +419,38 @@ describe("parseLLMResponse", () => {
     expect(FindingSchema.parse(finding)).toEqual(finding);
   });
 
+  it("rejects a malformed JSON string with a typed parse error", () => {
+    // Given the LLM response input is:
+    // """
+    // {"summary":"Broken response","findings":[
+    // """
+    const input = '{"summary":"Broken response","findings":[';
+
+    let parsedFindings: ReturnType<typeof parseLLMResponse> | undefined;
+    let thrownError: unknown;
+
+    // When the maintainer calls `parseLLMResponse`
+    try {
+      parsedFindings = parseLLMResponse(input);
+    } catch (error) {
+      thrownError = error;
+    }
+
+    // Then parsing fails with a typed LLM response parse error
+    expect(thrownError).toBeInstanceOf(Error);
+    expect(thrownError).toMatchObject({
+      name: "LLMResponseParseError",
+    });
+
+    // And no partial findings are returned
+    expect(parsedFindings).toBeUndefined();
+
+    // And the error cause contains the JSON syntax failure
+    expect(thrownError).toMatchObject({
+      cause: expect.any(SyntaxError),
+    });
+  });
+
   it("assigns a UUID v4 id to a parsed finding", () => {
     // Given the raw LLM response summary is "One finding found"
     // And the raw LLM response contains a finding for file "src/cards.ts"

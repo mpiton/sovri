@@ -103,6 +103,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `@sovri/review-engine`: add acceptance coverage that already-parsed unknown
   object inputs still parse into public `Finding[]` values (#221).
 
+- `@sovri/review-engine`: add acceptance coverage that malformed raw JSON
+  string inputs fail with a typed parse error retaining the JSON syntax cause
+  (#222).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency
