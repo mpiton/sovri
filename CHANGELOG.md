@@ -180,6 +180,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: acceptance coverage starts for the v0.1 prompt
+  builder user prompt contract, asserting that safe PR metadata and diff
+  content are preserved in the generated review prompt (#155).
+
 - `@sovri/review-engine`: `parseUnifiedDiff(raw)` now converts unified Git diff
   text into the normalized `@sovri/core` `DiffSchema` contract (#32). The parser
   validates parse-diff output with Zod, preserves binary file entries with
