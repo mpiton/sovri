@@ -62,6 +62,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   schema-violating LLM responses before any partial findings are returned
   (#209).
 
+- `@sovri/review-engine`: add acceptance coverage that parser responses with
+  101 findings fail with a typed findings limit validation error (#210).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency

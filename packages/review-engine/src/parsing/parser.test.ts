@@ -130,6 +130,42 @@ describe("parseLLMResponse", () => {
     expect(parsedFindings).toBeUndefined();
   });
 
+  it("throws a findings limit validation error for an oversized response", () => {
+    // Given the test fixture contains a response with summary "Too many findings"
+    // And the test fixture contains 101 findings
+    const response = {
+      summary: "Too many findings",
+      findings: Array.from({ length: 101 }, (_, index) =>
+        buildRawFinding({
+          file: `src/review-${index}.ts`,
+        }),
+      ),
+    };
+
+    let thrownError: unknown;
+
+    // When the maintainer runs the parser tests
+    try {
+      parseLLMResponse(response);
+    } catch (error) {
+      thrownError = error;
+    }
+
+    // Then the oversized response test passes
+    expect(thrownError).toBeInstanceOf(Error);
+
+    // And the test asserts that parsing fails with a findings limit validation error
+    expect(thrownError).toMatchObject({
+      name: "LLMResponseParseError",
+      issues: [
+        expect.objectContaining({
+          code: "too_big",
+          path: ["findings"],
+        }),
+      ],
+    });
+  });
+
   it("assigns separate UUID v4 ids to multiple parsed findings", () => {
     // Given the raw LLM response summary is "One finding found"
     // And the raw LLM response contains a finding for file "src/cards.ts"
