@@ -118,6 +118,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   for a strict response with summary `Review completed` and one raw finding
   (#225).
 
+- `@sovri/review-engine`: add top-level LLM response schema rejection coverage
+  for empty and 2001-character summaries (#226).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency

@@ -356,6 +356,48 @@ describe("LLMResponseSchema", () => {
     // And the response contains 1 raw finding
     expect(validation.data.findings).toHaveLength(1);
   });
+
+  it("rejects invalid summary values", () => {
+    const summaries = ["", "x".repeat(2001)];
+
+    for (const summary of summaries) {
+      // Given the valid raw finding file is "src/review.ts"
+      // And the valid raw finding line_start is 21
+      // And the valid finding line_end is 21
+      // And the valid finding suggested_code is "return review;"
+      // Given the raw LLM response summary is <summary>
+      // And the raw LLM response contains the valid raw finding
+      const response = {
+        summary,
+        findings: [
+          buildRawFinding({
+            file: "src/review.ts",
+            line_start: 21,
+            line_end: 21,
+            suggested_code: "return review;",
+          }),
+        ],
+      };
+
+      // When the maintainer validates the raw LLM response
+      const validation = LLMResponseSchema.safeParse(response);
+      const parsedFindings = validation.success ? validation.data.findings : undefined;
+
+      // Then validation fails with a summary validation error
+      if (validation.success) {
+        expect.fail("Expected invalid summary validation to fail");
+      }
+
+      expect(validation.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: ["summary"],
+        }),
+      );
+
+      // And no parsed findings are returned
+      expect(parsedFindings).toBeUndefined();
+    }
+  });
 });
 
 describe("parseLLMResponse", () => {
