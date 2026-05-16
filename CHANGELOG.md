@@ -90,6 +90,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `@sovri/review-engine`: add raw LLM finding schema rejection coverage for
   deterministic model-provided `id` and `source` fields as unknown keys (#217).
 
+- `@sovri/review-engine`: add raw LLM finding schema rejection coverage for
+  invalid severity, category, file, line range, confidence, title length, and
+  body length values (#218).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency

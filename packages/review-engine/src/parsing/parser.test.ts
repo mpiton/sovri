@@ -166,6 +166,120 @@ describe("LLMRawFindingSchema", () => {
       );
     }
   });
+
+  it("rejects invalid raw finding field values", () => {
+    const invalidRawFindings: ReadonlyArray<unknown> = [
+      {
+        severity: "critical",
+        category: "bug",
+        file: "src/app.ts",
+        line_start: 1,
+        line_end: 1,
+        title: "Invalid severity",
+        body: "Valid body",
+        suggested_code: null,
+        confidence: 0.75,
+      },
+      {
+        severity: "major",
+        category: "typo",
+        file: "src/app.ts",
+        line_start: 1,
+        line_end: 1,
+        title: "Invalid category",
+        body: "Valid body",
+        suggested_code: null,
+        confidence: 0.75,
+      },
+      {
+        severity: "major",
+        category: "bug",
+        file: "",
+        line_start: 1,
+        line_end: 1,
+        title: "Empty file",
+        body: "Valid body",
+        suggested_code: null,
+        confidence: 0.75,
+      },
+      {
+        severity: "major",
+        category: "bug",
+        file: "src/app.ts",
+        line_start: 9,
+        line_end: 7,
+        title: "Reversed lines",
+        body: "Valid body",
+        suggested_code: null,
+        confidence: 0.75,
+      },
+      {
+        severity: "major",
+        category: "bug",
+        file: "src/app.ts",
+        line_start: 1,
+        line_end: 1,
+        title: "Valid title",
+        body: "Valid body",
+        suggested_code: null,
+        confidence: 1.01,
+      },
+      {
+        severity: "major",
+        category: "bug",
+        file: "src/app.ts",
+        line_start: 0,
+        line_end: 1,
+        title: "Zero line start",
+        body: "Valid body",
+        suggested_code: null,
+        confidence: 0.75,
+      },
+      {
+        severity: "major",
+        category: "bug",
+        file: "src/app.ts",
+        line_start: 1,
+        line_end: 1,
+        title: "t".repeat(201),
+        body: "Valid body",
+        suggested_code: null,
+        confidence: 0.75,
+      },
+      {
+        severity: "major",
+        category: "bug",
+        file: "src/app.ts",
+        line_start: 1,
+        line_end: 1,
+        title: "Valid title",
+        body: "b".repeat(2001),
+        suggested_code: null,
+        confidence: 0.75,
+      },
+    ];
+
+    for (const rawFinding of invalidRawFindings) {
+      // Given the raw finding has severity "<severity>"
+      // And the raw finding has category "<category>"
+      // And the raw finding has file "<file>"
+      // And the raw finding has line_start <line_start>
+      // And the raw finding has line_end <line_end>
+      // And the raw finding has title <title>
+      // And the raw finding has body <body>
+      // And the raw finding has suggested_code null
+      // And the raw finding has confidence <confidence>
+      // When the maintainer validates the raw finding
+      const validation = LLMRawFindingSchema.safeParse(rawFinding);
+
+      // Then validation fails with a raw finding validation error
+      if (validation.success) {
+        expect.fail("Expected invalid raw finding validation to fail");
+      }
+
+      expect(validation.error.issues.length).toBeGreaterThan(0);
+    }
+  });
 });
 
 describe("parseLLMResponse", () => {
