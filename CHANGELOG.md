@@ -195,6 +195,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: acceptance coverage now asserts repeated full-mode
+  system prompt builds return identical template strings without runtime pull
+  request data (#165).
+
 - `@sovri/review-engine`: `buildSystemPrompt()` now validates external
   configuration input at runtime and acceptance coverage asserts unsupported
   review modes fail before any fallback system template is returned (#164).

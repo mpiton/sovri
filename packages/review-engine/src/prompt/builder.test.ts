@@ -135,6 +135,25 @@ describe("buildSystemPrompt", () => {
     expect(systemPrompt).toBeUndefined();
   });
 
+  it("returns the same template for repeated full mode calls", () => {
+    // Given the review config selects mode "full".
+    const config = { mode: "full" };
+
+    // When the maintainer builds the system prompt twice.
+    const firstSystemPrompt = buildSystemPrompt(config);
+    const secondSystemPrompt = buildSystemPrompt(config);
+
+    // Then both system prompt strings are identical.
+    expect(secondSystemPrompt).toBe(firstSystemPrompt);
+    // And neither system prompt includes runtime pull request data.
+    expect(firstSystemPrompt).not.toContain("Add payment validation");
+    expect(firstSystemPrompt).not.toContain("Reject invalid card state");
+    expect(firstSystemPrompt).not.toContain("export const reviewed = true");
+    expect(secondSystemPrompt).not.toContain("Add payment validation");
+    expect(secondSystemPrompt).not.toContain("Reject invalid card state");
+    expect(secondSystemPrompt).not.toContain("export const reviewed = true");
+  });
+
   it("keeps the baseline system template under the byte limit", () => {
     // Given the prompt builder uses the v0.1 full review template.
 
