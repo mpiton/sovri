@@ -5,20 +5,17 @@ import type { Diff } from "@sovri/core";
 import type { LLMProvider } from "@sovri/llm-providers";
 import type { Logger } from "@sovri/observability";
 import { v7 as uuidv7 } from "uuid";
-import { z } from "zod";
+import type { z } from "zod";
 
 import { parseUnifiedDiff } from "./diff/index.js";
-import { buildReviewPrompt } from "./prompt/index.js";
+import { buildReviewPrompt, ReviewPromptInputSchema } from "./prompt/index.js";
 import {
   parseLLMReviewResponse,
   ProviderReviewResponseSchema,
   type ProviderFinding,
 } from "./parsing/index.js";
 
-export const RunReviewInputSchema = z.strictObject({
-  unifiedDiff: z.string(),
-  instructions: z.array(z.string().min(1)).default([]),
-});
+export const RunReviewInputSchema = ReviewPromptInputSchema;
 
 export type RunReviewInput = z.input<typeof RunReviewInputSchema>;
 

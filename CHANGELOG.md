@@ -33,6 +33,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Security
 
+- `@sovri/review-engine`: `buildUserPrompt()` now fences and escapes pull
+  request repository, title, description, and unified diff content as user data
+  before they enter the provider prompt, blocking PR metadata from injecting
+  prompt directives outside the protected diff section (#155).
+
+- `@sovri/review-engine`: runtime prompt composition now keeps escaped unified
+  diffs inside a fenced `diff` block after routing through `buildUserPrompt()`,
+  preserving delimiter protection while still including pull request metadata
+  in the provider request (#155).
+
 - `@sovri/review-engine`: `buildReviewPrompt` now escapes triple-backtick
   sequences inside `unifiedDiff` before interpolating into the fenced `diff`
   block (#134, cubic-dev review). A diff containing ``` could otherwise close
@@ -105,6 +115,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   producing `{}` that an LLM would silently honour.
 
 ### Fixed
+
+- `@sovri/review-engine`: `runReview` now routes prompt generation through
+  `buildUserPrompt()` with validated pull request metadata, so the runtime
+  provider request uses the same title, description, and diff prompt contract
+  covered by the #155 acceptance scenario.
 
 - `@sovri/review-engine`: `parseUnifiedDiff` now rejects inputs that do not
   contain a `diff --git ` file header instead of returning files with empty
@@ -179,6 +194,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   the new branch via a `vi.mock` factory.
 
 ### Added
+
+- `@sovri/review-engine`: acceptance coverage starts for the v0.1 prompt
+  builder user prompt contract, and `buildUserPrompt()` now preserves safe PR
+  metadata and diff content in the generated review prompt (#155).
 
 - `@sovri/review-engine`: `parseUnifiedDiff(raw)` now converts unified Git diff
   text into the normalized `@sovri/core` `DiffSchema` contract (#32). The parser
