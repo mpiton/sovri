@@ -94,6 +94,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   invalid severity, category, file, line range, confidence, title length, and
   body length values (#218).
 
+- `@sovri/review-engine`: add raw LLM finding schema rejection coverage for
+  invalid optional CWE values on the `cwe` path (#219).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency

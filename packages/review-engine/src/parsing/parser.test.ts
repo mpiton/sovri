@@ -280,6 +280,49 @@ describe("LLMRawFindingSchema", () => {
       expect(validation.error.issues.length).toBeGreaterThan(0);
     }
   });
+
+  it("rejects invalid optional CWE values", () => {
+    const invalidCwes = ["cwe-79", "CWE-"];
+
+    for (const cwe of invalidCwes) {
+      // Given the raw finding has severity "major"
+      // And the raw finding has category "security"
+      // And the raw finding has file "src/auth/session.ts"
+      // And the raw finding has line_start 44
+      // And the raw finding has line_end 44
+      // And the raw finding has title "Reject unsigned session token"
+      // And the raw finding has body "The session token path accepts unsigned tokens."
+      // And the raw finding has suggested_code null
+      // And the raw finding has confidence 0.80
+      // And the raw finding has cwe "<cwe>"
+      const rawFinding = {
+        severity: "major",
+        category: "security",
+        file: "src/auth/session.ts",
+        line_start: 44,
+        line_end: 44,
+        title: "Reject unsigned session token",
+        body: "The session token path accepts unsigned tokens.",
+        suggested_code: null,
+        confidence: 0.8,
+        cwe,
+      };
+
+      // When the maintainer validates the raw finding
+      const validation = LLMRawFindingSchema.safeParse(rawFinding);
+
+      // Then validation fails with a CWE validation error
+      if (validation.success) {
+        expect.fail("Expected invalid CWE validation to fail");
+      }
+
+      expect(validation.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: ["cwe"],
+        }),
+      );
+    }
+  });
 });
 
 describe("parseLLMResponse", () => {
