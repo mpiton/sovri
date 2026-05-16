@@ -111,6 +111,41 @@ describe("buildUserPrompt", () => {
     );
   });
 
+  it.each([
+    { descriptionLabel: "missing", description: null },
+    { descriptionLabel: "empty", description: "" },
+  ])(
+    "keeps a stable prompt shape when the pull request description is $descriptionLabel",
+    ({ description }) => {
+      // Given the pull request description is <description>.
+      // And the diff content is:
+      // """
+      // diff --git a/src/cards.ts b/src/cards.ts
+      // @@ -1 +1,2 @@
+      //  export const acceptedStates = ["active"];
+      // +export const rejectedStates = ["expired"];
+      // """
+      const diff = `diff --git a/src/cards.ts b/src/cards.ts
+@@ -1 +1,2 @@
+ export const acceptedStates = ["active"];
++export const rejectedStates = ["expired"];`;
+
+      // When the maintainer builds the user prompt.
+      const prompt = buildUserPrompt(diff, {
+        number: 42,
+        repoFullName: "acme/payments",
+        title: "Add card state validation",
+        description,
+      });
+
+      // Then the prompt contains the description marker "(none)".
+      expect(prompt).toContain("(none)");
+      // And the prompt contains the diff content after the metadata section.
+      expect(prompt.indexOf("Diff:")).toBeGreaterThan(prompt.indexOf("Description:"));
+      expect(prompt.indexOf("src/cards.ts")).toBeGreaterThan(prompt.indexOf("Diff:"));
+    },
+  );
+
   it("escapes directive markers in pull request metadata", () => {
     const diff = `diff --git a/src/payments.ts b/src/payments.ts
 @@ -1 +1,2 @@

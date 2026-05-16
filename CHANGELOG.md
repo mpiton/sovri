@@ -195,6 +195,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: acceptance coverage now asserts missing and empty
+  pull request descriptions render as `(none)` while diff content remains after
+  the metadata section in `buildUserPrompt()` (#179).
+
 - `@sovri/review-engine`: acceptance coverage now asserts prompt contract
   failures identify missing diff content when a regression omits the diff from
   `buildUserPrompt()` (#168).
