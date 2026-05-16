@@ -21,8 +21,31 @@ function toFinding(finding: LLMRawFinding): Finding {
     line_end: finding.line_end,
     title: finding.title,
     body: finding.body,
+    suggestion: toSuggestion(finding),
     source: "llm",
     confidence: finding.confidence,
     cwe: finding.cwe,
   });
+}
+
+function toSuggestion(finding: LLMRawFinding): Finding["suggestion"] {
+  if (finding.suggested_code === undefined || finding.suggested_code === null) {
+    return undefined;
+  }
+
+  return {
+    code: finding.suggested_code,
+    committable: isCommittableSuggestion(finding),
+  };
+}
+
+function isCommittableSuggestion(finding: LLMRawFinding): boolean {
+  return (
+    finding.line_start === finding.line_end &&
+    finding.suggested_code !== undefined &&
+    finding.suggested_code !== null &&
+    finding.suggested_code.trim().length > 0 &&
+    !finding.suggested_code.includes("\n") &&
+    !finding.suggested_code.includes("\r")
+  );
 }

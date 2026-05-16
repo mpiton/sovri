@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { FindingSchema } from "@sovri/core";
+import { FindingSchema, type Category, type Severity } from "@sovri/core";
 import { describe, expect, it } from "vitest";
 
 import { parseLLMResponse } from "./parser.js";
@@ -10,8 +10,8 @@ const UuidV4Pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[
 const NonV4Uuid = "550e8400-e29b-11d4-a716-446655440000";
 
 type RawFindingFixture = {
-  severity: "major";
-  category: "bug";
+  severity: Severity;
+  category: Category;
   file: string;
   line_start: number;
   line_end: number;
@@ -146,5 +146,68 @@ describe("parseLLMResponse", () => {
 
     // And no finding with the non-v4 id is returned
     expect(findings.map(({ id }) => id)).not.toContain(NonV4Uuid);
+  });
+
+  it("returns a committable suggestion for a non-empty single-line replacement", () => {
+    // Given the raw finding has severity "minor"
+    // And the raw finding has category "maintainability"
+    // And the raw finding has file "src/totals.ts"
+    // And the raw finding has title "Use explicit zero fallback"
+    // And the raw finding has body "The total can be undefined before formatting."
+    // And the raw finding has confidence 0.84
+    // Given the raw finding line_start is 14
+    // And the raw finding line_end is 14
+    // And the raw finding suggested_code is "const total = amount ?? 0;"
+    const response = {
+      summary: "One finding found",
+      findings: [
+        buildRawFinding({
+          severity: "minor",
+          category: "maintainability",
+          file: "src/totals.ts",
+          line_start: 14,
+          line_end: 14,
+          title: "Use explicit zero fallback",
+          body: "The total can be undefined before formatting.",
+          suggested_code: "const total = amount ?? 0;",
+          confidence: 0.84,
+        }),
+      ],
+    };
+
+    // When the maintainer computes the committable value
+    const findings = parseLLMResponse(response);
+
+    const [finding] = findings;
+
+    // Then the committable result is true
+    expect(finding?.suggestion?.committable).toBe(true);
+
+    // And the suggestion is returned with code "const total = amount ?? 0;"
+    expect(finding?.suggestion?.code).toBe("const total = amount ?? 0;");
+
+    // And suggestion.committable is true
+    expect(finding?.suggestion?.committable).toBe(true);
+  });
+
+  it("does not mark empty or multiline replacements as committable", () => {
+    const examples = ["", "const total = amount ?? 0;\nreturn total;"];
+
+    for (const suggestedCode of examples) {
+      const findings = parseLLMResponse({
+        summary: "One finding found",
+        findings: [
+          buildRawFinding({
+            line_start: 14,
+            line_end: 14,
+            suggested_code: suggestedCode,
+          }),
+        ],
+      });
+
+      const [finding] = findings;
+
+      expect(finding?.suggestion?.committable).toBe(false);
+    }
   });
 });
