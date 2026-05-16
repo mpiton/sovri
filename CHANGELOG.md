@@ -58,6 +58,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   with summary `Review completed` and file `src/review.ts` returns a
   `Finding[]` whose finding validates against `FindingSchema` (#208).
 
+- `@sovri/review-engine`: throw a typed `LLMResponseParseError` for
+  schema-violating LLM responses before any partial findings are returned
+  (#209).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency

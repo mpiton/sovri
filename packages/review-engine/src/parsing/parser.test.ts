@@ -95,6 +95,41 @@ describe("parseLLMResponse", () => {
     expect(FindingSchema.parse(finding)).toEqual(finding);
   });
 
+  it("throws a typed parse error for a schema-violating response", () => {
+    // Given the test fixture contains a response with summary "Broken response"
+    // And the test fixture contains a finding with line_start 22 and line_end 20
+    const response = {
+      summary: "Broken response",
+      findings: [
+        buildRawFinding({
+          line_start: 22,
+          line_end: 20,
+        }),
+      ],
+    };
+
+    let parsedFindings: ReturnType<typeof parseLLMResponse> | undefined;
+    let thrownError: unknown;
+
+    // When the maintainer runs the parser tests
+    try {
+      parsedFindings = parseLLMResponse(response);
+    } catch (error) {
+      thrownError = error;
+    }
+
+    // Then the schema-violating response test passes
+    expect(thrownError).toBeInstanceOf(Error);
+
+    // And the test asserts that parsing fails with a typed LLM response parse error
+    expect(thrownError).toMatchObject({
+      name: "LLMResponseParseError",
+    });
+
+    // And the test asserts that no partial findings are returned
+    expect(parsedFindings).toBeUndefined();
+  });
+
   it("assigns separate UUID v4 ids to multiple parsed findings", () => {
     // Given the raw LLM response summary is "One finding found"
     // And the raw LLM response contains a finding for file "src/cards.ts"

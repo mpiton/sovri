@@ -1,13 +1,39 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { FindingSchema, type Finding } from "@sovri/core";
+import { FindingSchema, type Finding, type z } from "@sovri/core";
 import { v4 as uuidv4 } from "uuid";
 
 import { LLMResponseSchema, type LLMRawFinding } from "./schema.js";
 
+export interface LLMResponseParseErrorOptions {
+  readonly cause?: unknown;
+  readonly issues?: ReadonlyArray<z.core.$ZodIssue>;
+}
+
+export class LLMResponseParseError extends Error {
+  public override readonly name = "LLMResponseParseError";
+  public readonly issues?: ReadonlyArray<z.core.$ZodIssue>;
+
+  public constructor(message: string, options: LLMResponseParseErrorOptions = {}) {
+    super(message, errorOptions(options.cause));
+
+    if (options.issues !== undefined) {
+      this.issues = [...options.issues];
+    }
+  }
+}
+
 export function parseLLMResponse(json: unknown): Finding[] {
-  const response = LLMResponseSchema.parse(json);
+  const result = LLMResponseSchema.safeParse(json);
+  if (!result.success) {
+    throw new LLMResponseParseError("Unable to parse LLM response", {
+      cause: result.error,
+      issues: result.error.issues,
+    });
+  }
+
+  const response = result.data;
   return response.findings.map(toFinding);
 }
 
@@ -52,4 +78,8 @@ function isCommittableSuggestion(finding: LLMRawFinding): boolean {
     !finding.suggested_code.includes("\n") &&
     !finding.suggested_code.includes("\r")
   );
+}
+
+function errorOptions(cause: unknown): ErrorOptions | undefined {
+  return cause === undefined ? undefined : { cause };
 }
