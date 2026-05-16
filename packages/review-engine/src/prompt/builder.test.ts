@@ -141,4 +141,26 @@ describe("buildSystemPrompt", () => {
     // And no oversized system prompt is returned.
     expect(prompt).toBeUndefined();
   });
+
+  it.each([
+    { templateBytes: 1023, outcome: "accepted" },
+    { templateBytes: 1024, outcome: "accepted" },
+    { templateBytes: 1025, outcome: "rejected" },
+  ])(
+    "validates a $templateBytes-byte system template as $outcome",
+    ({ templateBytes, outcome }) => {
+      // Given the prompt builder static template is <template_bytes> UTF-8 bytes.
+      const template = "x".repeat(templateBytes);
+
+      // When the maintainer validates the system template size.
+      const validateTemplate = (): string => validateSystemTemplateSize(template);
+
+      // Then the template validation outcome is "<outcome>".
+      if (outcome === "accepted") {
+        expect(validateTemplate()).toBe(template);
+      } else {
+        expect(validateTemplate).toThrow(PromptTemplateSizeError);
+      }
+    },
+  );
 });

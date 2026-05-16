@@ -195,6 +195,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: acceptance coverage now asserts the exact system
+  prompt template byte boundary accepts 1023 and 1024 UTF-8 bytes while
+  rejecting 1025 bytes (#177).
+
 - `@sovri/review-engine`: system prompt template validation now enforces the
   1024-byte UTF-8 budget with a typed `PromptTemplateSizeError` before a prompt
   can be returned (#156).
