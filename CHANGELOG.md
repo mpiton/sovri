@@ -33,6 +33,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Security
 
+- `@sovri/review-engine`: `buildUserPrompt()` now fences and escapes pull
+  request repository, title, description, and unified diff content as user data
+  before they enter the provider prompt, blocking PR metadata from injecting
+  prompt directives outside the protected diff section (#155).
+
+- `@sovri/review-engine`: runtime prompt composition now keeps escaped unified
+  diffs inside a fenced `diff` block after routing through `buildUserPrompt()`,
+  preserving delimiter protection while still including pull request metadata
+  in the provider request (#155).
+
 - `@sovri/review-engine`: `buildReviewPrompt` now escapes triple-backtick
   sequences inside `unifiedDiff` before interpolating into the fenced `diff`
   block (#134, cubic-dev review). A diff containing ``` could otherwise close
@@ -105,6 +115,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   producing `{}` that an LLM would silently honour.
 
 ### Fixed
+
+- `@sovri/review-engine`: `runReview` now routes prompt generation through
+  `buildUserPrompt()` with validated pull request metadata, so the runtime
+  provider request uses the same title, description, and diff prompt contract
+  covered by the #155 acceptance scenario.
 
 - `@sovri/review-engine`: `parseUnifiedDiff` now rejects inputs that do not
   contain a `diff --git ` file header instead of returning files with empty
@@ -179,6 +194,95 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   the new branch via a `vi.mock` factory.
 
 ### Added
+
+- `@sovri/review-engine`: acceptance coverage now explicitly asserts missing
+  pull request descriptions render as `(none)` in the description section while
+  diff content remains after prompt metadata (#176).
+
+- `@sovri/review-engine`: acceptance coverage for oversized system prompt
+  templates now asserts the failure message identifies the 1024-byte UTF-8
+  limit (#175).
+
+- `@sovri/review-engine`: acceptance coverage for prompt metadata escaping now
+  reports the specific unsafe raw directive marker when a regression removes
+  escaping from `buildUserPrompt()` (#174).
+
+- `@sovri/review-engine`: acceptance coverage now explicitly asserts the
+  prompt builder output-shape contract across `buildSystemPrompt()` and
+  `buildUserPrompt()`, including non-empty system prompts, PR metadata, and
+  diff content (#173).
+
+- `@sovri/review-engine`: acceptance coverage now asserts code fences embedded
+  in diff content are escaped before the first closing diff fence and raw
+  instruction markers are escaped in `buildUserPrompt()` (#172).
+
+- `@sovri/review-engine`: acceptance coverage now asserts markdown instruction
+  text supplied through diff content remains inside quoted user-data sections
+  and cannot enter the prompt instruction section (#171).
+
+- `@sovri/review-engine`: acceptance coverage now asserts markdown supplied in
+  PR title, PR description, or diff content appears only inside quoted
+  user-data sections of `buildUserPrompt()` (#170).
+
+- `@sovri/review-engine`: acceptance coverage now asserts regular markdown
+  diff content remains inside the quoted diff user-data section and is not
+  promoted into the prompt instruction section (#169).
+
+- `@sovri/review-engine`: acceptance coverage now asserts missing and empty
+  pull request descriptions render as `(none)` while diff content remains after
+  the metadata section in `buildUserPrompt()` (#179).
+
+- `@sovri/review-engine`: acceptance coverage now asserts prompt contract
+  failures identify missing diff content when a regression omits the diff from
+  `buildUserPrompt()` (#168).
+
+- `@sovri/review-engine`: acceptance coverage now asserts `buildUserPrompt()`
+  includes pull request repository, number, title, description, diff path, and
+  added diff lines in the user prompt (#178).
+
+- `@sovri/review-engine`: acceptance coverage now asserts repeated full-mode
+  system prompt builds return identical template strings without runtime pull
+  request data (#165).
+
+- `@sovri/review-engine`: `buildSystemPrompt()` now validates external
+  configuration input at runtime and acceptance coverage asserts unsupported
+  review modes fail before any fallback system template is returned (#164).
+
+- `@sovri/review-engine`: acceptance coverage now asserts
+  `buildSystemPrompt({ mode: "full" })` returns the baseline static template,
+  requests code review and structured JSON findings, and excludes runtime pull
+  request data from the system prompt (#163).
+
+- `@sovri/review-engine`: acceptance coverage now asserts non-ASCII system
+  prompt template content is measured by UTF-8 bytes, including `é` as a
+  two-byte character (#161).
+
+- `@sovri/review-engine`: acceptance coverage now asserts the exact system
+  prompt template byte boundary accepts 1023 and 1024 UTF-8 bytes while
+  rejecting 1025 bytes (#177).
+
+- `@sovri/review-engine`: system prompt template validation now enforces the
+  1024-byte UTF-8 budget with a typed `PromptTemplateSizeError` before a prompt
+  can be returned (#156).
+
+- `@sovri/review-engine`: acceptance coverage now asserts oversized system
+  prompt templates fail construction instead of returning a prompt over the
+  1024-byte budget (#156).
+
+- `@sovri/review-engine`: `buildSystemPrompt({ mode: "full" })` now exposes
+  the compact v0.1 baseline system template, and `buildReviewPrompt()` reuses
+  that builder for runtime prompt composition (#159).
+
+- `@sovri/review-engine`: acceptance coverage now asserts the v0.1 full system
+  prompt template stays within the 1024-byte UTF-8 budget while diff content
+  remains in the user prompt (#159).
+
+- `@sovri/review-engine`: acceptance coverage now asserts directive markers in
+  diff content are escaped without hiding the changed line from review (#157).
+
+- `@sovri/review-engine`: acceptance coverage starts for the v0.1 prompt
+  builder user prompt contract, and `buildUserPrompt()` now preserves safe PR
+  metadata and diff content in the generated review prompt (#155).
 
 - `@sovri/review-engine`: `parseUnifiedDiff(raw)` now converts unified Git diff
   text into the normalized `@sovri/core` `DiffSchema` contract (#32). The parser
