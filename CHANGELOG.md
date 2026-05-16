@@ -195,6 +195,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: acceptance coverage now asserts code fences embedded
+  in diff content cannot terminate prompt quoting and raw instruction markers
+  are escaped in `buildUserPrompt()` (#172).
+
 - `@sovri/review-engine`: acceptance coverage now asserts markdown instruction
   text supplied through diff content remains inside quoted user-data sections
   and cannot enter the prompt instruction section (#171).
