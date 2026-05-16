@@ -3,7 +3,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { buildSystemPrompt, buildUserPrompt } from "./builder.js";
+import {
+  buildSystemPrompt,
+  buildUserPrompt,
+  PromptTemplateSizeError,
+  validateSystemTemplateSize,
+} from "./builder.js";
 
 describe("buildUserPrompt", () => {
   it("preserves safe review input in the user prompt", () => {
@@ -117,5 +122,23 @@ describe("buildSystemPrompt", () => {
 
     // And the system prompt leaves room for user prompt diff content.
     expect(userPrompt).toContain("export const reviewed = true");
+  });
+
+  it("rejects an oversized system template", () => {
+    // Given the prompt builder static template is 1025 UTF-8 bytes.
+    const template = "x".repeat(1025);
+
+    let prompt: string | undefined;
+
+    // When the maintainer builds the system prompt.
+    const buildPrompt = (): void => {
+      prompt = validateSystemTemplateSize(template);
+    };
+
+    // Then prompt construction fails with a prompt template size error.
+    expect(PromptTemplateSizeError).toBeDefined();
+    expect(buildPrompt).toThrow(PromptTemplateSizeError);
+    // And no oversized system prompt is returned.
+    expect(prompt).toBeUndefined();
   });
 });

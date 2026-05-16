@@ -4,6 +4,7 @@
 import { z } from "zod";
 
 const TRIPLE_BACKTICK = "`".repeat(3);
+export const SYSTEM_PROMPT_MAX_BYTES = 1024;
 
 const FULL_REVIEW_SYSTEM_TEMPLATE = [
   "You are Sovri's review engine.",
@@ -16,6 +17,18 @@ export const SystemPromptConfigSchema = z.strictObject({
 });
 
 export type SystemPromptConfig = z.input<typeof SystemPromptConfigSchema>;
+
+export class PromptTemplateSizeError extends Error {
+  readonly templateBytes: number;
+  readonly maxBytes: number;
+
+  constructor(templateBytes: number, maxBytes = SYSTEM_PROMPT_MAX_BYTES) {
+    super(`System prompt template exceeds ${maxBytes} UTF-8 bytes`);
+    this.name = "PromptTemplateSizeError";
+    this.templateBytes = templateBytes;
+    this.maxBytes = maxBytes;
+  }
+}
 
 export const PullRequestPromptContextSchema = z.strictObject({
   number: z.number().int().positive(),
@@ -42,10 +55,24 @@ function formatDescription(description: string | null): string {
   return description === null || description.length === 0 ? "(none)" : description;
 }
 
+function utf8ByteLength(content: string): number {
+  return new TextEncoder().encode(content).byteLength;
+}
+
+export function validateSystemTemplateSize(template: string): string {
+  const templateBytes = utf8ByteLength(template);
+
+  if (templateBytes > SYSTEM_PROMPT_MAX_BYTES) {
+    throw new PromptTemplateSizeError(templateBytes);
+  }
+
+  return template;
+}
+
 export function buildSystemPrompt(config: SystemPromptConfig): string {
   SystemPromptConfigSchema.parse(config);
 
-  return FULL_REVIEW_SYSTEM_TEMPLATE;
+  return validateSystemTemplateSize(FULL_REVIEW_SYSTEM_TEMPLATE);
 }
 
 export function buildUserPrompt(diff: string, prContext: PullRequestPromptContext): string {

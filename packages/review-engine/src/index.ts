@@ -14,8 +14,11 @@ export type { ReviewPrompt, ReviewPromptInput } from "./prompt/index.js";
 export {
   buildSystemPrompt,
   buildUserPrompt,
+  PromptTemplateSizeError,
   PullRequestPromptContextSchema,
+  SYSTEM_PROMPT_MAX_BYTES,
   SystemPromptConfigSchema,
+  validateSystemTemplateSize,
 } from "./prompt/builder.js";
 export type { PullRequestPromptContext, SystemPromptConfig } from "./prompt/builder.js";
 
