@@ -42,7 +42,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   while keeping empty or multiline replacements non-committable (#204).
 
 - `@sovri/review-engine`: add acceptance coverage for marking multiline,
-  empty, whitespace-only, and null suggestions as non-committable (#205).
+  empty, whitespace-only, and null suggestions as non-committable, including
+  explicit `committable: false` assertions when a suggestion object is expected
+  (#205).
 
 ### Removed
 
