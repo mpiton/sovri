@@ -11,6 +11,14 @@ import {
   validateSystemTemplateSize,
 } from "./builder.js";
 
+function countOccurrences(content: string, value: string): number {
+  return content.split(value).length - 1;
+}
+
+function fencedUserDataSections(prompt: string): string[] {
+  return [...prompt.matchAll(/```(?:text|diff)\n([\s\S]*?)\n```/g)].map((match) => match[1] ?? "");
+}
+
 describe("buildUserPrompt", () => {
   it("preserves safe review input in the user prompt", () => {
     // Given the diff content is:
@@ -182,6 +190,64 @@ describe("buildUserPrompt", () => {
     // And the prompt does not promote "# Review checklist" to a prompt heading.
     expect(prompt.slice(0, diffFenceStart)).not.toContain("# Review checklist");
   });
+
+  it.each([
+    {
+      title: "# Release checklist",
+      description: "Regular description",
+      diffAddition: "- Validate JSON output.",
+      quotedText: "# Release checklist",
+    },
+    {
+      title: "Regular title",
+      description: "# Security review notes",
+      diffAddition: "- Validate JSON output.",
+      quotedText: "# Security review notes",
+    },
+    {
+      title: "Regular title",
+      description: "Regular description",
+      diffAddition: "# Diff-supplied heading",
+      quotedText: "# Diff-supplied heading",
+    },
+  ])(
+    "quotes $quotedText only inside a user data section",
+    ({ title, description, diffAddition, quotedText }) => {
+      // Given the pull request title is "<title>".
+      // And the pull request description is "<description>".
+      // And the diff content is:
+      // """
+      // diff --git a/docs/review.md b/docs/review.md
+      // @@ -1 +1,2 @@
+      //  # Review checklist
+      // +<diff_addition>
+      // """
+      const diff = `diff --git a/docs/review.md b/docs/review.md
+@@ -1 +1,2 @@
+ # Review checklist
++${diffAddition}`;
+
+      // When the maintainer builds the user prompt.
+      const prompt = buildUserPrompt(diff, {
+        number: 42,
+        repoFullName: "acme/payments",
+        title,
+        description,
+      });
+
+      const quotedTextOccurrences = countOccurrences(prompt, quotedText);
+      const quotedSectionOccurrences = fencedUserDataSections(prompt).reduce(
+        (total, section) => total + countOccurrences(section, quotedText),
+        0,
+      );
+
+      // Then the prompt contains "<quoted_text>" only inside a quoted user data section.
+      expect(quotedTextOccurrences).toBeGreaterThan(0);
+      expect(quotedSectionOccurrences).toBe(quotedTextOccurrences);
+      // And the prompt does not promote "<quoted_text>" to a prompt heading or instruction.
+      expect(prompt.slice(0, prompt.indexOf("Repository:"))).not.toContain(quotedText);
+    },
+  );
 
   it("escapes directive markers in pull request metadata", () => {
     const diff = `diff --git a/src/payments.ts b/src/payments.ts
