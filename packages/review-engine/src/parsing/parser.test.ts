@@ -323,6 +323,46 @@ describe("parseLLMResponse", () => {
     expect(findings).toHaveLength(100);
   });
 
+  it("rejects a response with 101 findings", () => {
+    // Given the raw LLM response summary is "Too many findings found"
+    // And the raw LLM response contains 101 findings
+    const response = {
+      summary: "Too many findings found",
+      findings: Array.from({ length: 101 }, () => buildPaymentFinding()),
+    };
+
+    let parsedFindings: ReturnType<typeof parseLLMResponse> | undefined;
+    let thrownError: unknown;
+
+    // When the maintainer parses the LLM response
+    try {
+      parsedFindings = parseLLMResponse(response);
+    } catch (error) {
+      thrownError = error;
+    }
+
+    // Then parsing fails with a typed LLM response parse error
+    expect(thrownError).toBeInstanceOf(Error);
+    expect(thrownError).toMatchObject({
+      name: "LLMResponseParseError",
+    });
+
+    // And no partial findings are returned
+    expect(parsedFindings).toBeUndefined();
+
+    // And the error cause contains the findings limit validation failure
+    expect(thrownError).toMatchObject({
+      cause: expect.objectContaining({
+        issues: [
+          expect.objectContaining({
+            code: "too_big",
+            path: ["findings"],
+          }),
+        ],
+      }),
+    });
+  });
+
   it("rejects a non-v4 id before a finding is returned", () => {
     // Given a parser regression assigns id "550e8400-e29b-11d4-a716-446655440000"
     const regressionFinding = {
