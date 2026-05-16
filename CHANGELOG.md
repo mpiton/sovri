@@ -195,6 +195,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: acceptance coverage now asserts regular markdown
+  diff content remains inside the quoted diff user-data section and is not
+  promoted to a prompt heading (#169).
+
 - `@sovri/review-engine`: acceptance coverage now asserts missing and empty
   pull request descriptions render as `(none)` while diff content remains after
   the metadata section in `buildUserPrompt()` (#179).

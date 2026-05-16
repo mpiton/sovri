@@ -146,6 +146,43 @@ describe("buildUserPrompt", () => {
     },
   );
 
+  it("keeps regular markdown diff content as quoted review input", () => {
+    // Given the diff content is:
+    // """
+    // diff --git a/docs/review.md b/docs/review.md
+    // @@ -1 +1,3 @@
+    //  # Review checklist
+    // +- Validate JSON output.
+    // +- Confirm severity labels.
+    // """
+    const diff = `diff --git a/docs/review.md b/docs/review.md
+@@ -1 +1,3 @@
+ # Review checklist
++- Validate JSON output.
++- Confirm severity labels.`;
+
+    // When the maintainer builds the user prompt.
+    const prompt = buildUserPrompt(diff, {
+      number: 42,
+      repoFullName: "acme/payments",
+      title: "Document validation changes",
+      description: "The description includes markdown.",
+    });
+
+    const diffFenceStart = prompt.indexOf("```diff");
+    const reviewHeadingIndex = prompt.indexOf("# Review checklist");
+    const diffFenceEnd = prompt.lastIndexOf("```");
+
+    // Then the prompt contains a quoted user data section for the diff.
+    expect(diffFenceStart).toBeGreaterThan(-1);
+    expect(diffFenceEnd).toBeGreaterThan(diffFenceStart);
+    // And the prompt contains "# Review checklist" as quoted review input.
+    expect(reviewHeadingIndex).toBeGreaterThan(diffFenceStart);
+    expect(reviewHeadingIndex).toBeLessThan(diffFenceEnd);
+    // And the prompt does not promote "# Review checklist" to a prompt heading.
+    expect(prompt).not.toMatch(/^# Review checklist$/m);
+  });
+
   it("escapes directive markers in pull request metadata", () => {
     const diff = `diff --git a/src/payments.ts b/src/payments.ts
 @@ -1 +1,2 @@
