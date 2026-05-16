@@ -81,6 +81,36 @@ describe("buildUserPrompt", () => {
     expect(prompt).toContain('export const rejectedStates = ["expired", "blocked"];');
   });
 
+  it("fails the user prompt contract when diff content is omitted", () => {
+    // Given the pull request description is "Reject expired and blocked card states."
+    // And the diff content is:
+    // """
+    // diff --git a/src/cards.ts b/src/cards.ts
+    // @@ -1 +1,2 @@
+    //  export const acceptedStates = ["active"];
+    // +export const rejectedStates = ["expired"];
+    // """
+    const diff = `diff --git a/src/cards.ts b/src/cards.ts
+@@ -1 +1,2 @@
+ export const acceptedStates = ["active"];
++export const rejectedStates = ["expired"];`;
+
+    // When the maintainer builds the user prompt.
+    const prompt = buildUserPrompt(diff, {
+      number: 42,
+      repoFullName: "acme/payments",
+      title: "Add card state validation",
+      description: "Reject expired and blocked card states.",
+    });
+
+    // Then the user prompt contract fails if the diff path is missing.
+    expect(prompt, "missing diff content: src/cards.ts").toContain("src/cards.ts");
+    // And the failure identifies the missing diff content.
+    expect(prompt, 'missing diff content: export const rejectedStates = ["expired"];').toContain(
+      'export const rejectedStates = ["expired"];',
+    );
+  });
+
   it("escapes directive markers in pull request metadata", () => {
     const diff = `diff --git a/src/payments.ts b/src/payments.ts
 @@ -1 +1,2 @@
