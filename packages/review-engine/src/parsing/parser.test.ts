@@ -269,4 +269,37 @@ describe("parseLLMResponse", () => {
       }
     }
   });
+
+  it("returns no suggestion object for null suggested code", () => {
+    // Given the raw finding line_start is 14
+    // And the raw finding line_end is 14
+    // And the raw finding suggested_code is null
+    const response = {
+      summary: "One finding found",
+      findings: [
+        buildRawFinding({
+          severity: "minor",
+          category: "maintainability",
+          file: "src/totals.ts",
+          line_start: 14,
+          line_end: 14,
+          title: "Use explicit zero fallback",
+          body: "The total can be undefined before formatting.",
+          suggested_code: null,
+          confidence: 0.84,
+        }),
+      ],
+    };
+
+    // When the maintainer converts the raw finding to a public Finding
+    const findings = parseLLMResponse(response);
+
+    const [finding] = findings;
+
+    // Then the returned finding has no suggestion
+    expect(finding?.suggestion).toBeUndefined();
+
+    // And the returned finding still validates against `FindingSchema`
+    expect(FindingSchema.parse(finding)).toEqual(finding);
+  });
 });
