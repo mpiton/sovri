@@ -69,6 +69,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   schema-validation-specific error if raw LLM finding validation is bypassed
   (#211).
 
+- `@sovri/review-engine`: add acceptance coverage that a valid response with
+  summary `Two findings found` returns exactly two parsed findings (#212).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency
