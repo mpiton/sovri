@@ -495,6 +495,44 @@ describe("parseLLMResponse", () => {
     });
   });
 
+  it("rejects non-object parsed inputs with a typed parse error", () => {
+    const inputs = [null, [], 42];
+
+    for (const input of inputs) {
+      // Given the LLM response input is <input>
+      let parsedFindings: ReturnType<typeof parseLLMResponse> | undefined;
+      let thrownError: unknown;
+
+      // When the maintainer calls `parseLLMResponse`
+      try {
+        parsedFindings = parseLLMResponse(input);
+      } catch (error) {
+        thrownError = error;
+      }
+
+      // Then parsing fails with a typed LLM response parse error
+      expect(thrownError).toBeInstanceOf(Error);
+      expect(thrownError).toMatchObject({
+        name: "LLMResponseParseError",
+      });
+
+      // And no partial findings are returned
+      expect(parsedFindings).toBeUndefined();
+
+      // And the error cause contains the Zod validation failure
+      expect(thrownError).toMatchObject({
+        cause: expect.objectContaining({
+          issues: [
+            expect.objectContaining({
+              code: "invalid_type",
+              path: [],
+            }),
+          ],
+        }),
+      });
+    }
+  });
+
   it("assigns a UUID v4 id to a parsed finding", () => {
     // Given the raw LLM response summary is "One finding found"
     // And the raw LLM response contains a finding for file "src/cards.ts"

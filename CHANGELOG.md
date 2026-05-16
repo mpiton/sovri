@@ -111,6 +111,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   parsed object inputs fail with a typed parse error retaining the Zod cause
   (#223).
 
+- `@sovri/review-engine`: add acceptance coverage that non-object parsed inputs
+  fail with a typed parse error retaining the Zod cause (#224).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency
