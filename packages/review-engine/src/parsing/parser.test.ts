@@ -484,6 +484,39 @@ describe("LLMResponseSchema", () => {
       expect(parsedFindings).toBeUndefined();
     }
   });
+
+  it("accepts a response summary with exactly 2000 characters", () => {
+    const summary = "x".repeat(2000);
+
+    // Given the valid raw finding file is "src/review.ts"
+    // And the valid raw finding line_start is 21
+    // And the valid finding line_end is 21
+    // And the valid finding suggested_code is "return review;"
+    // Given the raw LLM response summary is 2000 x characters long
+    // And the raw LLM response contains the valid raw finding
+    const response = {
+      summary,
+      findings: [
+        buildRawFinding({
+          file: "src/review.ts",
+          line_start: 21,
+          line_end: 21,
+          suggested_code: "return review;",
+        }),
+      ],
+    };
+
+    // When the maintainer validates the raw LLM response
+    const validation = LLMResponseSchema.safeParse(response);
+
+    // Then validation succeeds
+    if (!validation.success) {
+      expect.fail("Expected 2000-character summary validation to succeed");
+    }
+
+    // And the summary length is 2000 JavaScript string characters
+    expect(validation.data.summary).toHaveLength(2000);
+  });
 });
 
 describe("parseLLMResponse", () => {
