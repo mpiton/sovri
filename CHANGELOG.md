@@ -195,6 +195,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: acceptance coverage now asserts prompt contract
+  failures identify missing diff content when a regression omits the diff from
+  `buildUserPrompt()` (#168).
+
 - `@sovri/review-engine`: acceptance coverage now asserts `buildUserPrompt()`
   includes pull request repository, number, title, description, diff path, and
   added diff lines in the user prompt (#178).
