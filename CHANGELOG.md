@@ -31,6 +31,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   unused public exports. The parser schema also tolerates the current provider
   response shape while preserving strict validation for unknown keys (#201).
 
+- `@sovri/review-engine`: add acceptance coverage that multiple parsed LLM
+  findings each receive a distinct UUID v4 identifier (#202).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency
