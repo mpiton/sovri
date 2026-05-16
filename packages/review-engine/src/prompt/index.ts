@@ -3,7 +3,7 @@
 
 import { z } from "zod";
 
-import { buildUserPrompt, PullRequestPromptContextSchema } from "./builder.js";
+import { buildSystemPrompt, buildUserPrompt, PullRequestPromptContextSchema } from "./builder.js";
 
 export const ReviewPromptInputSchema = z.strictObject({
   unifiedDiff: z.string(),
@@ -26,8 +26,7 @@ export function buildReviewPrompt(input: ReviewPromptInput): ReviewPrompt {
   const userPrompt = buildUserPrompt(promptInput.unifiedDiff, promptInput.pullRequest);
 
   return {
-    systemPrompt:
-      "You are Sovri's review engine. Review only the supplied unified diff and return structured JSON.",
+    systemPrompt: buildSystemPrompt({ mode: "full" }),
     userPrompt: `${userPrompt}${instructionBlock}`,
   };
 }

@@ -195,6 +195,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: `buildSystemPrompt({ mode: "full" })` now exposes
+  the compact v0.1 baseline system template, and `buildReviewPrompt()` reuses
+  that builder for runtime prompt composition (#159).
+
+- `@sovri/review-engine`: acceptance coverage now asserts the v0.1 full system
+  prompt template stays within the 1024-byte UTF-8 budget while diff content
+  remains in the user prompt (#159).
+
 - `@sovri/review-engine`: acceptance coverage now asserts directive markers in
   diff content are escaped without hiding the changed line from review (#157).
 

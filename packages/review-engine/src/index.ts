@@ -11,8 +11,13 @@ export type { ParsedReviewDiff, ParsedReviewDiffFile } from "./diff/index.js";
 
 export { buildReviewPrompt, ReviewPromptInputSchema } from "./prompt/index.js";
 export type { ReviewPrompt, ReviewPromptInput } from "./prompt/index.js";
-export { buildUserPrompt, PullRequestPromptContextSchema } from "./prompt/builder.js";
-export type { PullRequestPromptContext } from "./prompt/builder.js";
+export {
+  buildSystemPrompt,
+  buildUserPrompt,
+  PullRequestPromptContextSchema,
+  SystemPromptConfigSchema,
+} from "./prompt/builder.js";
+export type { PullRequestPromptContext, SystemPromptConfig } from "./prompt/builder.js";
 
 export {
   parseLLMReviewResponse,

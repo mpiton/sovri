@@ -5,6 +5,18 @@ import { z } from "zod";
 
 const TRIPLE_BACKTICK = "`".repeat(3);
 
+const FULL_REVIEW_SYSTEM_TEMPLATE = [
+  "You are Sovri's review engine.",
+  "Review only the supplied pull request metadata and unified diff.",
+  "Return structured JSON findings that match the requested schema.",
+].join(" ");
+
+export const SystemPromptConfigSchema = z.strictObject({
+  mode: z.literal("full"),
+});
+
+export type SystemPromptConfig = z.input<typeof SystemPromptConfigSchema>;
+
 export const PullRequestPromptContextSchema = z.strictObject({
   number: z.number().int().positive(),
   repoFullName: z.string().min(1),
@@ -28,6 +40,12 @@ function fencedUserData(language: string, content: string): string {
 
 function formatDescription(description: string | null): string {
   return description === null || description.length === 0 ? "(none)" : description;
+}
+
+export function buildSystemPrompt(config: SystemPromptConfig): string {
+  SystemPromptConfigSchema.parse(config);
+
+  return FULL_REVIEW_SYSTEM_TEMPLATE;
 }
 
 export function buildUserPrompt(diff: string, prContext: PullRequestPromptContext): string {
