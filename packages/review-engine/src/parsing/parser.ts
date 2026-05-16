@@ -33,6 +33,10 @@ function toSuggestion(finding: LLMRawFinding): Finding["suggestion"] {
     return undefined;
   }
 
+  if (finding.suggested_code.length > 0 && finding.suggested_code.trim().length === 0) {
+    return undefined;
+  }
+
   return {
     code: finding.suggested_code,
     committable: isCommittableSuggestion(finding),

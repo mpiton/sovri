@@ -50,6 +50,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   produces no public suggestion object while the returned finding still
   validates against `FindingSchema` (#206).
 
+- `@sovri/review-engine`: omit the public suggestion object when
+  `suggested_code` contains only whitespace, while preserving `FindingSchema`
+  validation for the returned finding (#207).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency
