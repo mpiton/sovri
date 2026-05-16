@@ -195,6 +195,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: `buildSystemPrompt()` now validates external
+  configuration input at runtime and acceptance coverage asserts unsupported
+  review modes fail before any fallback system template is returned (#164).
+
 - `@sovri/review-engine`: acceptance coverage now asserts
   `buildSystemPrompt({ mode: "full" })` returns the baseline static template,
   requests code review and structured JSON findings, and excludes runtime pull

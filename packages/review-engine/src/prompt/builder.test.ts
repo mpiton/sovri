@@ -2,6 +2,7 @@
 // Copyright 2026 Sovri SAS
 
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 
 import {
   buildSystemPrompt,
@@ -116,6 +117,22 @@ describe("buildSystemPrompt", () => {
     expect(systemPrompt).not.toContain("Add payment validation");
     expect(systemPrompt).not.toContain("Reject invalid card state");
     expect(systemPrompt).not.toContain("export const reviewed = true");
+  });
+
+  it("rejects unsupported review modes before returning a template", () => {
+    // Given the review config selects mode "strict".
+    const unsupportedConfig: unknown = { mode: "strict" };
+    let systemPrompt: string | undefined;
+
+    // When the maintainer builds the system prompt.
+    const buildPrompt = (): void => {
+      systemPrompt = buildSystemPrompt(unsupportedConfig);
+    };
+
+    // Then prompt construction fails with an unsupported review mode error.
+    expect(buildPrompt).toThrow(ZodError);
+    // And no fallback template is returned.
+    expect(systemPrompt).toBeUndefined();
   });
 
   it("keeps the baseline system template under the byte limit", () => {

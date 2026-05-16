@@ -69,7 +69,7 @@ export function validateSystemTemplateSize(template: string): string {
   return template;
 }
 
-export function buildSystemPrompt(config: SystemPromptConfig): string {
+export function buildSystemPrompt(config: unknown): string {
   SystemPromptConfigSchema.parse(config);
 
   return validateSystemTemplateSize(FULL_REVIEW_SYSTEM_TEMPLATE);
