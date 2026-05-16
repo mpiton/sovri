@@ -287,6 +287,24 @@ describe("parseLLMResponse", () => {
     expect(findings).toHaveLength(2);
   });
 
+  it("accepts a response with zero findings", () => {
+    // Given the raw LLM response summary is "No findings found"
+    // And the raw LLM response contains 0 findings
+    const response = {
+      summary: "No findings found",
+      findings: [],
+    };
+
+    // When the maintainer parses the LLM response
+    const findings = parseLLMResponse(response);
+
+    // Then parsing succeeds
+    expect(findings).toHaveLength(0);
+
+    // And 0 findings are returned
+    expect(findings).toHaveLength(0);
+  });
+
   it("rejects a non-v4 id before a finding is returned", () => {
     // Given a parser regression assigns id "550e8400-e29b-11d4-a716-446655440000"
     const regressionFinding = {

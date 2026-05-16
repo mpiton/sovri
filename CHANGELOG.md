@@ -72,6 +72,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `@sovri/review-engine`: add acceptance coverage that a valid response with
   summary `Two findings found` returns exactly two parsed findings (#212).
 
+- `@sovri/review-engine`: add acceptance coverage that a valid response with
+  summary `No findings found` returns an empty findings array (#213).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency
