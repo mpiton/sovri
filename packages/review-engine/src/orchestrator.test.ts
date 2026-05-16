@@ -44,5 +44,6 @@ describe("runReview", () => {
     expect(capturedUserPrompt).toContain("Reject invalid card state");
     expect(capturedUserPrompt).toContain("src/payments.ts");
     expect(capturedUserPrompt).toContain("export const reviewed = true");
+    expect(capturedUserPrompt).toContain("```diff");
   });
 });

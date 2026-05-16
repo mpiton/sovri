@@ -33,6 +33,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Security
 
+- `@sovri/review-engine`: runtime prompt composition now keeps escaped unified
+  diffs inside a fenced `diff` block after routing through `buildUserPrompt()`,
+  preserving delimiter protection while still including pull request metadata
+  in the provider request (#155).
+
 - `@sovri/review-engine`: `buildReviewPrompt` now escapes triple-backtick
   sequences inside `unifiedDiff` before interpolating into the fenced `diff`
   block (#134, cubic-dev review). A diff containing ``` could otherwise close

@@ -30,7 +30,10 @@ export function buildReviewPrompt(input: ReviewPromptInput): ReviewPrompt {
   const instructionBlock =
     instructions.length > 0 ? `\n\nRepository instructions:\n${instructions}` : "";
   const safeDiff = escapeFencedDiff(promptInput.unifiedDiff);
-  const userPrompt = buildUserPrompt(safeDiff, promptInput.pullRequest);
+  const userPrompt = buildUserPrompt(
+    `${TRIPLE_BACKTICK}diff\n${safeDiff}\n${TRIPLE_BACKTICK}`,
+    promptInput.pullRequest,
+  );
 
   return {
     systemPrompt:
