@@ -166,6 +166,44 @@ describe("parseLLMResponse", () => {
     });
   });
 
+  it("fails loudly if LLM response schema validation is bypassed", () => {
+    // Given a parser regression returns raw findings without Zod validation
+    const response = {
+      summary: "Validation bypass regression",
+      findings: [
+        {
+          ...buildRawFinding(),
+          id: NonV4Uuid,
+          source: "llm",
+        },
+      ],
+    };
+
+    let thrownError: unknown;
+
+    // When the maintainer runs the parser tests
+    try {
+      parseLLMResponse(response);
+    } catch (error) {
+      thrownError = error;
+    }
+
+    // Then the parser test suite fails
+    expect(thrownError, "missing LLM response schema validation").toBeInstanceOf(Error);
+
+    // And the failure identifies the missing schema validation
+    expect(thrownError).toMatchObject({
+      name: "LLMResponseParseError",
+      issues: [
+        expect.objectContaining({
+          code: "unrecognized_keys",
+          keys: expect.arrayContaining(["id", "source"]),
+          path: ["findings", 0],
+        }),
+      ],
+    });
+  });
+
   it("assigns separate UUID v4 ids to multiple parsed findings", () => {
     // Given the raw LLM response summary is "One finding found"
     // And the raw LLM response contains a finding for file "src/cards.ts"
