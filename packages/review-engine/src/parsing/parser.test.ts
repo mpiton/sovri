@@ -36,6 +36,21 @@ function buildRawFinding(overrides: Partial<RawFindingFixture> = {}): RawFinding
   };
 }
 
+function buildPaymentFinding(overrides: Partial<RawFindingFixture> = {}): RawFindingFixture {
+  return buildRawFinding({
+    severity: "major",
+    category: "bug",
+    file: "src/payments.ts",
+    line_start: 12,
+    line_end: 12,
+    title: "Reject expired cards",
+    body: "The expired card path is accepted.",
+    suggested_code: "return false;",
+    confidence: 0.91,
+    ...overrides,
+  });
+}
+
 describe("parseLLMResponse", () => {
   it("assigns a UUID v4 id to a parsed finding", () => {
     // Given the raw LLM response summary is "One finding found"
@@ -252,6 +267,24 @@ describe("parseLLMResponse", () => {
 
     // And the 3 returned finding ids are distinct
     expect(new Set(ids).size).toBe(3);
+  });
+
+  it("parses a response with two findings", () => {
+    // Given the raw LLM response summary is "Two findings found"
+    // And the raw LLM response contains 2 findings
+    const response = {
+      summary: "Two findings found",
+      findings: [buildPaymentFinding(), buildPaymentFinding()],
+    };
+
+    // When the maintainer parses the LLM response
+    const findings = parseLLMResponse(response);
+
+    // Then parsing succeeds
+    expect(findings).toHaveLength(2);
+
+    // And 2 findings are returned
+    expect(findings).toHaveLength(2);
   });
 
   it("rejects a non-v4 id before a finding is returned", () => {
