@@ -97,6 +97,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `@sovri/review-engine`: add raw LLM finding schema rejection coverage for
   invalid optional CWE values on the `cwe` path (#219).
 
+- `@sovri/review-engine`: allow `parseLLMResponse` to accept raw JSON string
+  inputs and parse them into public `Finding[]` values (#220).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency

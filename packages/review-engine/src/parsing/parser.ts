@@ -25,7 +25,8 @@ export class LLMResponseParseError extends Error {
 }
 
 export function parseLLMResponse(json: unknown): Finding[] {
-  const result = LLMResponseSchema.safeParse(json);
+  const parsedJson = parseJsonInput(json);
+  const result = LLMResponseSchema.safeParse(parsedJson);
   if (!result.success) {
     throw new LLMResponseParseError("Unable to parse LLM response", {
       cause: result.error,
@@ -35,6 +36,21 @@ export function parseLLMResponse(json: unknown): Finding[] {
 
   const response = result.data;
   return response.findings.map(toFinding);
+}
+
+function parseJsonInput(json: unknown): unknown {
+  if (typeof json !== "string") {
+    return json;
+  }
+
+  try {
+    const parsedJson: unknown = JSON.parse(json);
+    return parsedJson;
+  } catch (error) {
+    throw new LLMResponseParseError("Unable to parse LLM response", {
+      cause: error,
+    });
+  }
 }
 
 function toFinding(finding: LLMRawFinding): Finding {
