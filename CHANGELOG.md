@@ -124,6 +124,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `@sovri/review-engine`: add top-level LLM response schema rejection coverage
   for unknown fields such as `model_notes` (#227).
 
+- `@sovri/review-engine`: add top-level LLM response schema rejection coverage
+  for missing required `summary` and `findings` fields (#228).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency

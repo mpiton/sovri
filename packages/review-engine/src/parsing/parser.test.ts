@@ -439,6 +439,51 @@ describe("LLMResponseSchema", () => {
     // And no parsed findings are returned
     expect(parsedFindings).toBeUndefined();
   });
+
+  it("rejects missing required top-level fields", () => {
+    const responses: ReadonlyArray<{ field: string; response: unknown }> = [
+      {
+        field: "summary",
+        response: {
+          findings: [
+            buildRawFinding({
+              file: "src/review.ts",
+              line_start: 21,
+              line_end: 21,
+              suggested_code: "return review;",
+            }),
+          ],
+        },
+      },
+      {
+        field: "findings",
+        response: {
+          summary: "Review completed",
+        },
+      },
+    ];
+
+    for (const { field, response } of responses) {
+      // Given the raw LLM response is missing required field "<field>"
+      // When the maintainer validates the raw LLM response
+      const validation = LLMResponseSchema.safeParse(response);
+      const parsedFindings = validation.success ? validation.data.findings : undefined;
+
+      // Then validation fails with a required field validation error
+      if (validation.success) {
+        expect.fail("Expected missing required top-level field validation to fail");
+      }
+
+      expect(validation.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: [field],
+        }),
+      );
+
+      // And no parsed findings are returned
+      expect(parsedFindings).toBeUndefined();
+    }
+  });
 });
 
 describe("parseLLMResponse", () => {
