@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { parseLLMResponse } from "./parser.js";
 
 const UuidV4Pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const NonV4Uuid = "550e8400-e29b-11d4-a716-446655440000";
 
 type RawFindingFixture = {
   severity: "major";
@@ -115,5 +116,35 @@ describe("parseLLMResponse", () => {
 
     // And the 3 returned finding ids are distinct
     expect(new Set(ids).size).toBe(3);
+  });
+
+  it("rejects a non-v4 id before a finding is returned", () => {
+    // Given a parser regression assigns id "550e8400-e29b-11d4-a716-446655440000"
+    const regressionFinding = {
+      id: NonV4Uuid,
+      severity: "major",
+      category: "bug",
+      file: "src/cards.ts",
+      line_start: 8,
+      line_end: 8,
+      title: "Reject blocked card state",
+      body: "Blocked cards are still treated as active.",
+      source: "llm",
+      confidence: 0.87,
+    };
+
+    // When the maintainer validates the parsed finding
+    const validation = FindingSchema.safeParse(regressionFinding);
+
+    // Then validation fails against `FindingSchema`
+    expect(validation.success).toBe(false);
+
+    const findings = parseLLMResponse({
+      summary: "One finding found",
+      findings: [buildRawFinding()],
+    });
+
+    // And no finding with the non-v4 id is returned
+    expect(findings.map(({ id }) => id)).not.toContain(NonV4Uuid);
   });
 });

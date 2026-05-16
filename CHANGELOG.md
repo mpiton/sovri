@@ -34,6 +34,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `@sovri/review-engine`: add acceptance coverage that multiple parsed LLM
   findings each receive a distinct UUID v4 identifier (#202).
 
+- `@sovri/review-engine`: add acceptance coverage for rejecting non-v4 finding
+  identifiers before a parsed finding can be returned (#203).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency
@@ -130,6 +133,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   producing `{}` that an LLM would silently honour.
 
 ### Fixed
+
+- `@sovri/core`: `FindingSchema.id` now requires UUID v4 instead of accepting
+  any syntactically valid UUID version, so parser regressions that assign older
+  UUID versions are rejected before a `Finding` can be returned (#203).
 
 - `@sovri/review-engine`: `runReview` now routes prompt generation through
   `buildUserPrompt()` with validated pull request metadata, so the runtime
