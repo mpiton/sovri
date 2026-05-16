@@ -98,6 +98,26 @@ describe("buildUserPrompt", () => {
 });
 
 describe("buildSystemPrompt", () => {
+  it("returns the baseline static template for full review mode", () => {
+    // Given the review config selects mode "full".
+
+    // When the maintainer builds the system prompt.
+    const systemPrompt = buildSystemPrompt({ mode: "full" });
+
+    // Then the system prompt is a non-empty string.
+    expect(systemPrompt).not.toHaveLength(0);
+    // And the system prompt instructs the model to review code changes.
+    expect(systemPrompt).toContain(
+      "Review only the supplied pull request metadata and unified diff",
+    );
+    // And the system prompt asks for structured JSON findings.
+    expect(systemPrompt).toContain("Return structured JSON findings");
+    // And the system prompt does not include PR title, PR description, or diff content.
+    expect(systemPrompt).not.toContain("Add payment validation");
+    expect(systemPrompt).not.toContain("Reject invalid card state");
+    expect(systemPrompt).not.toContain("export const reviewed = true");
+  });
+
   it("keeps the baseline system template under the byte limit", () => {
     // Given the prompt builder uses the v0.1 full review template.
 
