@@ -180,7 +180,7 @@ describe("buildUserPrompt", () => {
     expect(reviewHeadingIndex).toBeGreaterThan(diffFenceStart);
     expect(reviewHeadingIndex).toBeLessThan(diffFenceEnd);
     // And the prompt does not promote "# Review checklist" to a prompt heading.
-    expect(prompt).not.toMatch(/^# Review checklist$/m);
+    expect(prompt.slice(0, diffFenceStart)).not.toContain("# Review checklist");
   });
 
   it("escapes directive markers in pull request metadata", () => {
