@@ -46,6 +46,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   explicit `committable: false` assertions when a suggestion object is expected
   (#205).
 
+- `@sovri/review-engine`: add acceptance coverage that `suggested_code: null`
+  produces no public suggestion object while the returned finding still
+  validates against `FindingSchema` (#206).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency
