@@ -195,6 +195,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: acceptance coverage for prompt metadata escaping now
+  reports the specific unsafe raw directive marker when a regression removes
+  escaping from `buildUserPrompt()` (#174).
+
 - `@sovri/review-engine`: acceptance coverage now explicitly asserts the
   prompt builder output-shape contract across `buildSystemPrompt()` and
   `buildUserPrompt()`, including non-empty system prompts, PR metadata, and
