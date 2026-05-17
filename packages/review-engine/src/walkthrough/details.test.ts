@@ -141,23 +141,21 @@ describe("composeWalkthrough finding details", () => {
     // Given the rendered markdown contains "src/api/review.ts:18"
     // And the rendered markdown contains "Missing payload null guard"
     // And the rendered markdown does not contain "The review payload is read before validation."
-    const incompleteMarkdown = [
-      "## Sovri review",
-      "### Findings",
-      "| Severity | Location | Title | Body |",
-      "| --- | --- | --- | --- |",
-      "| Major | src/api/review.ts:18 | Missing payload null guard | |",
-    ].join("\n");
+    const expectedDetail = {
+      location: "src/api/review.ts:18",
+      title: "Missing payload null guard",
+      body: "The review payload is read before validation.",
+    };
+    const completeMarkdown = composeWalkthrough(baseReview);
+    expectCompleteFindingDetail(completeMarkdown, expectedDetail);
+    const incompleteMarkdown = completeMarkdown.replace(expectedDetail.body, "");
+    expect(incompleteMarkdown).toContain(expectedDetail.location);
+    expect(incompleteMarkdown).toContain(expectedDetail.title);
+    expect(incompleteMarkdown).not.toContain(expectedDetail.body);
 
     // When the finding detail coverage is checked
     // Then the walkthrough is rejected as incomplete
-    expect(() =>
-      expectCompleteFindingDetail(incompleteMarkdown, {
-        location: "src/api/review.ts:18",
-        title: "Missing payload null guard",
-        body: "The review payload is read before validation.",
-      }),
-    ).toThrow(
+    expect(() => expectCompleteFindingDetail(incompleteMarkdown, expectedDetail)).toThrow(
       "Incomplete walkthrough finding detail: The review payload is read before validation.",
     );
   });
