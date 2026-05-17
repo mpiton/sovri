@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage for Octokit-ready
+  single-line inline comment draft payloads without deprecated `position`
+  fields (#347).
+
 - `@sovri/review-engine`: validate inline finding ranges before mapping
   them to GitHub review comment draft fields (#346).
 
