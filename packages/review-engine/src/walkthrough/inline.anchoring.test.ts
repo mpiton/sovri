@@ -47,6 +47,25 @@ describe("buildInlineComments diff anchoring", () => {
     expect(buildComments).not.toThrow();
     expect(comments).toHaveLength(0);
   });
+
+  it("skips a finding on a missing line", () => {
+    // Given a parsed diff contains file "src/billing.ts" with RIGHT-side lines 30, 31, and 32
+    const diff = createBillingDiff([30, 31, 32]);
+
+    // And a finding targets file "src/billing.ts" from line 99 to line 99
+    const findings = [createBillingFinding("src/billing.ts", 99)];
+    let comments: ReturnType<typeof buildInlineComments> = [];
+
+    // When the maintainer calls `buildInlineComments(findings, diff)`
+    const buildComments = () => {
+      comments = buildInlineComments(findings, diff);
+    };
+
+    // Then exactly 0 inline comment drafts are returned
+    // And no error is raised
+    expect(buildComments).not.toThrow();
+    expect(comments).toHaveLength(0);
+  });
 });
 
 function createBillingDiff(rightSideLines: readonly number[]): Diff {

@@ -22,6 +22,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Added
 
 - `@sovri/review-engine`: add acceptance coverage that findings targeting
+  missing RIGHT-side diff lines are skipped without error (#352).
+
+- `@sovri/review-engine`: add acceptance coverage that findings targeting
   files absent from the parsed diff are skipped without error (#351).
 
 - `@sovri/review-engine`: add acceptance coverage that findings on
