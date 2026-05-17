@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that walkthrough
+  structure checks reject markdown missing the File-by-file section (#304).
+
 - `@sovri/review-engine`: add acceptance coverage that no-finding
   walkthroughs keep the required section structure and empty-state copy (#303).
 
