@@ -66,6 +66,23 @@ describe("buildInlineComments diff anchoring", () => {
     expect(buildComments).not.toThrow();
     expect(comments).toHaveLength(0);
   });
+
+  it("skips a multi-line finding unless every line in the range exists", () => {
+    // Given a parsed diff contains file "src/billing.ts" with RIGHT-side lines 30 and 32
+    // And RIGHT-side line 31 is absent from the parsed diff
+    const diff = createBillingDiff([30, 32]);
+
+    // And a finding targets file "src/billing.ts" from line 30 to line 32
+    const findings = [createBillingFinding("src/billing.ts", 30, 32)];
+
+    // When the maintainer calls `buildInlineComments(findings, diff)`
+    const comments = buildInlineComments(findings, diff);
+
+    // Then exactly 0 inline comment drafts are returned
+    expect(comments).toHaveLength(0);
+    // And no partial multi-line draft is returned
+    expect(comments).toEqual([]);
+  });
 });
 
 function createBillingDiff(rightSideLines: readonly number[]): Diff {

@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that multi-line inline
+  findings are skipped when any RIGHT-side line in the range is absent (#353).
+
 - `@sovri/review-engine`: add acceptance coverage that findings targeting
   missing RIGHT-side diff lines are skipped without error (#352).
 
