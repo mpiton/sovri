@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that finding detail
+  completeness checks exercise `composeWalkthrough` output and reject
+  walkthrough rows missing the explanatory body text (#296).
+
 - `@sovri/review-engine`: add acceptance coverage that multiline finding
   bodies render as one markdown-safe paragraph without raw table-cell newlines
   or `<br>` tags (#295).
