@@ -46,6 +46,23 @@ describe("buildInlineComments fixture coverage", () => {
     // And the generated draft validates against `InlineCommentDraftSchema`
     expect(z.array(InlineCommentDraftSchema).parse(comments)).toEqual(expectedComments);
   });
+
+  it("returns no drafts for the unanchorable inline comment fixture", () => {
+    // Given fixture diff "inline-missing-line.diff" contains file "src/handler.ts" with RIGHT-side line 27
+    const diff = parseUnifiedDiff(loadTextFixture("inline-missing-line.diff"));
+
+    // And fixture findings "inline-missing-line.findings.json" contains one finding on "src/handler.ts" line 44
+    const findings = loadFindingsFixture("inline-missing-line.findings.json");
+
+    // And expected fixture "inline-missing-line.comments.json" contains an empty list
+    const expectedComments = loadCommentsFixture("inline-missing-line.comments.json");
+
+    // When the maintainer runs the inline comment fixture test
+    const comments = buildInlineComments(findings, diff);
+
+    // Then the generated draft list matches "inline-missing-line.comments.json"
+    expect(comments).toEqual(expectedComments);
+  });
 });
 
 function loadFindingsFixture(name: string): readonly Finding[] {

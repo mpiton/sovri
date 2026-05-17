@@ -1,0 +1,14 @@
+[
+  {
+    "id": "66666666-6666-4666-8666-666666666666",
+    "severity": "major",
+    "category": "bug",
+    "file": "src/handler.ts",
+    "line_start": 44,
+    "line_end": 44,
+    "title": "Missing payload guard",
+    "body": "`request.body` can be undefined before user access.",
+    "source": "llm",
+    "confidence": 0.88
+  }
+]

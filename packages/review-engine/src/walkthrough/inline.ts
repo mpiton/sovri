@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { FindingSchema, z, type Diff, type Finding } from "@sovri/core";
+import { DiffSchema, FindingSchema, z, type Diff, type Finding } from "@sovri/core";
 
 export const InlineCommentDraftSchema = z
   .object({
@@ -18,11 +18,14 @@ export type InlineCommentDraft = z.infer<typeof InlineCommentDraftSchema>;
 
 export function buildInlineComments(
   findings: readonly Finding[],
-  _diff: Diff,
+  diff: Diff,
 ): InlineCommentDraft[] {
   const validFindings = z.array(FindingSchema).parse(findings);
+  const rightSideLinesByPath = collectRightSideLines(DiffSchema.parse(diff));
 
-  return validFindings.map((finding) => buildInlineCommentDraft(finding));
+  return validFindings
+    .filter((finding) => isFindingAnchorable(finding, rightSideLinesByPath))
+    .map((finding) => buildInlineCommentDraft(finding));
 }
 
 function buildInlineCommentDraft(finding: Finding): InlineCommentDraft {
@@ -50,4 +53,52 @@ function buildInlineCommentDraft(finding: Finding): InlineCommentDraft {
 
 function formatInlineBody(finding: Finding): string {
   return [`**${finding.title}**`, "", finding.body].join("\n");
+}
+
+function collectRightSideLines(diff: Diff): ReadonlyMap<string, ReadonlySet<number>> {
+  const linesByPath = new Map<string, Set<number>>();
+
+  for (const file of diff.files) {
+    const rightSideLines = new Set<number>();
+    for (const hunk of file.hunks) {
+      addHunkRightSideLines(rightSideLines, hunk);
+    }
+    linesByPath.set(file.path, rightSideLines);
+  }
+
+  return linesByPath;
+}
+
+function addHunkRightSideLines(
+  rightSideLines: Set<number>,
+  hunk: Diff["files"][number]["hunks"][number],
+): void {
+  let lineNumber = hunk.new_start;
+
+  for (const line of hunk.lines) {
+    if (line.startsWith("-") || line.startsWith("\\")) {
+      continue;
+    }
+
+    rightSideLines.add(lineNumber);
+    lineNumber += 1;
+  }
+}
+
+function isFindingAnchorable(
+  finding: Finding,
+  linesByPath: ReadonlyMap<string, ReadonlySet<number>>,
+): boolean {
+  const rightSideLines = linesByPath.get(finding.file);
+  if (rightSideLines === undefined) {
+    return false;
+  }
+
+  for (let line = finding.line_start; line <= finding.line_end; line += 1) {
+    if (!rightSideLines.has(line)) {
+      return false;
+    }
+  }
+
+  return true;
 }
