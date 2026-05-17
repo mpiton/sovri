@@ -125,6 +125,30 @@ describe("composeWalkthrough required sections", () => {
       );
     },
   );
+
+  it("keeps the same section structure for a no-finding review", () => {
+    // Given the review contains 0 findings
+    const review: Review = {
+      ...baseReview,
+      findings: [],
+    };
+
+    // When the maintainer calls `composeWalkthrough(review)`
+    const markdown = composeWalkthrough(review);
+    const findingsSection = extractSection(markdown, "### Findings");
+    const fileByFileSection = extractSection(markdown, "### File-by-file");
+
+    // Then the markdown contains "### TL;DR"
+    expect(markdown).toContain("### TL;DR");
+    // And the markdown contains "### Findings"
+    expect(markdown).toContain("### Findings");
+    // And the markdown contains "### File-by-file"
+    expect(markdown).toContain("### File-by-file");
+    // And the Findings section states "No findings"
+    expect(findingsSection).toContain("No findings");
+    // And the File-by-file section states "No changed files with findings"
+    expect(fileByFileSection).toContain("No changed files with findings");
+  });
 });
 
 function findingWithSeverity(

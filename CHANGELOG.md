@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that no-finding
+  walkthroughs keep the required section structure and empty-state copy (#303).
+
 - `@sovri/review-engine`: add acceptance coverage that Findings groups
   present severities in descending rank order from blocker through nitpick
   (#302).
