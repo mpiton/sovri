@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that the File-by-file
+  walkthrough summary repeats finding locations and titles under sorted files
+  with per-file counts (#297).
+
 - `@sovri/review-engine`: add acceptance coverage that finding detail
   completeness checks exercise `composeWalkthrough` output and reject
   walkthrough rows missing the explanatory body text (#296).
