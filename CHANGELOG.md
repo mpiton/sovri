@@ -340,6 +340,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `@sovri/review-engine`: walkthrough finding ordering now uses code-point
+  comparison instead of `localeCompare`, so the rendered markdown is identical
+  across hosts regardless of ICU locale (e.g. `a.ts` always sorts before
+  `ä.ts`). Regression covered in stable-ordering-tiebreak.test.ts (#335,
+  codex review).
+
 - `@sovri/review-engine`: `formatMarkdownText` no longer HTML-escapes
   characters inside inline code spans, so finding text like `` `<button>` ``
   or `` `a && b` `` renders verbatim instead of leaking `&lt;`, `&gt;`, and

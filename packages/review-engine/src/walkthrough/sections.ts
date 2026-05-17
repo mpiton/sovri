@@ -104,7 +104,7 @@ function groupByFile(findings: readonly Finding[]): FileGroup[] {
   }
 
   return [...groups.entries()]
-    .toSorted(([leftFile], [rightFile]) => leftFile.localeCompare(rightFile))
+    .toSorted(([leftFile], [rightFile]) => compareCodePoints(leftFile, rightFile))
     .map(([file, groupFindings]) => ({
       file,
       findings: groupFindings.toSorted(compareFindingsWithinFile),
@@ -120,13 +120,23 @@ function compareFindings(left: Finding, right: Finding): number {
 
 function compareFindingsWithinFile(left: Finding, right: Finding): number {
   return (
-    left.file.localeCompare(right.file) ||
+    compareCodePoints(left.file, right.file) ||
     left.line_start - right.line_start ||
     left.line_end - right.line_end ||
-    left.title.localeCompare(right.title) ||
-    left.body.localeCompare(right.body) ||
-    left.id.localeCompare(right.id)
+    compareCodePoints(left.title, right.title) ||
+    compareCodePoints(left.body, right.body) ||
+    compareCodePoints(left.id, right.id)
   );
+}
+
+function compareCodePoints(left: string, right: string): number {
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+  return 0;
 }
 
 function formatSeverity(severity: Severity): string {

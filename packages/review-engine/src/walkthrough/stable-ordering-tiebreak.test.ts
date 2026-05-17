@@ -110,6 +110,34 @@ describe("composeWalkthrough same-severity tie breaks", () => {
       );
     },
   );
+
+  it("orders non-ASCII file names by code point, not by host locale", () => {
+    // Given the review has a finding in 'a.ts' and another in 'ä.ts'
+    const asciiFinding = finding({
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      file: "a.ts",
+      line: 1,
+      title: "ASCII file",
+    });
+    const accentedFinding = finding({
+      id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      file: "ä.ts",
+      line: 1,
+      title: "Accented file",
+    });
+    const review: Review = {
+      ...baseReview,
+      findings: [accentedFinding, asciiFinding],
+    };
+
+    // When the maintainer calls composeWalkthrough(review)
+    const markdown = composeWalkthrough(review);
+
+    // Then 'a.ts' (U+0061) renders before 'ä.ts' (U+00E4) by code point order
+    expect(indexOfRenderedSnippet(markdown, "a.ts:1 ASCII file")).toBeLessThan(
+      indexOfRenderedSnippet(markdown, "ä.ts:1 Accented file"),
+    );
+  });
 });
 
 type FindingInput = {
