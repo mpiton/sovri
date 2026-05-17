@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add golden comparison coverage that layout drift
+  fails with the affected golden fixture identified (#293).
+
 - `@sovri/review-engine`: add golden fixture coverage that required TL;DR,
   Findings, and File-by-file walkthrough sections remain present (#292).
 
