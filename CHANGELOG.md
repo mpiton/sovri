@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that walkthrough findings
+  render single-line and range locations with their titles and bodies (#294).
+
 - `@sovri/review-engine`: add golden comparison coverage that layout drift
   fails with the affected golden fixture identified (#293).
 
