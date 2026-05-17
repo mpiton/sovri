@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that multiline finding
+  bodies render as one markdown-safe paragraph without raw table-cell newlines
+  or `<br>` tags (#295).
+
 - `@sovri/review-engine`: add acceptance coverage that walkthrough findings
   render single-line and range locations with their titles and bodies (#294).
 

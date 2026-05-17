@@ -100,4 +100,40 @@ describe("composeWalkthrough finding details", () => {
       expect(markdown).toContain(body);
     },
   );
+
+  it("normalizes multiline finding bodies to one markdown-safe paragraph", () => {
+    // Given the review contains a major finding for file "src/api/review.ts"
+    // And the finding line_start is 18
+    // And the finding line_end is 18
+    // And the finding title is "Missing payload null guard"
+    // And the finding body is:
+    const review: Review = {
+      ...baseReview,
+      findings: [
+        {
+          ...baseFinding,
+          body: [
+            "The review payload is read before validation.",
+            "Add a schema parse before accessing nested fields.",
+          ].join("\n"),
+        },
+      ],
+    };
+
+    // When the maintainer calls `composeWalkthrough(review)`
+    const markdown = composeWalkthrough(review);
+
+    // Then the markdown contains "The review payload is read before validation. Add a schema parse before accessing nested fields."
+    expect(markdown).toContain(
+      "The review payload is read before validation. Add a schema parse before accessing nested fields.",
+    );
+    // And the finding table row for "Missing payload null guard" contains no raw newline inside a table cell
+    const row = markdown
+      .split("\n")
+      .find((line) => line.includes("Missing payload null guard") && line.includes("Major"));
+    expect(row).toBeDefined();
+    expect(row).not.toContain("\n");
+    // And the markdown does not contain "<br>"
+    expect(markdown).not.toContain("<br>");
+  });
 });
