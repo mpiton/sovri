@@ -165,4 +165,56 @@ describe("buildInlineComments", () => {
     // And no partial inline comment drafts are returned
     expect(comments).toBeUndefined();
   });
+
+  it("returns an empty draft list for empty finding input", () => {
+    // Given the findings list is empty
+    const findings: Finding[] = [];
+
+    // And the parsed diff contains file "src/session.ts" with RIGHT-side line 18
+    const diff: Diff = {
+      unified_diff: [
+        "diff --git a/src/session.ts b/src/session.ts",
+        `index ${"0".repeat(40)}..${sha} 100644`,
+        "--- a/src/session.ts",
+        "+++ b/src/session.ts",
+        "@@ -18,0 +18,1 @@",
+        "+const userId = session.user.id;",
+      ].join("\n"),
+      files: [
+        {
+          path: "src/session.ts",
+          status: "modified",
+          additions: 1,
+          deletions: 0,
+          sha,
+          patch: [
+            "diff --git a/src/session.ts b/src/session.ts",
+            `index ${"0".repeat(40)}..${sha} 100644`,
+            "--- a/src/session.ts",
+            "+++ b/src/session.ts",
+            "@@ -18,0 +18,1 @@",
+            "+const userId = session.user.id;",
+          ].join("\n"),
+          hunks: [
+            {
+              old_start: 18,
+              old_lines: 0,
+              new_start: 18,
+              new_lines: 1,
+              header: "@@ -18,0 +18,1 @@",
+              lines: ["+const userId = session.user.id;"],
+            },
+          ],
+        },
+      ],
+    };
+
+    // When the maintainer calls `buildInlineComments(findings, diff)`
+    const comments = buildInlineComments(findings, diff);
+
+    // Then exactly 0 inline comment drafts are returned
+    expect(comments).toHaveLength(0);
+    // And no error is raised
+    expect(comments).toEqual([]);
+  });
 });

@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that empty inline finding
+  input returns an empty draft list without error (#338).
+
 - `@sovri/review-engine`: validate inline comment findings before
   generating drafts (#337).
 
