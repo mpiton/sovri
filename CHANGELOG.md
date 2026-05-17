@@ -19,6 +19,118 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Added
+
+- `@sovri/review-engine`: add the first acceptance test for LLM response
+  parsing, requiring parsed LLM findings to receive UUID v4 identifiers and
+  validate against the public `FindingSchema` (#201).
+
+- `@sovri/review-engine`: add the initial LLM response parser and raw response
+  schemas that convert parsed LLM findings into public `Finding` values with
+  UUID v4 identifiers while keeping schema helper types internal to avoid
+  unused public exports. The parser schema also tolerates the current provider
+  response shape while preserving strict validation for unknown keys (#201).
+
+- `@sovri/review-engine`: add acceptance coverage that multiple parsed LLM
+  findings each receive a distinct UUID v4 identifier (#202).
+
+- `@sovri/review-engine`: add acceptance coverage for rejecting non-v4 finding
+  identifiers before a parsed finding can be returned (#203).
+
+- `@sovri/review-engine`: return a committable suggestion when a raw finding
+  contains a non-empty single-line replacement for a single-line location,
+  while keeping empty or multiline replacements non-committable (#204).
+
+- `@sovri/review-engine`: add acceptance coverage for marking multiline,
+  empty, whitespace-only, and null suggestions as non-committable, including
+  explicit `committable: false` assertions when a suggestion object is expected
+  (#205).
+
+- `@sovri/review-engine`: add acceptance coverage that `suggested_code: null`
+  produces no public suggestion object while the returned finding still
+  validates against `FindingSchema` (#206).
+
+- `@sovri/review-engine`: omit the public suggestion object when
+  `suggested_code` contains only whitespace, while preserving `FindingSchema`
+  validation for the returned finding (#207).
+
+- `@sovri/review-engine`: add acceptance coverage that a valid parser response
+  with summary `Review completed` and file `src/review.ts` returns a
+  `Finding[]` whose finding validates against `FindingSchema` (#208).
+
+- `@sovri/review-engine`: throw a typed `LLMResponseParseError` for
+  schema-violating LLM responses before any partial findings are returned
+  (#209).
+
+- `@sovri/review-engine`: add acceptance coverage that parser responses with
+  101 findings fail with a typed findings limit validation error (#210).
+
+- `@sovri/review-engine`: add acceptance coverage that parser tests fail with a
+  schema-validation-specific error if raw LLM finding validation is bypassed
+  (#211).
+
+- `@sovri/review-engine`: add acceptance coverage that a valid response with
+  summary `Two findings found` returns exactly two parsed findings (#212).
+
+- `@sovri/review-engine`: add acceptance coverage that a valid response with
+  summary `No findings found` returns an empty findings array (#213).
+
+- `@sovri/review-engine`: add acceptance coverage that a valid response with
+  exactly 100 findings is accepted and returns 100 parsed findings (#214).
+
+- `@sovri/review-engine`: add acceptance coverage that a response with 101
+  findings fails without partial output and exposes the findings limit failure
+  on the typed parse error cause (#215).
+
+- `@sovri/review-engine`: add raw LLM finding schema acceptance coverage for
+  valid model-provided fields, optional CWE values, and explicit assertions
+  that raw input fixtures and validated data omit deterministic `id` and
+  `source` fields (#216).
+
+- `@sovri/review-engine`: add raw LLM finding schema rejection coverage for
+  `id` and `source` fields (parser-assigned, not model-provided) appearing
+  as unknown keys in model output (#217).
+
+- `@sovri/review-engine`: add raw LLM finding schema rejection coverage for
+  invalid severity, category, file, line range, confidence, title length, and
+  body length values (#218).
+
+- `@sovri/review-engine`: add raw LLM finding schema rejection coverage for
+  invalid optional CWE values on the `cwe` path (#219).
+
+- `@sovri/review-engine`: allow `parseLLMResponse` to accept raw JSON string
+  inputs and parse them into public `Finding[]` values (#220).
+
+- `@sovri/review-engine`: add acceptance coverage that already-parsed unknown
+  object inputs still parse into public `Finding[]` values (#221).
+
+- `@sovri/review-engine`: add acceptance coverage that malformed raw JSON
+  string inputs fail with a typed parse error retaining the JSON syntax cause
+  (#222).
+
+- `@sovri/review-engine`: add acceptance coverage that schema-violating
+  parsed object inputs fail with a typed parse error retaining the Zod cause
+  (#223).
+
+- `@sovri/review-engine`: add acceptance coverage that non-object parsed inputs
+  fail with a typed parse error retaining the Zod cause (#224).
+
+- `@sovri/review-engine`: add top-level LLM response schema acceptance coverage
+  for a strict response with summary `Review completed` and one raw finding
+  (#225).
+
+- `@sovri/review-engine`: add top-level LLM response schema rejection coverage
+  for empty and 2001-character summaries (#226).
+
+- `@sovri/review-engine`: add top-level LLM response schema rejection coverage
+  for unknown fields such as `model_notes` (#227).
+
+- `@sovri/review-engine`: add top-level LLM response schema rejection coverage
+  for missing required `summary` and `findings` fields (#228).
+
+- `@sovri/review-engine`: add top-level LLM response schema boundary coverage
+  for summaries with exactly 2000 JavaScript string characters (#229).
+
 ### Removed
 
 - `@sovri/llm-providers`: `zod-to-json-schema@3.25.2` runtime dependency
@@ -115,6 +227,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   producing `{}` that an LLM would silently honour.
 
 ### Fixed
+
+- `@sovri/core`: `FindingSchema.id` now requires UUID v4 instead of accepting
+  any syntactically valid UUID version, so parser regressions that assign older
+  UUID versions are rejected before a `Finding` can be returned (#203).
 
 - `@sovri/review-engine`: `runReview` now routes prompt generation through
   `buildUserPrompt()` with validated pull request metadata, so the runtime
