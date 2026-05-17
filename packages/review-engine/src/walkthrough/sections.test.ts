@@ -87,7 +87,60 @@ describe("composeWalkthrough required sections", () => {
       sectionIndex(markdown, "### File-by-file"),
     );
   });
+
+  it.each([
+    { firstGroup: "Blocker", secondGroup: "Major" },
+    { firstGroup: "Major", secondGroup: "Minor" },
+    { firstGroup: "Minor", secondGroup: "Info" },
+    { firstGroup: "Info", secondGroup: "Nitpick" },
+  ] satisfies ReadonlyArray<{
+    readonly firstGroup: string;
+    readonly secondGroup: string;
+  }>)(
+    "groups present severities with $firstGroup before $secondGroup",
+    ({ firstGroup, secondGroup }) => {
+      // Given the review contains findings with severities "blocker, major, minor, info, nitpick"
+      const review: Review = {
+        ...baseReview,
+        findings: [
+          findingWithSeverity("minor", "22222222-2222-4222-8222-222222222222", 20),
+          findingWithSeverity("nitpick", "33333333-3333-4333-8333-333333333333", 30),
+          findingWithSeverity("blocker", "44444444-4444-4444-8444-444444444444", 40),
+          findingWithSeverity("info", "55555555-5555-4555-8555-555555555555", 50),
+          findingWithSeverity("major", "66666666-6666-4666-8666-666666666666", 60),
+        ],
+      };
+
+      // When the maintainer calls `composeWalkthrough(review)`
+      const markdown = composeWalkthrough(review);
+      const findingsSection = extractSection(markdown, "### Findings");
+
+      // Then the Findings section contains severity group <firstGroup>
+      expect(findingsSection).toContain(`#### ${firstGroup}`);
+      // And the Findings section contains severity group <secondGroup>
+      expect(findingsSection).toContain(`#### ${secondGroup}`);
+      // And <firstGroup> appears before <secondGroup>
+      expect(sectionIndex(findingsSection, `#### ${firstGroup}`)).toBeLessThan(
+        sectionIndex(findingsSection, `#### ${secondGroup}`),
+      );
+    },
+  );
 });
+
+function findingWithSeverity(
+  severity: Finding["severity"],
+  id: string,
+  lineStart: number,
+): Finding {
+  return {
+    ...baseFinding,
+    id,
+    severity,
+    line_start: lineStart,
+    line_end: lineStart,
+    title: `${severity} finding`,
+  };
+}
 
 function sectionIndex(markdown: string, heading: string): number {
   const index = markdown.indexOf(heading);
@@ -97,4 +150,13 @@ function sectionIndex(markdown: string, heading: string): number {
   }
 
   return index;
+}
+
+function extractSection(markdown: string, heading: string): string {
+  const headingStart = sectionIndex(markdown, heading);
+  const sectionStart = headingStart + heading.length;
+  const section = markdown.slice(sectionStart);
+  const nextSectionStart = section.indexOf("\n### ");
+
+  return nextSectionStart < 0 ? section : section.slice(0, nextSectionStart);
 }
