@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that multi-finding
+  walkthroughs render the required Sovri review, TL;DR, Findings, and
+  File-by-file sections in order (#301).
+
 - `@sovri/review-engine`: add acceptance coverage that escaped file paths
   and table pipes stay safe in both Findings and File-by-file walkthrough
   sections (#300).
