@@ -39,6 +39,34 @@ describe("buildInlineComments payload contract", () => {
     expect(draft).not.toHaveProperty("position");
   });
 
+  it("returns drafts with only GitHub Review API comment fields", () => {
+    // Given a parsed diff contains file "src/auth.ts" with RIGHT-side line 42
+    const diff = createAuthDiff();
+
+    // And a finding targets file "src/auth.ts" from line 42 to line 42
+    const findings = [createAuthFinding()];
+
+    // When the maintainer calls `buildInlineComments(findings, diff)`
+    const comments = buildInlineComments(findings, diff);
+
+    // Then every draft contains only allowed fields
+    // And the allowed fields are "path", "body", "line", "side", "start_line", and "start_side"
+    const allowedFields = new Set(["path", "body", "line", "side", "start_line", "start_side"]);
+    for (const draft of comments) {
+      for (const key of Object.keys(draft)) {
+        expect(allowedFields.has(key)).toBe(true);
+      }
+    }
+
+    // And no draft contains finding-only metadata such as "severity", "category", "confidence", or "source"
+    for (const draft of comments) {
+      expect(draft).not.toHaveProperty("severity");
+      expect(draft).not.toHaveProperty("category");
+      expect(draft).not.toHaveProperty("confidence");
+      expect(draft).not.toHaveProperty("source");
+    }
+  });
+
   it("rejects a malformed draft that omits line", () => {
     // Given an inline comment draft has path "src/auth.ts"
     // And the draft has body "Missing authorization check"

@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that inline comment
+  drafts only expose GitHub review comment payload fields (#349).
+
 - `@sovri/review-engine`: add acceptance coverage that malformed inline
   comment drafts missing `line` are rejected by the draft schema (#348).
 
