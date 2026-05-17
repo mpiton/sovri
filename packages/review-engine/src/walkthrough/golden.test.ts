@@ -47,7 +47,7 @@ describe("composeWalkthrough golden fixtures", () => {
 
     const markdown = composeWalkthrough(review);
 
-    expect(markdown).toBe(expectedMarkdown);
+    expectGoldenMatch(markdown, expectedMarkdown, goldenFixture);
     expect(expectedMarkdown).toContain(requiredText);
   });
 
@@ -66,7 +66,49 @@ describe("composeWalkthrough golden fixtures", () => {
       expect(expectedMarkdown).toContain("### File-by-file");
     },
   );
+
+  it.each([
+    [
+      "multi-finding.review.json",
+      "the ### File-by-file heading omitted",
+      "multi-finding.golden.md",
+      (markdown: string) => markdown.replace("\n### File-by-file\n", "\n"),
+    ],
+    [
+      "html-escaping.review.json",
+      "the escaped script tag rendered as HTML",
+      "html-escaping.golden.md",
+      (markdown: string) =>
+        markdown.replace("&lt;script&gt;alert(1)&lt;/script&gt;", "<script>alert(1)</script>"),
+    ],
+  ])(
+    "rejects golden layout drift in %s: %s",
+    (reviewFixture, _drift, goldenFixture, introduceDrift) => {
+      // Given the generated markdown for <reviewFixture> has <drift>
+      const review = loadReviewFixture(reviewFixture);
+      const driftedMarkdown = introduceDrift(composeWalkthrough(review));
+      // And the fixture expected output is <goldenFixture>
+      const expectedMarkdown = loadTextFixture(goldenFixture);
+
+      // When the maintainer runs the walkthrough tests
+      // Then the golden comparison fails
+      // And the failure identifies <goldenFixture>
+      expect(() => expectGoldenMatch(driftedMarkdown, expectedMarkdown, goldenFixture)).toThrow(
+        goldenFixture,
+      );
+    },
+  );
 });
+
+function expectGoldenMatch(
+  markdown: string,
+  expectedMarkdown: string,
+  goldenFixture: string,
+): void {
+  if (markdown !== expectedMarkdown) {
+    throw new Error(`Golden fixture mismatch: ${goldenFixture}`);
+  }
+}
 
 function loadReviewFixture(name: string): Review {
   const fixture = FixtureReviewSchema.parse(JSON.parse(loadTextFixture(name)));
