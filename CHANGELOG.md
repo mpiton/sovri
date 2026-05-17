@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that escaped file paths
+  and table pipes stay safe in both Findings and File-by-file walkthrough
+  sections (#300).
+
 - `@sovri/review-engine`: add acceptance coverage that raw `<img>` HTML
   copied from a finding body is escaped in walkthrough markdown (#299).
 
