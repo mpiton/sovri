@@ -1,0 +1,18 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "pr_number": 36,
+  "repo_full_name": "mpiton/sovri",
+  "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "started_at": "2026-05-17T08:00:00.000Z",
+  "completed_at": "2026-05-17T08:01:00.000Z",
+  "llm_provider": "test-provider",
+  "llm_model": "test-model",
+  "tokens_used": {
+    "prompt": 800,
+    "completion": 120
+  },
+  "summary": "No actionable findings were found.",
+  "findings": [],
+  "walkthrough_markdown": "Previous provider walkthrough.",
+  "status": "success"
+}

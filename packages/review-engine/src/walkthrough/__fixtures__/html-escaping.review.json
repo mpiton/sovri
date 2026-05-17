@@ -1,0 +1,31 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "pr_number": 36,
+  "repo_full_name": "mpiton/sovri",
+  "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "started_at": "2026-05-17T08:00:00.000Z",
+  "completed_at": "2026-05-17T08:01:00.000Z",
+  "llm_provider": "test-provider",
+  "llm_model": "test-model",
+  "tokens_used": {
+    "prompt": 900,
+    "completion": 150
+  },
+  "summary": "Found <script>alert(1)</script> & comments",
+  "findings": [
+    {
+      "id": "44444444-4444-4444-8444-444444444444",
+      "severity": "major",
+      "category": "security",
+      "file": "src/render.ts",
+      "line_start": 12,
+      "line_end": 12,
+      "title": "Avoid <b>trusted</b> HTML",
+      "body": "Use <strong>escaped</strong> text & validate.",
+      "source": "llm",
+      "confidence": 0.91
+    }
+  ],
+  "walkthrough_markdown": "Previous provider walkthrough.",
+  "status": "success"
+}
