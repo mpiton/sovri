@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that a multi-line
+  finding maps to `start_line`, `start_side`, ending `line`, and `side`
+  fields (#344).
+
 - `@sovri/review-engine`: add acceptance coverage that a single-line
   finding maps to a RIGHT-side `line` draft without range fields (#343).
 

@@ -30,6 +30,32 @@ describe("buildInlineComments line mapping", () => {
     // And the draft does not contain `start_side`
     expect(comments[0]).not.toHaveProperty("start_side");
   });
+
+  it("maps a multi-line finding to start_line and line", () => {
+    // Given a parsed diff contains file "src/config.ts" with RIGHT-side lines 12, 13, and 14
+    const diff = createConfigDiff(12, [
+      "export const timeoutMs = 1000;",
+      "export const retryCount = 3;",
+      "export const backoffMs = 50;",
+    ]);
+
+    // And a finding targets file "src/config.ts" from line 12 to line 14
+    const findings = [createConfigFinding(12, 14)];
+
+    // When the maintainer calls `buildInlineComments(findings, diff)`
+    const comments = buildInlineComments(findings, diff);
+
+    // Then exactly 1 inline comment draft is returned
+    expect(comments).toHaveLength(1);
+    // And the draft start_line is 12
+    expect(comments[0]?.start_line).toBe(12);
+    // And the draft start_side is "RIGHT"
+    expect(comments[0]?.start_side).toBe("RIGHT");
+    // And the draft line is 14
+    expect(comments[0]?.line).toBe(14);
+    // And the draft side is "RIGHT"
+    expect(comments[0]?.side).toBe("RIGHT");
+  });
 });
 
 function createConfigDiff(newStart: number, addedLines: readonly string[]): Diff {
