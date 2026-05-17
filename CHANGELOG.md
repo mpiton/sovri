@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that walkthrough
+  composition escapes user-controlled summary, finding title, finding body,
+  and finding file values before rendering markdown (#298).
+
 - `@sovri/review-engine`: add acceptance coverage that the File-by-file
   walkthrough summary repeats finding locations and titles under sorted files
   with per-file counts (#297).
