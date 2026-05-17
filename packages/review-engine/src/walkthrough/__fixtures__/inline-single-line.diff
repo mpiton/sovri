@@ -1,0 +1,11 @@
+diff --git a/src/handler.ts b/src/handler.ts
+index 0000000..1111111 100644
+--- a/src/handler.ts
++++ b/src/handler.ts
+@@ -24,5 +24,6 @@ export function handle(request: Request) {
+   const payload = request.body;
+   const session = payload.session;
+   const reviewer = request.user;
++  const userId = request.body.user.id;
+   return session.id;
+ }

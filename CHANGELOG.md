@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add fixture-backed acceptance coverage for
+  single-line inline comment draft generation (#339).
+
 - `@sovri/review-engine`: add acceptance coverage that empty inline finding
   input returns an empty draft list without error (#338).
 
