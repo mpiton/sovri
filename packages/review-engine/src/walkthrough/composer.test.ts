@@ -109,4 +109,22 @@ describe("composeWalkthrough", () => {
     // And the composer does not promote the body link to the finding anchor
     expect(markdown).not.toContain("[Missing payload null guard](");
   });
+
+  it("does not escape brackets inside inline code spans", () => {
+    const review: Review = {
+      ...baseReview,
+      findings: [
+        {
+          ...baseReview.findings[0],
+          body: "Check `items[i]` before [discussion](#discussion_r987654321)",
+        },
+      ],
+    };
+
+    const markdown = composeWalkthrough(review as unknown as WalkthroughInput);
+
+    expect(markdown).toContain("`items[i]`");
+    expect(markdown).not.toContain("`items\\[i\\]`");
+    expect(markdown).toContain("\\[discussion\\](#discussion_r987654321)");
+  });
 });

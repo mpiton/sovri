@@ -32,5 +32,44 @@ function formatBody(value: string): string {
 }
 
 function escapeMarkdownLinkDelimiters(value: string): string {
-  return value.replaceAll("[", "\\[").replaceAll("]", "\\]");
+  return splitInlineCodeSpans(value)
+    .map((segment) =>
+      segment.kind === "code"
+        ? segment.text
+        : segment.text.replaceAll("[", "\\[").replaceAll("]", "\\]"),
+    )
+    .join("");
+}
+
+type MarkdownSegment = {
+  readonly kind: "code" | "text";
+  readonly text: string;
+};
+
+function splitInlineCodeSpans(value: string): MarkdownSegment[] {
+  const segments: MarkdownSegment[] = [];
+  let cursor = 0;
+
+  while (cursor < value.length) {
+    const codeStart = value.indexOf("`", cursor);
+    if (codeStart === -1) {
+      segments.push({ kind: "text", text: value.slice(cursor) });
+      break;
+    }
+
+    const codeEnd = value.indexOf("`", codeStart + 1);
+    if (codeEnd === -1) {
+      segments.push({ kind: "text", text: value.slice(cursor) });
+      break;
+    }
+
+    if (codeStart > cursor) {
+      segments.push({ kind: "text", text: value.slice(cursor, codeStart) });
+    }
+
+    segments.push({ kind: "code", text: value.slice(codeStart, codeEnd + 1) });
+    cursor = codeEnd + 1;
+  }
+
+  return segments;
 }
