@@ -1,0 +1,14 @@
+[
+  {
+    "id": "55555555-5555-4555-8555-555555555555",
+    "severity": "major",
+    "category": "bug",
+    "file": "src/handler.ts",
+    "line_start": 27,
+    "line_end": 29,
+    "title": "Missing payload guard",
+    "body": "`request.body.user` is read repeatedly without validation.",
+    "source": "llm",
+    "confidence": 0.9
+  }
+]

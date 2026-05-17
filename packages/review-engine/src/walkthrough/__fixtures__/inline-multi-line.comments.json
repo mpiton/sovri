@@ -1,0 +1,10 @@
+[
+  {
+    "path": "src/handler.ts",
+    "body": "**Missing payload guard**\n\n`request.body.user` is read repeatedly without validation.",
+    "start_line": 27,
+    "start_side": "RIGHT",
+    "line": 29,
+    "side": "RIGHT"
+  }
+]

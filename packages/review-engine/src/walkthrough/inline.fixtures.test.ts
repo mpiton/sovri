@@ -27,6 +27,25 @@ describe("buildInlineComments fixture coverage", () => {
     // And the generated draft validates against `InlineCommentDraftSchema`
     expect(z.array(InlineCommentDraftSchema).parse(comments)).toEqual(expectedComments);
   });
+
+  it("matches the multi-line inline comment draft fixture", () => {
+    // Given fixture diff "inline-multi-line.diff" contains file "src/handler.ts" with RIGHT-side lines 27, 28, and 29
+    const diff = parseUnifiedDiff(loadTextFixture("inline-multi-line.diff"));
+
+    // And fixture findings "inline-multi-line.findings.json" contains one finding from line 27 to line 29
+    const findings = loadFindingsFixture("inline-multi-line.findings.json");
+
+    // And expected fixture "inline-multi-line.comments.json" contains one inline comment draft from line 27 to line 29
+    const expectedComments = loadCommentsFixture("inline-multi-line.comments.json");
+
+    // When the maintainer runs the inline comment fixture test
+    const comments = buildInlineComments(findings, diff);
+
+    // Then the generated draft matches "inline-multi-line.comments.json"
+    expect(comments).toEqual(expectedComments);
+    // And the generated draft validates against `InlineCommentDraftSchema`
+    expect(z.array(InlineCommentDraftSchema).parse(comments)).toEqual(expectedComments);
+  });
 });
 
 function loadFindingsFixture(name: string): readonly Finding[] {
