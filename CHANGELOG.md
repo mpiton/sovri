@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that inline comment anchor
+  rendering remains out of scope until the review input exposes trusted
+  inline-comment URL metadata (#290).
+
 - `@sovri/review-engine`: render finding bodies as one markdown-safe paragraph
   in walkthrough output while neutralizing markdown link delimiters for
   anchor-like user text, preserving brackets inside single- and multi-backtick

@@ -163,6 +163,27 @@ describe("composeWalkthrough", () => {
     expect(markdown).not.toContain("\\`[discussion](#discussion_r987654321)\\`");
   });
 
+  it("does not render inline comment anchors until trusted URL metadata exists", () => {
+    // Given the review contains a finding for file "src/api/review.ts"
+    // And the finding id is "11111111-1111-4111-8111-111111111111"
+    // And the review input has no field named "inline_comment_url"
+    const review = baseReview;
+
+    // When the maintainer calls `composeWalkthrough(review)`
+    const markdown = composeWalkthrough(review as unknown as WalkthroughInput);
+
+    // Then the markdown contains the finding title
+    expect(markdown).toContain("Missing payload null guard");
+    // And the markdown contains no inline comment anchor for that finding
+    const finding = review.findings[0];
+    if (finding === undefined) {
+      throw new Error("test review must contain one finding");
+    }
+    expect("inline_comment_url" in finding).toBe(false);
+    expect(markdown).not.toContain("[Missing payload null guard](");
+    expect(markdown).not.toContain("#discussion_r");
+  });
+
   it("allows escaped backticks to close an already-open code span", () => {
     const review: Review = {
       ...baseReview,
