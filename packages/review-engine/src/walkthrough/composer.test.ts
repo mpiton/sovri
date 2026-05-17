@@ -127,4 +127,22 @@ describe("composeWalkthrough", () => {
     expect(markdown).not.toContain("`items\\[i\\]`");
     expect(markdown).toContain("\\[discussion\\](#discussion_r987654321)");
   });
+
+  it("does not escape brackets inside multi-backtick code spans", () => {
+    const review: Review = {
+      ...baseReview,
+      findings: [
+        {
+          ...baseReview.findings[0],
+          body: "Check ``items[`index`]`` before [discussion](#discussion_r987654321)",
+        },
+      ],
+    };
+
+    const markdown = composeWalkthrough(review as unknown as WalkthroughInput);
+
+    expect(markdown).toContain("``items[`index`]``");
+    expect(markdown).not.toContain("``items\\[`index`\\]``");
+    expect(markdown).toContain("\\[discussion\\](#discussion_r987654321)");
+  });
 });

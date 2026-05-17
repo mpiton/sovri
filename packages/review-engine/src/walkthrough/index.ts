@@ -57,8 +57,9 @@ function splitInlineCodeSpans(value: string): MarkdownSegment[] {
       break;
     }
 
-    const codeEnd = value.indexOf("`", codeStart + 1);
-    if (codeEnd === -1) {
+    const markerLength = readBacktickRunLength(value, codeStart);
+    const codeEnd = findClosingBacktickRun(value, markerLength, codeStart + markerLength);
+    if (codeEnd === undefined) {
       segments.push({ kind: "text", text: value.slice(cursor) });
       break;
     }
@@ -67,9 +68,43 @@ function splitInlineCodeSpans(value: string): MarkdownSegment[] {
       segments.push({ kind: "text", text: value.slice(cursor, codeStart) });
     }
 
-    segments.push({ kind: "code", text: value.slice(codeStart, codeEnd + 1) });
-    cursor = codeEnd + 1;
+    segments.push({ kind: "code", text: value.slice(codeStart, codeEnd + markerLength) });
+    cursor = codeEnd + markerLength;
   }
 
   return segments;
+}
+
+function readBacktickRunLength(value: string, start: number): number {
+  let length = 0;
+
+  while (value[start + length] === "`") {
+    length += 1;
+  }
+
+  return length;
+}
+
+function findClosingBacktickRun(
+  value: string,
+  expectedLength: number,
+  start: number,
+): number | undefined {
+  let cursor = start;
+
+  while (cursor < value.length) {
+    const codeEnd = value.indexOf("`", cursor);
+    if (codeEnd === -1) {
+      return undefined;
+    }
+
+    const markerLength = readBacktickRunLength(value, codeEnd);
+    if (markerLength === expectedLength) {
+      return codeEnd;
+    }
+
+    cursor = codeEnd + markerLength;
+  }
+
+  return undefined;
 }
