@@ -81,6 +81,30 @@ describe("buildInlineComments line mapping", () => {
     // And the draft side is "RIGHT"
     expect(comments[0]?.side).toBe("RIGHT");
   });
+
+  it("rejects a reversed finding range before mapping", () => {
+    // Given a finding targets file "src/config.ts" from line 14 to line 12
+    const findings = [createConfigFinding(14, 12)];
+
+    // And the parsed diff contains file "src/config.ts" with RIGHT-side lines 12, 13, and 14
+    const diff = createConfigDiff(12, [
+      "export const timeoutMs = 1000;",
+      "export const retryCount = 3;",
+      "export const backoffMs = 50;",
+    ]);
+
+    let comments: ReturnType<typeof buildInlineComments> | undefined;
+
+    // When the maintainer calls `buildInlineComments(findings, diff)`
+    const build = () => {
+      comments = buildInlineComments(findings, diff);
+    };
+
+    // Then validation fails for the finding range
+    expect(build).toThrow();
+    // And no inline comment draft is returned for that finding
+    expect(comments).toBeUndefined();
+  });
 });
 
 function createConfigDiff(newStart: number, addedLines: readonly string[]): Diff {

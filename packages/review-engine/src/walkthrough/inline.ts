@@ -3,6 +3,16 @@
 
 import { DiffSchema, FindingSchema, z, type Diff, type Finding } from "@sovri/core";
 
+const InlineFindingSchema = FindingSchema.superRefine((finding, context) => {
+  if (finding.line_start > finding.line_end) {
+    context.addIssue({
+      code: "custom",
+      path: ["line_end"],
+      message: "line_end must be greater than or equal to line_start",
+    });
+  }
+});
+
 export const InlineCommentDraftSchema = z
   .object({
     path: z.string().min(1),
@@ -20,7 +30,7 @@ export function buildInlineComments(
   findings: readonly Finding[],
   diff: Diff,
 ): InlineCommentDraft[] {
-  const validFindings = z.array(FindingSchema).parse(findings);
+  const validFindings = z.array(InlineFindingSchema).parse(findings);
   const rightSideLinesByPath = collectRightSideLines(DiffSchema.parse(diff));
 
   return validFindings
