@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that same-severity
+  walkthrough findings use stable file, line, then title tie-break ordering
+  (#310).
+
 - `@sovri/review-engine`: add acceptance coverage that higher-severity
   walkthrough findings render before lower-severity findings even when the
   input array is reversed (#309).
