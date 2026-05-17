@@ -63,6 +63,25 @@ describe("buildInlineComments fixture coverage", () => {
     // Then the generated draft list matches "inline-missing-line.comments.json"
     expect(comments).toEqual(expectedComments);
   });
+
+  it("returns stable fixture output across repeated runs", () => {
+    // Given fixture diff "inline-stable-order.diff" contains files "src/a.ts" and "src/b.ts"
+    const diff = parseUnifiedDiff(loadTextFixture("inline-stable-order.diff"));
+
+    // And fixture findings "inline-stable-order.findings.json" contains 3 anchorable findings
+    const findings = loadFindingsFixture("inline-stable-order.findings.json");
+    const expectedComments = loadCommentsFixture("inline-stable-order.comments.json");
+
+    // When the maintainer runs the inline comment fixture test twice
+    const firstComments = buildInlineComments(findings, diff);
+    const secondComments = buildInlineComments(findings, diff);
+
+    // Then both generated draft lists are identical
+    expect(secondComments).toEqual(firstComments);
+    // And both generated draft lists match "inline-stable-order.comments.json"
+    expect(firstComments).toEqual(expectedComments);
+    expect(secondComments).toEqual(expectedComments);
+  });
 });
 
 function loadFindingsFixture(name: string): readonly Finding[] {

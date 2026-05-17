@@ -1,0 +1,20 @@
+[
+  {
+    "path": "src/b.ts",
+    "body": "**Missing audit guard**\n\n`result` is audited before validation.",
+    "line": 8,
+    "side": "RIGHT"
+  },
+  {
+    "path": "src/a.ts",
+    "body": "**Validate after load**\n\n`value` should be validated near the load boundary.",
+    "line": 11,
+    "side": "RIGHT"
+  },
+  {
+    "path": "src/b.ts",
+    "body": "**Report without context**\n\n`report` lacks the request context.",
+    "line": 9,
+    "side": "RIGHT"
+  }
+]

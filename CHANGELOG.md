@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add fixture-backed acceptance coverage that inline
+  comment generation is deterministic across repeated runs (#342).
+
 - `@sovri/review-engine`: skip inline comment drafts when a finding range
   cannot be anchored to RIGHT-side diff lines (#341).
 

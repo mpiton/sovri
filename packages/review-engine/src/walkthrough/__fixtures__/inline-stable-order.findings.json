@@ -1,0 +1,38 @@
+[
+  {
+    "id": "77777777-7777-4777-8777-777777777777",
+    "severity": "major",
+    "category": "bug",
+    "file": "src/b.ts",
+    "line_start": 8,
+    "line_end": 8,
+    "title": "Missing audit guard",
+    "body": "`result` is audited before validation.",
+    "source": "llm",
+    "confidence": 0.86
+  },
+  {
+    "id": "88888888-8888-4888-8888-888888888888",
+    "severity": "minor",
+    "category": "maintainability",
+    "file": "src/a.ts",
+    "line_start": 11,
+    "line_end": 11,
+    "title": "Validate after load",
+    "body": "`value` should be validated near the load boundary.",
+    "source": "llm",
+    "confidence": 0.81
+  },
+  {
+    "id": "99999999-9999-4999-8999-999999999999",
+    "severity": "minor",
+    "category": "bug",
+    "file": "src/b.ts",
+    "line_start": 9,
+    "line_end": 9,
+    "title": "Report without context",
+    "body": "`report` lacks the request context.",
+    "source": "llm",
+    "confidence": 0.79
+  }
+]
