@@ -88,7 +88,7 @@ function loadFindingsFixture(name: string): readonly Finding[] {
   return z.array(FindingSchema).parse(JSON.parse(loadTextFixture(name)));
 }
 
-function loadCommentsFixture(name: string): unknown[] {
+function loadCommentsFixture(name: string) {
   return z.array(InlineCommentDraftSchema).parse(JSON.parse(loadTextFixture(name)));
 }
 

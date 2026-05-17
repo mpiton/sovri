@@ -37,8 +37,13 @@ export type {
   ProviderReviewResponse,
 } from "./parsing/index.js";
 
-export { composeWalkthrough, WalkthroughInputSchema } from "./walkthrough/index.js";
-export type { WalkthroughInput } from "./walkthrough/index.js";
+export {
+  buildInlineComments,
+  composeWalkthrough,
+  InlineCommentDraftSchema,
+  WalkthroughInputSchema,
+} from "./walkthrough/index.js";
+export type { InlineCommentDraft, WalkthroughInput } from "./walkthrough/index.js";
 
 export { runReview } from "./orchestrator.js";
 export type { ReviewEngineResult, RunReviewInput, RunReviewOptions } from "./orchestrator.js";

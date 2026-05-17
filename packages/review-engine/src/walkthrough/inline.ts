@@ -22,7 +22,18 @@ export const InlineCommentDraftSchema = z
     line: z.number().int().positive(),
     side: z.literal("RIGHT"),
   })
-  .strict();
+  .strict()
+  .superRefine((draft, context) => {
+    const hasStartLine = draft.start_line !== undefined;
+    const hasStartSide = draft.start_side !== undefined;
+    if (hasStartLine !== hasStartSide) {
+      context.addIssue({
+        code: "custom",
+        path: [hasStartLine ? "start_side" : "start_line"],
+        message: "start_line and start_side must both be provided or both omitted",
+      });
+    }
+  });
 
 export type InlineCommentDraft = z.infer<typeof InlineCommentDraftSchema>;
 

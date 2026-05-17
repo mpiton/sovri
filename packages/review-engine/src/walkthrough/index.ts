@@ -11,6 +11,9 @@ export const WalkthroughInputSchema = ReviewSchema;
 
 export type WalkthroughInput = z.input<typeof WalkthroughInputSchema>;
 
+export { buildInlineComments, InlineCommentDraftSchema } from "./inline.js";
+export type { InlineCommentDraft } from "./inline.js";
+
 export function composeWalkthrough(input: unknown): string {
   const review = WalkthroughInputSchema.parse(input);
   const findings = sortFindings(review.findings);

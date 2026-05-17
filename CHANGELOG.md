@@ -21,6 +21,18 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: re-export `buildInlineComments`,
+  `InlineCommentDraftSchema`, and the `InlineCommentDraft` type from the
+  package entrypoint so downstream consumers can build GitHub inline drafts
+  without reaching into internal modules (#372).
+
+### Changed
+
+- `@sovri/review-engine`: `InlineCommentDraftSchema` now rejects payloads that
+  provide only one of `start_line` / `start_side`, enforcing GitHub's
+  multi-line comment contract at validation time instead of at API time
+  (#372).
+
 - `@sovri/review-engine`: add acceptance coverage that multi-line inline
   findings are skipped when any RIGHT-side line in the range is absent (#353).
 

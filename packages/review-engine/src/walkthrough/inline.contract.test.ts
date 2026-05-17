@@ -67,6 +67,30 @@ describe("buildInlineComments payload contract", () => {
     }
   });
 
+  it("rejects a draft that provides only one of start_line or start_side", () => {
+    // Given a draft has start_line without start_side
+    const startLineOnly = {
+      path: "src/auth.ts",
+      body: "Missing authorization check",
+      start_line: 40,
+      line: 42,
+      side: "RIGHT",
+    };
+    // And another draft has start_side without start_line
+    const startSideOnly = {
+      path: "src/auth.ts",
+      body: "Missing authorization check",
+      start_side: "RIGHT",
+      line: 42,
+      side: "RIGHT",
+    };
+
+    // When the maintainer validates each draft against `InlineCommentDraftSchema`
+    // Then both validations fail
+    expect(() => InlineCommentDraftSchema.parse(startLineOnly)).toThrow();
+    expect(() => InlineCommentDraftSchema.parse(startSideOnly)).toThrow();
+  });
+
   it("rejects a malformed draft that omits line", () => {
     // Given an inline comment draft has path "src/auth.ts"
     // And the draft has body "Missing authorization check"
