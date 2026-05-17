@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that valid reviews return
+  markdown strings with TL;DR summary text and the empty-summary fallback
+  (#305).
+
 - `@sovri/review-engine`: add acceptance coverage that walkthrough
   structure checks reject markdown missing the File-by-file section (#304).
 
