@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage for rejecting fabricated
+  GitHub discussion links when review findings lack trusted inline-comment URL
+  metadata (#288).
+
 - `@sovri/review-engine`: make walkthrough composition accept validated review
   inputs and render finding titles without generated inline comment anchors
   (#287).

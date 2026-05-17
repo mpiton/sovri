@@ -58,4 +58,20 @@ describe("composeWalkthrough", () => {
     // And the markdown does not use "11111111-1111-4111-8111-111111111111" as an anchor target
     expect(markdown).not.toContain("(#11111111-1111-4111-8111-111111111111)");
   });
+
+  it.each([
+    "[inline comment](#discussion_r123456789)",
+    "[view comment](https://github.com/mpiton/sovri/pull/36#discussion_r123456789)",
+  ])("does not render fabricated GitHub discussion links: %s", (fabricatedAnchor) => {
+    // Given the review contains a finding without inline-comment URL metadata
+    const review = baseReview;
+
+    // When the maintainer calls `composeWalkthrough(review)`
+    const markdown = composeWalkthrough(review as unknown as WalkthroughInput);
+
+    // Then the markdown must not contain <fabricatedAnchor>
+    expect(markdown).not.toContain(fabricatedAnchor);
+    // And the markdown must not contain a generated GitHub comment URL
+    expect(markdown).not.toMatch(/https:\/\/github\.com\/mpiton\/sovri\/pull\/36#discussion_r\d+/u);
+  });
 });
