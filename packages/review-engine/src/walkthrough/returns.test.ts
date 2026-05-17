@@ -102,6 +102,25 @@ describe("composeWalkthrough markdown return value", () => {
     // And the markdown contains "### File-by-file"
     expect(markdown).toContain("### File-by-file");
   });
+
+  it("rejects invalid review input without returning partial markdown", () => {
+    // Given the review is missing required field "summary"
+    const invalidReviewInput = Object.fromEntries(
+      Object.entries(baseReview).filter(([key]) => key !== "summary"),
+    );
+    let markdown: string | undefined;
+
+    // When the maintainer calls `composeWalkthrough(review)`
+    const callComposer = (): void => {
+      markdown = composeWalkthrough(invalidReviewInput);
+    };
+
+    // Then validation fails against `ReviewSchema`
+    expect(callComposer).toThrow();
+    expect(() => ReviewSchema.parse(invalidReviewInput)).toThrow();
+    // And no partial markdown string is returned
+    expect(markdown).toBeUndefined();
+  });
 });
 
 function extractSection(markdown: string, heading: string): string {

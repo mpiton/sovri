@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that invalid
+  walkthrough review inputs fail validation without returning partial markdown
+  (#307).
+
 - `@sovri/review-engine`: add acceptance coverage that valid no-finding
   reviews still return useful walkthrough markdown with summary and empty
   findings sections (#306).

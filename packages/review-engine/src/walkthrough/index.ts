@@ -11,7 +11,7 @@ export const WalkthroughInputSchema = ReviewSchema;
 
 export type WalkthroughInput = z.input<typeof WalkthroughInputSchema>;
 
-export function composeWalkthrough(input: WalkthroughInput): string {
+export function composeWalkthrough(input: unknown): string {
   const review = WalkthroughInputSchema.parse(input);
   const findings = sortFindings(review.findings);
 
