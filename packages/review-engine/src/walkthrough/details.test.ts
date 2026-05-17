@@ -159,6 +159,81 @@ describe("composeWalkthrough finding details", () => {
       "Incomplete walkthrough finding detail: The review payload is read before validation.",
     );
   });
+
+  it.each([
+    {
+      file: "src/api/review.ts",
+      countText: "2 findings",
+      expectedFinding: "src/api/review.ts:18 Missing payload null guard",
+    },
+    {
+      file: "src/api/review.ts",
+      countText: "2 findings",
+      expectedFinding: "src/api/review.ts:31 Duplicated branch",
+    },
+    {
+      file: "src/auth/session.ts",
+      countText: "1 finding",
+      expectedFinding: "src/auth/session.ts:42-45 Unvalidated session token",
+    },
+  ] satisfies ReadonlyArray<{
+    readonly file: string;
+    readonly countText: string;
+    readonly expectedFinding: string;
+  }>)(
+    "repeats $expectedFinding in the sorted file-by-file summary",
+    ({ file, countText, expectedFinding }) => {
+      // Given the review contains findings:
+      const review: Review = {
+        ...baseReview,
+        findings: [
+          {
+            ...baseFinding,
+            severity: "major",
+            file: "src/api/review.ts",
+            line_start: 18,
+            line_end: 18,
+            title: "Missing payload null guard",
+            body: "The review payload is read before validation.",
+          },
+          {
+            ...baseFinding,
+            id: "22222222-2222-4222-8222-222222222222",
+            severity: "minor",
+            file: "src/api/review.ts",
+            line_start: 31,
+            line_end: 31,
+            title: "Duplicated branch",
+            body: "The branch repeats an existing condition.",
+          },
+          {
+            ...baseFinding,
+            id: "33333333-3333-4333-8333-333333333333",
+            severity: "blocker",
+            file: "src/auth/session.ts",
+            line_start: 42,
+            line_end: 45,
+            title: "Unvalidated session token",
+            body: "The handler accepts a token without signature validation.",
+          },
+        ],
+      };
+
+      // When the maintainer calls `composeWalkthrough(review)`
+      const markdown = composeWalkthrough(review);
+      const fileByFileSection = extractSection(markdown, "### File-by-file");
+
+      // Then the File-by-file section contains <file>
+      expect(fileByFileSection).toContain(`#### ${file}`);
+      // And the File-by-file section contains <countText>
+      expect(fileByFileSection).toContain(countText);
+      // And the File-by-file section contains <expectedFinding>
+      expect(fileByFileSection).toContain(expectedFinding);
+      expect(fileByFileSection.indexOf("#### src/api/review.ts")).toBeLessThan(
+        fileByFileSection.indexOf("#### src/auth/session.ts"),
+      );
+    },
+  );
 });
 
 function expectCompleteFindingDetail(
@@ -176,4 +251,18 @@ function expectCompleteFindingDetail(
   if (missingDetails.length > 0) {
     throw new Error(`Incomplete walkthrough finding detail: ${missingDetails.join(", ")}`);
   }
+}
+
+function extractSection(markdown: string, heading: string): string {
+  const headingStart = markdown.indexOf(heading);
+
+  if (headingStart < 0) {
+    throw new Error(`Missing walkthrough section: ${heading}`);
+  }
+
+  const sectionStart = headingStart + heading.length;
+  const section = markdown.slice(sectionStart);
+  const nextSectionStart = section.indexOf("\n### ");
+
+  return nextSectionStart < 0 ? section : section.slice(0, nextSectionStart);
 }
