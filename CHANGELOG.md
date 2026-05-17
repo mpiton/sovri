@@ -88,7 +88,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `source` fields (#216).
 
 - `@sovri/review-engine`: add raw LLM finding schema rejection coverage for
-  deterministic model-provided `id` and `source` fields as unknown keys (#217).
+  `id` and `source` fields (parser-assigned, not model-provided) appearing
+  as unknown keys in model output (#217).
 
 - `@sovri/review-engine`: add raw LLM finding schema rejection coverage for
   invalid severity, category, file, line range, confidence, title length, and
