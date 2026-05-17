@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add acceptance coverage that raw `<img>` HTML
+  copied from a finding body is escaped in walkthrough markdown (#299).
+
 - `@sovri/review-engine`: add acceptance coverage that walkthrough
   composition escapes user-controlled summary, finding title, finding body,
   and finding file values before rendering markdown (#298).

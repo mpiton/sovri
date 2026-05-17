@@ -86,6 +86,22 @@ describe("composeWalkthrough HTML escaping", () => {
     // And the markdown does not contain <forbidden>
     expect(markdown).not.toContain(forbidden);
   });
+
+  it("escapes raw HTML copied from a finding body", () => {
+    // Given the review contains a finding for file "src/render.ts"
+    // And the finding line_start is 12
+    // And the finding line_end is 12
+    // And the finding body is "Render <img src=x onerror=alert(1)> directly"
+    const review = reviewWithField("finding body", "Render <img src=x onerror=alert(1)> directly");
+
+    // When the maintainer calls `composeWalkthrough(review)`
+    const markdown = composeWalkthrough(review);
+
+    // Then the markdown must not contain "<img src=x onerror=alert(1)>"
+    expect(markdown).not.toContain("<img src=x onerror=alert(1)>");
+    // And the markdown contains "Render &lt;img src=x onerror=alert(1)&gt; directly"
+    expect(markdown).toContain("Render &lt;img src=x onerror=alert(1)&gt; directly");
+  });
 });
 
 function reviewWithField(field: EscapedField, raw: string): Review {
