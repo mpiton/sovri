@@ -24,7 +24,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `@sovri/review-engine`: render finding bodies as one markdown-safe paragraph
   in walkthrough output while neutralizing markdown link delimiters for
   anchor-like user text, preserving brackets inside single- and multi-backtick
-  inline code spans, and treating escaped backticks as literal text (#289).
+  inline code spans, treating escaped opening backticks as literal text, and
+  preserving Markdown closing semantics inside code spans (#289).
 
 - `@sovri/review-engine`: add acceptance coverage that anchor-like user text
   in finding bodies is rendered as inert markdown when no trusted inline-comment

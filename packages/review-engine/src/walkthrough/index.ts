@@ -112,8 +112,8 @@ function findClosingBacktickRun(
   let cursor = start;
 
   while (cursor < value.length) {
-    const codeEnd = findNextUnescapedBacktick(value, cursor);
-    if (codeEnd === undefined) {
+    const codeEnd = value.indexOf("`", cursor);
+    if (codeEnd === -1) {
       return undefined;
     }
 

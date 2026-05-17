@@ -162,4 +162,21 @@ describe("composeWalkthrough", () => {
     expect(markdown).toContain("\\`\\[discussion\\](#discussion_r987654321)\\`");
     expect(markdown).not.toContain("\\`[discussion](#discussion_r987654321)\\`");
   });
+
+  it("allows escaped backticks to close an already-open code span", () => {
+    const review: Review = {
+      ...baseReview,
+      findings: [
+        {
+          ...baseReview.findings[0],
+          body: "`code \\` [discussion](#discussion_r987654321)`",
+        },
+      ],
+    };
+
+    const markdown = composeWalkthrough(review as unknown as WalkthroughInput);
+
+    expect(markdown).toContain("`code \\` \\[discussion\\](#discussion_r987654321)`");
+    expect(markdown).not.toContain("`code \\` [discussion](#discussion_r987654321)`");
+  });
 });
