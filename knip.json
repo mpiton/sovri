@@ -26,8 +26,8 @@
       "ignoreDependencies": ["@anthropic-ai/sdk", "zod"]
     },
     "apps/*": {
-      "entry": ["src/index.ts!", "src/{server,main,bin,worker}.ts!"],
-      "project": ["src/**/*.{ts,tsx,mts}!"]
+      "entry": ["src/index.ts!", "src/{server,main,bin,worker}.ts!", "tests/**/*.test.ts!"],
+      "project": ["src/**/*.{ts,tsx,mts}!", "tests/**/*.{ts,tsx,mts}!"]
     }
   },
   "ignore": [

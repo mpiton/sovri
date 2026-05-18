@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `apps/community-bot`: add the initial Probot scaffold with manifest,
+  package metadata, source layout, TypeScript inheritance, and scaffold
+  contract tests (#39).
+
 - `@sovri/review-engine`: add the initial `reviewPullRequest`
   orchestration entrypoint with severity threshold and ignored path filters
   while enforcing configured review limits and preserving provider finding

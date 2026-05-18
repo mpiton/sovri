@@ -7,6 +7,7 @@
     { "path": "./packages/core" },
     { "path": "./packages/llm-providers" },
     { "path": "./packages/observability" },
-    { "path": "./packages/review-engine" }
+    { "path": "./packages/review-engine" },
+    { "path": "./apps/community-bot" }
   ]
 }

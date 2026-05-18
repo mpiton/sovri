@@ -1,0 +1,56 @@
+{
+  "name": "@sovri/community-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sovri Community GitHub App - thin Probot orchestration layer for AI code review.",
+  "homepage": "https://github.com/mpiton/sovri/tree/main/apps/community-bot#readme",
+  "bugs": {
+    "url": "https://github.com/mpiton/sovri/issues"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mpiton/sovri.git",
+    "directory": "apps/community-bot"
+  },
+  "bin": {
+    "sovri-community-bot": "./dist/server.js"
+  },
+  "files": [
+    "dist",
+    "app.yml"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/app.d.ts",
+      "import": "./dist/app.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "probot run ./src/app.ts",
+    "lint": "oxlint . --max-warnings=0 --no-error-on-unmatched-pattern",
+    "start": "node ./dist/server.js",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@sovri/config": "workspace:*",
+    "@sovri/observability": "workspace:*",
+    "@sovri/review-engine": "workspace:*",
+    "probot": "^14.3.2"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "4.0.9",
+    "@types/node": "24.12.4",
+    "js-yaml": "4.1.1",
+    "tsup": "8.5.1",
+    "vitest": "4.1.6"
+  },
+  "engines": {
+    "node": ">=24.8.0 <25.0.0",
+    "pnpm": ">=10.0.0 <11.0.0"
+  }
+}

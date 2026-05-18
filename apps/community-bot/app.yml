@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sovri SAS
+
+name: Sovri Community Bot
+description: EU-sovereign AI code review bot for GitHub pull requests.
+url: https://github.com/mpiton/sovri
+hook_attributes:
+  url: https://example.invalid/github/webhooks
+default_permissions:
+  pull_requests: write
+  contents: read
+  issues: write
+  metadata: read
+default_events:
+  - pull_request
+  - issue_comment
