@@ -443,6 +443,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   through a new `inspectLayoutPresence` helper instead of re-deriving the
   missing element from the same input list.
 
+- `apps/community-bot`: `dev` script targets the compiled `dist/app.js`
+  instead of `src/app.ts` (Codex review on #452). The TypeScript sources use
+  ESM `.js` import specifiers that Probot's CLI cannot resolve against the
+  raw `src/` tree, so the previous script failed in a clean checkout. The
+  script now runs `tsup` then `probot run ./dist/app.js`.
+
 - `@sovri/review-engine`: `normalizeFindingPath` no longer rewrites provider
   finding paths whose repository-relative form merely contains an ignore-rule
   prefix mid-path (#427, Codex + cubic-dev review). The previous
