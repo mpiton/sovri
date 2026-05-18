@@ -54,6 +54,7 @@ interface SuccessfulReviewGeneration {
 
 interface FailedReviewGeneration {
   readonly error: string;
+  readonly failureKind: "parse" | "provider";
   readonly tokenUsage: TokenUsage;
   readonly status: "failed";
 }
@@ -194,8 +195,13 @@ export async function reviewPullRequest(
     maxTokens: provider.maxTokens,
   });
   if (generation.status === "failed") {
+    const findings =
+      generation.failureKind === "parse"
+        ? [buildReviewFailedFinding(input.diff, generation.error)]
+        : [];
+
     return buildFailedReview(input.pullRequest, provider, startedAt, generation.error, {
-      findings: [buildReviewFailedFinding(input.diff, generation.error)],
+      findings,
       tokenUsage: generation.tokenUsage,
     });
   }
@@ -267,7 +273,16 @@ async function generateParsedProviderReview(
   }
 
   if (!isRetryableSchemaFailure(firstAttempt.error)) {
-    throw firstAttempt.error;
+    if (shouldPropagateProviderFailure(firstAttempt.error)) {
+      throw firstAttempt.error;
+    }
+
+    return {
+      error: providerFailureMessage(firstAttempt.error),
+      failureKind: "provider",
+      tokenUsage: firstAttempt.tokenUsage,
+      status: "failed",
+    };
   }
 
   const retryAttempt = await generateProviderReviewAttempt(provider, {
@@ -277,11 +292,21 @@ async function generateParsedProviderReview(
 
   if (!retryAttempt.success) {
     if (!isRetryableSchemaFailure(retryAttempt.error)) {
-      throw retryAttempt.error;
+      if (shouldPropagateProviderFailure(retryAttempt.error)) {
+        throw retryAttempt.error;
+      }
+
+      return {
+        error: providerFailureMessage(retryAttempt.error),
+        failureKind: "provider",
+        tokenUsage: addTokenUsage(firstAttempt.tokenUsage, retryAttempt.tokenUsage),
+        status: "failed",
+      };
     }
 
     return {
       error: schemaFailureMessage(retryAttempt.error),
+      failureKind: "parse",
       tokenUsage: addTokenUsage(firstAttempt.tokenUsage, retryAttempt.tokenUsage),
       status: "failed",
     };
@@ -377,6 +402,20 @@ function parseTokenUsage(tokenUsage: unknown): TokenUsage {
   return TokenUsageSchema.parse(tokenUsage);
 }
 
+function shouldPropagateProviderFailure(error: unknown): boolean {
+  return error instanceof z.ZodError || hasProviderValidationIssues(error);
+}
+
+function hasProviderValidationIssues(error: unknown): boolean {
+  if (!isJsonObject(error)) {
+    return false;
+  }
+
+  const issues: unknown = Reflect.get(error, "issues");
+
+  return Array.isArray(issues);
+}
+
 function addTokenUsage(left: TokenUsage, right: TokenUsage): TokenUsage {
   return {
     prompt: left.prompt + right.prompt,
@@ -399,6 +438,10 @@ function buildCorrectiveSystemPrompt(systemPrompt: string, failure: unknown): st
 
 function schemaFailureMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Provider response failed schema validation";
+}
+
+function providerFailureMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Provider call failed";
 }
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {

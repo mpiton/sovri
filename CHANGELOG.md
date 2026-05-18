@@ -77,6 +77,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   explicit input validation before review execution or fallback I/O can occur
   (#386).
 
+- `@sovri/review-engine`: return a failed `Review` when the injected provider
+  rejects during `reviewPullRequest`, without attempting fallback filesystem or
+  network I/O (#387).
+
 - `@sovri/review-engine`: re-export `buildInlineComments`,
   `InlineCommentDraftSchema`, and the `InlineCommentDraft` type from the
   package entrypoint so downstream consumers can build GitHub inline drafts

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import type { Diff, PullRequest } from "@sovri/core";
+import { ReviewSchema, type Diff, type PullRequest } from "@sovri/core";
 import type { GenerateStructuredParams, LLMProvider } from "@sovri/llm-providers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -162,6 +162,51 @@ describe("reviewPullRequest injected-provider I/O boundary", () => {
     // And no raw network sentinel is triggered
     expect(rawNetworkCalls).toBe(0);
   });
+
+  it("returns a failed Review when provider rejection does not trigger fallback I/O", async () => {
+    const provider = new RejectingProvider("provider timeout");
+    let environmentReads = 0;
+    let countReviewEnvironmentReads = false;
+    let rawNetworkCalls = 0;
+
+    vi.stubGlobal("fetch", () => {
+      rawNetworkCalls += 1;
+      throw new Error("raw network sentinel triggered");
+    });
+    const restoreEnvironment = guardEnvironmentReads(() => {
+      if (countReviewEnvironmentReads) {
+        environmentReads += 1;
+      }
+    });
+
+    try {
+      const reviewPullRequest = await loadReviewPullRequest();
+
+      // Given the injected provider rejects with message "provider timeout"
+      // When the maintainer calls `reviewPullRequest`
+      countReviewEnvironmentReads = true;
+      const review = ReviewSchema.parse(
+        await reviewPullRequest({ pullRequest, diff, config }, { provider }),
+      );
+
+      // And no secondary provider is called
+      expect(review.llm_provider).toBe("test-provider");
+      expect(review.status).toBe("failed");
+      expect(review.error).toContain("provider timeout");
+    } finally {
+      countReviewEnvironmentReads = false;
+      restoreEnvironment();
+    }
+
+    // Then the provider is called exactly 1 time
+    expect(provider.calls).toBe(1);
+    // And no filesystem sentinel is triggered
+    expect(sentinels.filesystemReads).toBe(0);
+    // And no default provider is created from environment variables
+    expect(environmentReads).toBe(0);
+    // And no raw network sentinel is triggered
+    expect(rawNetworkCalls).toBe(0);
+  });
 });
 
 class CountingProvider implements LLMProvider {
@@ -178,6 +223,21 @@ class CountingProvider implements LLMProvider {
       findings: [],
       walkthrough_markdown: "## Sovri review\n\nReview completed.",
     });
+  }
+}
+
+class RejectingProvider implements LLMProvider {
+  public readonly name = "test-provider";
+  public readonly model = "test-model";
+  public readonly maxTokens = 2048;
+  public calls = 0;
+
+  constructor(private readonly message: string) {}
+
+  async generateStructured<T>(): Promise<T> {
+    this.calls += 1;
+
+    throw new Error(this.message);
   }
 }
 
