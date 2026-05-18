@@ -28,6 +28,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `apps/community-bot`: add ATDD coverage for pull request handler
+  delegation across opened and synchronize webhook examples (#477).
+
 - `apps/community-bot`: add the Probot bootstrap entry point contract with a
   named `app` registration factory, runtime environment validation, and
   structured startup logging through `@sovri/observability`, with local dev
