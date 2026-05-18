@@ -23,10 +23,10 @@ export type PullRequestWebhookContext = {
 };
 
 export type PullRequestOctokit = {
-  readonly request: <TData>(
-    route: string,
+  readonly request: (
+    route: "GET /repos/{owner}/{repo}/compare/{basehead}",
     parameters: PullRequestDiffParameters,
-  ) => Promise<{ readonly data: TData }>;
+  ) => Promise<{ readonly data: string }>;
   readonly rest: {
     readonly issues: {
       readonly createComment: (parameters: IssueCommentParameters) => Promise<unknown>;
@@ -43,11 +43,11 @@ export type PullRequestOctokit = {
 };
 
 type PullRequestDiffParameters = {
+  readonly basehead: string;
   readonly mediaType: {
     readonly format: "diff";
   };
   readonly owner: string;
-  readonly pull_number: number;
   readonly repo: string;
 };
 
@@ -85,10 +85,14 @@ type RepositoryContentParameters = {
   readonly repo: string;
 };
 
-export type ReviewPostTarget = {
-  readonly commitSha: string;
+export type ReviewCommentTarget = {
   readonly number: number;
   readonly repoFullName: string;
+};
+
+export type ReviewPostTarget = ReviewCommentTarget & {
+  readonly baseSha: string;
+  readonly commitSha: string;
 };
 
 export type PullRequestHandlerLogger = {
@@ -102,7 +106,7 @@ export type PullRequestHandlerDependencies = {
   readonly fetchDiff: (target: ReviewPostTarget) => Promise<Diff>;
   readonly loadConfig: (target: ReviewPostTarget) => Promise<SovriConfig>;
   readonly logger: PullRequestHandlerLogger;
-  readonly postErrorComment: (target: ReviewPostTarget, message: string) => Promise<void>;
+  readonly postErrorComment: (target: ReviewCommentTarget, message: string) => Promise<void>;
   readonly postReview: (target: ReviewPostTarget, review: Review) => Promise<void>;
   readonly reviewPullRequest: (
     input: ReviewPullRequestInput,
@@ -166,11 +170,14 @@ async function handlePullRequest(
   context: PullRequestWebhookContext,
   dependencies: PullRequestHandlerDependencies,
 ): Promise<void> {
-  const target = buildTarget(context);
-  const logContext = buildLogContext(context, target);
-  dependencies.logger.info(logContext, "Pull request review started");
+  const initialLogContext = buildInitialLogContext(context);
+  const commentTarget = buildOptionalCommentTarget(context);
+  dependencies.logger.info(initialLogContext, "Pull request review started");
 
+  let target: ReviewPostTarget | undefined;
   try {
+    target = buildTarget(context);
+    const logContext = buildLogContext(context, target);
     const config = await dependencies.loadConfig(target);
     if ((context.payload.pull_request.draft ?? false) && !config.review.autoReviewDrafts) {
       dependencies.logger.info(
@@ -206,10 +213,10 @@ async function handlePullRequest(
     );
   } catch (error) {
     await reportReviewFailure({
+      commentTarget: target ?? commentTarget,
       dependencies,
       error,
-      logContext,
-      target,
+      logContext: target === undefined ? initialLogContext : buildLogContext(context, target),
     });
   }
 }
@@ -217,6 +224,7 @@ async function handlePullRequest(
 function buildTarget(context: PullRequestWebhookContext): ReviewPostTarget {
   const pullRequest = context.payload.pull_request;
   return {
+    baseSha: requireString(pullRequest.base?.sha, "pull_request.base.sha"),
     commitSha: requireString(pullRequest.head?.sha, "pull_request.head.sha"),
     number: requireNumber(pullRequest.number, "pull_request.number"),
     repoFullName: requireString(context.payload.repository.full_name, "repository.full_name"),
@@ -244,6 +252,32 @@ function buildPullRequest(
   };
 }
 
+function buildInitialLogContext(
+  context: PullRequestWebhookContext,
+): Readonly<Record<string, unknown>> {
+  return {
+    delivery_id: context.id,
+    event: context.name,
+    pr_number: context.payload.pull_request.number,
+    repo: context.payload.repository.full_name,
+  };
+}
+
+function buildOptionalCommentTarget(
+  context: PullRequestWebhookContext,
+): ReviewCommentTarget | undefined {
+  const number = context.payload.pull_request.number;
+  const repoFullName = context.payload.repository.full_name;
+  if (number === undefined || repoFullName === undefined || repoFullName.length === 0) {
+    return undefined;
+  }
+
+  return {
+    number,
+    repoFullName,
+  };
+}
+
 function buildLogContext(
   context: PullRequestWebhookContext,
   target: ReviewPostTarget,
@@ -257,13 +291,16 @@ function buildLogContext(
 }
 
 async function reportReviewFailure(values: {
+  readonly commentTarget: ReviewCommentTarget | undefined;
   readonly dependencies: PullRequestHandlerDependencies;
   readonly error: unknown;
   readonly logContext: Readonly<Record<string, unknown>>;
-  readonly target: ReviewPostTarget;
 }): Promise<void> {
   const errorMessage = errorMessageFrom(values.error);
-  const commentErrorMessage = await tryPostFailureComment(values.dependencies, values.target);
+  const commentErrorMessage =
+    values.commentTarget === undefined
+      ? "review comment target is unavailable"
+      : await tryPostFailureComment(values.dependencies, values.commentTarget);
 
   values.dependencies.logger.error(
     {
@@ -277,7 +314,7 @@ async function reportReviewFailure(values: {
 
 async function tryPostFailureComment(
   dependencies: PullRequestHandlerDependencies,
-  target: ReviewPostTarget,
+  target: ReviewCommentTarget,
 ): Promise<string | undefined> {
   try {
     await dependencies.postErrorComment(target, "review failed");

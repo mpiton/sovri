@@ -473,6 +473,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `apps/community-bot`: fetch pull request diffs from the delivered
+  `base_sha...head_sha` comparison and keep invalid pull request webhook
+  payloads inside correlated failure logging instead of escaping before the
+  handler error path (#41).
+
 - `apps/community-bot`: scaffold tests now exercise the real validators
   (CodeRabbit + cubic-dev review on #452). `inspectManifestAccess` enforces
   the manifest `name` field, and the layout scenario routes presence checks

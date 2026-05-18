@@ -15,6 +15,7 @@ import {
 } from "../../src/handlers/pull-request.js";
 
 const REPO_FULL_NAME = "mpiton/sovri";
+const BASE_SHA = "dddddddddddddddddddddddddddddddddddddddd";
 const OPENED_HEAD_SHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const SYNCHRONIZED_HEAD_SHA = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const DELIVERY_ID = "8f1b9c2d-3e4f-45a6-91b2-123456789abc";
@@ -654,6 +655,72 @@ describe("pull request handlers - remaining ATDD scenarios", () => {
     expect(logOutput(dependencies)).toContain("GitHub comment API failed");
   });
 
+  it("posts one PR error comment when a full review target cannot be built", async () => {
+    const dependencies = buildDependencies({
+      config: buildConfig({ autoReviewDrafts: false }),
+      diff: buildDiff(),
+      review: buildReview({ commitSha: OPENED_HEAD_SHA }),
+    });
+
+    // Given the webhook payload is missing the pull request head SHA
+    // When `handlePullRequestOpened(context)` handles the invalid payload
+    await handlePullRequestOpened(
+      buildContext({
+        event: "pull_request.opened",
+        headSha: OPENED_HEAD_SHA,
+        omitHeadSha: true,
+      }),
+      dependencies,
+    );
+
+    // Then the failure is logged with the delivery ID
+    expect(dependencies.logger.error).toHaveBeenCalledTimes(1);
+    expect(errorLogsIncludeDeliveryId(dependencies)).toBe(true);
+    expect(logOutput(dependencies)).toContain("pull_request.head.sha is required");
+    // And exactly 1 PR error comment is posted through the available PR identity
+    expect(dependencies.postErrorComment).toHaveBeenCalledTimes(1);
+    expect(dependencies.postErrorComment).toHaveBeenCalledWith(
+      expect.objectContaining({ number: 41, repoFullName: REPO_FULL_NAME }),
+      "review failed",
+    );
+    // And review work does not continue after target validation fails
+    expect(dependencies.loadConfig).not.toHaveBeenCalled();
+    expect(dependencies.fetchDiff).not.toHaveBeenCalled();
+    expect(dependencies.reviewPullRequest).not.toHaveBeenCalled();
+    expect(dependencies.postReview).not.toHaveBeenCalled();
+  });
+
+  it("posts one PR error comment when later payload validation fails", async () => {
+    const dependencies = buildDependencies({
+      config: buildConfig({ autoReviewDrafts: false }),
+      diff: buildDiff(),
+      review: buildReview({ commitSha: OPENED_HEAD_SHA }),
+    });
+
+    // Given the webhook payload has enough data to identify the PR
+    // And the payload is missing the pull request author login
+    // When `handlePullRequestOpened(context)` handles the invalid payload
+    await handlePullRequestOpened(
+      buildContext({
+        event: "pull_request.opened",
+        headSha: OPENED_HEAD_SHA,
+        omitAuthorLogin: true,
+      }),
+      dependencies,
+    );
+
+    // Then exactly 1 PR error comment is posted
+    expect(dependencies.postErrorComment).toHaveBeenCalledTimes(1);
+    expect(commentOutput(dependencies)).toContain("review failed");
+    // And the validation failure is logged with the delivery ID
+    expect(dependencies.logger.error).toHaveBeenCalledTimes(1);
+    expect(errorLogsIncludeDeliveryId(dependencies)).toBe(true);
+    expect(logOutput(dependencies)).toContain("pull_request.user.login is required");
+    // And the review engine is not called with an invalid pull request input
+    expect(dependencies.reviewPullRequest).not.toHaveBeenCalled();
+    expect(dependencies.postReview).not.toHaveBeenCalled();
+  });
+
   it.each([
     {
       event: "pull_request.opened",
@@ -748,7 +815,10 @@ function buildConfig(values: { readonly autoReviewDrafts: boolean }): SovriConfi
 function buildContext(values: {
   readonly draft?: boolean;
   readonly event: string;
-  readonly headSha: string;
+  readonly headSha?: string;
+  readonly omitAuthorLogin?: boolean;
+  readonly omitBaseSha?: boolean;
+  readonly omitHeadSha?: boolean;
   readonly title?: string;
 }): PullRequestWebhookContext {
   return {
@@ -761,7 +831,7 @@ function buildContext(values: {
         additions: 12,
         base: {
           ref: "main",
-          sha: "dddddddddddddddddddddddddddddddddddddddd",
+          ...(values.omitBaseSha === true ? {} : { sha: BASE_SHA }),
         },
         body: "Implement pull request handlers.",
         changed_files: 1,
@@ -769,13 +839,11 @@ function buildContext(values: {
         draft: values.draft ?? false,
         head: {
           ref: "task-41",
-          sha: values.headSha,
+          ...(values.omitHeadSha === true ? {} : { sha: values.headSha ?? OPENED_HEAD_SHA }),
         },
         number: 41,
         title: values.title ?? "Implement handlers/pull-request.ts",
-        user: {
-          login: "octocat",
-        },
+        user: values.omitAuthorLogin === true ? {} : { login: "octocat" },
       },
       repository: {
         full_name: REPO_FULL_NAME,
@@ -879,6 +947,7 @@ function buildReview(values: {
 
 function buildTarget() {
   return {
+    baseSha: BASE_SHA,
     commitSha: OPENED_HEAD_SHA,
     number: 41,
     repoFullName: REPO_FULL_NAME,

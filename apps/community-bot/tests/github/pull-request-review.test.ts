@@ -10,6 +10,7 @@ import { createPullRequestHandlerDependencies } from "../../src/github/pull-requ
 import type { PullRequestWebhookContext } from "../../src/handlers/pull-request.js";
 
 const RepoFullName = "mpiton/sovri";
+const BaseSha = "dddddddddddddddddddddddddddddddddddddddd";
 const HeadSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 describe("pull request GitHub adapter", () => {
@@ -49,6 +50,39 @@ review:
     });
 
     await expect(dependencies.loadConfig(buildTarget())).resolves.toEqual(DEFAULT_CONFIG);
+  });
+
+  it("fetches the diff from the delivered base and head SHA comparison", async () => {
+    const runtime = buildRuntimeContext({
+      diffContent: [
+        "diff --git a/apps/community-bot/src/handlers/pull-request.ts b/apps/community-bot/src/handlers/pull-request.ts",
+        "index eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee..ffffffffffffffffffffffffffffffffffffffff 100644",
+        "--- a/apps/community-bot/src/handlers/pull-request.ts",
+        "+++ b/apps/community-bot/src/handlers/pull-request.ts",
+        "@@ -1 +1,2 @@",
+        "-old",
+        "+new",
+        "+line",
+      ].join("\n"),
+    });
+    const dependencies = createPullRequestHandlerDependencies(runtime.context, {
+      ANTHROPIC_API_KEY: "test-key",
+    });
+
+    const diff = await dependencies.fetchDiff(buildTarget());
+
+    expect(diff.files[0]?.path).toBe("apps/community-bot/src/handlers/pull-request.ts");
+    expect(runtime.diffRequests).toEqual([
+      {
+        parameters: {
+          basehead: `${BaseSha}...${HeadSha}`,
+          mediaType: { format: "diff" },
+          owner: "mpiton",
+          repo: "sovri",
+        },
+        route: "GET /repos/{owner}/{repo}/compare/{basehead}",
+      },
+    ]);
   });
 
   it("creates provider options from the configured model", () => {
@@ -109,14 +143,23 @@ review:
 function buildRuntimeContext(
   values: {
     readonly configContent?: string;
+    readonly diffContent?: string;
     readonly missingConfig?: boolean;
   } = {},
 ): {
   readonly context: PullRequestWebhookContext;
   readonly contentRequests: unknown[];
+  readonly diffRequests: {
+    readonly parameters: unknown;
+    readonly route: string;
+  }[];
   readonly reviewRequests: unknown[];
 } {
   const contentRequests: unknown[] = [];
+  const diffRequests: {
+    readonly parameters: unknown;
+    readonly route: string;
+  }[] = [];
   const reviewRequests: unknown[] = [];
 
   return {
@@ -125,8 +168,9 @@ function buildRuntimeContext(
       id: "8f1b9c2d-3e4f-45a6-91b2-123456789abc",
       name: "pull_request.opened",
       octokit: {
-        async request() {
-          throw new Error("unexpected GitHub diff request");
+        async request(route, parameters) {
+          diffRequests.push({ parameters, route });
+          return { data: values.diffContent ?? "" };
         },
         rest: {
           issues: {
@@ -158,7 +202,7 @@ function buildRuntimeContext(
           additions: 12,
           base: {
             ref: "main",
-            sha: "dddddddddddddddddddddddddddddddddddddddd",
+            sha: BaseSha,
           },
           body: "Implement pull request handlers.",
           changed_files: 1,
@@ -179,12 +223,14 @@ function buildRuntimeContext(
         },
       },
     },
+    diffRequests,
     reviewRequests,
   };
 }
 
 function buildTarget() {
   return {
+    baseSha: BaseSha,
     commitSha: HeadSha,
     number: 41,
     repoFullName: RepoFullName,

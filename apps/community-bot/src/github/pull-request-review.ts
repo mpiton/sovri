@@ -14,6 +14,7 @@ import {
 import type {
   PullRequestHandlerDependencies,
   PullRequestWebhookContext,
+  ReviewCommentTarget,
   ReviewPostTarget,
 } from "../handlers/pull-request.js";
 
@@ -66,17 +67,14 @@ async function loadRepositoryConfig(
 
 async function fetchPullRequestDiff(context: PullRequestWebhookContext, target: ReviewPostTarget) {
   const repo = splitRepoFullName(target.repoFullName);
-  const response = await context.octokit.request<string>(
-    "GET /repos/{owner}/{repo}/pulls/{pull_number}",
-    {
-      mediaType: {
-        format: "diff",
-      },
-      owner: repo.owner,
-      pull_number: target.number,
-      repo: repo.repo,
+  const response = await context.octokit.request("GET /repos/{owner}/{repo}/compare/{basehead}", {
+    basehead: `${target.baseSha}...${target.commitSha}`,
+    mediaType: {
+      format: "diff",
     },
-  );
+    owner: repo.owner,
+    repo: repo.repo,
+  });
 
   return parseUnifiedDiff(response.data);
 }
@@ -105,7 +103,7 @@ async function postReview(
 
 async function postErrorComment(
   context: PullRequestWebhookContext,
-  target: ReviewPostTarget,
+  target: ReviewCommentTarget,
   message: string,
 ): Promise<void> {
   const repo = splitRepoFullName(target.repoFullName);
