@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `apps/community-bot`: add the Probot bootstrap entry point contract with a
+  named `app` registration factory, runtime environment validation, and
+  structured startup logging through `@sovri/observability`, with local dev
+  startup routed through the server entry point (#40).
+
 - `apps/community-bot`: add the initial Probot scaffold with manifest,
   package metadata, source layout, TypeScript inheritance, and scaffold
   contract tests (#39).
