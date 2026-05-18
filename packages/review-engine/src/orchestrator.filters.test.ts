@@ -223,4 +223,65 @@ describe("reviewPullRequest config filters", () => {
 
     expect(review.findings).toHaveLength(0);
   });
+
+  it("drops findings below the configured threshold", async () => {
+    const reviewPullRequest = getReviewPullRequest();
+    const oneFilePullRequest: PullRequest = {
+      ...pullRequest,
+      additions: 6,
+      deletions: 1,
+      changed_files: 1,
+    };
+    const oneFileDiff: Diff = {
+      unified_diff: diff.unified_diff,
+      files: [
+        {
+          path: "packages/review-engine/src/orchestrator.ts",
+          status: "modified",
+          additions: 6,
+          deletions: 1,
+          sha: "cccccccccccccccccccccccccccccccccccccccc",
+          patch: "@@ -15,0 +16,2 @@",
+          hunks: [],
+        },
+      ],
+    };
+    const examples: ReadonlyArray<{ readonly severity: Severity; readonly title: string }> = [
+      { severity: "minor", title: "Minor naming issue" },
+      { severity: "info", title: "Informational note" },
+      { severity: "nitpick", title: "Nitpick wording" },
+    ];
+
+    await Promise.all(
+      examples.map(async ({ severity, title }) => {
+        let providerCallCount = 0;
+        const provider = createProvider([
+          providerFinding(severity, "packages/review-engine/src/orchestrator.ts", 18, title),
+        ]);
+        const countingProvider: LLMProvider = {
+          ...provider,
+          async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
+            providerCallCount += 1;
+            return provider.generateStructured(params);
+          },
+        };
+
+        // Given the pull request changes 1 file
+        // And the pull request has 6 additions and 1 deletion
+        // And the provider returns one <severity> finding titled <title>
+        // When the maintainer calls `reviewPullRequest`
+        const review = await reviewPullRequest(
+          { pullRequest: oneFilePullRequest, diff: oneFileDiff, config },
+          { provider: countingProvider },
+        );
+
+        // Then the provider is called exactly 1 time
+        expect(providerCallCount).toBe(1);
+        // And the returned Review contains 0 findings
+        expect(review.findings).toHaveLength(0);
+        // And the returned Review status is "success"
+        expect(review.status).toBe("success");
+      }),
+    );
+  });
 });

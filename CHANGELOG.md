@@ -29,6 +29,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `@sovri/review-engine`: add scenario coverage for review orchestrator
   severity threshold and ignored path filters (#373).
 
+- `@sovri/review-engine`: add scenario test coverage that findings below the
+  configured severity threshold are dropped (#374).
+
 - `@sovri/review-engine`: re-export `buildInlineComments`,
   `InlineCommentDraftSchema`, and the `InlineCommentDraft` type from the
   package entrypoint so downstream consumers can build GitHub inline drafts
