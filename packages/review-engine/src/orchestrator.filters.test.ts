@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import type { Category, Diff, PullRequest, Review, Severity } from "@sovri/core";
+import {
+  ReviewSchema,
+  type Category,
+  type Diff,
+  type PullRequest,
+  type Review,
+  type Severity,
+} from "@sovri/core";
 import type { GenerateStructuredParams, LLMProvider } from "@sovri/llm-providers";
 import { describe, expect, it } from "vitest";
 
@@ -438,5 +445,45 @@ describe("reviewPullRequest config filters", () => {
         expect(review.status).toBe(status);
       }),
     );
+  });
+
+  it("returns a schema-valid failed Review when a pre-LLM limit skips the provider", async () => {
+    let providerCallCount = 0;
+    const provider = createProvider([]);
+    const countingProvider: LLMProvider = {
+      ...provider,
+      async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
+        providerCallCount += 1;
+        return provider.generateStructured(params);
+      },
+    };
+    const overLimitPullRequest: PullRequest = {
+      ...pullRequest,
+      additions: 12,
+      deletions: 4,
+      changed_files: 3,
+    };
+    const reviewPullRequest = getReviewPullRequest();
+
+    // Given the pull request changes 3 files
+    // And the pull request has 12 additions and 4 deletions
+    // When the maintainer calls `reviewPullRequest`
+    const review = await reviewPullRequest(
+      { pullRequest: overLimitPullRequest, diff, config },
+      { provider: countingProvider },
+    );
+
+    // Then the provider is called exactly 0 times
+    expect(providerCallCount).toBe(0);
+    // And the returned Review validates against `ReviewSchema`
+    expect(ReviewSchema.safeParse(review).success).toBe(true);
+    // And the returned Review status is "failed"
+    expect(review.status).toBe("failed");
+    // And the returned Review `tokens_used` is 0 prompt tokens and 0 completion tokens
+    expect(review.tokens_used).toEqual({ prompt: 0, completion: 0 });
+    // And the returned Review summary contains "exceeds review limits"
+    expect(review.summary).toContain("exceeds review limits");
+    // And the returned Review error contains "exceeds review limits"
+    expect(review.error).toContain("exceeds review limits");
   });
 });
