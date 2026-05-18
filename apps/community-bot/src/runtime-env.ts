@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+import { createPrivateKey } from "node:crypto";
+
 const DEFAULT_PORT = 3000;
+const DECIMAL_INTEGER = /^\d+$/u;
 const MAX_PORT = 65535;
 const MIN_PORT = 1;
 
@@ -36,8 +39,10 @@ export function applyRuntimeEnvironmentDefaults(
 
 function readPrivateKey(env: NodeJS.ProcessEnv): string {
   const privateKey = readRequiredEnv(env, "PRIVATE_KEY").replaceAll("\\n", "\n");
-  if (!privateKey.includes("-----BEGIN") || !privateKey.includes("PRIVATE KEY-----")) {
-    throw new RuntimeEnvironmentError("PRIVATE_KEY must contain PEM private key material");
+  try {
+    createPrivateKey(privateKey);
+  } catch {
+    throw new RuntimeEnvironmentError("PRIVATE_KEY must contain valid PEM private key material");
   }
   return privateKey;
 }
@@ -55,8 +60,14 @@ function readPort(value: string | undefined): number {
     return DEFAULT_PORT;
   }
 
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < MIN_PORT || parsed > MAX_PORT) {
+  const normalized = value.trim();
+  if (!DECIMAL_INTEGER.test(normalized)) {
+    throw new RuntimeEnvironmentError(
+      `PORT must be an integer between ${MIN_PORT} and ${MAX_PORT}`,
+    );
+  }
+  const parsed = Number.parseInt(normalized, 10);
+  if (parsed < MIN_PORT || parsed > MAX_PORT) {
     throw new RuntimeEnvironmentError(
       `PORT must be an integer between ${MIN_PORT} and ${MAX_PORT}`,
     );

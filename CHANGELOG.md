@@ -19,6 +19,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Security
+
+- `apps/community-bot`: validate `PRIVATE_KEY` by parsing through
+  `node:crypto.createPrivateKey` instead of substring marker matching, and
+  reject non-decimal `PORT` env values (e.g. `1e3`, `0x10`) to enforce a
+  strict base-10 integer contract.
+
 ### Added
 
 - `apps/community-bot`: add the Probot bootstrap entry point contract with a

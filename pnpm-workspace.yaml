@@ -4,3 +4,9 @@
 packages:
   - "packages/*"
   - "apps/*"
+
+# pnpm-only settings (kept out of .npmrc so `pnpm exec` does not warn
+# via the npm config parser on every run).
+autoInstallPeers: true
+strictPeerDependencies: true
+verifyStoreIntegrity: true
