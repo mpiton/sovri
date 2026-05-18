@@ -84,6 +84,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `@sovri/review-engine`: add scenario coverage that a valid provider response
   produces every required `Review` field in `reviewPullRequest` (#388).
 
+- `@sovri/review-engine`: validate `reviewPullRequest` pull request, diff, and
+  config inputs before provider execution so invalid inputs cannot produce
+  partial reviews (#389).
+
 - `@sovri/review-engine`: re-export `buildInlineComments`,
   `InlineCommentDraftSchema`, and the `InlineCommentDraft` type from the
   package entrypoint so downstream consumers can build GitHub inline drafts

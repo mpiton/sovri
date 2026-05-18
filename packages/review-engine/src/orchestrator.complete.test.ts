@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { ReviewSchema, type Diff, type PullRequest, type Severity } from "@sovri/core";
+import { ReviewSchema, z, type Diff, type PullRequest, type Severity } from "@sovri/core";
 import type {
   GenerateStructuredParams,
   LLMProvider,
@@ -10,6 +10,15 @@ import type {
 import { describe, expect, it } from "vitest";
 
 import { reviewPullRequest } from "./orchestrator.js";
+
+type ReviewPullRequestRuntime = (
+  input: {
+    readonly pullRequest: unknown;
+    readonly diff: Diff;
+    readonly config: ReviewFilterConfig;
+  },
+  options: { readonly provider: LLMProvider },
+) => Promise<unknown>;
 
 interface ReviewFilterConfig {
   readonly review: {
@@ -26,6 +35,7 @@ class CompleteReviewProvider implements LLMProvider {
   public readonly name = "test-provider";
   public readonly model = "test-model";
   public readonly maxTokens = 2048;
+  public calls = 0;
 
   async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
     const generation = await this.generateStructuredWithUsage(params);
@@ -36,6 +46,8 @@ class CompleteReviewProvider implements LLMProvider {
   async generateStructuredWithUsage<T>(
     params: GenerateStructuredParams<T>,
   ): Promise<StructuredGeneration<T>> {
+    this.calls += 1;
+
     return {
       data: params.schema.parse({
         summary: "One major orchestration finding.",
@@ -105,9 +117,46 @@ describe("reviewPullRequest complete Review contract", () => {
       }),
     ]);
   });
+
+  it("rejects invalid pull request input before calling the provider", async () => {
+    const provider = new CompleteReviewProvider();
+    const runtimeReviewPullRequest = getReviewPullRequestRuntime();
+
+    // Given the pull request head SHA is "not-a-sha"
+    const invalidPullRequest = {
+      ...pullRequest,
+      head_sha: "not-a-sha",
+    };
+
+    // When the maintainer calls `reviewPullRequest`
+    const review = runtimeReviewPullRequest(
+      { pullRequest: invalidPullRequest, diff, config },
+      { provider },
+    );
+
+    // Then validation fails before the provider is called
+    await expect(review).rejects.toBeInstanceOf(z.ZodError);
+    expect(provider.calls).toBe(0);
+  });
 });
 
 const UuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+
+function isReviewPullRequestRuntime(value: unknown): value is ReviewPullRequestRuntime {
+  return typeof value === "function";
+}
+
+function getReviewPullRequestRuntime(): ReviewPullRequestRuntime {
+  const candidate: unknown = reviewPullRequest;
+
+  expect(isReviewPullRequestRuntime(candidate)).toBe(true);
+
+  if (!isReviewPullRequestRuntime(candidate)) {
+    throw new TypeError("reviewPullRequest is not callable");
+  }
+
+  return candidate;
+}
 
 const config: ReviewFilterConfig = {
   review: { severityThreshold: "major" },

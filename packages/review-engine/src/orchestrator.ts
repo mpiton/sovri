@@ -6,7 +6,10 @@ import { posix } from "node:path";
 import {
   applyIgnoreRules,
   computeSeverityRank,
+  DiffSchema,
+  PullRequestSchema,
   ReviewSchema,
+  SeveritySchema,
   z,
   type Diff,
   type Finding,
@@ -36,6 +39,23 @@ const TokenUsageSchema = z.object({
 
 const ZeroTokenUsage = TokenUsageSchema.parse({ prompt: 0, completion: 0 });
 const FindingBodyMaxLength = 2_000;
+
+const ReviewPullRequestConfigSchema = z.object({
+  review: z.object({
+    severityThreshold: SeveritySchema,
+  }),
+  ignores: z.array(z.string()),
+  limits: z.object({
+    maxFilesPerReview: z.number().int().nonnegative(),
+    maxLinesPerReview: z.number().int().nonnegative(),
+  }),
+});
+
+const ReviewPullRequestInputSchema = z.object({
+  pullRequest: PullRequestSchema,
+  diff: DiffSchema,
+  config: ReviewPullRequestConfigSchema,
+});
 
 type TokenUsage = z.infer<typeof TokenUsageSchema>;
 
@@ -166,25 +186,26 @@ export async function reviewPullRequest(
   input: ReviewPullRequestInput,
   options: ReviewPullRequestOptions,
 ): Promise<Review> {
+  const reviewInput = ReviewPullRequestInputSchema.parse(input);
   const provider = parseInjectedProvider(options.provider);
   const startedAt = new Date();
-  const limitError = getLimitError(input.pullRequest, input.config);
+  const limitError = getLimitError(reviewInput.pullRequest, reviewInput.config);
   if (limitError !== undefined) {
-    return buildFailedReview(input.pullRequest, provider, startedAt, limitError);
+    return buildFailedReview(reviewInput.pullRequest, provider, startedAt, limitError);
   }
 
   const prompt = buildReviewPrompt({
-    unifiedDiff: input.diff.unified_diff,
+    unifiedDiff: reviewInput.diff.unified_diff,
     pullRequest: {
-      number: input.pullRequest.number,
-      repoFullName: input.pullRequest.repo_full_name,
-      title: input.pullRequest.title,
-      description: input.pullRequest.body ?? "",
+      number: reviewInput.pullRequest.number,
+      repoFullName: reviewInput.pullRequest.repo_full_name,
+      title: reviewInput.pullRequest.title,
+      description: reviewInput.pullRequest.body ?? "",
     },
   });
 
   options.logger?.info(
-    { provider: provider.name, changed_files: input.diff.files.length },
+    { provider: provider.name, changed_files: reviewInput.diff.files.length },
     "Review engine request started",
   );
 
@@ -197,10 +218,10 @@ export async function reviewPullRequest(
   if (generation.status === "failed") {
     const findings =
       generation.failureKind === "parse"
-        ? [buildReviewFailedFinding(input.diff, generation.error)]
+        ? [buildReviewFailedFinding(reviewInput.diff, generation.error)]
         : [];
 
-    return buildFailedReview(input.pullRequest, provider, startedAt, generation.error, {
+    return buildFailedReview(reviewInput.pullRequest, provider, startedAt, generation.error, {
       findings,
       tokenUsage: generation.tokenUsage,
     });
@@ -208,15 +229,15 @@ export async function reviewPullRequest(
 
   const findings = applyReviewFilters(
     generation.parsed.findings.map(toFinding),
-    input.config.review.severityThreshold,
-    input.config.ignores,
+    reviewInput.config.review.severityThreshold,
+    reviewInput.config.ignores,
   );
 
   return ReviewSchema.parse({
     id: uuidv7(),
-    pr_number: input.pullRequest.number,
-    repo_full_name: input.pullRequest.repo_full_name,
-    commit_sha: input.pullRequest.head_sha,
+    pr_number: reviewInput.pullRequest.number,
+    repo_full_name: reviewInput.pullRequest.repo_full_name,
+    commit_sha: reviewInput.pullRequest.head_sha,
     started_at: startedAt,
     completed_at: new Date(),
     llm_provider: provider.name,
