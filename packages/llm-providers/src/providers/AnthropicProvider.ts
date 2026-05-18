@@ -9,11 +9,16 @@ import type {
   Model,
 } from "@anthropic-ai/sdk/resources/messages/messages";
 
-import type { z } from "@sovri/core";
+import { z } from "@sovri/core";
 
 import { AnthropicAuthError, AnthropicResponseError } from "../errors.js";
 import { zodToProviderJsonSchema } from "../helpers/provider-json-schema.js";
-import type { GenerateStructuredParams, LLMProvider } from "../types/LLMProvider.js";
+import type {
+  GenerateStructuredParams,
+  LLMProvider,
+  StructuredGeneration,
+  TokenUsage,
+} from "../types/LLMProvider.js";
 import {
   createAnthropicMessageWithRetry,
   DEFAULT_ANTHROPIC_TIMEOUT_MS,
@@ -29,6 +34,13 @@ export const MAX_ANTHROPIC_TIMEOUT_MS = 2_147_483_647;
 export { DEFAULT_ANTHROPIC_TIMEOUT_MS } from "./AnthropicProvider.retry.js";
 
 type AnthropicJsonSchema = Parameters<typeof jsonSchemaOutputFormat>[0];
+
+const AnthropicTokenUsageResponseSchema = z.object({
+  usage: z.object({
+    input_tokens: z.number().int().nonnegative(),
+    output_tokens: z.number().int().nonnegative(),
+  }),
+});
 
 export interface AnthropicProviderOptions {
   readonly model?: Model;
@@ -60,20 +72,20 @@ export class AnthropicProvider implements LLMProvider {
   }
 
   async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
+    const result = await this.generateStructuredWithUsage(params);
+
+    return result.data;
+  }
+
+  async generateStructuredWithUsage<T>(
+    params: GenerateStructuredParams<T>,
+  ): Promise<StructuredGeneration<T>> {
     const request = this.createRequest(params);
     const response = await this.createMessage(request);
-    const text = extractTextContent(response);
-    const parsedJson = parseJson(text);
-    const parsedSchema = params.schema.safeParse(parsedJson);
+    const data = parseStructuredResponse(response, params.schema);
+    const tokenUsage = extractTokenUsage(response);
 
-    if (!parsedSchema.success) {
-      throw new AnthropicResponseError("Anthropic response failed schema validation", {
-        cause: parsedSchema.error,
-        issues: parsedSchema.error.issues,
-      });
-    }
-
-    return parsedSchema.data;
+    return { data, tokenUsage };
   }
 
   private createRequest<T>(params: GenerateStructuredParams<T>): MessageCreateParamsNonStreaming {
@@ -100,6 +112,37 @@ export class AnthropicProvider implements LLMProvider {
       timeoutMs: this.timeoutMs,
     });
   }
+}
+
+function parseStructuredResponse<T>(response: unknown, schema: z.ZodType<T>): T {
+  const text = extractTextContent(response);
+  const parsedJson = parseJson(text);
+  const parsedSchema = schema.safeParse(parsedJson);
+
+  if (!parsedSchema.success) {
+    throw new AnthropicResponseError("Anthropic response failed schema validation", {
+      cause: parsedSchema.error,
+      issues: parsedSchema.error.issues,
+    });
+  }
+
+  return parsedSchema.data;
+}
+
+function extractTokenUsage(response: unknown): TokenUsage {
+  const parsed = AnthropicTokenUsageResponseSchema.safeParse(response);
+
+  if (!parsed.success) {
+    throw new AnthropicResponseError("Anthropic response did not contain valid token usage", {
+      cause: parsed.error,
+      issues: parsed.error.issues,
+    });
+  }
+
+  return {
+    prompt: parsed.data.usage.input_tokens,
+    completion: parsed.data.usage.output_tokens,
+  };
 }
 
 function readAnthropicApiKey(env: NodeJS.ProcessEnv): string {
