@@ -225,5 +225,6 @@ function toFinding(finding: ProviderFinding): Finding {
 
 function normalizeFindingPath(file: string): string {
   const normalized = posix.normalize(file.replaceAll("\\", "/"));
-  return normalized.replace(/^(?:\/|\.\.\/|\.\/)+/u, "");
+  const repositoryPath = normalized.replace(/^(?:\/|\.\.\/|\.\/)+/u, "");
+  return repositoryPath.length > 0 ? repositoryPath : normalized;
 }
