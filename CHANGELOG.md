@@ -69,6 +69,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   corrective retry, including deleted-file fallback locations with zero new-line
   anchors and long retryable provider error messages (#384).
 
+- `@sovri/review-engine`: add use-case coverage that a normal
+  `reviewPullRequest` call only crosses I/O boundaries through the injected
+  provider, including an import-time environment-read guard (#385).
+
 - `@sovri/review-engine`: re-export `buildInlineComments`,
   `InlineCommentDraftSchema`, and the `InlineCommentDraft` type from the
   package entrypoint so downstream consumers can build GitHub inline drafts
