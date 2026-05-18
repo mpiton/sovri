@@ -48,6 +48,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   including Anthropic cached input-token fields, when providers expose
   structured generation metadata (#379).
 
+- `@sovri/review-engine`: add scenario test coverage that invalid provider
+  token usage is rejected before returning a Review (#380).
+
 - `@sovri/review-engine`: re-export `buildInlineComments`,
   `InlineCommentDraftSchema`, and the `InlineCommentDraft` type from the
   package entrypoint so downstream consumers can build GitHub inline drafts

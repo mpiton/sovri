@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import type { Diff, PullRequest, Severity } from "@sovri/core";
+import { z, type Diff, type PullRequest, type Severity } from "@sovri/core";
 import type { GenerateStructuredParams, LLMProvider } from "@sovri/llm-providers";
 import { describe, expect, it } from "vitest";
 
@@ -127,5 +127,17 @@ describe("reviewPullRequest token usage", () => {
         expect(review.tokens_used.completion).toBe(tokenUsage.completion);
       }),
     );
+  });
+
+  it("rejects invalid token usage before returning a Review", async () => {
+    const provider = createUsageAwareProvider({ prompt: -1, completion: 144 });
+
+    // Given the provider reports -1 prompt tokens and 144 completion tokens
+    // When the maintainer calls `reviewPullRequest`
+    const review = reviewPullRequest({ pullRequest, diff, config }, { provider });
+
+    // Then validation fails against the token usage contract
+    // And no invalid Review is returned
+    await expect(review).rejects.toBeInstanceOf(z.ZodError);
   });
 });
