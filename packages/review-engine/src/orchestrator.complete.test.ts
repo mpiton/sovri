@@ -106,6 +106,12 @@ describe("reviewPullRequest complete Review contract", () => {
     expect(review.walkthrough_markdown.length).toBeGreaterThan(0);
     // And the returned Review has status "success"
     expect(review.status).toBe("success");
+    // And no corrective retry is used
+    expect(provider.calls).toBe(1);
+    // And the returned Review error is absent
+    expect(review.error).toBeUndefined();
+    // And no returned finding is titled "review_failed"
+    expect(review.findings.some((finding) => finding.title === "review_failed")).toBe(false);
 
     expect(review.tokens_used).toEqual({ prompt: 812, completion: 144 });
     expect(review.completed_at.getTime()).toBeGreaterThanOrEqual(review.started_at.getTime());
