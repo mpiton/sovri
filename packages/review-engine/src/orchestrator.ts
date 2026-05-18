@@ -86,6 +86,10 @@ class ProviderReviewSchemaError extends Error {
   }
 }
 
+class ReviewPullRequestOptionsValidationError extends Error {
+  public override readonly name = "ReviewPullRequestOptionsValidationError";
+}
+
 export type RunReviewInput = z.input<typeof RunReviewInputSchema>;
 
 export interface RunReviewOptions {
@@ -161,10 +165,11 @@ export async function reviewPullRequest(
   input: ReviewPullRequestInput,
   options: ReviewPullRequestOptions,
 ): Promise<Review> {
+  const provider = parseInjectedProvider(options.provider);
   const startedAt = new Date();
   const limitError = getLimitError(input.pullRequest, input.config);
   if (limitError !== undefined) {
-    return buildFailedReview(input.pullRequest, options.provider, startedAt, limitError);
+    return buildFailedReview(input.pullRequest, provider, startedAt, limitError);
   }
 
   const prompt = buildReviewPrompt({
@@ -178,18 +183,18 @@ export async function reviewPullRequest(
   });
 
   options.logger?.info(
-    { provider: options.provider.name, changed_files: input.diff.files.length },
+    { provider: provider.name, changed_files: input.diff.files.length },
     "Review engine request started",
   );
 
-  const generation = await generateParsedProviderReview(options.provider, {
+  const generation = await generateParsedProviderReview(provider, {
     systemPrompt: prompt.systemPrompt,
     userPrompt: prompt.userPrompt,
     schema: ProviderReviewResponseSchema,
-    maxTokens: options.provider.maxTokens,
+    maxTokens: provider.maxTokens,
   });
   if (generation.status === "failed") {
-    return buildFailedReview(input.pullRequest, options.provider, startedAt, generation.error, {
+    return buildFailedReview(input.pullRequest, provider, startedAt, generation.error, {
       findings: [buildReviewFailedFinding(input.diff, generation.error)],
       tokenUsage: generation.tokenUsage,
     });
@@ -208,14 +213,44 @@ export async function reviewPullRequest(
     commit_sha: input.pullRequest.head_sha,
     started_at: startedAt,
     completed_at: new Date(),
-    llm_provider: options.provider.name,
-    llm_model: options.provider.model,
+    llm_provider: provider.name,
+    llm_model: provider.model,
     tokens_used: generation.tokenUsage,
     summary: generation.parsed.summary,
     findings,
     walkthrough_markdown: generation.parsed.walkthrough_markdown,
     status: generation.status,
   });
+}
+
+function parseInjectedProvider(provider: unknown): LLMProvider {
+  if (isInjectedProvider(provider)) {
+    return provider;
+  }
+
+  throw new ReviewPullRequestOptionsValidationError(
+    "reviewPullRequest requires an injected provider",
+  );
+}
+
+function isInjectedProvider(provider: unknown): provider is LLMProvider {
+  if (!isJsonObject(provider)) {
+    return false;
+  }
+
+  const name = Reflect.get(provider, "name");
+  const model = Reflect.get(provider, "model");
+  const maxTokens = Reflect.get(provider, "maxTokens");
+  const generateStructured = Reflect.get(provider, "generateStructured");
+
+  return (
+    typeof name === "string" &&
+    typeof model === "string" &&
+    typeof maxTokens === "number" &&
+    Number.isInteger(maxTokens) &&
+    maxTokens > 0 &&
+    typeof generateStructured === "function"
+  );
 }
 
 async function generateParsedProviderReview(

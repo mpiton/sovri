@@ -73,6 +73,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `reviewPullRequest` call only crosses I/O boundaries through the injected
   provider, including an import-time environment-read guard (#385).
 
+- `@sovri/review-engine`: reject missing `reviewPullRequest` providers through
+  explicit input validation before review execution or fallback I/O can occur
+  (#386).
+
 - `@sovri/review-engine`: re-export `buildInlineComments`,
   `InlineCommentDraftSchema`, and the `InlineCommentDraft` type from the
   package entrypoint so downstream consumers can build GitHub inline drafts

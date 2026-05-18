@@ -5,6 +5,28 @@ import type { Diff, PullRequest } from "@sovri/core";
 import type { GenerateStructuredParams, LLMProvider } from "@sovri/llm-providers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+interface ReviewPullRequestConfig {
+  readonly review: {
+    readonly severityThreshold: "major";
+  };
+  readonly ignores: readonly string[];
+  readonly limits: {
+    readonly maxFilesPerReview: number;
+    readonly maxLinesPerReview: number;
+  };
+}
+
+interface ReviewPullRequestInput {
+  readonly pullRequest: PullRequest;
+  readonly diff: Diff;
+  readonly config: ReviewPullRequestConfig;
+}
+
+type ReviewPullRequestRuntime = (
+  input: ReviewPullRequestInput,
+  options: unknown,
+) => Promise<unknown>;
+
 const sentinels = vi.hoisted(() => ({
   filesystemReads: 0,
 }));
@@ -73,7 +95,7 @@ describe("reviewPullRequest injected-provider I/O boundary", () => {
     });
 
     try {
-      const { reviewPullRequest } = await import("./orchestrator.js");
+      const reviewPullRequest = await loadReviewPullRequest();
 
       // Given the provider returns a valid response with 0 findings
       // When the maintainer calls `reviewPullRequest`
@@ -82,14 +104,7 @@ describe("reviewPullRequest injected-provider I/O boundary", () => {
         {
           pullRequest,
           diff,
-          config: {
-            review: { severityThreshold: "major" },
-            ignores: [],
-            limits: {
-              maxFilesPerReview: 5,
-              maxLinesPerReview: 50,
-            },
-          },
+          config,
         },
         { provider },
       );
@@ -108,6 +123,44 @@ describe("reviewPullRequest injected-provider I/O boundary", () => {
     expect(rawNetworkCalls).toBe(0);
     // And no GitHub API sentinel is triggered
     expect(githubApiCalls).toBe(0);
+  });
+
+  it("fails input validation before review execution when provider is missing", async () => {
+    let environmentReads = 0;
+    let countReviewEnvironmentReads = false;
+    let rawNetworkCalls = 0;
+
+    vi.stubGlobal("fetch", () => {
+      rawNetworkCalls += 1;
+      throw new Error("raw network sentinel triggered");
+    });
+    const restoreEnvironment = guardEnvironmentReads(() => {
+      if (countReviewEnvironmentReads) {
+        environmentReads += 1;
+      }
+    });
+
+    try {
+      const reviewPullRequest = await loadReviewPullRequest();
+
+      // Given no provider is injected
+      // When the maintainer calls `reviewPullRequest`
+      countReviewEnvironmentReads = true;
+      const review = reviewPullRequest({ pullRequest, diff, config }, {});
+
+      // Then input validation fails before review execution
+      await expect(review).rejects.toThrow("reviewPullRequest requires an injected provider");
+    } finally {
+      countReviewEnvironmentReads = false;
+      restoreEnvironment();
+    }
+
+    // And no default provider is created from environment variables
+    expect(environmentReads).toBe(0);
+    // And no filesystem sentinel is triggered
+    expect(sentinels.filesystemReads).toBe(0);
+    // And no raw network sentinel is triggered
+    expect(rawNetworkCalls).toBe(0);
   });
 });
 
@@ -156,6 +209,32 @@ function guardEnvironmentReads(onRead: () => void): () => void {
     Object.defineProperty(process, "env", originalDescriptor);
   };
 }
+
+function isReviewPullRequestRuntime(value: unknown): value is ReviewPullRequestRuntime {
+  return typeof value === "function";
+}
+
+async function loadReviewPullRequest(): Promise<ReviewPullRequestRuntime> {
+  const orchestrator = await import("./orchestrator.js");
+  const candidate: unknown = Reflect.get(orchestrator, "reviewPullRequest");
+
+  expect(isReviewPullRequestRuntime(candidate)).toBe(true);
+
+  if (!isReviewPullRequestRuntime(candidate)) {
+    throw new TypeError("reviewPullRequest is not exported");
+  }
+
+  return candidate;
+}
+
+const config: ReviewPullRequestConfig = {
+  review: { severityThreshold: "major" },
+  ignores: [],
+  limits: {
+    maxFilesPerReview: 5,
+    maxLinesPerReview: 50,
+  },
+};
 
 const pullRequest: PullRequest = {
   number: 38,
