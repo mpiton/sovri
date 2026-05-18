@@ -466,6 +466,8 @@ describe("reviewPullRequest config filters", () => {
     const reviewPullRequest = getReviewPullRequest();
 
     // Given the pull request changes 3 files
+    // And the review config has `maxFilesPerReview` set to 2
+    expect(config.limits.maxFilesPerReview).toBe(2);
     // And the pull request has 12 additions and 4 deletions
     // When the maintainer calls `reviewPullRequest`
     const review = await reviewPullRequest(
