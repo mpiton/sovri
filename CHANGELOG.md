@@ -119,6 +119,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   set failed status, zero token usage, and limit error text without provider
   calls (#397).
 
+- `@sovri/review-engine`: add scenario coverage that provider rejections set
+  failed status, zero token usage, and provider error text after one provider
+  call (#398).
+
 - `@sovri/review-engine`: re-export `buildInlineComments`,
   `InlineCommentDraftSchema`, and the `InlineCommentDraft` type from the
   package entrypoint so downstream consumers can build GitHub inline drafts

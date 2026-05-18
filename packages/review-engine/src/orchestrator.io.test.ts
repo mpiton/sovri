@@ -192,6 +192,7 @@ describe("reviewPullRequest injected-provider I/O boundary", () => {
       // And no secondary provider is called
       expect(review.llm_provider).toBe("test-provider");
       expect(review.status).toBe("failed");
+      expect(review.tokens_used).toEqual({ prompt: 0, completion: 0 });
       expect(review.error).toContain("provider timeout");
     } finally {
       countReviewEnvironmentReads = false;
