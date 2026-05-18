@@ -4,7 +4,12 @@
 export type { Severity } from "@sovri/core";
 export type { Logger } from "@sovri/observability";
 
-export type { LLMProvider, GenerateStructuredParams } from "./types/LLMProvider.js";
+export type {
+  GenerateStructuredParams,
+  LLMProvider,
+  StructuredGeneration,
+  TokenUsage,
+} from "./types/LLMProvider.js";
 
 export {
   AnthropicAuthError,

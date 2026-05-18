@@ -130,6 +130,23 @@ describe("AnthropicProvider", () => {
     expect(findingsSchema).not.toHaveProperty("maxItems");
     expect(z.string().parse(findingsSchema.description)).toContain("maxItems");
   });
+
+  it("returns provider token usage with structured responses", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", TestApiKey);
+
+    server.use(
+      http.post(AnthropicMessagesUrl, () =>
+        anthropicMessageWithText(JSON.stringify(validStructuredResponse)),
+      ),
+    );
+
+    const provider = new AnthropicProvider({ model: TestModel });
+
+    const result = await provider.generateStructuredWithUsage(generateParams);
+
+    expect(result.data).toEqual(validStructuredResponse);
+    expect(result.tokenUsage).toEqual({ prompt: 42, completion: 24 });
+  });
 });
 
 function anthropicMessageWithText(text: string) {

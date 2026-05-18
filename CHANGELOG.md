@@ -44,6 +44,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `@sovri/review-engine`: add scenario test coverage for pre-provider limit
   skips returning schema-valid failed reviews with zero token usage (#378).
 
+- `@sovri/review-engine`: copy provider token usage into Review results when
+  providers expose structured generation metadata (#379).
+
 - `@sovri/review-engine`: re-export `buildInlineComments`,
   `InlineCommentDraftSchema`, and the `InlineCommentDraft` type from the
   package entrypoint so downstream consumers can build GitHub inline drafts
