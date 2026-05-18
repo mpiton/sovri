@@ -163,6 +163,8 @@ describe("reviewPullRequest MSW integration paths", () => {
     expect(observedProviderRequests).toBe(2);
     // And the returned Review status is "partial"
     expect(review.status).toBe("partial");
+    // And the returned Review error is absent
+    expect(review.error).toBeUndefined();
     // And no returned finding is titled "review_failed"
     expect(review.findings.some((finding) => finding.title === "review_failed")).toBe(false);
     // And the returned Review `tokens_used.prompt` is 900

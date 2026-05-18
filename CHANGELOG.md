@@ -107,6 +107,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `reviewPullRequest` success sets status `success` without corrective retry,
   error output, or synthetic fallback findings (#394).
 
+- `@sovri/review-engine`: add scenario coverage that corrective retry success
+  sets status `partial` without error output or synthetic fallback findings
+  (#395).
+
 - `@sovri/review-engine`: re-export `buildInlineComments`,
   `InlineCommentDraftSchema`, and the `InlineCommentDraft` type from the
   package entrypoint so downstream consumers can build GitHub inline drafts
