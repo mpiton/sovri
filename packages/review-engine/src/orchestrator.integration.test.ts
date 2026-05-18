@@ -17,12 +17,9 @@ import { buildInlineComments } from "./walkthrough/index.js";
 
 const ProviderUrl = "https://llm.test/v1/messages";
 
-const ProviderHttpResponseSchema = z.object({
-  data: z.unknown(),
-  tokenUsage: z.object({
-    prompt: z.number().int().nonnegative(),
-    completion: z.number().int().nonnegative(),
-  }),
+const TokenUsageSchema = z.object({
+  prompt: z.number().int().nonnegative(),
+  completion: z.number().int().nonnegative(),
 });
 
 const server = setupServer();
@@ -105,6 +102,66 @@ describe("reviewPullRequest MSW integration paths", () => {
       }),
     ]);
   });
+
+  it("retries a schema-invalid first response and returns a partial Review", async () => {
+    let observedProviderRequests = 0;
+    server.use(
+      http.post(ProviderUrl, () => {
+        observedProviderRequests += 1;
+
+        if (observedProviderRequests === 1) {
+          return HttpResponse.json({
+            data: {
+              summary: 42,
+              findings: [],
+              walkthrough_markdown: "## Sovri review\n\nInvalid review.",
+            },
+            tokenUsage: { prompt: 600, completion: 120 },
+          });
+        }
+
+        return HttpResponse.json({
+          data: {
+            summary: "Corrected review.",
+            findings: [],
+            walkthrough_markdown: "## Sovri review\n\nCorrected review.",
+          },
+          tokenUsage: { prompt: 300, completion: 80 },
+        });
+      }),
+    );
+    const provider = createHttpProvider();
+    const diff = parseUnifiedDiff(unifiedDiff);
+
+    // Given MSW first returns schema-invalid provider JSON
+    // And MSW then returns a valid provider response with summary "Corrected review."
+    // And MSW returns total usage of 900 prompt tokens and 200 completion tokens
+    // When the integration test calls `reviewPullRequest`
+    const review = await reviewPullRequest(
+      {
+        pullRequest,
+        diff,
+        config: {
+          review: { severityThreshold: "major" },
+          ignores: [],
+          limits: {
+            maxFilesPerReview: 5,
+            maxLinesPerReview: 50,
+          },
+        },
+      },
+      { provider },
+    );
+
+    // Then exactly 2 provider requests are observed by MSW
+    expect(observedProviderRequests).toBe(2);
+    // And the returned Review status is "partial"
+    expect(review.status).toBe("partial");
+    // And no returned finding is titled "review_failed"
+    expect(review.findings.some((finding) => finding.title === "review_failed")).toBe(false);
+    // And the returned Review `tokens_used.prompt` is 900
+    expect(review.tokens_used.prompt).toBe(900);
+  });
 });
 
 function createHttpProvider(): LLMProvider {
@@ -142,12 +199,19 @@ async function generateHttpStructured<T>(
     }),
   });
   const body: unknown = await response.json();
-  const parsed = ProviderHttpResponseSchema.parse(body);
+  const parsed = createProviderHttpResponseSchema<T>().parse(body);
 
   return {
-    data: params.schema.parse(parsed.data),
+    data: parsed.data,
     tokenUsage: parsed.tokenUsage,
   };
+}
+
+function createProviderHttpResponseSchema<T>() {
+  return z.object({
+    data: z.custom<T>(),
+    tokenUsage: TokenUsageSchema,
+  });
 }
 
 const pullRequest: PullRequest = {
