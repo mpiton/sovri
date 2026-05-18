@@ -348,4 +348,49 @@ describe("reviewPullRequest config filters", () => {
       }),
     );
   });
+
+  it("treats the file count limit as inclusive before the provider call", async () => {
+    const reviewPullRequest = getReviewPullRequest();
+    const examples: ReadonlyArray<{
+      readonly changedFiles: number;
+      readonly providerCalls: number;
+      readonly status: Review["status"];
+    }> = [
+      { changedFiles: 2, providerCalls: 1, status: "success" },
+      { changedFiles: 3, providerCalls: 0, status: "failed" },
+    ];
+
+    await Promise.all(
+      examples.map(async ({ changedFiles, providerCalls, status }) => {
+        let providerCallCount = 0;
+        const provider = createProvider([]);
+        const countingProvider: LLMProvider = {
+          ...provider,
+          async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
+            providerCallCount += 1;
+            return provider.generateStructured(params);
+          },
+        };
+        const inputPullRequest: PullRequest = {
+          ...pullRequest,
+          additions: 10,
+          deletions: 2,
+          changed_files: changedFiles,
+        };
+
+        // Given the pull request changes <changedFiles> files
+        // And the pull request has 10 additions and 2 deletions
+        // When the maintainer calls `reviewPullRequest`
+        const review = await reviewPullRequest(
+          { pullRequest: inputPullRequest, diff, config },
+          { provider: countingProvider },
+        );
+
+        // Then the provider call count is <providerCalls>
+        expect(providerCallCount).toBe(providerCalls);
+        // And the returned Review status is <status>
+        expect(review.status).toBe(status);
+      }),
+    );
+  });
 });
