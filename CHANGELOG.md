@@ -21,6 +21,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `@sovri/review-engine`: add the initial `reviewPullRequest`
+  orchestration entrypoint with severity threshold and ignored path filters
+  while enforcing configured review limits and preserving provider finding
+  metadata with safe POSIX and Windows path normalization (#373).
+
+- `@sovri/review-engine`: add scenario coverage for review orchestrator
+  severity threshold and ignored path filters (#373).
+
 - `@sovri/review-engine`: re-export `buildInlineComments`,
   `InlineCommentDraftSchema`, and the `InlineCommentDraft` type from the
   package entrypoint so downstream consumers can build GitHub inline drafts

@@ -45,7 +45,14 @@ export {
 } from "./walkthrough/index.js";
 export type { InlineCommentDraft, WalkthroughInput } from "./walkthrough/index.js";
 
-export { runReview } from "./orchestrator.js";
-export type { ReviewEngineResult, RunReviewInput, RunReviewOptions } from "./orchestrator.js";
+export { reviewPullRequest, runReview } from "./orchestrator.js";
+export type {
+  ReviewEngineResult,
+  ReviewPullRequestConfig,
+  ReviewPullRequestInput,
+  ReviewPullRequestOptions,
+  RunReviewInput,
+  RunReviewOptions,
+} from "./orchestrator.js";
 
 export type { Diff, Review } from "@sovri/core";
