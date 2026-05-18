@@ -13,7 +13,7 @@ import {
   type Review,
   type Severity,
 } from "@sovri/core";
-import type { LLMProvider } from "@sovri/llm-providers";
+import type { GenerateStructuredParams, LLMProvider } from "@sovri/llm-providers";
 import type { Logger } from "@sovri/observability";
 import { v4 as uuidv4, v7 as uuidv7 } from "uuid";
 import type { z } from "zod";
@@ -24,9 +24,28 @@ import {
   parseLLMReviewResponse,
   ProviderReviewResponseSchema,
   type ProviderFinding,
+  type ProviderReviewResponse,
 } from "./parsing/index.js";
 
 export const RunReviewInputSchema = ReviewPromptInputSchema;
+
+const ZeroTokenUsage: TokenUsage = { prompt: 0, completion: 0 };
+
+interface TokenUsage {
+  readonly prompt: number;
+  readonly completion: number;
+}
+
+interface StructuredGeneration<T> {
+  readonly data: T;
+  readonly tokenUsage: TokenUsage;
+}
+
+interface UsageAwareProvider extends LLMProvider {
+  generateStructuredWithUsage<T>(
+    params: GenerateStructuredParams<T>,
+  ): Promise<StructuredGeneration<T>>;
+}
 
 export type RunReviewInput = z.input<typeof RunReviewInputSchema>;
 
@@ -124,13 +143,13 @@ export async function reviewPullRequest(
     "Review engine request started",
   );
 
-  const response = await options.provider.generateStructured({
+  const generation = await generateProviderReviewResponse(options.provider, {
     systemPrompt: prompt.systemPrompt,
     userPrompt: prompt.userPrompt,
     schema: ProviderReviewResponseSchema,
     maxTokens: options.provider.maxTokens,
   });
-  const parsed = parseLLMReviewResponse(response, ProviderReviewResponseSchema);
+  const parsed = parseLLMReviewResponse(generation.data, ProviderReviewResponseSchema);
   const findings = applyReviewFilters(
     parsed.findings.map(toFinding),
     input.config.review.severityThreshold,
@@ -146,12 +165,32 @@ export async function reviewPullRequest(
     completed_at: new Date(),
     llm_provider: options.provider.name,
     llm_model: options.provider.model,
-    tokens_used: { prompt: 0, completion: 0 },
+    tokens_used: generation.tokenUsage,
     summary: parsed.summary,
     findings,
     walkthrough_markdown: parsed.walkthrough_markdown,
     status: "success",
   });
+}
+
+async function generateProviderReviewResponse(
+  provider: LLMProvider,
+  params: GenerateStructuredParams<ProviderReviewResponse>,
+): Promise<StructuredGeneration<ProviderReviewResponse>> {
+  if (isUsageAwareProvider(provider)) {
+    return provider.generateStructuredWithUsage(params);
+  }
+
+  return {
+    data: await provider.generateStructured(params),
+    tokenUsage: ZeroTokenUsage,
+  };
+}
+
+function isUsageAwareProvider(provider: LLMProvider): provider is UsageAwareProvider {
+  const candidate: unknown = Reflect.get(provider, "generateStructuredWithUsage");
+
+  return typeof candidate === "function";
 }
 
 function getLimitError(

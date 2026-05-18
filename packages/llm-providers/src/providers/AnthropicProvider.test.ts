@@ -37,6 +37,13 @@ const AnthropicRequestSchema = z
   .passthrough();
 type AnthropicRequest = z.infer<typeof AnthropicRequestSchema>;
 
+interface AnthropicUsage {
+  readonly input_tokens: number;
+  readonly output_tokens: number;
+  readonly cache_creation_input_tokens?: number;
+  readonly cache_read_input_tokens?: number;
+}
+
 const validStructuredResponse: LLMResponse = {
   summary: "The diff looks safe.",
   findings: [],
@@ -130,9 +137,50 @@ describe("AnthropicProvider", () => {
     expect(findingsSchema).not.toHaveProperty("maxItems");
     expect(z.string().parse(findingsSchema.description)).toContain("maxItems");
   });
+
+  it("returns provider token usage with structured responses", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", TestApiKey);
+
+    server.use(
+      http.post(AnthropicMessagesUrl, () =>
+        anthropicMessageWithText(JSON.stringify(validStructuredResponse)),
+      ),
+    );
+
+    const provider = new AnthropicProvider({ model: TestModel });
+
+    const result = await provider.generateStructuredWithUsage(generateParams);
+
+    expect(result.data).toEqual(validStructuredResponse);
+    expect(result.tokenUsage).toEqual({ prompt: 42, completion: 24 });
+  });
+
+  it("includes cached Anthropic input tokens in prompt usage", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", TestApiKey);
+
+    server.use(
+      http.post(AnthropicMessagesUrl, () =>
+        anthropicMessageWithText(JSON.stringify(validStructuredResponse), {
+          input_tokens: 42,
+          cache_creation_input_tokens: 50,
+          cache_read_input_tokens: 100,
+          output_tokens: 24,
+        }),
+      ),
+    );
+
+    const provider = new AnthropicProvider({ model: TestModel });
+
+    const result = await provider.generateStructuredWithUsage(generateParams);
+
+    expect(result.tokenUsage).toEqual({ prompt: 192, completion: 24 });
+  });
 });
 
-function anthropicMessageWithText(text: string) {
+function anthropicMessageWithText(
+  text: string,
+  usage: AnthropicUsage = { input_tokens: 42, output_tokens: 24 },
+) {
   return HttpResponse.json({
     id: "msg_test",
     type: "message",
@@ -141,7 +189,7 @@ function anthropicMessageWithText(text: string) {
     content: [{ type: "text", text }],
     stop_reason: "end_turn",
     stop_sequence: null,
-    usage: { input_tokens: 42, output_tokens: 24 },
+    usage,
   });
 }
 
