@@ -166,9 +166,11 @@ describe("AnthropicProvider error handling", () => {
 
     const provider = new AnthropicProvider({ model: TestModel });
 
-    await expect(provider.generateStructured(generateParams)).rejects.toThrow(
-      AnthropicResponseError,
-    );
+    await expect(provider.generateStructured(generateParams)).rejects.toMatchObject({
+      name: "AnthropicResponseError",
+      retryableWithCorrectivePrompt: true,
+      tokenUsage: { prompt: 42, completion: 24 },
+    });
   });
 });
 

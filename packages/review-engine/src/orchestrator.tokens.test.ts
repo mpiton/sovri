@@ -23,6 +23,32 @@ interface UsageAwareProvider extends LLMProvider {
   ): Promise<StructuredGeneration<T>>;
 }
 
+interface ProviderIssue {
+  readonly path: readonly string[];
+  readonly message: string;
+}
+
+class ProviderSchemaValidationError extends Error {
+  readonly issues: readonly ProviderIssue[];
+  readonly tokenUsage: TokenUsage;
+  readonly retryableWithCorrectivePrompt = true;
+
+  constructor(tokenUsage: TokenUsage) {
+    super("Provider response failed schema validation");
+    this.issues = [{ path: ["summary"], message: "Expected string" }];
+    this.tokenUsage = tokenUsage;
+  }
+}
+
+class ProviderProtocolError extends Error {
+  readonly issues: readonly ProviderIssue[];
+
+  constructor() {
+    super("Provider usage metadata failed validation");
+    this.issues = [{ path: ["usage", "input_tokens"], message: "Expected integer" }];
+  }
+}
+
 interface ReviewFilterConfig {
   readonly review: {
     readonly severityThreshold: Severity;
@@ -57,6 +83,111 @@ function createUsageAwareProvider(tokenUsage: TokenUsage): UsageAwareProvider {
       };
     },
   };
+}
+
+function createSchemaInvalidThenValidProvider(): UsageAwareProvider {
+  const response = {
+    summary: "Corrected review.",
+    findings: [],
+    walkthrough_markdown: "## Sovri review\n\nCorrected review.",
+  };
+  let callCount = 0;
+  const provider: UsageAwareProvider = {
+    name: "test-provider",
+    model: "test-model",
+    maxTokens: 2048,
+    async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
+      const generation = await provider.generateStructuredWithUsage(params);
+
+      return generation.data;
+    },
+    async generateStructuredWithUsage<T>(
+      params: GenerateStructuredParams<T>,
+    ): Promise<StructuredGeneration<T>> {
+      callCount += 1;
+
+      if (callCount === 1) {
+        throw new ProviderSchemaValidationError({ prompt: 600, completion: 120 });
+      }
+
+      return {
+        data: params.schema.parse(response),
+        tokenUsage: { prompt: 300, completion: 80 },
+      };
+    },
+  };
+
+  return provider;
+}
+
+function createSchemaInvalidUsageThenValidProvider(): UsageAwareProvider {
+  const response = {
+    summary: "Corrected review.",
+    findings: [],
+    walkthrough_markdown: "## Sovri review\n\nCorrected review.",
+  };
+  let callCount = 0;
+  const provider: UsageAwareProvider = {
+    name: "test-provider",
+    model: "test-model",
+    maxTokens: 2048,
+    async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
+      const generation = await provider.generateStructuredWithUsage(params);
+
+      return generation.data;
+    },
+    async generateStructuredWithUsage<T>(
+      params: GenerateStructuredParams<T>,
+    ): Promise<StructuredGeneration<T>> {
+      callCount += 1;
+
+      if (callCount === 1) {
+        throw new ProviderSchemaValidationError({ prompt: -5, completion: 0 });
+      }
+
+      return {
+        data: params.schema.parse(response),
+        tokenUsage: { prompt: 10, completion: 0 },
+      };
+    },
+  };
+
+  return provider;
+}
+
+function createProtocolInvalidThenValidProvider(): UsageAwareProvider {
+  const response = {
+    summary: "Corrected review.",
+    findings: [],
+    walkthrough_markdown: "## Sovri review\n\nCorrected review.",
+  };
+  let callCount = 0;
+  const provider: UsageAwareProvider = {
+    name: "test-provider",
+    model: "test-model",
+    maxTokens: 2048,
+    async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
+      const generation = await provider.generateStructuredWithUsage(params);
+
+      return generation.data;
+    },
+    async generateStructuredWithUsage<T>(
+      params: GenerateStructuredParams<T>,
+    ): Promise<StructuredGeneration<T>> {
+      callCount += 1;
+
+      if (callCount === 1) {
+        throw new ProviderProtocolError();
+      }
+
+      return {
+        data: params.schema.parse(response),
+        tokenUsage: { prompt: 300, completion: 80 },
+      };
+    },
+  };
+
+  return provider;
 }
 
 const pullRequest: PullRequest = {
@@ -139,5 +270,50 @@ describe("reviewPullRequest token usage", () => {
     // Then validation fails against the token usage contract
     // And no invalid Review is returned
     await expect(review).rejects.toBeInstanceOf(z.ZodError);
+  });
+
+  it("accumulates token usage when a corrective retry succeeds", async () => {
+    const provider = createSchemaInvalidThenValidProvider();
+
+    // Given the first provider response is schema-invalid
+    // And the first provider response reports 600 prompt tokens and 120 completion tokens
+    // And the corrective provider response is valid
+    // And the corrective provider response reports 300 prompt tokens and 80 completion tokens
+    // When the maintainer calls `reviewPullRequest`
+    const review = await reviewPullRequest({ pullRequest, diff, config }, { provider });
+
+    // Then the returned Review status is "partial"
+    expect(review.status).toBe("partial");
+    // And the returned Review `tokens_used.prompt` is 900
+    expect(review.tokens_used.prompt).toBe(900);
+    // And the returned Review `tokens_used.completion` is 200
+    expect(review.tokens_used.completion).toBe(200);
+  });
+
+  it("rejects invalid token usage from schema-invalid retry attempts", async () => {
+    const provider = createSchemaInvalidUsageThenValidProvider();
+
+    // Given the first provider response is schema-invalid
+    // And the first provider response reports invalid token usage
+    // And the corrective provider response reports enough valid tokens to mask the invalid usage
+    // When the maintainer calls `reviewPullRequest`
+    const review = reviewPullRequest({ pullRequest, diff, config }, { provider });
+
+    // Then validation fails against the token usage contract
+    // And no partial Review is returned
+    await expect(review).rejects.toBeInstanceOf(z.ZodError);
+  });
+
+  it("does not retry provider protocol errors that expose issues", async () => {
+    const provider = createProtocolInvalidThenValidProvider();
+
+    // Given the first provider call fails while validating provider protocol metadata
+    // And the provider error exposes validation issues
+    // When the maintainer calls `reviewPullRequest`
+    const review = reviewPullRequest({ pullRequest, diff, config }, { provider });
+
+    // Then the protocol error is preserved
+    // And no corrective retry returns a partial review
+    await expect(review).rejects.toThrow("Provider usage metadata failed validation");
   });
 });

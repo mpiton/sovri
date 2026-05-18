@@ -3,6 +3,8 @@
 
 import type { z } from "@sovri/core";
 
+import type { TokenUsage } from "./types/LLMProvider.js";
+
 export interface AnthropicProviderErrorOptions {
   readonly cause?: unknown;
   readonly status?: number;
@@ -12,6 +14,8 @@ export interface AnthropicProviderErrorOptions {
 
 export interface AnthropicResponseErrorOptions extends AnthropicProviderErrorOptions {
   readonly issues?: ReadonlyArray<z.core.$ZodIssue>;
+  readonly tokenUsage?: TokenUsage;
+  readonly retryableWithCorrectivePrompt?: true;
 }
 
 type AnthropicResponseErrorName =
@@ -50,6 +54,8 @@ export class AnthropicResponseError<
   readonly requestId?: string | null;
   readonly attemptDurationsMs?: ReadonlyArray<number>;
   readonly issues?: ReadonlyArray<z.core.$ZodIssue>;
+  readonly tokenUsage?: TokenUsage;
+  readonly retryableWithCorrectivePrompt?: true;
 
   override get name(): Name {
     return this.errorName;
@@ -73,6 +79,12 @@ export class AnthropicResponseError<
     }
     if (options.issues !== undefined) {
       this.issues = options.issues;
+    }
+    if (options.tokenUsage !== undefined) {
+      this.tokenUsage = options.tokenUsage;
+    }
+    if (options.retryableWithCorrectivePrompt !== undefined) {
+      this.retryableWithCorrectivePrompt = options.retryableWithCorrectivePrompt;
     }
   }
 }

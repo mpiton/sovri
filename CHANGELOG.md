@@ -51,6 +51,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `@sovri/review-engine`: add scenario test coverage that invalid provider
   token usage is rejected before returning a Review (#380).
 
+- `@sovri/review-engine`: accumulate token usage across schema-validation
+  corrective retries, mark corrected reviews as partial, and avoid retrying
+  provider protocol errors that expose validation issues while validating each
+  attempt's token usage before accumulation (#381).
+
 - `@sovri/review-engine`: re-export `buildInlineComments`,
   `InlineCommentDraftSchema`, and the `InlineCommentDraft` type from the
   package entrypoint so downstream consumers can build GitHub inline drafts

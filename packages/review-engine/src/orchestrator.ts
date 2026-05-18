@@ -7,6 +7,7 @@ import {
   applyIgnoreRules,
   computeSeverityRank,
   ReviewSchema,
+  z,
   type Diff,
   type Finding,
   type PullRequest,
@@ -16,7 +17,6 @@ import {
 import type { GenerateStructuredParams, LLMProvider } from "@sovri/llm-providers";
 import type { Logger } from "@sovri/observability";
 import { v4 as uuidv4, v7 as uuidv7 } from "uuid";
-import type { z } from "zod";
 
 import { parseUnifiedDiff } from "./diff/index.js";
 import { buildReviewPrompt, ReviewPromptInputSchema } from "./prompt/index.js";
@@ -29,22 +29,52 @@ import {
 
 export const RunReviewInputSchema = ReviewPromptInputSchema;
 
-const ZeroTokenUsage: TokenUsage = { prompt: 0, completion: 0 };
+const TokenUsageSchema = z.object({
+  prompt: z.number().int().nonnegative(),
+  completion: z.number().int().nonnegative(),
+});
 
-interface TokenUsage {
-  readonly prompt: number;
-  readonly completion: number;
-}
+const ZeroTokenUsage = TokenUsageSchema.parse({ prompt: 0, completion: 0 });
+
+type TokenUsage = z.infer<typeof TokenUsageSchema>;
 
 interface StructuredGeneration<T> {
   readonly data: T;
   readonly tokenUsage: TokenUsage;
 }
 
+interface ParsedReviewGeneration {
+  readonly parsed: ProviderReviewResponse;
+  readonly tokenUsage: TokenUsage;
+  readonly status: Review["status"];
+}
+
+type ProviderReviewAttempt =
+  | {
+      readonly success: true;
+      readonly parsed: ProviderReviewResponse;
+      readonly tokenUsage: TokenUsage;
+    }
+  | {
+      readonly success: false;
+      readonly error: unknown;
+      readonly tokenUsage: TokenUsage;
+    };
+
 interface UsageAwareProvider extends LLMProvider {
   generateStructuredWithUsage<T>(
     params: GenerateStructuredParams<T>,
   ): Promise<StructuredGeneration<T>>;
+}
+
+class ProviderReviewSchemaError extends Error {
+  override get name(): "ProviderReviewSchemaError" {
+    return "ProviderReviewSchemaError";
+  }
+
+  constructor(cause: unknown) {
+    super("Provider response failed schema validation", { cause });
+  }
 }
 
 export type RunReviewInput = z.input<typeof RunReviewInputSchema>;
@@ -143,15 +173,14 @@ export async function reviewPullRequest(
     "Review engine request started",
   );
 
-  const generation = await generateProviderReviewResponse(options.provider, {
+  const generation = await generateParsedProviderReview(options.provider, {
     systemPrompt: prompt.systemPrompt,
     userPrompt: prompt.userPrompt,
     schema: ProviderReviewResponseSchema,
     maxTokens: options.provider.maxTokens,
   });
-  const parsed = parseLLMReviewResponse(generation.data, ProviderReviewResponseSchema);
   const findings = applyReviewFilters(
-    parsed.findings.map(toFinding),
+    generation.parsed.findings.map(toFinding),
     input.config.review.severityThreshold,
     input.config.ignores,
   );
@@ -166,11 +195,73 @@ export async function reviewPullRequest(
     llm_provider: options.provider.name,
     llm_model: options.provider.model,
     tokens_used: generation.tokenUsage,
-    summary: parsed.summary,
+    summary: generation.parsed.summary,
     findings,
-    walkthrough_markdown: parsed.walkthrough_markdown,
-    status: "success",
+    walkthrough_markdown: generation.parsed.walkthrough_markdown,
+    status: generation.status,
   });
+}
+
+async function generateParsedProviderReview(
+  provider: LLMProvider,
+  params: GenerateStructuredParams<ProviderReviewResponse>,
+): Promise<ParsedReviewGeneration> {
+  const firstAttempt = await generateProviderReviewAttempt(provider, params);
+  if (firstAttempt.success) {
+    return {
+      parsed: firstAttempt.parsed,
+      tokenUsage: firstAttempt.tokenUsage,
+      status: "success",
+    };
+  }
+
+  if (!isRetryableSchemaFailure(firstAttempt.error)) {
+    throw firstAttempt.error;
+  }
+
+  const retryAttempt = await generateProviderReviewAttempt(provider, {
+    ...params,
+    systemPrompt: buildCorrectiveSystemPrompt(params.systemPrompt, firstAttempt.error),
+  });
+
+  if (!retryAttempt.success) {
+    throw retryAttempt.error;
+  }
+
+  return {
+    parsed: retryAttempt.parsed,
+    tokenUsage: addTokenUsage(firstAttempt.tokenUsage, retryAttempt.tokenUsage),
+    status: "partial",
+  };
+}
+
+async function generateProviderReviewAttempt(
+  provider: LLMProvider,
+  params: GenerateStructuredParams<ProviderReviewResponse>,
+): Promise<ProviderReviewAttempt> {
+  try {
+    const generation = await generateProviderReviewResponse(provider, params);
+
+    try {
+      return {
+        success: true,
+        parsed: parseLLMReviewResponse(generation.data, ProviderReviewResponseSchema),
+        tokenUsage: generation.tokenUsage,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: new ProviderReviewSchemaError(error),
+        tokenUsage: generation.tokenUsage,
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error,
+      tokenUsage: tokenUsageFromError(error),
+    };
+  }
 }
 
 async function generateProviderReviewResponse(
@@ -178,7 +269,12 @@ async function generateProviderReviewResponse(
   params: GenerateStructuredParams<ProviderReviewResponse>,
 ): Promise<StructuredGeneration<ProviderReviewResponse>> {
   if (isUsageAwareProvider(provider)) {
-    return provider.generateStructuredWithUsage(params);
+    const generation = await provider.generateStructuredWithUsage(params);
+
+    return {
+      data: generation.data,
+      tokenUsage: parseTokenUsage(generation.tokenUsage),
+    };
   }
 
   return {
@@ -191,6 +287,59 @@ function isUsageAwareProvider(provider: LLMProvider): provider is UsageAwareProv
   const candidate: unknown = Reflect.get(provider, "generateStructuredWithUsage");
 
   return typeof candidate === "function";
+}
+
+function isRetryableSchemaFailure(error: unknown): boolean {
+  if (error instanceof ProviderReviewSchemaError) {
+    return true;
+  }
+
+  if (!isJsonObject(error)) {
+    return false;
+  }
+
+  return Reflect.get(error, "retryableWithCorrectivePrompt") === true;
+}
+
+function tokenUsageFromError(error: unknown): TokenUsage {
+  if (!isJsonObject(error)) {
+    return ZeroTokenUsage;
+  }
+
+  const tokenUsage: unknown = Reflect.get(error, "tokenUsage");
+  if (tokenUsage === undefined) {
+    return ZeroTokenUsage;
+  }
+
+  return parseTokenUsage(tokenUsage);
+}
+
+function parseTokenUsage(tokenUsage: unknown): TokenUsage {
+  return TokenUsageSchema.parse(tokenUsage);
+}
+
+function addTokenUsage(left: TokenUsage, right: TokenUsage): TokenUsage {
+  return {
+    prompt: left.prompt + right.prompt,
+    completion: left.completion + right.completion,
+  };
+}
+
+function buildCorrectiveSystemPrompt(systemPrompt: string, failure: unknown): string {
+  return [
+    systemPrompt,
+    "",
+    "Correct the previous provider response.",
+    "Return valid JSON matching the requested schema.",
+    "Do not include Markdown fences or explanatory prose.",
+    "",
+    "Validation failure:",
+    failure instanceof Error ? failure.message : "Provider response failed schema validation",
+  ].join("\n");
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function getLimitError(

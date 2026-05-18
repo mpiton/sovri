@@ -84,8 +84,8 @@ export class AnthropicProvider implements LLMProvider {
   ): Promise<StructuredGeneration<T>> {
     const request = this.createRequest(params);
     const response = await this.createMessage(request);
-    const data = parseStructuredResponse(response, params.schema);
     const tokenUsage = extractTokenUsage(response);
+    const data = parseStructuredResponse(response, params.schema, tokenUsage);
 
     return { data, tokenUsage };
   }
@@ -116,7 +116,11 @@ export class AnthropicProvider implements LLMProvider {
   }
 }
 
-function parseStructuredResponse<T>(response: unknown, schema: z.ZodType<T>): T {
+function parseStructuredResponse<T>(
+  response: unknown,
+  schema: z.ZodType<T>,
+  tokenUsage: TokenUsage,
+): T {
   const text = extractTextContent(response);
   const parsedJson = parseJson(text);
   const parsedSchema = schema.safeParse(parsedJson);
@@ -125,6 +129,8 @@ function parseStructuredResponse<T>(response: unknown, schema: z.ZodType<T>): T 
     throw new AnthropicResponseError("Anthropic response failed schema validation", {
       cause: parsedSchema.error,
       issues: parsedSchema.error.issues,
+      retryableWithCorrectivePrompt: true,
+      tokenUsage,
     });
   }
 
