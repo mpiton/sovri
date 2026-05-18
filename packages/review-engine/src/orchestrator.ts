@@ -458,7 +458,10 @@ function buildCorrectiveSystemPrompt(systemPrompt: string, failure: unknown): st
 }
 
 function schemaFailureMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Provider response failed schema validation";
+  const reason =
+    error instanceof Error ? error.message : "Provider response failed schema validation";
+
+  return `Sovri could not parse provider response after corrective retry: ${reason}`;
 }
 
 function providerFailureMessage(error: unknown): string {
@@ -532,7 +535,7 @@ function buildReviewFailedFinding(diff: Diff, error: string): Finding {
 }
 
 function buildReviewFailedFindingBody(error: string): string {
-  const body = `Provider response could not be parsed after corrective retry: ${error}`;
+  const body = error;
 
   return body.length <= FindingBodyMaxLength ? body : body.slice(0, FindingBodyMaxLength);
 }

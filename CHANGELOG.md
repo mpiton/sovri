@@ -111,6 +111,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   sets status `partial` without error output or synthetic fallback findings
   (#395).
 
+- `@sovri/review-engine`: make exhausted parse-fallback Reviews expose a
+  `could not parse` error while preserving the synthetic `review_failed`
+  finding (#396).
+
 - `@sovri/review-engine`: re-export `buildInlineComments`,
   `InlineCommentDraftSchema`, and the `InlineCommentDraft` type from the
   package entrypoint so downstream consumers can build GitHub inline drafts

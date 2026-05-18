@@ -215,6 +215,8 @@ describe("reviewPullRequest MSW integration paths", () => {
     expect(ReviewSchema.safeParse(review).success).toBe(true);
     // And the returned Review status is "failed"
     expect(review.status).toBe("failed");
+    // And the returned Review error contains "could not parse"
+    expect(review.error).toContain("could not parse");
     // And the returned Review findings contain a synthetic finding titled "review_failed"
     expect(review.findings).toEqual([
       expect.objectContaining({
