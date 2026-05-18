@@ -99,6 +99,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   that assembled reviews missing `tokens_used` are rejected by `ReviewSchema`
   before return (#392).
 
+- `@sovri/review-engine`: add scenario coverage that parse-fallback failed
+  reviews still validate against `ReviewSchema` after repeated schema-invalid
+  provider responses (#393).
+
 - `@sovri/review-engine`: re-export `buildInlineComments`,
   `InlineCommentDraftSchema`, and the `InlineCommentDraft` type from the
   package entrypoint so downstream consumers can build GitHub inline drafts

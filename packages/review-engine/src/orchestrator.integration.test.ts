@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { z, type Diff, type PullRequest } from "@sovri/core";
+import { ReviewSchema, z, type Diff, type PullRequest } from "@sovri/core";
 import type {
   GenerateStructuredParams,
   LLMProvider,
@@ -209,6 +209,8 @@ describe("reviewPullRequest MSW integration paths", () => {
 
     // Then exactly 2 provider requests are observed by MSW
     expect(observedProviderRequests).toBe(2);
+    // And the returned Review validates against `ReviewSchema`
+    expect(ReviewSchema.safeParse(review).success).toBe(true);
     // And the returned Review status is "failed"
     expect(review.status).toBe("failed");
     // And the returned Review findings contain a synthetic finding titled "review_failed"
