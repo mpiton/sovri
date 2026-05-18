@@ -3,6 +3,14 @@
 
 import { run } from "probot";
 
-import registerCommunityBot from "./app.js";
+import { createLogger } from "@sovri/observability";
 
-run(registerCommunityBot);
+import { app } from "./app.js";
+import { applyRuntimeEnvironmentDefaults } from "./runtime-env.js";
+
+const logger = createLogger("community-bot.server");
+
+logger.info("Sovri community-bot starting");
+applyRuntimeEnvironmentDefaults();
+
+run(app);

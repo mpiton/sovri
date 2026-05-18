@@ -9,8 +9,8 @@ import { registerWebhookHandlers } from "./handlers/index.js";
 
 export type { CommunityBotDependencies } from "./types.js";
 
-export default function registerCommunityBot(app: Probot): void {
-  registerGitHubAdapters(app);
-  registerCommandHandlers(app);
-  registerWebhookHandlers(app);
+export function app(probot: Probot): void {
+  registerGitHubAdapters(probot);
+  registerCommandHandlers(probot);
+  registerWebhookHandlers(probot);
 }
