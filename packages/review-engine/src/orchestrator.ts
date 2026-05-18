@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+import { posix } from "node:path";
+
 import {
   applyIgnoreRules,
   computeSeverityRank,
@@ -102,6 +104,11 @@ export async function reviewPullRequest(
   options: ReviewPullRequestOptions,
 ): Promise<Review> {
   const startedAt = new Date();
+  const limitError = getLimitError(input.pullRequest, input.config);
+  if (limitError !== undefined) {
+    return buildFailedReview(input.pullRequest, options.provider, startedAt, limitError);
+  }
+
   const prompt = buildReviewPrompt({
     unifiedDiff: input.diff.unified_diff,
     pullRequest: {
@@ -147,6 +154,47 @@ export async function reviewPullRequest(
   });
 }
 
+function getLimitError(
+  pullRequest: PullRequest,
+  config: ReviewPullRequestConfig,
+): string | undefined {
+  const changedLines = pullRequest.additions + pullRequest.deletions;
+
+  if (pullRequest.changed_files > config.limits.maxFilesPerReview) {
+    return `Pull request exceeds review limits: ${pullRequest.changed_files} files changed, max ${config.limits.maxFilesPerReview}.`;
+  }
+
+  if (changedLines > config.limits.maxLinesPerReview) {
+    return `Pull request exceeds review limits: ${changedLines} changed lines, max ${config.limits.maxLinesPerReview}.`;
+  }
+
+  return undefined;
+}
+
+function buildFailedReview(
+  pullRequest: PullRequest,
+  provider: LLMProvider,
+  startedAt: Date,
+  error: string,
+): Review {
+  return ReviewSchema.parse({
+    id: uuidv7(),
+    pr_number: pullRequest.number,
+    repo_full_name: pullRequest.repo_full_name,
+    commit_sha: pullRequest.head_sha,
+    started_at: startedAt,
+    completed_at: new Date(),
+    llm_provider: provider.name,
+    llm_model: provider.model,
+    tokens_used: { prompt: 0, completion: 0 },
+    summary: error,
+    findings: [],
+    walkthrough_markdown: `## Sovri review\n\n${error}`,
+    status: "failed",
+    error,
+  });
+}
+
 function applyReviewFilters(
   findings: readonly Finding[],
   severityThreshold: Severity,
@@ -164,13 +212,18 @@ function toFinding(finding: ProviderFinding): Finding {
   return {
     id: uuidv4(),
     severity: finding.severity,
-    category: "maintainability",
-    file: finding.file,
+    category: finding.category,
+    file: normalizeFindingPath(finding.file),
     line_start: finding.line_start,
     line_end: finding.line_end,
     title: finding.title,
     body: finding.body,
     source: "llm",
-    confidence: 1,
+    confidence: finding.confidence,
   };
+}
+
+function normalizeFindingPath(file: string): string {
+  const normalized = posix.normalize(file.replaceAll("\\", "/"));
+  return normalized.replace(/^(?:\/|\.\.\/|\.\/)+/u, "");
 }

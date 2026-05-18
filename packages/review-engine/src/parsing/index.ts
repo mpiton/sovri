@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import type { Severity } from "@sovri/core";
+import { CategorySchema, type Severity } from "@sovri/core";
 import { z } from "zod";
 
 export const ProviderFindingSchema = z
   .strictObject({
     severity: z.enum(["blocker", "major", "minor", "info", "nitpick"]),
+    category: CategorySchema.default("maintainability"),
     file: z.string().min(1),
     line_start: z.number().int().positive(),
     line_end: z.number().int().positive(),
     title: z.string().min(1).max(200),
     body: z.string().min(1).max(2000),
+    confidence: z.number().min(0).max(1).default(1),
   })
   .refine(({ line_start, line_end }) => line_end >= line_start, {
     path: ["line_end"],

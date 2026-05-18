@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import type { Diff, PullRequest, Review, Severity } from "@sovri/core";
+import type { Category, Diff, PullRequest, Review, Severity } from "@sovri/core";
 import type { GenerateStructuredParams, LLMProvider } from "@sovri/llm-providers";
 import { describe, expect, it } from "vitest";
 
@@ -70,14 +70,18 @@ function providerFinding(
   file: string,
   lineStart: number,
   title: string,
+  category: Category = "bug",
+  confidence = 0.87,
 ): ProviderFinding {
   return {
     severity,
+    category,
     file,
     line_start: lineStart,
     line_end: lineStart,
     title,
     body: `${title} body.`,
+    confidence,
   };
 }
 
