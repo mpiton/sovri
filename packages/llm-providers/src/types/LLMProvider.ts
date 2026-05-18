@@ -8,6 +8,9 @@ export interface LLMProvider {
   readonly model: string;
   readonly maxTokens: number;
   generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T>;
+  generateStructuredWithUsage?<T>(
+    params: GenerateStructuredParams<T>,
+  ): Promise<StructuredGeneration<T>>;
 }
 
 export interface GenerateStructuredParams<T> {
@@ -16,4 +19,14 @@ export interface GenerateStructuredParams<T> {
   readonly schema: z.ZodType<T>;
   readonly temperature?: number;
   readonly maxTokens?: number;
+}
+
+export interface TokenUsage {
+  readonly prompt: number;
+  readonly completion: number;
+}
+
+export interface StructuredGeneration<T> {
+  readonly data: T;
+  readonly tokenUsage: TokenUsage;
 }
