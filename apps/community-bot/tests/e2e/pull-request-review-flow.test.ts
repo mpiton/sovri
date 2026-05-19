@@ -1,0 +1,955 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Sovri SAS
+
+import { Probot } from "probot";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+import { z } from "@sovri/core";
+import { createLogger } from "@sovri/observability";
+import { ProviderReviewResponseSchema, type ProviderReviewResponse } from "@sovri/review-engine";
+
+import { app } from "../../src/app.js";
+import { validatePullRequestReviewRequest } from "../../src/github/comment-poster.js";
+
+const GitHubBaseUrl = "https://api.github.com";
+const AnthropicMessagesUrl = "https://api.anthropic.com/v1/messages";
+const Owner = "octo-org";
+const Repo = "sovri-target";
+const RepoFullName = `${Owner}/${Repo}`;
+const PullNumber = 42;
+const BaseSha = "dddddddddddddddddddddddddddddddddddddddd";
+const OpenedHeadSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const SynchronizedHeadSha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const SecondSynchronizedHeadSha = "cccccccccccccccccccccccccccccccccccccccc";
+const OpenedDeliveryId = "8f1b9c2d-3e4f-45a6-91b2-123456789abc";
+const SynchronizeDeliveryId = "9f1b9c2d-3e4f-45a6-91b2-123456789abc";
+const SecretWebhookValue = "secret-webhook-value-45";
+const SecretLlmValue = "secret-llm-value-45";
+const SecretInstallationToken = "secret-installation-token-45";
+
+const IssueCommentCreateSchema = z.object({ body: z.string() }).passthrough();
+const PullRequestReviewBodySchema = z
+  .object({
+    body: z.string(),
+    comments: z.array(
+      z.object({
+        body: z.string(),
+        line: z.number().int().positive(),
+        path: z.string().min(1),
+        side: z.literal("RIGHT"),
+        start_line: z.number().int().positive().optional(),
+        start_side: z.literal("RIGHT").optional(),
+      }),
+    ),
+    commit_id: z.string().min(1),
+    event: z.literal("COMMENT"),
+  })
+  .passthrough();
+const PullRequestReviewRouteSchema = z.object({
+  owner: z.string().min(1),
+  pull_number: z.string().regex(/^\d+$/),
+  repo: z.string().min(1),
+});
+
+type ReviewRequest = ReturnType<typeof validatePullRequestReviewRequest>;
+
+type ObservedRuntime = {
+  readonly anthropicApiKeys: string[];
+  readonly anthropicRequests: unknown[];
+  readonly issueCommentBodies: string[];
+  readonly listFilesQueries: string[];
+  readonly reviewRequests: ReviewRequest[];
+};
+
+type UnhandledRequest = {
+  readonly method: string;
+  readonly url: string;
+};
+
+const server = setupServer();
+let unhandledRequests: UnhandledRequest[] = [];
+let openedReviewFlow: Promise<ObservedRuntime> | undefined;
+const synchronizeReviewFlows = new Map<string, Promise<ObservedRuntime>>();
+
+beforeAll(() => {
+  server.listen({
+    onUnhandledRequest(request) {
+      unhandledRequests.push({ method: request.method, url: request.url });
+      throw new Error(`unexpected network request: ${request.method} ${request.url}`);
+    },
+  });
+});
+
+afterEach(() => {
+  server.resetHandlers();
+  unhandledRequests = [];
+  vi.unstubAllEnvs();
+});
+
+afterAll(() => server.close());
+
+describe("community bot pull request review E2E ATDD", () => {
+  it.each([
+    { elapsedMs: 9_600, reported: "9.6 s" },
+    { elapsedMs: 29_999, reported: "29.999 s" },
+  ])("accepts CI duration $reported below 30 seconds", ({ elapsedMs, reported }) => {
+    // Given the end-to-end suite starts at monotonic time 100000 ms
+    // And the end-to-end suite finishes after <elapsed_ms> ms
+    // When the CI budget assertion is evaluated
+    const result = evaluateBudget(elapsedMs, 30_000);
+
+    // Then the budget assertion passes
+    expect(result.passed).toBe(true);
+    // And the reported suite duration is "<reported_duration>"
+    expect(formatDuration(elapsedMs)).toBe(reported);
+  });
+
+  it.each([30_000, 31_000])("rejects CI duration %d ms at or above 30 seconds", (elapsedMs) => {
+    // Given the end-to-end suite starts at monotonic time 100000 ms
+    // And the end-to-end suite finishes after <elapsed_ms> ms
+    // When the CI budget assertion is evaluated
+    const result = evaluateBudget(elapsedMs, 30_000);
+
+    // Then the budget assertion fails
+    expect(result.passed).toBe(false);
+    // And the failure mentions "suite must finish in under 30 s"
+    expect(result.message).toContain("under 30 s");
+  });
+
+  it("includes fixture setup, webhook delivery, and teardown in the suite budget", () => {
+    // Given MSW setup takes 150 ms
+    // And the opened webhook flow takes 4200 ms
+    // And the synchronize webhook flow takes 4300 ms
+    // And fixture teardown takes 100 ms
+    const measuredDuration = 150 + 4_200 + 4_300 + 100;
+
+    // When the CI budget assertion is evaluated
+    const result = evaluateBudget(measuredDuration, 30_000);
+
+    // Then the measured duration is 8750 ms
+    expect(measuredDuration).toBe(8_750);
+    // And the budget assertion passes
+    expect(result.passed).toBe(true);
+  });
+
+  it("runs the opened review flow with every network call intercepted by MSW", async () => {
+    // Given MSW handles `GET https://api.github.com/repos/octo-org/sovri-target/pulls/42/files`
+    // And MSW handles `POST https://api.anthropic.com/v1/messages`
+    // And MSW handles `POST https://api.github.com/repos/octo-org/sovri-target/pulls/42/reviews`
+    // When the opened pull request end-to-end suite runs
+    const runtime = await runOpenedReviewFlow();
+
+    // Then the suite observes 0 unhandled network requests
+    expect(unhandledRequests).toEqual([]);
+    // And no GitHub credential is required outside the fixture
+    expect(runtime.reviewRequests).toHaveLength(1);
+    // And no Anthropic credential is required outside the fixture
+    expect(runtime.anthropicApiKeys).toEqual([SecretLlmValue]);
+  });
+
+  it("records an unhandled GitHub request with method and URL", async () => {
+    // Given MSW has no handler for `GET https://api.github.com/rate_limit`
+    // When the system under test sends `GET https://api.github.com/rate_limit`
+    const response = await fetch(`${GitHubBaseUrl}/rate_limit`);
+
+    // Then the unhandled-request listener records method "GET"
+    expect(unhandledRequests[0]?.method).toBe("GET");
+    // And the unhandled-request listener records URL "https://api.github.com/rate_limit"
+    expect(unhandledRequests[0]?.url).toBe(`${GitHubBaseUrl}/rate_limit`);
+    // And the suite fails before any real network call succeeds
+    expect(response.status).toBe(500);
+    expect(unhandledRequests).toHaveLength(1);
+  });
+
+  it("records an unhandled non-GitHub request with method and URL", async () => {
+    // Given MSW has no handler for `POST https://telemetry.invalid/events`
+    // When the system under test sends `POST https://telemetry.invalid/events`
+    const response = await fetch("https://telemetry.invalid/events", { method: "POST" });
+
+    // Then the unhandled-request listener records method "POST"
+    expect(unhandledRequests[0]?.method).toBe("POST");
+    // And the unhandled-request listener records URL "https://telemetry.invalid/events"
+    expect(unhandledRequests[0]?.url).toBe("https://telemetry.invalid/events");
+    // And the failure mentions "unexpected network request"
+    expect(response.status).toBe(500);
+    expect(unhandledRequests).toHaveLength(1);
+  });
+
+  it("delivers the opened webhook fixture through Probot", async () => {
+    // Given the synthetic payload action is "opened"
+    // And the synthetic payload pull request title is "Wire Sovri pull request review"
+    // And the synthetic payload pull request author is "octocat"
+    // When the fixture is delivered through the Probot webhook receiver
+    const runtime = await runOpenedReviewFlow();
+
+    // Then the community bot handles event "pull_request.opened"
+    expect(runtime.reviewRequests).toHaveLength(1);
+    // And the handler receives repository "octo-org/sovri-target"
+    expect(runtime.reviewRequests[0]?.owner).toBe(Owner);
+    expect(runtime.reviewRequests[0]?.repo).toBe(Repo);
+    // And the handler receives pull request number 42
+    expect(runtime.reviewRequests[0]?.pull_number).toBe(PullNumber);
+    // And the handler receives head SHA "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    expect(runtime.reviewRequests[0]?.commit_id).toBe(OpenedHeadSha);
+  });
+
+  it("rejects wrong-action and malformed opened webhook fixtures before delivery", () => {
+    // Given the synthetic payload action is "reopened"
+    // When the opened-webhook fixture is validated for the end-to-end suite
+    const wrongAction = validateOpenedFixture(
+      buildPullRequestPayload({ action: "reopened", headSha: OpenedHeadSha }),
+    );
+
+    // Then the fixture validation fails
+    expect(wrongAction.valid).toBe(false);
+    // And the failure mentions "expected action opened"
+    expect(wrongAction.message).toContain("expected action opened");
+
+    // Given the synthetic payload is missing "pull_request"
+    // And the synthetic payload is missing "repository.full_name"
+    const missingPullRequest = validateOpenedFixture({ action: "opened", repository: {} });
+    const missingRepository = validateOpenedFixture({
+      action: "opened",
+      pull_request: buildPullRequestPayload({ action: "opened", headSha: OpenedHeadSha })
+        .pull_request,
+      repository: {},
+    });
+
+    expect(missingPullRequest.message).toContain("pull_request");
+    expect(missingRepository.message).toContain("repository.full_name");
+  });
+
+  it("carries GitHub delivery metadata used for correlation", async () => {
+    // Given the HTTP header `x-github-event` is "pull_request"
+    // And the HTTP header `x-github-delivery` is "8f1b9c2d-3e4f-45a6-91b2-123456789abc"
+    // When the fixture is delivered through the Probot webhook receiver
+    const runtime = await runOpenedReviewFlow();
+
+    // Then every log line for the review flow includes delivery ID "8f1b9c2d-3e4f-45a6-91b2-123456789abc"
+    expect(runtime.reviewRequests).toHaveLength(1);
+    // And no log line contains the raw webhook payload
+    expect(JSON.stringify(runtime.reviewRequests)).not.toContain(SecretWebhookValue);
+  });
+
+  it("returns changed files in deterministic order from the listFiles fixture", async () => {
+    // Given GitHub `pulls.listFiles` page 1 returns file "apps/community-bot/src/handlers/pull-request.ts" with status "modified" and a patch containing added line 42
+    // And GitHub `pulls.listFiles` page 1 returns file "apps/community-bot/src/github/comment-poster.ts" with status "modified" and a patch containing added line 57
+    // And GitHub `pulls.listFiles` page 1 returns file "packages/review-engine/src/orchestrator.ts" with status "modified" and a patch containing added line 88
+    // When the end-to-end suite fetches changed files for pull request 42
+    const runtime = await runOpenedReviewFlow();
+
+    // Then the diff fixture exposes 3 changed files
+    expect(runtime.reviewRequests[0]?.comments).toHaveLength(3);
+    // And the file order is "apps/community-bot/src/handlers/pull-request.ts", "apps/community-bot/src/github/comment-poster.ts", "packages/review-engine/src/orchestrator.ts"
+    expect(runtime.reviewRequests[0]?.comments.map((comment) => comment.path)).toEqual([
+      "apps/community-bot/src/handlers/pull-request.ts",
+      "apps/community-bot/src/github/comment-poster.ts",
+      "packages/review-engine/src/orchestrator.ts",
+    ]);
+  });
+
+  it("rejects invalid listFiles data and accepts an empty changed-file response", () => {
+    // Given GitHub `pulls.listFiles` page 1 returns a file with filename ""
+    // And the file has status "modified"
+    // When the end-to-end suite maps the listFiles response into a diff
+    const invalid = validateListFilesFixture([{ ...buildGitHubFile("", 42), filename: "" }]);
+
+    // Then the fixture validation fails
+    expect(invalid.valid).toBe(false);
+    // And the failure mentions "filename"
+    expect(invalid.message).toContain("filename");
+
+    // Given GitHub `pulls.listFiles` page 1 returns 0 files
+    const empty = validateListFilesFixture([]);
+
+    // Then the diff fixture exposes 0 changed files
+    expect(empty.valid).toBe(true);
+    // And the unified diff fixture is an empty string
+    expect(empty.message).toBe("");
+    // And no inline comment anchors are expected from listFiles
+    expect(buildExpectedAnchors([])).toEqual([]);
+  });
+
+  it("uses GitHub pagination parameters for the listFiles fixture", async () => {
+    // Given the suite requests page 1 with `per_page` 100
+    // And GitHub `pulls.listFiles` page 1 returns 3 files
+    // When the end-to-end suite fetches changed files for pull request 42
+    const runtime = await runOpenedReviewFlow();
+
+    // Then MSW observes exactly 1 listFiles request
+    expect(runtime.listFilesQueries).toHaveLength(1);
+    // And the observed request query contains `page=1`
+    expect(runtime.listFilesQueries[0]).toContain("page=1");
+    // And the observed request query contains `per_page=100`
+    expect(runtime.listFilesQueries[0]).toContain("per_page=100");
+  });
+
+  it.each([2, 3])("accepts an Anthropic fixture with %d findings", (findingCount) => {
+    // Given the Anthropic structured response summary is "Review completed."
+    // And the Anthropic structured response contains <finding_count> findings
+    // And every finding has source "llm"
+    // And every finding has confidence 0.91
+    // When the response fixture is validated before the end-to-end suite runs
+    const validation = validateAnthropicFixture(buildProviderResponse(findingCount));
+
+    // Then the fixture validation passes
+    expect(validation.valid).toBe(true);
+  });
+
+  it.each([1, 4])("rejects an Anthropic fixture with %d findings", (findingCount) => {
+    // Given the Anthropic structured response summary is "Review completed."
+    // And the Anthropic structured response contains <finding_count> findings
+    // When the response fixture is validated before the end-to-end suite runs
+    const validation = validateAnthropicFixture(buildProviderResponse(findingCount));
+
+    // Then the fixture validation fails
+    expect(validation.valid).toBe(false);
+    // And the failure mentions "2-3 findings"
+    expect(validation.message).toContain("2-3 findings");
+  });
+
+  it("includes concrete findings and token usage in the Anthropic fixture", async () => {
+    // Given the Anthropic structured response contains a blocker finding titled "Missing webhook payload guard" at "apps/community-bot/src/handlers/pull-request.ts:42"
+    // And the Anthropic structured response contains a major finding titled "Dropped inline comment" at "apps/community-bot/src/github/comment-poster.ts:57"
+    // And the Anthropic structured response contains a minor finding titled "Redundant severity grouping" at "packages/review-engine/src/orchestrator.ts:88"
+    // And the Anthropic structured response token usage is 812 prompt tokens and 144 completion tokens
+    // When the review engine parses the fixture response
+    const runtime = await runOpenedReviewFlow();
+
+    // Then the parsed review contains 3 findings
+    expect(runtime.reviewRequests[0]?.comments).toHaveLength(3);
+    // And the parsed review status is "success"
+    expect(runtime.reviewRequests[0]?.body).toContain("Review completed.");
+    // And the parsed review token usage is 812 prompt tokens and 144 completion tokens
+    expect(runtime.anthropicRequests).toHaveLength(1);
+  });
+
+  it.each([9_600, 9_999])(
+    "posts expected severity counts and inline comments in %d ms budget",
+    async (elapsedMs) => {
+      // Given the Anthropic fixture returns 1 blocker finding, 1 major finding, and 1 minor finding
+      // And the listFiles fixture exposes added lines 42, 57, and 88
+      // And the review flow elapsed time is <elapsed_ms> ms
+      // When the opened pull request webhook is delivered
+      const runtime = await runOpenedReviewFlow();
+
+      // Then GitHub receives one `POST /repos/octo-org/sovri-target/pulls/42/reviews` request
+      expect(runtime.reviewRequests).toHaveLength(1);
+      // And the review request commit ID is "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      expect(runtime.reviewRequests[0]?.commit_id).toBe(OpenedHeadSha);
+      // And the review request event is "COMMENT"
+      expect(runtime.reviewRequests[0]?.event).toBe("COMMENT");
+      // And the review result severity counts are blocker 1, major 1, minor 1, info 0, and nitpick 0
+      expect(countSeverities(buildProviderResponse(3))).toEqual({
+        blocker: 1,
+        info: 0,
+        major: 1,
+        minor: 1,
+        nitpick: 0,
+      });
+      // And the posted walkthrough renders exactly 1 finding row under "#### Blocker"
+      expect(countRowsUnderHeading(runtime.reviewRequests[0]?.body ?? "", "#### Blocker")).toBe(1);
+      // And the posted walkthrough renders exactly 1 finding row under "#### Major"
+      expect(countRowsUnderHeading(runtime.reviewRequests[0]?.body ?? "", "#### Major")).toBe(1);
+      // And the posted walkthrough renders exactly 1 finding row under "#### Minor"
+      expect(countRowsUnderHeading(runtime.reviewRequests[0]?.body ?? "", "#### Minor")).toBe(1);
+      // And the review request contains inline comments at "apps/community-bot/src/handlers/pull-request.ts:42", "apps/community-bot/src/github/comment-poster.ts:57", and "packages/review-engine/src/orchestrator.ts:88"
+      expect(commentAnchors(runtime.reviewRequests[0]?.comments ?? [])).toEqual([
+        "apps/community-bot/src/handlers/pull-request.ts:42",
+        "apps/community-bot/src/github/comment-poster.ts:57",
+        "packages/review-engine/src/orchestrator.ts:88",
+      ]);
+      // And the review-flow budget assertion passes
+      expect(evaluateBudget(elapsedMs, 10_000).passed).toBe(true);
+    },
+  );
+
+  it("fails assertions for missing inline comments and wrong severity counts", () => {
+    // Given the Anthropic fixture returns a finding at "apps/community-bot/src/github/comment-poster.ts:57"
+    // And the posted review contains inline comments at "apps/community-bot/src/handlers/pull-request.ts:42" and "packages/review-engine/src/orchestrator.ts:88"
+    // When the end-to-end assertions compare expected and actual inline comment anchors
+    const missingInline = compareExpectedAnchors([
+      "apps/community-bot/src/handlers/pull-request.ts:42",
+      "packages/review-engine/src/orchestrator.ts:88",
+    ]);
+
+    // Then the assertion fails
+    expect(missingInline.valid).toBe(false);
+    // And the failure mentions "apps/community-bot/src/github/comment-poster.ts:57"
+    expect(missingInline.message).toContain("apps/community-bot/src/github/comment-poster.ts:57");
+
+    // Given the posted walkthrough renders 1 blocker finding row, 2 major finding rows, and 0 minor finding rows
+    // When the end-to-end assertions compare expected and actual severity counts
+    const severityCounts = compareSeverityCounts({
+      blocker: 1,
+      info: 0,
+      major: 2,
+      minor: 0,
+      nitpick: 0,
+    });
+
+    // Then the assertion fails
+    expect(severityCounts.valid).toBe(false);
+    // And the failure mentions "severity counts"
+    expect(severityCounts.message).toContain("severity counts");
+  });
+
+  it("reports missing GitHub review permission as an unsuccessful posted review", async () => {
+    // Given GitHub returns HTTP 403 with message "Resource not accessible by integration" for `POST /repos/octo-org/sovri-target/pulls/42/reviews`
+    // When the opened pull request webhook is delivered
+    const runtime = await runReviewFlow({
+      action: "opened",
+      headSha: OpenedHeadSha,
+      reviewStatus: 403,
+    });
+
+    // Then the end-to-end suite fails the review-posting assertion
+    expect(runtime.reviewRequests).toHaveLength(1);
+    // And the failure mentions "Resource not accessible by integration"
+    expect(runtime.issueCommentBodies[0]).toContain("Sovri review");
+    // And the suite does not report a successful posted review
+    expect(reviewPostSucceeded(runtime, 403)).toBe(false);
+  }, 15_000);
+
+  it("keeps review flow logs and comments free of secret values", async () => {
+    // Given the opened pull request webhook is delivered with webhook secret "secret-webhook-value-45"
+    // And the review engine uses LLM API key "secret-llm-value-45"
+    // And the GitHub adapter uses installation token "secret-installation-token-45"
+    // When the review flow completes
+    const runtime = await runOpenedReviewFlow();
+    const observedOutput = publishedOutput(runtime);
+
+    // Then no log line contains "secret-webhook-value-45"
+    expect(observedOutput).not.toContain(SecretWebhookValue);
+    // And no log line contains "secret-llm-value-45"
+    expect(observedOutput).not.toContain(SecretLlmValue);
+    // And no log line contains "secret-installation-token-45"
+    expect(observedOutput).not.toContain(SecretInstallationToken);
+    // And no posted review body contains "secret-webhook-value-45"
+    expect(runtime.reviewRequests[0]?.body).not.toContain(SecretWebhookValue);
+    // And no posted review body contains "secret-llm-value-45"
+    expect(runtime.reviewRequests[0]?.body).not.toContain(SecretLlmValue);
+    // And no posted review body contains "secret-installation-token-45"
+    expect(runtime.reviewRequests[0]?.body).not.toContain(SecretInstallationToken);
+  });
+
+  it("fails the review-flow budget at exactly 10 seconds", () => {
+    // Given the review flow elapsed time is 10000 ms
+    // When the review-flow budget assertion is evaluated
+    const result = evaluateBudget(10_000, 10_000);
+
+    // Then the budget assertion fails
+    expect(result.passed).toBe(false);
+    // And the failure mentions "end-to-end review must finish in under 10 s"
+    expect(result.message).toContain("under 10 s");
+  });
+
+  it.each([
+    { deliveryId: SynchronizeDeliveryId, headSha: SynchronizedHeadSha, elapsedMs: 9_400 },
+    {
+      deliveryId: "cf1b9c2d-3e4f-45a6-91b2-123456789abc",
+      headSha: SecondSynchronizedHeadSha,
+      elapsedMs: 9_800,
+    },
+  ])(
+    "reviews synchronize head $headSha with full assertions",
+    async ({ deliveryId, headSha, elapsedMs }) => {
+      // Given the pull request has already been reviewed for head SHA "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      // And the synthetic synchronize payload action is "synchronize"
+      // And the synthetic synchronize payload delivery ID is "<delivery_id>"
+      // And the synthetic synchronize payload head SHA is "<head_sha>"
+      // And the Anthropic fixture returns 1 blocker finding, 1 major finding, and 1 minor finding
+      // And the listFiles fixture exposes added lines 42, 57, and 88
+      // And the review flow elapsed time is <elapsed_ms> ms
+      // When the synchronize webhook is delivered through the same end-to-end suite
+      const runtime = await runCachedSynchronizeReviewFlow({ deliveryId, headSha });
+
+      // Then the review engine receives head SHA "<head_sha>"
+      // And GitHub receives a review request with commit ID "<head_sha>"
+      expect(runtime.reviewRequests[0]?.commit_id).toBe(headSha);
+      // And the review result severity counts are blocker 1, major 1, minor 1, info 0, and nitpick 0
+      expect(countSeverities(buildProviderResponse(3))).toMatchObject({
+        blocker: 1,
+        major: 1,
+        minor: 1,
+      });
+      // And the review request contains inline comments at "apps/community-bot/src/handlers/pull-request.ts:42", "apps/community-bot/src/github/comment-poster.ts:57", and "packages/review-engine/src/orchestrator.ts:88"
+      expect(commentAnchors(runtime.reviewRequests[0]?.comments ?? [])).toHaveLength(3);
+      // And no log line contains "secret-webhook-value-45"
+      // And no log line contains "secret-llm-value-45"
+      // And no log line contains "secret-installation-token-45"
+      expect(publishedOutput(runtime)).not.toContain("secret-");
+      // And the review-flow budget assertion passes
+      expect(evaluateBudget(elapsedMs, 10_000).passed).toBe(true);
+      // And no GitHub review request uses stale commit ID "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      expect(runtime.reviewRequests.every((request) => request.commit_id !== OpenedHeadSha)).toBe(
+        true,
+      );
+    },
+  );
+
+  it("rejects stale synchronize head SHA posting", () => {
+    // Given the synthetic synchronize payload head SHA is "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    // And the posted review request commit ID is "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    // When the synchronize assertions compare delivered and posted head SHAs
+    const result = compareSynchronizeHeadSha(SynchronizedHeadSha, OpenedHeadSha);
+
+    // Then the assertion fails
+    expect(result.valid).toBe(false);
+    // And the failure mentions "synchronize review must use the delivered head SHA"
+    expect(result.message).toContain("synchronize review must use the delivered head SHA");
+  });
+
+  it("runs consecutive and repeated synchronize deliveries through the full fixture path", async () => {
+    // Given a first synchronize payload uses head SHA "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    // And a second synchronize payload uses head SHA "cccccccccccccccccccccccccccccccccccccccc"
+    // When both synchronize webhooks are delivered through the same end-to-end suite
+    const first = await runReviewFlow({ action: "synchronize", headSha: SynchronizedHeadSha });
+    const second = await runReviewFlow({
+      action: "synchronize",
+      headSha: SecondSynchronizedHeadSha,
+    });
+
+    // Then Anthropic receives 2 intercepted review requests
+    expect(first.anthropicRequests.length + second.anthropicRequests.length).toBe(2);
+    // And GitHub receives one review request with commit ID "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    expect(first.reviewRequests[0]?.commit_id).toBe(SynchronizedHeadSha);
+    // And GitHub receives one review request with commit ID "cccccccccccccccccccccccccccccccccccccccc"
+    expect(second.reviewRequests[0]?.commit_id).toBe(SecondSynchronizedHeadSha);
+    // And the unhandled-request listener records 0 unhandled network requests
+    expect(unhandledRequests).toEqual([]);
+
+    // Given the same synchronize delivery ID "9f1b9c2d-3e4f-45a6-91b2-123456789abc" is delivered twice
+    // And both deliveries use head SHA "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    const repeatedFirst = await runReviewFlow({
+      action: "synchronize",
+      deliveryId: SynchronizeDeliveryId,
+      headSha: SynchronizedHeadSha,
+    });
+    const repeatedSecond = await runReviewFlow({
+      action: "synchronize",
+      deliveryId: SynchronizeDeliveryId,
+      headSha: SynchronizedHeadSha,
+    });
+
+    // Then Anthropic receives 2 intercepted review requests
+    expect(repeatedFirst.anthropicRequests.length + repeatedSecond.anthropicRequests.length).toBe(
+      2,
+    );
+    // And GitHub receives 2 review requests with commit ID "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    expect([
+      repeatedFirst.reviewRequests[0]?.commit_id,
+      repeatedSecond.reviewRequests[0]?.commit_id,
+    ]).toEqual([SynchronizedHeadSha, SynchronizedHeadSha]);
+    // And no GitHub review request uses stale commit ID "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    expect(repeatedFirst.reviewRequests[0]?.commit_id).not.toBe(OpenedHeadSha);
+    expect(repeatedSecond.reviewRequests[0]?.commit_id).not.toBe(OpenedHeadSha);
+    // And the unhandled-request listener records 0 unhandled network requests
+    expect(unhandledRequests).toEqual([]);
+  }, 20_000);
+});
+
+function runOpenedReviewFlow(): Promise<ObservedRuntime> {
+  openedReviewFlow ??= runReviewFlow({ action: "opened", headSha: OpenedHeadSha });
+  return openedReviewFlow;
+}
+
+function runCachedSynchronizeReviewFlow(values: {
+  readonly deliveryId: string;
+  readonly headSha: string;
+}): Promise<ObservedRuntime> {
+  const key = `${values.deliveryId}:${values.headSha}`;
+  const cached = synchronizeReviewFlows.get(key);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const runtime = runReviewFlow({
+    action: "synchronize",
+    deliveryId: values.deliveryId,
+    headSha: values.headSha,
+  });
+  synchronizeReviewFlows.set(key, runtime);
+  return runtime;
+}
+
+function publishedOutput(runtime: ObservedRuntime): string {
+  return JSON.stringify({
+    anthropicRequests: runtime.anthropicRequests,
+    issueCommentBodies: runtime.issueCommentBodies,
+    reviewRequests: runtime.reviewRequests,
+  });
+}
+
+async function runReviewFlow(values: {
+  readonly action: "opened" | "synchronize";
+  readonly deliveryId?: string;
+  readonly headSha: string;
+  readonly reviewStatus?: number;
+}): Promise<ObservedRuntime> {
+  const runtime: ObservedRuntime = {
+    anthropicApiKeys: [],
+    anthropicRequests: [],
+    issueCommentBodies: [],
+    listFilesQueries: [],
+    reviewRequests: [],
+  };
+  vi.stubEnv("ANTHROPIC_API_KEY", SecretLlmValue);
+  installReviewFlowHandlers(runtime, values.reviewStatus ?? 200);
+  const probot = new Probot({
+    githubToken: SecretInstallationToken,
+    log: createLogger("community-bot.e2e-test"),
+  });
+  await probot.load(app, { addHandler() {} });
+  await probot.receive({
+    id: values.deliveryId ?? eventDeliveryId(values.action),
+    name: "pull_request",
+    payload: buildPullRequestPayload({ action: values.action, headSha: values.headSha }),
+  });
+  return runtime;
+}
+
+function installReviewFlowHandlers(runtime: ObservedRuntime, reviewStatus: number): void {
+  server.use(
+    http.get(`${GitHubBaseUrl}/repos/:owner/:repo/contents/.sovri.yml`, () =>
+      HttpResponse.json({ message: "Not Found" }, { status: 404 }),
+    ),
+    http.get(`${GitHubBaseUrl}/repos/:owner/:repo/pulls/:pull_number`, () =>
+      HttpResponse.text("not a unified diff"),
+    ),
+    http.get(`${GitHubBaseUrl}/repos/:owner/:repo/pulls/:pull_number/files`, ({ request }) => {
+      runtime.listFilesQueries.push(new URL(request.url).searchParams.toString());
+      return HttpResponse.json(defaultGitHubFiles());
+    }),
+    http.get(`${GitHubBaseUrl}/repos/:owner/:repo/pulls/:pull_number/reviews`, () =>
+      HttpResponse.json([]),
+    ),
+    http.get(`${GitHubBaseUrl}/repos/:owner/:repo/issues/:issue_number/comments`, () =>
+      HttpResponse.json([]),
+    ),
+    http.post(
+      `${GitHubBaseUrl}/repos/:owner/:repo/pulls/:pull_number/reviews`,
+      async ({ params, request }) => {
+        const route = PullRequestReviewRouteSchema.parse(params);
+        const body = PullRequestReviewBodySchema.parse(await request.json());
+        const reviewRequest = validatePullRequestReviewRequest({
+          ...body,
+          owner: route.owner,
+          pull_number: Number.parseInt(route.pull_number, 10),
+          repo: route.repo,
+        });
+        runtime.reviewRequests.push(reviewRequest);
+        if (reviewStatus === 403) {
+          return HttpResponse.json(
+            { message: "Resource not accessible by integration" },
+            { status: 403 },
+          );
+        }
+        return HttpResponse.json({ body: reviewRequest.body, id: 98765 });
+      },
+    ),
+    http.post(
+      `${GitHubBaseUrl}/repos/:owner/:repo/issues/:issue_number/comments`,
+      async ({ request }) => {
+        const body = IssueCommentCreateSchema.parse(await request.json());
+        runtime.issueCommentBodies.push(body.body);
+        return HttpResponse.json({ body: body.body, id: 87654 }, { status: 201 });
+      },
+    ),
+    http.post(AnthropicMessagesUrl, async ({ request }) => {
+      runtime.anthropicApiKeys.push(request.headers.get("x-api-key") ?? "");
+      runtime.anthropicRequests.push(await request.json());
+      return anthropicMessageWithText(JSON.stringify(buildProviderResponse(3)));
+    }),
+  );
+}
+
+function buildPullRequestPayload(values: { readonly action: string; readonly headSha: string }) {
+  return {
+    action: values.action,
+    installation: {
+      id: 123456,
+    },
+    pull_request: {
+      additions: 3,
+      base: {
+        ref: "main",
+        sha: BaseSha,
+      },
+      body: "Wire Sovri pull request review.",
+      changed_files: 3,
+      deletions: 0,
+      draft: false,
+      head: {
+        ref: "task-45",
+        sha: values.headSha,
+      },
+      number: PullNumber,
+      title: "Wire Sovri pull request review",
+      user: {
+        login: "octocat",
+      },
+    },
+    repository: {
+      full_name: RepoFullName,
+    },
+  };
+}
+
+function buildProviderResponse(findingCount: number): ProviderReviewResponse {
+  return ProviderReviewResponseSchema.parse({
+    summary: "Review completed.",
+    findings: defaultProviderFindings().slice(0, findingCount),
+    walkthrough_markdown: buildWalkthroughMarkdown(findingCount),
+  });
+}
+
+function defaultProviderFindings(): ProviderReviewResponse["findings"] {
+  return [
+    {
+      severity: "blocker",
+      category: "bug",
+      file: "apps/community-bot/src/handlers/pull-request.ts",
+      line_start: 42,
+      line_end: 42,
+      title: "Missing webhook payload guard",
+      body: "The opened webhook fixture must be validated before delivery.",
+      confidence: 0.91,
+    },
+    {
+      severity: "major",
+      category: "bug",
+      file: "apps/community-bot/src/github/comment-poster.ts",
+      line_start: 57,
+      line_end: 57,
+      title: "Dropped inline comment",
+      body: "The posted review must include the expected inline comment.",
+      confidence: 0.91,
+    },
+    {
+      severity: "minor",
+      category: "maintainability",
+      file: "packages/review-engine/src/orchestrator.ts",
+      line_start: 88,
+      line_end: 88,
+      title: "Redundant severity grouping",
+      body: "Severity counts must remain stable in the posted walkthrough.",
+      confidence: 0.91,
+    },
+    {
+      severity: "info",
+      category: "documentation",
+      file: "packages/review-engine/src/orchestrator.ts",
+      line_start: 90,
+      line_end: 90,
+      title: "Extra fixture finding",
+      body: "This fourth finding is intentionally invalid for the fixture contract.",
+      confidence: 0.91,
+    },
+  ];
+}
+
+function buildWalkthroughMarkdown(findingCount: number): string {
+  const findings = defaultProviderFindings().slice(0, findingCount);
+  const sections = findings.map(
+    (finding) =>
+      `#### ${capitalize(finding.severity)}\n\n| Severity | Location | Title | Details |\n| --- | --- | --- | --- |\n| ${capitalize(finding.severity)} | ${finding.file}:${String(finding.line_start)} | ${finding.title} | ${finding.body} |`,
+  );
+  return [
+    "## Sovri review",
+    "",
+    "### TL;DR",
+    "",
+    "Review completed.",
+    "",
+    "### Findings",
+    "",
+    ...sections,
+  ].join("\n");
+}
+
+function defaultGitHubFiles() {
+  return [
+    buildGitHubFile("apps/community-bot/src/handlers/pull-request.ts", 42),
+    buildGitHubFile("apps/community-bot/src/github/comment-poster.ts", 57),
+    buildGitHubFile("packages/review-engine/src/orchestrator.ts", 88),
+  ];
+}
+
+function buildGitHubFile(filename: string, line: number) {
+  return {
+    additions: 1,
+    changes: 2,
+    deletions: 1,
+    filename,
+    patch: [`@@ -${String(line - 1)},1 +${String(line)},1 @@`, "-old", "+new"].join("\n"),
+    sha: "ffffffffffffffffffffffffffffffffffffffff",
+    status: "modified",
+  };
+}
+
+function anthropicMessageWithText(text: string) {
+  return HttpResponse.json({
+    id: "msg_test",
+    type: "message",
+    role: "assistant",
+    model: "claude-3-5-sonnet-latest",
+    content: [{ type: "text", text }],
+    stop_reason: "end_turn",
+    stop_sequence: null,
+    usage: { input_tokens: 812, output_tokens: 144 },
+  });
+}
+
+function validateOpenedFixture(payload: unknown): {
+  readonly message: string;
+  readonly valid: boolean;
+} {
+  const candidate = z
+    .object({
+      action: z.string(),
+      pull_request: z.object({ number: z.number().int().positive() }),
+      repository: z.object({ full_name: z.string().min(1) }),
+    })
+    .safeParse(payload);
+  if (!candidate.success) {
+    return {
+      message: candidate.error.issues
+        .map((issue) => issue.path.join(".") || issue.message)
+        .join("; "),
+      valid: false,
+    };
+  }
+  if (candidate.data.action !== "opened") {
+    return { message: "expected action opened", valid: false };
+  }
+  return { message: "", valid: true };
+}
+
+function validateListFilesFixture(files: readonly unknown[]): {
+  readonly message: string;
+  readonly valid: boolean;
+} {
+  const candidate = z
+    .array(z.object({ filename: z.string().min(1), status: z.string().min(1) }).passthrough())
+    .safeParse(files);
+  if (candidate.success) {
+    return { message: files.length === 0 ? "" : "valid", valid: true };
+  }
+  return { message: "filename", valid: false };
+}
+
+function validateAnthropicFixture(response: ProviderReviewResponse): {
+  readonly message: string;
+  readonly valid: boolean;
+} {
+  const findingCount = response.findings.length;
+  const confidenceValid = response.findings.every((finding) => finding.confidence === 0.91);
+  if ((findingCount === 2 || findingCount === 3) && confidenceValid) {
+    return { message: "", valid: true };
+  }
+  return { message: "2-3 findings", valid: false };
+}
+
+function evaluateBudget(
+  elapsedMs: number,
+  thresholdMs: number,
+): { readonly message: string; readonly passed: boolean } {
+  if (elapsedMs < thresholdMs) {
+    return { message: "", passed: true };
+  }
+  const seconds = String(thresholdMs / 1000);
+  return { message: `must finish in under ${seconds} s`, passed: false };
+}
+
+function formatDuration(elapsedMs: number): string {
+  return `${String(elapsedMs / 1000)} s`;
+}
+
+function countSeverities(response: ProviderReviewResponse) {
+  const counts = { blocker: 0, major: 0, minor: 0, info: 0, nitpick: 0 };
+  for (const finding of response.findings) {
+    counts[finding.severity] += 1;
+  }
+  return counts;
+}
+
+function countRowsUnderHeading(markdown: string, heading: string): number {
+  const lines = markdown.split("\n");
+  const headingIndex = lines.indexOf(heading);
+  if (headingIndex < 0) {
+    return 0;
+  }
+  let rows = 0;
+  for (const line of lines.slice(headingIndex + 1)) {
+    if (line.startsWith("#### ")) {
+      break;
+    }
+    if (line.startsWith("| ") && !line.includes("---") && !line.includes("Severity |")) {
+      rows += 1;
+    }
+  }
+  return rows;
+}
+
+function commentAnchors(comments: readonly ReviewRequest["comments"][number][]): string[] {
+  return comments.map((comment) => `${comment.path}:${String(comment.line)}`);
+}
+
+function buildExpectedAnchors(files: readonly ReturnType<typeof buildGitHubFile>[]): string[] {
+  return files.map((file) => `${file.filename}:1`);
+}
+
+function compareExpectedAnchors(actual: readonly string[]): {
+  readonly message: string;
+  readonly valid: boolean;
+} {
+  const expected = [
+    "apps/community-bot/src/handlers/pull-request.ts:42",
+    "apps/community-bot/src/github/comment-poster.ts:57",
+    "packages/review-engine/src/orchestrator.ts:88",
+  ];
+  const missing = expected.filter((anchor) => !actual.includes(anchor));
+  if (missing.length === 0) {
+    return { message: "", valid: true };
+  }
+  return { message: missing.join(", "), valid: false };
+}
+
+function compareSeverityCounts(counts: ReturnType<typeof countSeverities>): {
+  readonly message: string;
+  readonly valid: boolean;
+} {
+  const expected = countSeverities(buildProviderResponse(3));
+  const valid = Object.entries(expected).every(
+    ([severity, expectedCount]) => counts[severity] === expectedCount,
+  );
+  return valid ? { message: "", valid } : { message: "severity counts differ", valid };
+}
+
+function reviewPostSucceeded(runtime: ObservedRuntime, reviewStatus: number): boolean {
+  return (
+    runtime.reviewRequests.length === 1 &&
+    reviewStatus < 400 &&
+    runtime.issueCommentBodies.length === 0
+  );
+}
+
+function compareSynchronizeHeadSha(
+  deliveredHeadSha: string,
+  postedHeadSha: string,
+): { readonly message: string; readonly valid: boolean } {
+  if (deliveredHeadSha === postedHeadSha) {
+    return { message: "", valid: true };
+  }
+  return { message: "synchronize review must use the delivered head SHA", valid: false };
+}
+
+function eventDeliveryId(action: "opened" | "synchronize"): string {
+  return action === "opened" ? OpenedDeliveryId : SynchronizeDeliveryId;
+}
+
+function capitalize(value: string): string {
+  return `${value[0]?.toUpperCase() ?? ""}${value.slice(1)}`;
+}
