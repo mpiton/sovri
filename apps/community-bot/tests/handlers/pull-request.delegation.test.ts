@@ -884,6 +884,9 @@ function buildOctokit(): PullRequestWebhookContext["octokit"] {
         async createReview() {
           throw new Error("unexpected GitHub pull request review");
         },
+        async listFiles() {
+          throw new Error("unexpected GitHub pull request files request");
+        },
       },
       repos: {
         async getContent() {

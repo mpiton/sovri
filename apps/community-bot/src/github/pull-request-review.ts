@@ -6,7 +6,6 @@ import { AnthropicProvider } from "@sovri/llm-providers";
 import { createLogger } from "@sovri/observability";
 import {
   buildInlineComments,
-  parseUnifiedDiff,
   reviewPullRequest,
   type Diff,
   type InlineCommentDraft,
@@ -20,6 +19,7 @@ import type {
   ReviewCommentTarget,
   ReviewPostTarget,
 } from "../handlers/pull-request.js";
+import { fetchDiff as fetchPullRequestDiff } from "./diff-fetcher.js";
 
 const logger = createLogger("community-bot.pull-request");
 
@@ -29,7 +29,8 @@ export function createPullRequestHandlerDependencies(
 ): PullRequestHandlerDependencies {
   return {
     buildReviewOptions: (config) => buildReviewOptions(config, env),
-    fetchDiff: (target) => fetchPullRequestDiff(context, target),
+    fetchDiff: (target) =>
+      fetchPullRequestDiff(context.octokit, splitRepoFullName(target.repoFullName), target.number),
     loadConfig: (target) => loadRepositoryConfig(context, target),
     logger,
     postErrorComment: (target, message) => postErrorComment(context, target, message),
@@ -66,20 +67,6 @@ async function loadRepositoryConfig(
 
     throw error;
   }
-}
-
-async function fetchPullRequestDiff(context: PullRequestWebhookContext, target: ReviewPostTarget) {
-  const repo = splitRepoFullName(target.repoFullName);
-  const response = await context.octokit.request("GET /repos/{owner}/{repo}/compare/{basehead}", {
-    basehead: `${target.baseSha}...${target.commitSha}`,
-    mediaType: {
-      format: "diff",
-    },
-    owner: repo.owner,
-    repo: repo.repo,
-  });
-
-  return parseUnifiedDiff(response.data);
 }
 
 async function postReview(

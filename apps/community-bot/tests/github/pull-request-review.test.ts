@@ -52,7 +52,7 @@ review:
     await expect(dependencies.loadConfig(buildTarget())).resolves.toEqual(DEFAULT_CONFIG);
   });
 
-  it("fetches the diff from the delivered base and head SHA comparison", async () => {
+  it("fetches the diff from the pull request raw diff endpoint", async () => {
     const runtime = buildRuntimeContext({
       diffContent: [
         "diff --git a/apps/community-bot/src/handlers/pull-request.ts b/apps/community-bot/src/handlers/pull-request.ts",
@@ -74,13 +74,13 @@ review:
     expect(diff.files[0]?.path).toBe("apps/community-bot/src/handlers/pull-request.ts");
     expect(runtime.diffRequests).toEqual([
       {
-        parameters: {
-          basehead: `${BaseSha}...${HeadSha}`,
-          mediaType: { format: "diff" },
+        parameters: expect.objectContaining({
+          headers: { accept: "application/vnd.github.v3.diff" },
           owner: "mpiton",
+          pull_number: 41,
           repo: "sovri",
-        },
-        route: "GET /repos/{owner}/{repo}/compare/{basehead}",
+        }),
+        route: "GET /repos/{owner}/{repo}/pulls/{pull_number}",
       },
     ]);
   });
@@ -221,6 +221,9 @@ function buildRuntimeContext(
             async createReview(parameters) {
               reviewRequests.push(parameters);
               return undefined;
+            },
+            async listFiles() {
+              return { data: [] };
             },
           },
           repos: {

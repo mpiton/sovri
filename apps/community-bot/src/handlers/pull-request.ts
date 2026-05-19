@@ -24,15 +24,18 @@ export type PullRequestWebhookContext = {
 
 export type PullRequestOctokit = {
   readonly request: (
-    route: "GET /repos/{owner}/{repo}/compare/{basehead}",
+    route: "GET /repos/{owner}/{repo}/pulls/{pull_number}",
     parameters: PullRequestDiffParameters,
-  ) => Promise<{ readonly data: string }>;
+  ) => Promise<{ readonly data: unknown }>;
   readonly rest: {
     readonly issues: {
       readonly createComment: (parameters: IssueCommentParameters) => Promise<unknown>;
     };
     readonly pulls: {
       readonly createReview: (parameters: PullRequestReviewParameters) => Promise<unknown>;
+      readonly listFiles: (
+        parameters: PullRequestFilesParameters,
+      ) => Promise<{ readonly data: unknown }>;
     };
     readonly repos: {
       readonly getContent: (
@@ -43,12 +46,26 @@ export type PullRequestOctokit = {
 };
 
 type PullRequestDiffParameters = {
-  readonly basehead: string;
-  readonly mediaType: {
-    readonly format: "diff";
+  readonly headers: {
+    readonly accept: "application/vnd.github.v3.diff";
   };
   readonly owner: string;
+  readonly pull_number: number;
   readonly repo: string;
+  readonly request: {
+    readonly signal: AbortSignal;
+  };
+};
+
+type PullRequestFilesParameters = {
+  readonly owner: string;
+  readonly page: number;
+  readonly per_page: 100;
+  readonly pull_number: number;
+  readonly repo: string;
+  readonly request: {
+    readonly signal: AbortSignal;
+  };
 };
 
 type IssueCommentParameters = {

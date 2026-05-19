@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@sovri/config": "workspace:*",
+    "@sovri/core": "workspace:*",
     "@sovri/llm-providers": "workspace:*",
     "@sovri/observability": "workspace:*",
     "@sovri/review-engine": "workspace:*",

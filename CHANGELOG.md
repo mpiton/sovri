@@ -28,6 +28,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `apps/community-bot`: add an Octokit pull request diff fetcher using the
+  raw GitHub diff endpoint with paginated `pulls.listFiles` fallback, 30 s
+  timeout handling, typed failures, and adapter coverage for #42.
+
 - `apps/community-bot`: add ATDD coverage for pull request handler
   delegation across opened and synchronize webhook examples (#477).
 
