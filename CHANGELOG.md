@@ -68,6 +68,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `apps/community-bot`: add Probot/MSW end-to-end ATDD coverage for opened
+  and synchronize pull request review flows, deterministic GitHub fixtures,
+  Anthropic structured responses, review posting, permission fallback,
+  no-network enforcement, secret redaction assertions, and suite budget
+  checks (#572-#598).
+
 - `apps/community-bot`: add unauthenticated `GET /version` backed by the
   community bot package manifest with Node major-version normalization (#554,
   #556, #560-#562).
