@@ -222,11 +222,75 @@ $(printf '%s\n' "$stderr" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_action_pinning_sha_pass_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given ".github/workflows/ci.yml" contains these action references:
+  #   | action_ref                                                       |
+  #   | actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac        |
+  #   | pnpm/action-setup@d7766e4727e5c7cdb6066c497694f72f1b5945ad       |
+  #   | actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020      |
+  #   | github/codeql-action/init@0b7f35c6c6b164fc7d5af9edc7ed1e90e6e1a5bf |
+  {
+    printf 'name: ci\n'
+    printf 'jobs:\n'
+    printf '  backend-checks:\n'
+    printf '    steps:\n'
+    printf '      - uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac\n'
+    printf '      - uses: pnpm/action-setup@d7766e4727e5c7cdb6066c497694f72f1b5945ad\n'
+    printf '      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\n'
+    printf '      - uses: github/codeql-action/init@0b7f35c6c6b164fc7d5af9edc7ed1e90e6e1a5bf\n'
+  } >"$workflow_file"
+
+  # When the workflow action pinning rule is evaluated
+  node "$SCRIPT" action-pinning --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x action pinning SHA pass: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # Then the action pinning assertion passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "action_pinning=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x action pinning SHA pass: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    return
+  fi
+
+  # And no external action reference is reported as moving
+  if printf '%s\n' "$stdout" | grep -Fq "moving_reference="; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x action pinning SHA pass: unexpected moving reference
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_duration_pass_case 180000 "180 s"
 run_duration_pass_case 299999 "299.999 s"
 run_duration_queue_exclusion_case
 run_duration_cache_miss_case
 run_invalid_cache_state_case
+run_action_pinning_sha_pass_case
 
 if [ "$FAIL" -ne 0 ]; then
   printf 'ci-policy tests: %s passed, %s failed\n%s\n' "$PASS" "$FAIL" "$FAILURES" >&2
