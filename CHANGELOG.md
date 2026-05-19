@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `apps/community-bot` tests: derive exact `/version` endpoint expectations
+  from the community bot package manifest instead of repeating the current
+  package version literal in assertions (#570).
+
 - `apps/community-bot`: comment poster now posts fresh inline review drafts via
   `pulls.createReviewComment` when updating an existing marked walkthrough
   review (previously only the body was updated, dropping new findings on
@@ -63,6 +67,21 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   strict base-10 integer contract.
 
 ### Added
+
+- `apps/community-bot`: add unauthenticated `GET /version` backed by the
+  community bot package manifest with Node major-version normalization (#554,
+  #556, #560-#562).
+
+- `apps/community-bot`: add ATDD coverage for Docker healthcheck command
+  shape, `/version`, in-process operational endpoint tests, and stateless
+  health/version behavior (#552-#568).
+
+- `apps/community-bot`: add the first operational route registrar with
+  unauthenticated `GET /health` plus the root Dockerfile healthcheck targeting
+  the default Community bot port (#551).
+
+- `apps/community-bot`: add ATDD coverage for the operational `/health`
+  endpoint and Docker healthcheck contract (#551).
 
 - `apps/community-bot`: add a GitHub comment poster adapter for marked
   idempotent walkthrough reviews, inline review drafts, audit identifier

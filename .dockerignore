@@ -1,0 +1,17 @@
+.git
+.turbo
+.worktrees
+
+node_modules
+**/node_modules
+
+coverage
+**/coverage
+
+dist
+**/dist
+
+specs
+
+*.log
+sbom.json

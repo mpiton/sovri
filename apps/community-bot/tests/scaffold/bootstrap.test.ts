@@ -40,12 +40,16 @@ describe("community bot Probot bootstrap", () => {
   });
 
   it("exports the named app registration function", () => {
-    // Given "apps/community-bot/src/app.ts" imports the `Probot` type from "probot"
+    // Given "apps/community-bot/src/app.ts" imports the Probot application types from "probot"
     const appSource = readRepoFile("apps/community-bot/src/app.ts");
-    expect(appSource).toContain('import type { Probot } from "probot";');
+    expect(appSource).toContain(
+      'import type { ApplicationFunctionOptions, Probot } from "probot";',
+    );
     // And "apps/community-bot/src/app.ts" exports a function named `app`
-    // And `app` accepts one `Probot` parameter
-    expect(appSource).toContain("export function app(probot: Probot): void");
+    // And `app` accepts Probot plus its application function options
+    expect(appSource).toContain(
+      "export function app(probot: Probot, options: ApplicationFunctionOptions): void",
+    );
     // When the application module is inspected
     // Then `app` returns `void`
     expect(appSource).toContain("): void");
@@ -68,7 +72,13 @@ describe("community bot Probot bootstrap", () => {
     expect(readRepoFile("apps/community-bot/src/handlers/index.ts")).toContain(
       "export function registerWebhookHandlers",
     );
+    // And "apps/community-bot/src/operational-routes.ts" exports `registerOperationalRoutes`
+    expect(readRepoFile("apps/community-bot/src/operational-routes.ts")).toContain(
+      "export function registerOperationalRoutes",
+    );
     // When the application module is inspected
+    // Then `app` calls `registerOperationalRoutes`
+    expect(appSource).toContain("registerOperationalRoutes(options.addHandler);");
     // Then `app` calls `registerGitHubAdapters`
     expect(appSource).toContain("registerGitHubAdapters(probot);");
     // And `app` calls `registerCommandHandlers`
