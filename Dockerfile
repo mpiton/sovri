@@ -16,6 +16,7 @@ RUN pnpm deploy --filter @sovri/community-bot --prod /app/deploy/community-bot
 FROM node:24-alpine AS runtime
 
 ENV NODE_ENV="production"
+ENV HOST="0.0.0.0"
 ENV PORT="3000"
 
 WORKDIR /app
