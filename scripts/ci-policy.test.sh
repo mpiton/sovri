@@ -121,9 +121,72 @@ $(printf '%s\n' "$stdout" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_duration_cache_miss_case() {
+  local stdout stderr stdout_file stderr_file ec
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the pnpm store cache restore outcome is "miss"
+  # And the Turborepo cache restore outcome is "hit"
+  # And the backend-checks job completes after 360000 ms
+  node "$SCRIPT" duration-budget \
+    --job-start-ms 100000 \
+    --job-end-ms 460000 \
+    --pnpm-cache miss \
+    --turbo-cache hit \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ cache miss: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the backend-checks duration budget is evaluated
+  # Then the run is classified as "cache-miss"
+  if ! printf '%s\n' "$stdout" | grep -Fq "run_classification=cache-miss"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ cache miss: missing cache-miss classification
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the run is not accepted as evidence for R-01
+  if ! printf '%s\n' "$stdout" | grep -Fq "r01_evidence=not-accepted"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ cache miss: missing not-accepted evidence status
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the cache-hit duration budget result is not reported as passing
+  if printf '%s\n' "$stdout" | grep -Fq "duration_budget=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ cache miss: cache-hit budget must not be reported as passing
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_duration_pass_case 180000 "180 s"
 run_duration_pass_case 299999 "299.999 s"
 run_duration_queue_exclusion_case
+run_duration_cache_miss_case
 
 if [ "$FAIL" -ne 0 ]; then
   printf 'ci-policy tests: %s passed, %s failed\n%s\n' "$PASS" "$FAIL" "$FAILURES" >&2
