@@ -91,7 +91,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `ci`: add the first CI policy helper for backend-checks cache-hit duration
   budget evaluation, measured job-duration reporting, and cache-miss
-  classification, plus workflow action SHA pinning validation (#634, #636-#642).
+  classification, plus workflow action SHA pinning validation (#634, #636-#643).
 
 - `apps/community-bot`: add `scripts/smoke-docker.sh` and operational coverage
   for local Docker build/run smoke testing, `/health` polling, boot-log

@@ -115,6 +115,9 @@ const extractActionReferences = (workflow) => {
 
 const isExternalActionReference = (actionReference) => !actionReference.startsWith("./");
 
+const isGitHubMaintainedActionReference = (actionReference) =>
+  actionReference.startsWith("actions/");
+
 const isPinnedExternalActionReference = (actionReference) =>
   PINNED_EXTERNAL_ACTION_PATTERN.test(actionReference);
 
@@ -147,6 +150,16 @@ const getBoundaryReasons = (actionReferences) =>
     .map(getShaBoundaryReason)
     .filter((reason) => reason !== undefined);
 
+const getFailureMessages = (movingReferences) => {
+  const messages = ["external actions must be pinned to a full commit SHA"];
+
+  if (movingReferences.some(isGitHubMaintainedActionReference)) {
+    messages.push("GitHub-maintained actions must be pinned to a full commit SHA");
+  }
+
+  return messages;
+};
+
 const runActionPinning = (args) => {
   const options = parseOptions(args);
   const workflowPath = readRequiredOption(options, "workflow", actionPinningUsage);
@@ -165,7 +178,7 @@ const runActionPinning = (args) => {
   stdout.write(
     `action_pinning=fail\n${movingReferences.map((ref) => `moving_reference=${ref}\n`).join("")}${boundaryReasons.map((reason) => `boundary_reason=${reason}\n`).join("")}`,
   );
-  fail("external actions must be pinned to a full commit SHA", 1);
+  fail(getFailureMessages(movingReferences).join("\n"), 1);
 };
 
 const [command, ...args] = argv.slice(2);
