@@ -408,6 +408,87 @@ $(printf '%s\n' "$stderr" | sed 's/^/        /')"
   done
 }
 
+run_action_pinning_sha_boundary_example() {
+  local sha_ref="$1"
+  local outcome="$2"
+  local reason="$3"
+  local action_ref workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  action_ref="actions/checkout@${sha_ref}"
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given ".github/workflows/ci.yml" contains the action reference "actions/checkout@<sha_ref>"
+  {
+    printf 'name: ci\n'
+    printf 'jobs:\n'
+    printf '  backend-checks:\n'
+    printf '    steps:\n'
+    printf '      - uses: %s\n' "$action_ref"
+  } >"$workflow_file"
+
+  # When the workflow action pinning rule is evaluated
+  node "$SCRIPT" action-pinning --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # Then the action pinning assertion outcome is "<outcome>"
+  if [ "$outcome" = "accepted" ] && [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x action pinning SHA boundary ${sha_ref}: expected accepted exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if [ "$outcome" = "rejected" ] && [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x action pinning SHA boundary ${sha_ref}: expected rejected non-zero exit
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the boundary reason is "<reason>"
+  if ! printf '%s\n' "$combined" | grep -Fq "$reason"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x action pinning SHA boundary ${sha_ref}: missing boundary reason ${reason}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_action_pinning_sha_boundary_case() {
+  run_action_pinning_sha_boundary_example \
+    "123456789012345678901234567890123456789" \
+    "rejected" \
+    "39 hexadecimal characters is too short"
+  run_action_pinning_sha_boundary_example \
+    "1234567890123456789012345678901234567890" \
+    "accepted" \
+    "40 hexadecimal characters is exactly valid"
+  run_action_pinning_sha_boundary_example \
+    "12345678901234567890123456789012345678901" \
+    "rejected" \
+    "41 hexadecimal characters is too long"
+}
+
 run_duration_pass_case 180000 "180 s"
 run_duration_pass_case 299999 "299.999 s"
 run_duration_queue_exclusion_case
@@ -416,6 +497,7 @@ run_invalid_cache_state_case
 run_action_pinning_sha_pass_case
 run_action_pinning_no_external_refs_case
 run_action_pinning_moving_refs_case
+run_action_pinning_sha_boundary_case
 
 if [ "$FAIL" -ne 0 ]; then
   printf 'ci-policy tests: %s passed, %s failed\n%s\n' "$PASS" "$FAIL" "$FAILURES" >&2
