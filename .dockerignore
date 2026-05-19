@@ -8,8 +8,15 @@ node_modules
 coverage
 **/coverage
 
+**/*.test.ts
+**/*.spec.ts
+**/__fixtures__
+**/fixtures
+
 dist
 **/dist
+apps/*/dist
+packages/*/dist
 
 specs
 

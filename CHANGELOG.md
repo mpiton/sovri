@@ -68,6 +68,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `apps/community-bot`: add an app-scoped multi-stage Docker image contract
+  covering root `.dockerignore` exclusions, non-root runtime identity, runtime
+  artifact layout, image-size budget boundaries, and `/health` healthcheck
+  metadata (#601-#616).
+
 - `apps/community-bot`: add Probot/MSW end-to-end ATDD coverage for opened
   and synchronize pull request review flows, deterministic GitHub fixtures,
   Anthropic structured responses, review posting, permission fallback,
