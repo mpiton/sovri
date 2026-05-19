@@ -285,12 +285,68 @@ $(printf '%s\n' "$stdout" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_action_pinning_no_external_refs_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given ".github/workflows/ci.yml" contains no `uses:` entries
+  {
+    printf 'name: ci\n'
+    printf 'jobs:\n'
+    printf '  backend-checks:\n'
+    printf '    steps:\n'
+    printf '      - run: pnpm exec oxlint . --max-warnings=0\n'
+  } >"$workflow_file"
+
+  # When the workflow action pinning rule is evaluated
+  node "$SCRIPT" action-pinning --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x action pinning no external refs: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # Then the action pinning assertion passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "action_pinning=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x action pinning no external refs: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    return
+  fi
+
+  # And no external action reference is reported as moving
+  if printf '%s\n' "$stdout" | grep -Fq "moving_reference="; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x action pinning no external refs: unexpected moving reference
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_duration_pass_case 180000 "180 s"
 run_duration_pass_case 299999 "299.999 s"
 run_duration_queue_exclusion_case
 run_duration_cache_miss_case
 run_invalid_cache_state_case
 run_action_pinning_sha_pass_case
+run_action_pinning_no_external_refs_case
 
 if [ "$FAIL" -ne 0 ]; then
   printf 'ci-policy tests: %s passed, %s failed\n%s\n' "$PASS" "$FAIL" "$FAILURES" >&2
