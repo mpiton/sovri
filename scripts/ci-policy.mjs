@@ -49,6 +49,13 @@ const runDurationBudget = (args) => {
     fail("ERROR: --job-end-ms must be greater than or equal to --job-start-ms.", 2);
   }
 
+  if (pnpmCache !== "hit" || turboCache !== "hit") {
+    stdout.write(
+      `measured_duration_ms=${elapsedMs}\nrun_classification=cache-miss\nr01_evidence=not-accepted\n`,
+    );
+    return;
+  }
+
   if (pnpmCache === "hit" && turboCache === "hit" && elapsedMs < DURATION_BUDGET_MS) {
     stdout.write(
       `measured_duration_ms=${elapsedMs}\nduration_budget=pass\nreported_duration=${formatDuration(elapsedMs)}\n`,
