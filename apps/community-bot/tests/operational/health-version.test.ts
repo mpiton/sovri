@@ -198,7 +198,7 @@ describe("community bot operational routes", () => {
     expect(response.headers.get("content-type")).toBe("application/json");
 
     // And the JSON response body is exactly `{"version":"0.1.0","node":"24.x"}`
-    expect(await response.text()).toBe('{"version":"0.1.0","node":"24.x"}');
+    expect(await response.text()).toBe(expectedVersionResponseText());
   });
 
   it.each([
@@ -212,10 +212,10 @@ describe("community bot operational routes", () => {
 
     // When the version endpoint contract is checked
     // Then the contract check fails
-    expect(serialized).not.toBe('{"version":"0.1.0","node":"24.x"}');
+    expect(serialized).not.toBe(expectedVersionResponseText());
 
     // And the failure mentions `{"version":"0.1.0","node":"24.x"}`
-    expect('{"version":"0.1.0","node":"24.x"}').toContain("version");
+    expect(expectedVersionResponseText()).toContain("version");
   });
 
   it.each(["24.0.0", "24.12.4"])("normalizes runtime Node %s to 24.x", (runtimeVersion) => {
@@ -249,7 +249,7 @@ describe("community bot operational routes", () => {
     expect(await healthResponse.text()).toBe('{"status":"ok"}');
 
     // And the tests assert exact JSON body `{"version":"0.1.0","node":"24.x"}` for `/version`
-    expect(await versionResponse.text()).toBe('{"version":"0.1.0","node":"24.x"}');
+    expect(await versionResponse.text()).toBe(expectedVersionResponseText());
   });
 
   it("rejects source-only endpoint coverage", () => {
@@ -308,7 +308,7 @@ describe("community bot operational routes", () => {
     // And no LLM provider request is attempted
     // And no database connection is attempted
     expect(await healthResponse.text()).toBe('{"status":"ok"}');
-    expect(await versionResponse.text()).toBe('{"version":"0.1.0","node":"24.x"}');
+    expect(await versionResponse.text()).toBe(expectedVersionResponseText());
   });
 
   it("rejects operational endpoint external dependencies", () => {
@@ -383,6 +383,14 @@ function getServerBaseUrl(server: HttpServer): string {
     throw new TestServerError("Expected HTTP server to listen on a TCP port");
   }
   return `http://127.0.0.1:${address.port}`;
+}
+
+function expectedVersionResponseText(): string {
+  const version = readJsonObject("apps/community-bot/package.json").version;
+  if (typeof version !== "string") {
+    throw new TestServerError("Expected community bot package version to be a string");
+  }
+  return JSON.stringify({ version, node: "24.x" });
 }
 
 async function closeServer(server: HttpServer): Promise<void> {

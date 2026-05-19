@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `apps/community-bot` tests: derive exact `/version` endpoint expectations
+  from the community bot package manifest instead of repeating the current
+  package version literal in assertions (#570).
+
 - `apps/community-bot`: comment poster now posts fresh inline review drafts via
   `pulls.createReviewComment` when updating an existing marked walkthrough
   review (previously only the body was updated, dropping new findings on
