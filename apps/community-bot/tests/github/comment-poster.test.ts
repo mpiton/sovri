@@ -652,6 +652,7 @@ function buildRuntime(
   const createReviewCommentRequests: unknown[] = [];
   const updateReviewRequests: unknown[] = [];
   const createIssueCommentRequests: { readonly body: string }[] = [];
+  const deleteIssueCommentRequests: unknown[] = [];
   const updateIssueCommentRequests: unknown[] = [];
   const logEntries: {
     readonly bindings: Readonly<Record<string, unknown>>;
@@ -662,6 +663,7 @@ function buildRuntime(
     createIssueCommentRequests,
     createReviewCommentRequests,
     createReviewRequests,
+    deleteIssueCommentRequests,
     fallbackCreateStatus: values.fallbackCreateStatus,
     issueCommentStore,
     logger: {
@@ -707,6 +709,15 @@ function buildRuntime(
           const comment = { body: parameters.body, id: runtime.nextIssueCommentId };
           issueCommentStore.push(comment);
           return { data: comment };
+        },
+        async deleteComment(parameters) {
+          deleteIssueCommentRequests.push(parameters);
+          const index = issueCommentStore.findIndex((item) => item.id === parameters.comment_id);
+          if (index === -1) {
+            throw new GitHubStatusError(404);
+          }
+          issueCommentStore.splice(index, 1);
+          return { data: undefined };
         },
         async listComments(parameters) {
           if ((parameters.page ?? 1) > 1) {
@@ -780,6 +791,16 @@ function createMswOctokit(): CommentPosterOctokit {
             },
           );
           return { data: await readIdResponse(response) };
+        },
+        async deleteComment(parameters) {
+          const response = await fetch(
+            `${GitHubBaseUrl}/repos/${parameters.owner}/${parameters.repo}/issues/comments/${parameters.comment_id}`,
+            { method: "DELETE" },
+          );
+          if (!response.ok) {
+            throw new GitHubStatusError(response.status);
+          }
+          return { data: undefined };
         },
         async listComments(parameters) {
           const response = await fetch(

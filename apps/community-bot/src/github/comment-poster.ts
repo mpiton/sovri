@@ -78,6 +78,9 @@ export type CommentPosterOctokit = {
       readonly createComment: (
         parameters: IssueCommentCreateParameters,
       ) => Promise<{ readonly data: GitHubIssueCommentResponse }>;
+      readonly deleteComment: (
+        parameters: IssueCommentDeleteParameters,
+      ) => Promise<{ readonly data: unknown }>;
       readonly listComments: (
         parameters: IssueCommentListParameters,
       ) => Promise<{ readonly data: readonly GitHubIssueCommentResponse[] }>;
@@ -105,6 +108,12 @@ export type CommentPosterOctokit = {
 type IssueCommentCreateParameters = {
   readonly body: string;
   readonly issue_number: number;
+  readonly owner: string;
+  readonly repo: string;
+};
+
+type IssueCommentDeleteParameters = {
+  readonly comment_id: number;
   readonly owner: string;
   readonly repo: string;
 };
@@ -184,23 +193,15 @@ export async function postReview(
         review_id: existingReview.id,
       });
       logReviewPosted(postLogger, repo, prNumber, response.data.id);
-      await Promise.allSettled(
-        review.inlineComments.map((draft) =>
-          octokit.rest.pulls.createReviewComment({
-            ...toPullRequestReviewComment(draft),
-            commit_id: review.commitSha,
-            owner: repo.owner,
-            pull_number: prNumber,
-            repo: repo.repo,
-          }),
-        ),
-      );
+      await postInlineDrafts(octokit, repo, prNumber, review, postLogger);
+      await cleanupStaleFallback(octokit, repo, prNumber, actorLogin, postLogger);
       return;
     }
 
     const request = buildPullRequestReviewRequest(repo, prNumber, review, body);
     const response = await octokit.rest.pulls.createReview(request);
     logReviewPosted(postLogger, repo, prNumber, response.data.id);
+    await cleanupStaleFallback(octokit, repo, prNumber, actorLogin, postLogger);
   } catch (error) {
     await postFallbackComment({
       actorLogin,
@@ -211,6 +212,80 @@ export async function postReview(
       prNumber,
       repo,
     });
+  }
+}
+
+async function postInlineDrafts(
+  octokit: CommentPosterOctokit,
+  repo: RepositoryRef,
+  prNumber: number,
+  review: ReviewPostInput,
+  postLogger: CommentPosterLogger,
+): Promise<void> {
+  const results = await Promise.allSettled(
+    review.inlineComments.map((draft) =>
+      octokit.rest.pulls.createReviewComment({
+        ...toPullRequestReviewComment(draft),
+        commit_id: review.commitSha,
+        owner: repo.owner,
+        pull_number: prNumber,
+        repo: repo.repo,
+      }),
+    ),
+  );
+
+  for (let index = 0; index < results.length; index += 1) {
+    const result = results[index];
+    if (result === undefined || result.status !== "rejected") {
+      continue;
+    }
+    postLogger.info(
+      {
+        error_status: statusFrom(result.reason),
+        inline_comment_index: index,
+        pr_number: prNumber,
+        repo: `${repo.owner}/${repo.repo}`,
+      },
+      "PR review inline comment post failed",
+    );
+  }
+}
+
+async function cleanupStaleFallback(
+  octokit: CommentPosterOctokit,
+  repo: RepositoryRef,
+  prNumber: number,
+  actorLogin: string | undefined,
+  postLogger: CommentPosterLogger,
+): Promise<void> {
+  const stale = await findMarkedIssueComment(octokit, repo, prNumber, actorLogin);
+  if (stale === undefined) {
+    return;
+  }
+  try {
+    await octokit.rest.issues.deleteComment({
+      comment_id: stale.id,
+      owner: repo.owner,
+      repo: repo.repo,
+    });
+    postLogger.info(
+      {
+        fallback_comment_id: stale.id,
+        pr_number: prNumber,
+        repo: `${repo.owner}/${repo.repo}`,
+      },
+      "PR review stale fallback comment deleted",
+    );
+  } catch (deleteError) {
+    postLogger.info(
+      {
+        error_status: statusFrom(deleteError),
+        fallback_comment_id: stale.id,
+        pr_number: prNumber,
+        repo: `${repo.owner}/${repo.repo}`,
+      },
+      "PR review stale fallback comment delete failed",
+    );
   }
 }
 

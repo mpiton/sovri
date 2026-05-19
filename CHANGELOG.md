@@ -36,6 +36,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   whole branch runs inside the same `try` as `pulls.createReview` so any
   failure routes through `postFallbackComment` instead of bubbling out of
   `postReview` (#43).
+- `apps/community-bot`: rejected inline review comment posts are now logged
+  with their HTTP status and draft index instead of being silently swallowed
+  by `Promise.allSettled`, and a successful `pulls.updateReview` or
+  `pulls.createReview` deletes any pre-existing marked fallback comment so a
+  stale walkthrough does not linger on the PR after a later run succeeds
+  (#43).
 - `apps/community-bot` tests: `waitFor` helper now rejects synchronously when
   the abort signal is already aborted (including the `ms === 0` fast path) and
   removes its abort listener on natural timeout to avoid dangling references.
