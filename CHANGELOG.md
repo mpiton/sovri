@@ -24,6 +24,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `apps/community-bot` tests: `waitFor` helper now rejects synchronously when
   the abort signal is already aborted (including the `ms === 0` fast path) and
   removes its abort listener on natural timeout to avoid dangling references.
+- `apps/community-bot`: the `pulls.listFiles` fallback now rejects as soon as
+  it reaches GitHub's 3000-file listing cap, since the endpoint cannot signal
+  truncation past the cap and would otherwise return a silently truncated diff.
 
 ### Security
 

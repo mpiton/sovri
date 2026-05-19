@@ -34,8 +34,10 @@ describe("GitHub diff fetcher listFiles fallback", () => {
     expect(diff.files[100]?.path).toBe("src/page-2-file-101.ts");
   });
 
-  it("accepts exactly 3000 changed files", async () => {
-    // Given GitHub `pulls.listFiles` returns 30 pages of 100 files each.
+  it("rejects when the fallback reaches GitHub's 3000-file listing cap", async () => {
+    // Given GitHub `pulls.listFiles` returns 30 pages of 100 files each
+    // (GitHub caps the endpoint at 3000 files, so the bot cannot tell whether
+    // the listing is complete or truncated once it reaches that count).
     const pages = Array.from({ length: 30 }, (_, index) =>
       buildFiles(100, `src/page-${String(index + 1)}-file`),
     );
@@ -45,10 +47,12 @@ describe("GitHub diff fetcher listFiles fallback", () => {
     });
 
     // When the bot fetches the pull request diff.
-    const diff = await fetchDiff(fake.octokit, Repo, PullNumber);
+    const result = fetchDiff(fake.octokit, Repo, PullNumber);
 
-    // Then fetching succeeds.
-    expect(diff.files).toHaveLength(3000);
+    // Then fetching fails with a typed diff fetch error named "DiffFetchError".
+    await expect(result).rejects.toThrow(
+      "Pull request diff reaches GitHub's 3000-file listing cap",
+    );
   });
 
   it("rejects more than 3000 changed files", async () => {
@@ -65,7 +69,9 @@ describe("GitHub diff fetcher listFiles fallback", () => {
     const result = fetchDiff(fake.octokit, Repo, PullNumber);
 
     // Then fetching fails with a typed diff fetch error named "DiffFetchError".
-    await expect(result).rejects.toThrow("Pull request diff exceeds 3000 files");
+    await expect(result).rejects.toThrow(
+      "Pull request diff reaches GitHub's 3000-file listing cap",
+    );
   });
 
   it("preserves file order across fallback pages", async () => {

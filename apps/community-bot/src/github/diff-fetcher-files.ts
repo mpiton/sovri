@@ -56,8 +56,10 @@ async function fetchDiffFilesPage(
   const pageFiles = parseFilesPage(response.data);
   const files = [...previousFiles, ...pageFiles];
 
-  if (files.length > MaxPullRequestFiles) {
-    throw new DiffFetchError(`Pull request diff exceeds ${String(MaxPullRequestFiles)} files`);
+  if (files.length >= MaxPullRequestFiles) {
+    throw new DiffFetchError(
+      `Pull request diff reaches GitHub's ${String(MaxPullRequestFiles)}-file listing cap; results may be truncated`,
+    );
   }
   if (pageFiles.length < GitHubPageSize) {
     return parseConstructedDiff(files);
