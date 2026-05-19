@@ -128,12 +128,13 @@ run_duration_queue_exclusion_case() {
   stdout_file=$(mktemp)
   stderr_file=$(mktemp)
 
-  # Given the backend-checks workflow run waits in the GitHub Actions queue for 120000 ms
+  # Given the backend-checks workflow run waits in the GitHub Actions queue
+  # for 120000 ms (queue time is excluded from the measurement because
+  # --job-start-ms anchors at the runner-start instant, not the workflow-trigger instant)
   # And the pnpm store cache restore outcome is "hit"
   # And the Turborepo cache restore outcome is "hit"
   # And the backend-checks job runs for 240000 ms after the runner starts
   node "$SCRIPT" duration-budget \
-    --workflow-queue-ms 120000 \
     --job-start-ms 100000 \
     --job-end-ms 340000 \
     --pnpm-cache hit \

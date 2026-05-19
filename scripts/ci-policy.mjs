@@ -1,6 +1,9 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
-import { argv, exit, stdout, stderr } from "node:process";
+import { readFileSync, writeSync } from "node:fs";
+import { argv, exit } from "node:process";
+
+const writeStdout = (chunk) => writeSync(1, chunk);
+const writeStderr = (chunk) => writeSync(2, chunk);
 
 const DURATION_BUDGET_MS = 300000;
 const FULL_COMMIT_SHA_LENGTH = 40;
@@ -14,7 +17,7 @@ const actionPinningUsage = "Usage: node scripts/ci-policy.mjs action-pinning --w
 const usage = `${durationBudgetUsage}\n${actionPinningUsage}`;
 
 const fail = (message, code) => {
-  stderr.write(`${message}\n`);
+  writeStderr(`${message}\n`);
   exit(code);
 };
 
@@ -73,27 +76,27 @@ const runDurationBudget = (args) => {
   }
 
   if (pnpmCache !== "hit" || turboCache !== "hit") {
-    stdout.write(
+    writeStdout(
       `measured_duration_ms=${elapsedMs}\nrun_classification=cache-miss\nr01_evidence=not-accepted\n`,
     );
     return;
   }
 
   if (pnpmCache === "hit" && turboCache === "hit" && elapsedMs < DURATION_BUDGET_MS) {
-    stdout.write(
+    writeStdout(
       `measured_duration_ms=${elapsedMs}\nduration_budget=pass\nreported_duration=${formatDuration(elapsedMs)}\n`,
     );
     return;
   }
 
   if (pnpmCache === "hit" && turboCache === "hit") {
-    stdout.write(
+    writeStdout(
       `measured_duration_ms=${elapsedMs}\nduration_budget=fail\nreported_duration=${formatDuration(elapsedMs)}\n`,
     );
     fail("backend-checks must finish in under 5 minutes on cache hit", 1);
   }
 
-  stdout.write(
+  writeStdout(
     `measured_duration_ms=${elapsedMs}\nduration_budget=unsupported\nreported_duration=${formatDuration(elapsedMs)}\n`,
   );
   exit(2);
@@ -176,13 +179,13 @@ const runActionPinning = (args) => {
   const boundaryReasons = getBoundaryReasons(actionReferences);
 
   if (movingReferences.length === 0) {
-    stdout.write(
+    writeStdout(
       `action_pinning=pass\n${boundaryReasons.map((reason) => `boundary_reason=${reason}\n`).join("")}`,
     );
     return;
   }
 
-  stdout.write(
+  writeStdout(
     `action_pinning=fail\n${movingReferences.map((ref) => `moving_reference=${ref}\n`).join("")}${boundaryReasons.map((reason) => `boundary_reason=${reason}\n`).join("")}`,
   );
   fail(getFailureMessages(movingReferences).join("\n"), 1);
