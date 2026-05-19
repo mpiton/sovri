@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs";
 import { argv, exit, stdout, stderr } from "node:process";
 
 const DURATION_BUDGET_MS = 300000;
+const FULL_COMMIT_SHA_LENGTH = 40;
 const PINNED_EXTERNAL_ACTION_PATTERN = /@[0-9a-f]{40}$/;
+const HEX_SHA_SUFFIX_PATTERN = /@([0-9a-f]+)$/;
 const USES_LINE_PATTERN = /^\s*(?:-\s*)?uses:\s*['"]?([^'"\s#]+)['"]?\s*(?:#.*)?$/;
 
 const durationBudgetUsage =
@@ -123,19 +125,45 @@ const findMovingExternalActionReferences = (actionReferences) =>
       !isPinnedExternalActionReference(actionReference),
   );
 
+const getShaBoundaryReason = (actionReference) => {
+  const match = actionReference.match(HEX_SHA_SUFFIX_PATTERN);
+  const shaRef = match?.[1];
+  if (shaRef === undefined) return undefined;
+
+  if (shaRef.length === FULL_COMMIT_SHA_LENGTH) {
+    return "40 hexadecimal characters is exactly valid";
+  }
+
+  if (shaRef.length < FULL_COMMIT_SHA_LENGTH) {
+    return `${shaRef.length} hexadecimal characters is too short`;
+  }
+
+  return `${shaRef.length} hexadecimal characters is too long`;
+};
+
+const getBoundaryReasons = (actionReferences) =>
+  actionReferences
+    .filter(isExternalActionReference)
+    .map(getShaBoundaryReason)
+    .filter((reason) => reason !== undefined);
+
 const runActionPinning = (args) => {
   const options = parseOptions(args);
   const workflowPath = readRequiredOption(options, "workflow", actionPinningUsage);
   const workflow = readWorkflowFile(workflowPath);
-  const movingReferences = findMovingExternalActionReferences(extractActionReferences(workflow));
+  const actionReferences = extractActionReferences(workflow);
+  const movingReferences = findMovingExternalActionReferences(actionReferences);
+  const boundaryReasons = getBoundaryReasons(actionReferences);
 
   if (movingReferences.length === 0) {
-    stdout.write("action_pinning=pass\n");
+    stdout.write(
+      `action_pinning=pass\n${boundaryReasons.map((reason) => `boundary_reason=${reason}\n`).join("")}`,
+    );
     return;
   }
 
   stdout.write(
-    `action_pinning=fail\n${movingReferences.map((ref) => `moving_reference=${ref}`).join("\n")}\n`,
+    `action_pinning=fail\n${movingReferences.map((ref) => `moving_reference=${ref}\n`).join("")}${boundaryReasons.map((reason) => `boundary_reason=${reason}\n`).join("")}`,
   );
   fail("external actions must be pinned to a full commit SHA", 1);
 };
