@@ -50,11 +50,15 @@ const runDurationBudget = (args) => {
   }
 
   if (pnpmCache === "hit" && turboCache === "hit" && elapsedMs < DURATION_BUDGET_MS) {
-    stdout.write(`duration_budget=pass\nreported_duration=${formatDuration(elapsedMs)}\n`);
+    stdout.write(
+      `measured_duration_ms=${elapsedMs}\nduration_budget=pass\nreported_duration=${formatDuration(elapsedMs)}\n`,
+    );
     return;
   }
 
-  stdout.write(`duration_budget=unsupported\nreported_duration=${formatDuration(elapsedMs)}\n`);
+  stdout.write(
+    `measured_duration_ms=${elapsedMs}\nduration_budget=unsupported\nreported_duration=${formatDuration(elapsedMs)}\n`,
+  );
   exit(2);
 };
 

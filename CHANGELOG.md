@@ -90,7 +90,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Added
 
 - `ci`: add the first CI policy helper for backend-checks cache-hit duration
-  budget evaluation (#634).
+  budget evaluation and measured job-duration reporting (#634, #636).
 
 - `apps/community-bot`: add `scripts/smoke-docker.sh` and operational coverage
   for local Docker build/run smoke testing, `/health` polling, boot-log
