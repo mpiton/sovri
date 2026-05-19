@@ -21,6 +21,33 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `apps/community-bot`: comment poster now posts fresh inline review drafts via
+  `pulls.createReviewComment` when updating an existing marked walkthrough
+  review (previously only the body was updated, dropping new findings on
+  synchronize reruns), paginates `pulls.listReviews` and `issues.listComments`
+  to find markers beyond the first page, optionally filters lookups by
+  `actorLogin` to avoid matching foreign artifacts that contain the marker,
+  and re-checks for an existing marked fallback comment before creating a new
+  one to close the TOCTOU window on concurrent reruns (#43).
+- `apps/community-bot`: existing-review branch in the comment poster now
+  refreshes the walkthrough body via `pulls.updateReview` first and posts
+  inline drafts via `Promise.allSettled` so a single rejected
+  `pulls.createReviewComment` no longer blocks the marker refresh, and the
+  whole branch runs inside the same `try` as `pulls.createReview` so any
+  failure routes through `postFallbackComment` instead of bubbling out of
+  `postReview` (#43).
+- `apps/community-bot`: rejected inline review comment posts are now logged
+  with their HTTP status and draft index instead of being silently swallowed
+  by `Promise.allSettled`, and a successful `pulls.updateReview` or
+  `pulls.createReview` deletes any pre-existing marked fallback comment so a
+  stale walkthrough does not linger on the PR after a later run succeeds
+  (#43).
+- `apps/community-bot`: `cleanupStaleFallback` now treats the
+  `issues.listComments` lookup as best-effort. A transient or permission
+  failure during the stale-fallback lookup is logged and swallowed instead
+  of bubbling into the main `postReview` try, so a successful
+  `pulls.createReview` or `pulls.updateReview` is no longer misreported as a
+  failure and never triggers a duplicate fallback comment (#43).
 - `apps/community-bot` tests: `waitFor` helper now rejects synchronously when
   the abort signal is already aborted (including the `ms === 0` fast path) and
   removes its abort listener on natural timeout to avoid dangling references.
@@ -36,6 +63,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   strict base-10 integer contract.
 
 ### Added
+
+- `apps/community-bot`: add a GitHub comment poster adapter for marked
+  idempotent walkthrough reviews, inline review drafts, audit identifier
+  logging, issue-comment fallback, and MSW-backed posting outcomes (#43,
+  #529-#549).
 
 - `apps/community-bot`: add an Octokit pull request diff fetcher using the
   raw GitHub diff endpoint with paginated `pulls.listFiles` fallback, 30 s

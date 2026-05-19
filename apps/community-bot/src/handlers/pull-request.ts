@@ -8,6 +8,8 @@ import type {
   ReviewPullRequestInput,
   ReviewPullRequestOptions,
 } from "@sovri/review-engine";
+import type { CommentPosterOctokit } from "../github/comment-poster.js";
+import type { DiffFetcherOctokit } from "../github/diff-fetcher.js";
 
 export type PullRequestWebhookContext = {
   readonly id: string;
@@ -22,77 +24,16 @@ export type PullRequestWebhookContext = {
   };
 };
 
-export type PullRequestOctokit = {
-  readonly request: (
-    route: "GET /repos/{owner}/{repo}/pulls/{pull_number}",
-    parameters: PullRequestDiffParameters,
-  ) => Promise<{ readonly data: unknown }>;
-  readonly rest: {
-    readonly issues: {
-      readonly createComment: (parameters: IssueCommentParameters) => Promise<unknown>;
-    };
-    readonly pulls: {
-      readonly createReview: (parameters: PullRequestReviewParameters) => Promise<unknown>;
-      readonly listFiles: (
-        parameters: PullRequestFilesParameters,
-      ) => Promise<{ readonly data: unknown }>;
-    };
-    readonly repos: {
-      readonly getContent: (
-        parameters: RepositoryContentParameters,
-      ) => Promise<{ readonly data: unknown }>;
+export type PullRequestOctokit = CommentPosterOctokit &
+  DiffFetcherOctokit & {
+    readonly rest: {
+      readonly repos: {
+        readonly getContent: (
+          parameters: RepositoryContentParameters,
+        ) => Promise<{ readonly data: unknown }>;
+      };
     };
   };
-};
-
-type PullRequestDiffParameters = {
-  readonly headers: {
-    readonly accept: "application/vnd.github.v3.diff";
-  };
-  readonly owner: string;
-  readonly pull_number: number;
-  readonly repo: string;
-  readonly request: {
-    readonly signal: AbortSignal;
-  };
-};
-
-type PullRequestFilesParameters = {
-  readonly owner: string;
-  readonly page: number;
-  readonly per_page: 100;
-  readonly pull_number: number;
-  readonly repo: string;
-  readonly request: {
-    readonly signal: AbortSignal;
-  };
-};
-
-type IssueCommentParameters = {
-  readonly body: string;
-  readonly issue_number: number;
-  readonly owner: string;
-  readonly repo: string;
-};
-
-type PullRequestReviewParameters = {
-  readonly body: string;
-  readonly comments: PullRequestReviewCommentParameters[];
-  readonly commit_id: string;
-  readonly event: "COMMENT";
-  readonly owner: string;
-  readonly pull_number: number;
-  readonly repo: string;
-};
-
-type PullRequestReviewCommentParameters = {
-  readonly body: string;
-  readonly line: number;
-  readonly path: string;
-  readonly side: "RIGHT";
-  readonly start_line?: number;
-  readonly start_side?: "RIGHT";
-};
 
 type RepositoryContentParameters = {
   readonly mediaType: {

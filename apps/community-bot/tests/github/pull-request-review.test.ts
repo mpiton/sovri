@@ -107,7 +107,7 @@ review:
 
     expect(runtime.reviewRequests).toEqual([
       expect.objectContaining({
-        body: "Review complete",
+        body: "<!-- sovri:walkthrough -->\nReview complete",
         comments: [
           {
             body: "**Delegation check**\n\nThe handler should delegate review work.",
@@ -213,14 +213,26 @@ function buildRuntimeContext(
         },
         rest: {
           issues: {
-            async createComment() {
-              return undefined;
+            async createComment(parameters) {
+              return { data: { body: parameters.body, id: 87654 } };
+            },
+            async listComments() {
+              return { data: [] };
+            },
+            async updateComment(parameters) {
+              return { data: { body: parameters.body, id: parameters.comment_id } };
             },
           },
           pulls: {
             async createReview(parameters) {
               reviewRequests.push(parameters);
-              return undefined;
+              return { data: { body: parameters.body, id: 98765 } };
+            },
+            async listReviews() {
+              return { data: [] };
+            },
+            async updateReview(parameters) {
+              return { data: { body: parameters.body, id: parameters.review_id } };
             },
             async listFiles() {
               return { data: [] };

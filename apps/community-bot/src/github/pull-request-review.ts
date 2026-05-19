@@ -8,11 +8,11 @@ import {
   buildInlineComments,
   reviewPullRequest,
   type Diff,
-  type InlineCommentDraft,
   type Review,
   type ReviewPullRequestOptions,
 } from "@sovri/review-engine";
 
+import { postReview as postPullRequestReview } from "./comment-poster.js";
 import type {
   PullRequestHandlerDependencies,
   PullRequestWebhookContext,
@@ -76,34 +76,19 @@ async function postReview(
   diff: Diff,
 ): Promise<void> {
   const repo = splitRepoFullName(target.repoFullName);
-  await context.octokit.rest.pulls.createReview({
-    body: review.walkthrough_markdown,
-    comments: buildInlineComments(review.findings, diff).map(toPullRequestReviewComment),
-    commit_id: target.commitSha,
-    event: "COMMENT",
-    owner: repo.owner,
-    pull_number: target.number,
-    repo: repo.repo,
-  });
-}
-
-function toPullRequestReviewComment(draft: InlineCommentDraft) {
-  const base = {
-    body: draft.body,
-    line: draft.line,
-    path: draft.path,
-    side: draft.side,
-  };
-
-  if (draft.start_line === undefined || draft.start_side === undefined) {
-    return base;
-  }
-
-  return {
-    ...base,
-    start_line: draft.start_line,
-    start_side: draft.start_side,
-  };
+  await postPullRequestReview(
+    context.octokit,
+    repo,
+    target.number,
+    {
+      commitSha: target.commitSha,
+      inlineComments: buildInlineComments(review.findings, diff),
+      walkthroughMarkdown: review.walkthrough_markdown,
+    },
+    {
+      logger,
+    },
+  );
 }
 
 async function postErrorComment(
