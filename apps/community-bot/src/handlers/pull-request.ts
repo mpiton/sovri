@@ -8,6 +8,7 @@ import type {
   ReviewPullRequestInput,
   ReviewPullRequestOptions,
 } from "@sovri/review-engine";
+import type { CommentPosterOctokit } from "../github/comment-poster.js";
 
 export type PullRequestWebhookContext = {
   readonly id: string;
@@ -22,18 +23,14 @@ export type PullRequestWebhookContext = {
   };
 };
 
-export type PullRequestOctokit = {
+export type PullRequestOctokit = CommentPosterOctokit & {
   readonly request: (
     route: "GET /repos/{owner}/{repo}/compare/{basehead}",
     parameters: PullRequestDiffParameters,
   ) => Promise<{ readonly data: string }>;
   readonly rest: {
-    readonly issues: {
-      readonly createComment: (parameters: IssueCommentParameters) => Promise<unknown>;
-    };
-    readonly pulls: {
-      readonly createReview: (parameters: PullRequestReviewParameters) => Promise<unknown>;
-    };
+    readonly issues: CommentPosterOctokit["rest"]["issues"];
+    readonly pulls: CommentPosterOctokit["rest"]["pulls"];
     readonly repos: {
       readonly getContent: (
         parameters: RepositoryContentParameters,
@@ -49,32 +46,6 @@ type PullRequestDiffParameters = {
   };
   readonly owner: string;
   readonly repo: string;
-};
-
-type IssueCommentParameters = {
-  readonly body: string;
-  readonly issue_number: number;
-  readonly owner: string;
-  readonly repo: string;
-};
-
-type PullRequestReviewParameters = {
-  readonly body: string;
-  readonly comments: PullRequestReviewCommentParameters[];
-  readonly commit_id: string;
-  readonly event: "COMMENT";
-  readonly owner: string;
-  readonly pull_number: number;
-  readonly repo: string;
-};
-
-type PullRequestReviewCommentParameters = {
-  readonly body: string;
-  readonly line: number;
-  readonly path: string;
-  readonly side: "RIGHT";
-  readonly start_line?: number;
-  readonly start_side?: "RIGHT";
 };
 
 type RepositoryContentParameters = {

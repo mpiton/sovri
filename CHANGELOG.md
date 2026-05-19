@@ -28,6 +28,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `apps/community-bot`: add a GitHub comment poster adapter for marked
+  idempotent walkthrough reviews, inline review drafts, audit identifier
+  logging, issue-comment fallback, and MSW-backed posting outcomes (#43,
+  #529-#549).
+
 - `apps/community-bot`: add ATDD coverage for pull request handler
   delegation across opened and synchronize webhook examples (#477).
 
