@@ -10,6 +10,7 @@ const FULL_COMMIT_SHA_LENGTH = 40;
 const PINNED_EXTERNAL_ACTION_PATTERN = /@[0-9a-f]{40}$/;
 const HEX_SHA_SUFFIX_PATTERN = /@([0-9a-f]+)$/;
 const USES_LINE_PATTERN = /^\s*(?:-\s*)?uses:\s*['"]?([^'"\s#]+)['"]?\s*(?:#.*)?$/;
+const BLOCK_SCALAR_PATTERN = /:\s*[>|][+-]?\s*(?:#.*)?$/;
 
 const durationBudgetUsage =
   "Usage: node scripts/ci-policy.mjs duration-budget --job-start-ms <ms> --job-end-ms <ms> --pnpm-cache hit --turbo-cache hit";
@@ -60,6 +61,30 @@ const readRequiredOption = (options, key, commandUsage) => {
     fail(`ERROR: --${key} is required.\n${commandUsage}`, 2);
   }
   return value;
+};
+
+const getIndent = (line) => line.match(/^ */)?.[0].length ?? 0;
+
+const getYamlStructureLines = (workflow) => {
+  const lines = [];
+  let blockScalarIndent;
+
+  for (const line of workflow.split(/\r?\n/)) {
+    if (blockScalarIndent !== undefined) {
+      if (line.trim().length === 0) continue;
+
+      if (getIndent(line) > blockScalarIndent) continue;
+      blockScalarIndent = undefined;
+    }
+
+    lines.push(line);
+
+    if (BLOCK_SCALAR_PATTERN.test(line)) {
+      blockScalarIndent = getIndent(line);
+    }
+  }
+
+  return lines;
 };
 
 const formatDuration = (elapsedMs) => {
@@ -128,11 +153,11 @@ const extractActionReferences = (workflow) => {
 };
 
 const getIndentedBlock = (workflow, parentPattern) => {
-  const lines = workflow.split(/\r?\n/);
+  const lines = getYamlStructureLines(workflow);
   const startIndex = lines.findIndex((line) => parentPattern.test(line));
   if (startIndex === -1) return "";
 
-  const startIndent = lines[startIndex].match(/^ */)?.[0].length ?? 0;
+  const startIndent = getIndent(lines[startIndex]);
   const block = [lines[startIndex]];
 
   for (const line of lines.slice(startIndex + 1)) {
@@ -141,7 +166,7 @@ const getIndentedBlock = (workflow, parentPattern) => {
       continue;
     }
 
-    const indent = line.match(/^ */)?.[0].length ?? 0;
+    const indent = getIndent(line);
     if (indent <= startIndent) break;
     block.push(line);
   }
@@ -150,13 +175,13 @@ const getIndentedBlock = (workflow, parentPattern) => {
 };
 
 const getListItemBlocks = (workflow) => {
-  const lines = workflow.split(/\r?\n/);
+  const lines = getYamlStructureLines(workflow);
   const blocks = [];
 
   for (let index = 0; index < lines.length; index += 1) {
     if (!/^\s*-\s+/.test(lines[index])) continue;
 
-    const startIndent = lines[index].match(/^ */)?.[0].length ?? 0;
+    const startIndent = getIndent(lines[index]);
     const block = [lines[index]];
 
     for (const line of lines.slice(index + 1)) {
@@ -165,7 +190,7 @@ const getListItemBlocks = (workflow) => {
         continue;
       }
 
-      const indent = line.match(/^ */)?.[0].length ?? 0;
+      const indent = getIndent(line);
       if (indent <= startIndent) break;
       block.push(line);
     }
