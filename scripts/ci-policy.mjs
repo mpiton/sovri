@@ -508,7 +508,17 @@ const masksSharedScriptFailure = (command, scriptPath) => {
   const scriptIndex = getSharedScriptTokenIndex(tokens, scriptPath);
   if (scriptIndex === undefined) return false;
 
-  return tokens.slice(scriptIndex + 1).includes("||");
+  const trailingTokens = tokens.slice(scriptIndex + 1);
+  const orOperatorIndex = trailingTokens.indexOf("||");
+  if (orOperatorIndex === -1) return false;
+
+  const fallbackCommand = trailingTokens.slice(orOperatorIndex + 1).join(" ");
+  return !/^exit\s+(?:[1-9]\d*|\$\?)$/.test(fallbackCommand);
+};
+
+const isContinueOnErrorEnabled = (value) => {
+  const normalizedValue = stripYamlQuotes(value.trim());
+  return normalizedValue !== "false" && normalizedValue !== "${{ false }}";
 };
 
 const hasStepContinueOnError = (step) => {
@@ -517,11 +527,12 @@ const hasStepContinueOnError = (step) => {
   if (firstLine === undefined) return false;
 
   const stepIndent = getIndent(firstLine);
-  return lines.some(
-    (line) =>
-      getIndent(line) === stepIndent + 2 &&
-      /^\s*continue-on-error:\s*(?:true|["']true["'])\s*(?:#.*)?$/.test(line),
-  );
+  return lines.some((line) => {
+    if (getIndent(line) !== stepIndent + 2) return false;
+
+    const match = line.match(/^\s*continue-on-error:\s*(.*?)\s*(?:#.*)?$/);
+    return match?.[1] !== undefined && isContinueOnErrorEnabled(match[1]);
+  });
 };
 
 const hasRunCommand = (step, scriptPath) =>
