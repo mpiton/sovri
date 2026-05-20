@@ -274,6 +274,11 @@ const runBuildDockerNeeds = (args) => {
   const jobsBlock = getIndentedBlock(workflow, /^\s*jobs:\s*(?:#.*)?$/);
   const buildDockerJob = getIndentedBlock(jobsBlock, /^\s+build-docker:\s*(?:#.*)?$/);
   const needsBlock = getIndentedBlock(buildDockerJob, /^\s+needs:\s*(?:.*)?$/);
+  if (needsBlock.length === 0) {
+    writeStdout("build_docker_needs=fail\nneeds=missing\n");
+    fail("build-docker must wait for required gates", 1);
+  }
+
   const needs = new Set(readYamlNeedsValues(needsBlock));
   const missingNeeds = REQUIRED_BUILD_DOCKER_NEEDS.filter((job) => !needs.has(job));
 
