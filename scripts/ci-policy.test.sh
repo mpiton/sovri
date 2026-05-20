@@ -875,6 +875,60 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   done
 }
 
+run_build_docker_needs_missing_needs_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  backend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo backend
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+YAML
+
+  # Given the build-docker job has no `needs` entries
+  # And the backend-checks job is still running
+  node "$SCRIPT" build-docker-needs --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the build-docker dependency rule is evaluated
+  # Then the build-docker dependency assertion fails
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker missing needs: expected non-zero exit
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "build-docker must wait for required gates"
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must wait for required gates"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker missing needs: missing failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_build_docker_scheduler_failed_gate_case() {
   local stdout stderr stdout_file stderr_file ec combined
 
@@ -4587,6 +4641,7 @@ run_build_docker_needs_inline_gates_case
 run_build_docker_needs_multiline_flow_gates_case
 run_build_docker_needs_scalar_gate_case
 run_build_docker_needs_missing_required_gate_case
+run_build_docker_needs_missing_needs_case
 run_build_docker_scheduler_failed_gate_case
 run_build_docker_scheduler_non_success_gate_case
 run_duration_fail_case 300000
