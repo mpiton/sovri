@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `ci`: add fixture coverage rejecting secrets-scan durations at or above one
+  minute in the duration budget policy (#679).
+
 - `ci`: add fixture coverage rejecting Gitleaks action pins whose provenance
   is not the v2 release line (#677).
 
