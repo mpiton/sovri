@@ -403,16 +403,29 @@ const getLiteralScalarCommands = (scalarLines) => {
   return joinLineContinuedCommands(commands);
 };
 
+const getStepRunValue = (line, index, stepIndent) => {
+  if (index === 0 && getIndent(line) === stepIndent) {
+    return line.match(/^\s*-\s+run:\s*(.*)$/)?.[1];
+  }
+
+  if (getIndent(line) !== stepIndent + 2) return undefined;
+  return line.match(/^\s*run:\s*(.*)$/)?.[1];
+};
+
 const getRunCommandLines = (step) => {
   const lines = step.split(/\r?\n/);
+  const firstLine = lines[0];
+  if (firstLine === undefined) return [];
+
+  const stepIndent = getIndent(firstLine);
   const commands = [];
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    const match = line.match(/^\s*(?:-\s*)?run:\s*(.*)$/);
-    if (match?.[1] === undefined) continue;
+    const stepRunValue = getStepRunValue(line, index, stepIndent);
+    if (stepRunValue === undefined) continue;
 
-    const runValue = match[1].trim();
+    const runValue = stepRunValue.trim();
     const isLiteralScalar = runValue.startsWith("|");
     const isFoldedScalar = runValue.startsWith(">");
     if (!isLiteralScalar && !isFoldedScalar) {

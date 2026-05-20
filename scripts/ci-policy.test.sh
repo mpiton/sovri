@@ -1280,6 +1280,59 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_secrets_no_secrets_reuse_nested_run_field_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Secret filename and API key patterns
+        uses: actions/github-script@0123456789abcdef0123456789abcdef01234567
+        with:
+          run: scripts/no-secrets.sh
+YAML
+
+  # Given a non-shell action step contains a nested "run" input mentioning the guard script
+  node "$SCRIPT" secrets-no-secrets-reuse \
+    --workflow "$workflow_file" \
+    --script-path scripts/no-secrets.sh \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # Then the no-secrets reuse assertion fails because the script is not executed
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets no-secrets reuse nested run field: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$combined" | grep -Fq "no_secrets_reuse=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets no-secrets reuse nested run field: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_no_secrets_reuse_run_field_in_block_body_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec combined
 
@@ -3266,6 +3319,7 @@ run_secrets_no_secrets_reuse_block_scalar_case
 run_secrets_no_secrets_reuse_comment_bypass_case
 run_secrets_no_secrets_reuse_fake_step_in_run_block_case
 run_secrets_no_secrets_reuse_folded_scalar_bypass_case
+run_secrets_no_secrets_reuse_nested_run_field_case
 run_secrets_no_secrets_reuse_run_field_in_block_body_case
 run_secrets_no_secrets_reuse_script_path_in_heredoc_body_case
 run_secrets_no_secrets_reuse_special_heredoc_delimiter_case
