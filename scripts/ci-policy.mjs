@@ -259,7 +259,35 @@ const getListItemBlocksFromLines = (lines) => {
 
 const getListItemBlocks = (workflow) => getListItemBlocksFromLines(getYamlStructureLines(workflow));
 
-const getRawListItemBlocks = (workflow) => getListItemBlocksFromLines(workflow.split(/\r?\n/));
+const getTopLevelListItemBlocks = (workflow) => {
+  const lines = workflow.split(/\r?\n/);
+  const itemIndent = lines.find((line) => /^\s*-\s+/.test(line))?.match(/^ */)?.[0].length;
+  if (itemIndent === undefined) return [];
+
+  const blocks = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    if (getIndent(lines[index]) !== itemIndent || !/^\s*-\s+/.test(lines[index])) continue;
+
+    const block = [lines[index]];
+
+    for (const line of lines.slice(index + 1)) {
+      if (line.trim().length === 0) {
+        block.push(line);
+        continue;
+      }
+
+      const indent = getIndent(line);
+      if (indent < itemIndent) break;
+      if (indent === itemIndent && /^\s*-\s+/.test(line)) break;
+      block.push(line);
+    }
+
+    blocks.push(block.join("\n"));
+  }
+
+  return blocks;
+};
 
 const hasInlineFullHistoryFetchDepth = (step) => {
   const inlineWith = step.match(/^\s*with:\s*\{([^}]*)\}\s*(?:#.*)?$/m)?.[1];
@@ -289,8 +317,22 @@ const getSecretsScanRawStepsBlock = (workflow) => {
   return getIndentedBlockRaw(secretsJob, /^\s+steps:\s*(?:#.*)?$/);
 };
 
-const hasSecretFilenameStepName = (step) =>
-  /^\s*(?:-\s*)?name:\s*["']?Secret filename and API key patterns["']?\s*(?:#.*)?$/m.test(step);
+const hasSecretFilenameStepName = (step) => {
+  const lines = step.split(/\r?\n/);
+  const firstLine = lines[0];
+  if (firstLine === undefined) return false;
+
+  const stepIndent = getIndent(firstLine);
+  const inlineNamePattern =
+    /^\s*-\s+name:\s*["']?Secret filename and API key patterns["']?\s*(?:#.*)?$/;
+  const propertyNamePattern =
+    /^\s*name:\s*["']?Secret filename and API key patterns["']?\s*(?:#.*)?$/;
+
+  return lines.some((line, index) => {
+    if (index === 0 && getIndent(line) === stepIndent) return inlineNamePattern.test(line);
+    return getIndent(line) === stepIndent + 2 && propertyNamePattern.test(line);
+  });
+};
 
 const stripYamlQuotes = (value) => {
   const match = value.match(/^(['"])(.*)\1$/);
@@ -307,16 +349,25 @@ const getRunCommandLines = (step) => {
     if (match?.[1] === undefined) continue;
 
     const runValue = match[1].trim();
-    if (!/^[>|]/.test(runValue)) {
+    const isLiteralScalar = runValue.startsWith("|");
+    const isFoldedScalar = runValue.startsWith(">");
+    if (!isLiteralScalar && !isFoldedScalar) {
       commands.push(stripYamlQuotes(runValue));
       continue;
     }
 
     const runIndent = getIndent(line);
+    const scalarLines = [];
     for (const blockLine of lines.slice(index + 1)) {
       if (blockLine.trim().length === 0) continue;
       if (getIndent(blockLine) <= runIndent) break;
-      commands.push(blockLine.trim());
+      scalarLines.push(blockLine.trim());
+    }
+
+    if (isFoldedScalar) {
+      commands.push(scalarLines.join(" "));
+    } else {
+      commands.push(...scalarLines);
     }
   }
 
@@ -721,7 +772,8 @@ const runSecretsNoSecretsReuse = (args) => {
   const scriptPath = readRequiredOption(options, "script-path", secretsNoSecretsReuseUsage);
   const workflow = readWorkflowFile(workflowPath);
   const stepsBlock = getSecretsScanRawStepsBlock(workflow);
-  const namedSecretGuardStep = getRawListItemBlocks(stepsBlock).find(hasSecretFilenameStepName);
+  const namedSecretGuardStep =
+    getTopLevelListItemBlocks(stepsBlock).find(hasSecretFilenameStepName);
   const callsSharedScript =
     namedSecretGuardStep !== undefined && hasRunCommand(namedSecretGuardStep, scriptPath);
   const duplicatesPatternsInline = hasInlineSecretPatternList(stepsBlock);
