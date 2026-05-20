@@ -1254,6 +1254,75 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_secrets_checkout_other_job_full_history_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  backend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout backend
+        uses: actions/checkout@0123456789abcdef0123456789abcdef01234567
+        with:
+          fetch-depth: 0
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fedcba9876543210fedcba9876543210fedcba98
+        with:
+          fetch-depth: 1
+YAML
+
+  # Given another job contains a checkout step with input "fetch-depth" set to 0
+  # And the secrets-scan job contains a checkout step with input "fetch-depth" set to 1
+  node "$SCRIPT" secrets-checkout-depth \
+    --workflow "$workflow_file" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # Then the checkout depth assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets checkout other job full history: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$combined" | grep -Fq "checkout_depth=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets checkout other job full history: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions that fetch-depth: 0 must be configured in secrets-scan
+  if ! printf '%s\n' "$combined" | grep -Fq "fetch-depth: 0"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets checkout other job full history: missing fetch-depth failure message
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_checkout_requires_steps_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec combined
 
@@ -1606,6 +1675,7 @@ run_secrets_checkout_missing_fetch_depth_case
 run_secrets_checkout_positive_fetch_depth_case 1
 run_secrets_checkout_positive_fetch_depth_case 2
 run_secrets_checkout_positive_fetch_depth_case 50
+run_secrets_checkout_other_job_full_history_case
 run_secrets_checkout_requires_steps_case
 run_secrets_checkout_rejects_shallow_checkout_case
 run_secrets_checkout_requires_with_fetch_depth_case
