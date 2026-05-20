@@ -27,7 +27,9 @@ const secretsCheckoutDepthUsage =
   "Usage: node scripts/ci-policy.mjs secrets-checkout-depth --workflow <path>";
 const secretsFixtureEvidenceUsage =
   "Usage: node scripts/ci-policy.mjs secrets-fixture-evidence --input <fixture-evidence.json> --false-positive-fixture <path>";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}`;
+const secretsNoSecretsReuseUsage =
+  "Usage: node scripts/ci-policy.mjs secrets-no-secrets-reuse --workflow <path> --script-path <path>";
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -70,6 +72,8 @@ const readRequiredOption = (options, key, commandUsage) => {
   }
   return value;
 };
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const getIndent = (line) => line.match(/^ */)?.[0].length ?? 0;
 
@@ -247,6 +251,27 @@ const hasFullHistoryFetchDepthInput = (step) => {
   const withBlock = getIndentedBlock(step, /^\s+with:\s*(?:#.*)?$/);
   return /^\s*fetch-depth:\s*(?:0|["']0["'])\s*(?:#.*)?$/m.test(withBlock);
 };
+
+const getSecretsScanStepsBlock = (workflow) => {
+  const jobsBlock = getIndentedBlock(workflow, /^\s*jobs:\s*(?:#.*)?$/);
+  const secretsJob = getIndentedBlock(jobsBlock, /^\s+secrets-scan:\s*(?:#.*)?$/);
+  return getIndentedBlock(secretsJob, /^\s+steps:\s*(?:#.*)?$/);
+};
+
+const hasSecretFilenameStepName = (step) =>
+  /^\s*(?:-\s*)?name:\s*["']?Secret filename and API key patterns["']?\s*(?:#.*)?$/m.test(step);
+
+const hasRunCommand = (step, scriptPath) => {
+  const escapedPath = escapeRegExp(scriptPath);
+  const runPattern = new RegExp(
+    `^\\s*(?:-\\s*)?run:\\s*["']?(?:\\./)?${escapedPath}["']?\\s*(?:#.*)?$`,
+    "m",
+  );
+  return runPattern.test(step);
+};
+
+const hasInlineSecretPatternList = (stepsBlock) =>
+  /OPENAI_API_KEY|ANTHROPIC_API_KEY|SECRET_PATTERNS|aws_secret_access_key/.test(stepsBlock);
 
 const isExternalActionReference = (actionReference) => !actionReference.startsWith("./");
 
@@ -606,9 +631,7 @@ const runSecretsCheckoutDepth = (args) => {
   const options = parseOptions(args);
   const workflowPath = readRequiredOption(options, "workflow", secretsCheckoutDepthUsage);
   const workflow = readWorkflowFile(workflowPath);
-  const jobsBlock = getIndentedBlock(workflow, /^\s*jobs:\s*(?:#.*)?$/);
-  const secretsJob = getIndentedBlock(jobsBlock, /^\s+secrets-scan:\s*(?:#.*)?$/);
-  const stepsBlock = getIndentedBlock(secretsJob, /^\s+steps:\s*(?:#.*)?$/);
+  const stepsBlock = getSecretsScanStepsBlock(workflow);
   const checkoutUsesPattern =
     /^\s*(?:-\s*)?uses:\s*['"]?actions\/checkout@[^\s'"]+['"]?\s*(?:#.*)?$/m;
   const checkoutSteps = getListItemBlocks(stepsBlock).filter((step) =>
@@ -629,6 +652,28 @@ const runSecretsCheckoutDepth = (args) => {
   );
 };
 
+const runSecretsNoSecretsReuse = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", secretsNoSecretsReuseUsage);
+  const scriptPath = readRequiredOption(options, "script-path", secretsNoSecretsReuseUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const stepsBlock = getSecretsScanStepsBlock(workflow);
+  const namedSecretGuardStep = getListItemBlocks(stepsBlock).find(hasSecretFilenameStepName);
+  const callsSharedScript =
+    namedSecretGuardStep !== undefined && hasRunCommand(namedSecretGuardStep, scriptPath);
+  const duplicatesPatternsInline = hasInlineSecretPatternList(stepsBlock);
+
+  if (callsSharedScript && !duplicatesPatternsInline) {
+    writeStdout(`no_secrets_reuse=pass\nshared_script=${scriptPath}\ninline_pattern_list=absent\n`);
+    return;
+  }
+
+  writeStdout(
+    `no_secrets_reuse=fail\nshared_script=${callsSharedScript ? scriptPath : "missing"}\ninline_pattern_list=${duplicatesPatternsInline ? "present" : "absent"}\n`,
+  );
+  fail(`CI must reuse the shared secret guard: secrets-scan must run ${scriptPath}`, 1);
+};
+
 const [command, ...args] = argv.slice(2);
 
 if (command === "duration-budget") {
@@ -645,6 +690,8 @@ if (command === "duration-budget") {
   runSecretsCheckoutDepth(args);
 } else if (command === "secrets-fixture-evidence") {
   runSecretsFixtureEvidence(args);
+} else if (command === "secrets-no-secrets-reuse") {
+  runSecretsNoSecretsReuse(args);
 } else {
   fail(usage, 2);
 }
