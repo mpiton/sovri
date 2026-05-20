@@ -31,6 +31,8 @@ const forbiddenJobsDurationBudgetUsage =
   "Usage: node scripts/ci-policy.mjs forbidden-jobs-duration-budget --forbidden-tools-ms <ms|missing|unknown> --forbidden-imports-ms <ms|missing|unknown>";
 const buildDockerNeedsUsage =
   "Usage: node scripts/ci-policy.mjs build-docker-needs --workflow <path>";
+const buildDockerSchedulerUsage =
+  "Usage: node scripts/ci-policy.mjs build-docker-scheduler --backend-checks <success|failure|cancelled|skipped> --supply-chain <success|failure|cancelled|skipped> --secrets-scan <success|failure|cancelled|skipped> --forbidden-tools <success|failure|cancelled|skipped> --forbidden-imports <success|failure|cancelled|skipped>";
 const actionPinningUsage = "Usage: node scripts/ci-policy.mjs action-pinning --workflow <path>";
 const gitleaksActionPinningUsage =
   "Usage: node scripts/ci-policy.mjs gitleaks-action-pinning --workflow <path> --metadata <gitleaks-pin-metadata.json>";
@@ -42,7 +44,7 @@ const secretsFixtureEvidenceUsage =
   "Usage: node scripts/ci-policy.mjs secrets-fixture-evidence --input <fixture-evidence.json> --false-positive-fixture <path>";
 const secretsNoSecretsReuseUsage =
   "Usage: node scripts/ci-policy.mjs secrets-no-secrets-reuse --workflow <path> --script-path <path> [--repo-root <path>]";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerNeedsUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -284,6 +286,34 @@ const runBuildDockerNeeds = (args) => {
     `build_docker_needs=fail\n${missingNeeds.map((job) => `missing_required_job=${job}\n`).join("")}`,
   );
   fail(`build-docker must need ${missingNeeds.join(", ")}`, 1);
+};
+
+const readJobState = (options, jobName) => {
+  const value = options.get(jobName);
+  if (value !== "success" && value !== "failure" && value !== "cancelled" && value !== "skipped") {
+    fail(`ERROR: --${jobName} must be "success", "failure", "cancelled", or "skipped".`, 2);
+  }
+  return value;
+};
+
+const runBuildDockerScheduler = (args) => {
+  const options = parseOptions(args);
+  const upstreamJobs = REQUIRED_BUILD_DOCKER_NEEDS.map((jobName) => [
+    jobName,
+    readJobState(options, jobName),
+  ]);
+  const failedJobs = upstreamJobs.filter(([, state]) => state !== "success");
+
+  if (failedJobs.length > 0) {
+    writeStdout(
+      `build_docker_eligible=false\nbuild_docker_result=skipped\n${failedJobs
+        .map(([jobName]) => `failed_upstream_job=${jobName}\n`)
+        .join("")}`,
+    );
+    return;
+  }
+
+  writeStdout("build_docker_eligible=true\nbuild_docker_result=eligible\n");
 };
 
 const readWorkflowFile = (workflowPath) => {
@@ -1155,6 +1185,8 @@ if (command === "duration-budget") {
   runForbiddenJobsDurationBudget(args);
 } else if (command === "build-docker-needs") {
   runBuildDockerNeeds(args);
+} else if (command === "build-docker-scheduler") {
+  runBuildDockerScheduler(args);
 } else if (command === "action-pinning") {
   runActionPinning(args);
 } else if (command === "gitleaks-action-pinning") {

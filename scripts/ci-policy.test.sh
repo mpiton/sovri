@@ -875,6 +875,114 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   done
 }
 
+run_build_docker_scheduler_failed_gate_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the backend-checks job succeeds
+  # And the supply-chain job succeeds
+  # And the secrets-scan job fails
+  # And the forbidden-tools job succeeds
+  # And the forbidden-imports job succeeds
+  node "$SCRIPT" build-docker-scheduler \
+    --backend-checks success \
+    --supply-chain success \
+    --secrets-scan failure \
+    --forbidden-tools success \
+    --forbidden-imports success \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker scheduler failed gate: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the workflow scheduler evaluates the build-docker job dependencies
+  # Then the build-docker job is not eligible to run
+  if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_eligible=false"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker scheduler failed gate: missing ineligible result
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the build-docker job result is "skipped"
+  if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_result=skipped"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker scheduler failed gate: missing skipped result
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_build_docker_scheduler_non_success_gate_case() {
+  local state stdout stderr stdout_file stderr_file ec combined
+
+  for state in cancelled skipped; do
+    stdout_file=$(mktemp)
+    stderr_file=$(mktemp)
+
+    node "$SCRIPT" build-docker-scheduler \
+      --backend-checks success \
+      --supply-chain success \
+      --secrets-scan "$state" \
+      --forbidden-tools success \
+      --forbidden-imports success \
+      >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+    stdout=$(cat "$stdout_file" 2>/dev/null || true)
+    stderr=$(cat "$stderr_file" 2>/dev/null || true)
+    rm -f "$stdout_file" "$stderr_file"
+    combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+    if [ "$ec" -ne 0 ]; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  x build-docker scheduler ${state} gate: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+      continue
+    fi
+
+    if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_result=skipped"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  x build-docker scheduler ${state} gate: missing skipped result
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+      continue
+    fi
+
+    if ! printf '%s\n' "$stdout" | grep -Fq "failed_upstream_job=secrets-scan"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  x build-docker scheduler ${state} gate: missing upstream evidence
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+      continue
+    fi
+
+    PASS=$((PASS + 1))
+  done
+}
+
 run_action_pinning_sha_pass_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec
 
@@ -4479,6 +4587,8 @@ run_build_docker_needs_inline_gates_case
 run_build_docker_needs_multiline_flow_gates_case
 run_build_docker_needs_scalar_gate_case
 run_build_docker_needs_missing_required_gate_case
+run_build_docker_scheduler_failed_gate_case
+run_build_docker_scheduler_non_success_gate_case
 run_duration_fail_case 300000
 run_duration_fail_case 360000
 run_duration_queue_exclusion_case
