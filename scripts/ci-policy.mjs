@@ -304,10 +304,26 @@ const findDirectChildEntry = (entries, parentEntry, childPattern) => {
   return undefined;
 };
 
+const findRootEntry = (entries, rootPattern) => {
+  const rootIndent = entries
+    .filter((entry) => {
+      const trimmedLine = entry.line.trim();
+      return trimmedLine.length > 0 && !trimmedLine.startsWith("#");
+    })
+    .map((entry) => getIndent(entry.line))
+    .reduce((lowestIndent, indent) => Math.min(lowestIndent, indent), Number.POSITIVE_INFINITY);
+
+  if (rootIndent === Number.POSITIVE_INFINITY) return undefined;
+
+  return entries.find(
+    (entry) => getIndent(entry.line) === rootIndent && rootPattern.test(entry.line),
+  );
+};
+
 const getBuildDockerStepsBlockEntry = (workflow) => {
-  const jobsPattern = /^jobs:\s*(?:#.*)?$/;
+  const jobsPattern = /^\s*jobs:\s*(?:#.*)?$/;
   const entries = getYamlStructureEntries(workflow);
-  const jobsEntry = entries.find((entry) => jobsPattern.test(entry.line));
+  const jobsEntry = findRootEntry(entries, jobsPattern);
   if (jobsEntry === undefined) return undefined;
 
   const buildDockerEntry = findDirectChildEntry(
