@@ -1073,6 +1073,64 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_secrets_checkout_missing_step_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo scan
+YAML
+
+  # Given the secrets-scan job contains no checkout step using "actions/checkout"
+  node "$SCRIPT" secrets-checkout-depth \
+    --workflow "$workflow_file" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # Then the checkout depth assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets checkout missing step: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$combined" | grep -Fq "checkout_depth=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets checkout missing step: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions the required full-history checkout configuration
+  if ! printf '%s\n' "$combined" | grep -Fq "secrets-scan must use actions/checkout with fetch-depth: 0"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets checkout missing step: missing checkout failure message
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_checkout_requires_steps_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec combined
 
@@ -1420,6 +1478,7 @@ run_audit_gate_high_without_advisory_name_case
 run_audit_gate_mixed_high_and_critical_prioritizes_critical_case
 run_audit_gate_critical_vulnerability_case
 run_secrets_checkout_depth_zero_case
+run_secrets_checkout_missing_step_case
 run_secrets_checkout_requires_steps_case
 run_secrets_checkout_rejects_shallow_checkout_case
 run_secrets_checkout_requires_with_fetch_depth_case
