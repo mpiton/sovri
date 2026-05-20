@@ -800,6 +800,81 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_build_docker_needs_missing_required_gate_case() {
+  local missing_job workflow_file stdout stderr stdout_file stderr_file ec combined job
+
+  for missing_job in \
+    "backend-checks" \
+    "supply-chain" \
+    "secrets-scan" \
+    "forbidden-tools" \
+    "forbidden-imports"; do
+    workflow_file=$(mktemp)
+    stdout_file=$(mktemp)
+    stderr_file=$(mktemp)
+
+    {
+      printf 'name: ci\n'
+      printf 'jobs:\n'
+      printf '  build-docker:\n'
+      printf '    needs:\n'
+      for job in \
+        "backend-checks" \
+        "supply-chain" \
+        "secrets-scan" \
+        "forbidden-tools" \
+        "forbidden-imports"; do
+        if [ "$job" != "$missing_job" ]; then
+          printf '      - %s\n' "$job"
+        fi
+      done
+      printf '    runs-on: ubuntu-latest\n'
+      printf '    steps:\n'
+      printf '      - run: echo build\n'
+    } >"$workflow_file"
+
+    # Given the build-docker job needs every required upstream job except "<missing_job>"
+    node "$SCRIPT" build-docker-needs --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+    stdout=$(cat "$stdout_file" 2>/dev/null || true)
+    stderr=$(cat "$stderr_file" 2>/dev/null || true)
+    rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+    combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+    # When the build-docker dependency rule is evaluated
+    # Then the build-docker dependency assertion fails
+    if [ "$ec" -eq 0 ]; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  x build-docker missing required gate ${missing_job}: expected non-zero exit
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+      continue
+    fi
+
+    if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_needs=fail"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  x build-docker missing required gate ${missing_job}: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+      continue
+    fi
+
+    # And the failure mentions "build-docker must need <missing_job>"
+    if ! printf '%s\n' "$combined" | grep -Fq "build-docker must need ${missing_job}"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  x build-docker missing required gate ${missing_job}: missing failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+      continue
+    fi
+
+    PASS=$((PASS + 1))
+  done
+}
+
 run_action_pinning_sha_pass_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec
 
@@ -4403,6 +4478,7 @@ run_build_docker_needs_required_gates_case
 run_build_docker_needs_inline_gates_case
 run_build_docker_needs_multiline_flow_gates_case
 run_build_docker_needs_scalar_gate_case
+run_build_docker_needs_missing_required_gate_case
 run_duration_fail_case 300000
 run_duration_fail_case 360000
 run_duration_queue_exclusion_case
