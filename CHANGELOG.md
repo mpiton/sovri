@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `ci`: reject secrets-scan no-secrets script invocations that would mask a
+  failing shared guard result (#684).
+
 - `ci`: add fixture coverage rejecting inline duplicated API-key pattern scans
   when secrets-scan does not run the shared no-secrets guard (#683).
 

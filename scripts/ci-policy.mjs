@@ -459,19 +459,22 @@ const getRunCommandLines = (step) => {
 
 const consumesShellOptionValue = (token) => /[oO]/.test(token.slice(1));
 
-const isSharedScriptRunCommand = (command, scriptPath) => {
+const getShellCommandTokens = (command) => {
   const commandWithoutComment = command.replace(/\s+#.*$/, "").trim();
-  const tokens = commandWithoutComment.split(/\s+/).filter(Boolean);
+  return commandWithoutComment.split(/\s+/).filter(Boolean);
+};
+
+const isScriptPathToken = (token, scriptPath) => {
+  const strippedToken = stripYamlQuotes(token);
+  return strippedToken === scriptPath || strippedToken === `./${scriptPath}`;
+};
+
+const getSharedScriptTokenIndex = (tokens, scriptPath) => {
   const firstToken = tokens[0];
-  if (firstToken === undefined) return false;
+  if (firstToken === undefined) return undefined;
 
-  const isScriptPathToken = (token) => {
-    const strippedToken = stripYamlQuotes(token);
-    return strippedToken === scriptPath || strippedToken === `./${scriptPath}`;
-  };
-
-  if (isScriptPathToken(firstToken)) return true;
-  if (firstToken !== "bash" && firstToken !== "sh") return false;
+  if (isScriptPathToken(firstToken, scriptPath)) return 0;
+  if (firstToken !== "bash" && firstToken !== "sh") return undefined;
 
   let scriptIndex = 1;
   while (scriptIndex < tokens.length) {
@@ -490,11 +493,45 @@ const isSharedScriptRunCommand = (command, scriptPath) => {
   }
 
   const scriptToken = tokens[scriptIndex];
-  return scriptToken !== undefined && isScriptPathToken(scriptToken);
+  if (scriptToken === undefined || !isScriptPathToken(scriptToken, scriptPath)) {
+    return undefined;
+  }
+
+  return scriptIndex;
+};
+
+const isSharedScriptRunCommand = (command, scriptPath) =>
+  getSharedScriptTokenIndex(getShellCommandTokens(command), scriptPath) !== undefined;
+
+const masksSharedScriptFailure = (command, scriptPath) => {
+  const tokens = getShellCommandTokens(command);
+  const scriptIndex = getSharedScriptTokenIndex(tokens, scriptPath);
+  if (scriptIndex === undefined) return false;
+
+  return tokens.slice(scriptIndex + 1).includes("||");
+};
+
+const hasStepContinueOnError = (step) => {
+  const lines = step.split(/\r?\n/);
+  const firstLine = lines[0];
+  if (firstLine === undefined) return false;
+
+  const stepIndent = getIndent(firstLine);
+  return lines.some(
+    (line) =>
+      getIndent(line) === stepIndent + 2 &&
+      /^\s*continue-on-error:\s*(?:true|["']true["'])\s*(?:#.*)?$/.test(line),
+  );
 };
 
 const hasRunCommand = (step, scriptPath) =>
   getRunCommandLines(step).some((command) => isSharedScriptRunCommand(command, scriptPath));
+
+const doesStepPropagateSharedScriptFailure = (step, scriptPath) =>
+  !hasStepContinueOnError(step) &&
+  getRunCommandLines(step)
+    .filter((command) => isSharedScriptRunCommand(command, scriptPath))
+    .every((command) => !masksSharedScriptFailure(command, scriptPath));
 
 const hasInlineSecretPatternList = (stepsBlock) =>
   /OPENAI_API_KEY|ANTHROPIC_API_KEY|SECRET_PATTERNS|aws_secret_access_key/.test(stepsBlock);
@@ -888,16 +925,25 @@ const runSecretsNoSecretsReuse = (args) => {
     getTopLevelListItemBlocks(stepsBlock).find(hasSecretFilenameStepName);
   const callsSharedScript =
     namedSecretGuardStep !== undefined && hasRunCommand(namedSecretGuardStep, scriptPath);
+  const scriptFailurePropagates =
+    namedSecretGuardStep !== undefined &&
+    callsSharedScript &&
+    doesStepPropagateSharedScriptFailure(namedSecretGuardStep, scriptPath);
   const duplicatesPatternsInline = hasInlineSecretPatternList(stepsBlock);
 
-  if (callsSharedScript && !duplicatesPatternsInline) {
-    writeStdout(`no_secrets_reuse=pass\nshared_script=${scriptPath}\ninline_pattern_list=absent\n`);
+  if (callsSharedScript && scriptFailurePropagates && !duplicatesPatternsInline) {
+    writeStdout(
+      `no_secrets_reuse=pass\nshared_script=${scriptPath}\ninline_pattern_list=absent\nscript_failure_propagation=pass\n`,
+    );
     return;
   }
 
   writeStdout(
-    `no_secrets_reuse=fail\nshared_script=${callsSharedScript ? scriptPath : "missing"}\ninline_pattern_list=${duplicatesPatternsInline ? "present" : "absent"}\n`,
+    `no_secrets_reuse=fail\nshared_script=${callsSharedScript ? scriptPath : "missing"}\ninline_pattern_list=${duplicatesPatternsInline ? "present" : "absent"}\nscript_failure_propagation=${callsSharedScript && !scriptFailurePropagates ? "fail" : "missing"}\n`,
   );
+  if (callsSharedScript && !scriptFailurePropagates) {
+    fail(`CI must fail when ${scriptPath} fails`, 1);
+  }
   fail(`CI must reuse the shared secret guard: secrets-scan must run ${scriptPath}`, 1);
 };
 
