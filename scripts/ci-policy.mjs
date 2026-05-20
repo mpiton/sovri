@@ -286,21 +286,35 @@ const runBuildDockerDurationBudget = (args) => {
   fail("build-docker must finish in under 10 minutes", 1);
 };
 
+const findDirectChildLine = (block, parentLine, childPattern) => {
+  const childIndent = getIndent(parentLine) + 2;
+  return block
+    .split(/\r?\n/)
+    .find((line) => getIndent(line) === childIndent && childPattern.test(line));
+};
+
 const getBuildDockerStepsBlock = (workflow) => {
   const jobsPattern = /^jobs:\s*(?:#.*)?$/;
   const jobsStructure = getIndentedBlock(workflow, jobsPattern);
   const jobsBlock = getIndentedBlockRaw(workflow, jobsPattern);
-  const buildDockerHeader = jobsStructure
-    .split(/\r?\n/)
-    .find((line) => /^\s+build-docker:\s*(?:&[^\s#]+)?\s*(?:#.*)?$/.test(line));
+  const jobsHeader = jobsStructure.split(/\r?\n/)[0];
+  if (jobsHeader === undefined) return "";
+
+  const buildDockerHeader = findDirectChildLine(
+    jobsStructure,
+    jobsHeader,
+    /^\s+build-docker:\s*(?:&[^\s#]+)?\s*(?:#.*)?$/,
+  );
   if (buildDockerHeader === undefined) return "";
 
   const buildDockerPattern = exactLinePattern(buildDockerHeader);
   const buildDockerStructure = getIndentedBlock(jobsStructure, buildDockerPattern);
   const buildDockerJob = getIndentedBlockRaw(jobsBlock, buildDockerPattern);
-  const stepsHeader = buildDockerStructure
-    .split(/\r?\n/)
-    .find((line) => /^\s+steps:\s*(?:#.*)?$/.test(line));
+  const stepsHeader = findDirectChildLine(
+    buildDockerStructure,
+    buildDockerHeader,
+    /^\s+steps:\s*(?:#.*)?$/,
+  );
   if (stepsHeader === undefined) return "";
 
   return getIndentedBlockRaw(buildDockerJob, exactLinePattern(stepsHeader));
