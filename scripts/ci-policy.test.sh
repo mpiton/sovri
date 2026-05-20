@@ -345,6 +345,57 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_secrets_duration_queue_exclusion_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the secrets-scan workflow run waits in the GitHub Actions queue for 120000 ms
+  # And the secrets-scan job runs for 45000 ms after the runner starts
+  node "$SCRIPT" secrets-duration-budget \
+    --workflow-trigger-ms 0 \
+    --job-start-ms 120000 \
+    --job-end-ms 165000 \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets duration queue exclusion: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # Then the measured duration is 45000 ms
+  if ! printf '%s\n' "$combined" | grep -Fq "measured_duration_ms=45000"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets duration queue exclusion: missing measured duration
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the duration budget assertion passes
+  if ! printf '%s\n' "$combined" | grep -Fq "duration_budget=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets duration queue exclusion: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_invalid_cache_state_case() {
   local stdout stderr stdout_file stderr_file ec
 
@@ -2543,6 +2594,7 @@ run_secrets_duration_pass_case 15000 "15 s"
 run_secrets_duration_pass_case 59999 "59.999 s"
 run_secrets_duration_fail_case 60000
 run_secrets_duration_fail_case 90000
+run_secrets_duration_queue_exclusion_case
 run_duration_fail_case 300000
 run_duration_fail_case 360000
 run_duration_queue_exclusion_case
