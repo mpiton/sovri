@@ -883,6 +883,63 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_audit_gate_mixed_high_and_critical_prioritizes_critical_case() {
+  local audit_file stdout stderr stdout_file stderr_file ec combined
+
+  audit_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$audit_file" <<'JSON'
+{
+  "metadata": {
+    "vulnerabilities": {
+      "low": 0,
+      "moderate": 0,
+      "high": 1,
+      "critical": 1
+    }
+  },
+  "advisories": {
+    "GHSA-high-0001": {
+      "severity": "high"
+    }
+  }
+}
+JSON
+
+  node "$SCRIPT" audit-gate \
+    --input "$audit_file" \
+    --audit-level high \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$audit_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x audit gate mixed high and critical: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$combined" | grep -Fq "critical vulnerabilities"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x audit gate mixed high and critical: missing critical failure message
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_duration_pass_case 180000 "180 s"
 run_duration_pass_case 299999 "299.999 s"
 run_duration_fail_case 300000
@@ -900,6 +957,7 @@ run_audit_gate_no_high_or_critical_case
 run_audit_gate_missing_vulnerability_metadata_case
 run_audit_gate_high_vulnerability_case
 run_audit_gate_high_without_advisory_name_case
+run_audit_gate_mixed_high_and_critical_prioritizes_critical_case
 
 if [ "$FAIL" -ne 0 ]; then
   printf 'ci-policy tests: %s passed, %s failed\n%s\n' "$PASS" "$FAIL" "$FAILURES" >&2

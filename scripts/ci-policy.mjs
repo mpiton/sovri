@@ -253,6 +253,11 @@ const runAuditGate = (args) => {
   const highCount = getAuditSeverityCount(vulnerabilities, "high");
   const criticalCount = getAuditSeverityCount(vulnerabilities, "critical");
 
+  if (criticalCount > 0) {
+    writeStdout("audit_gate=fail\n");
+    fail("pnpm audit reported critical vulnerabilities", 1);
+  }
+
   if (highCount > 0) {
     const highAdvisories = getAuditAdvisoryNames(report, "high");
     const highFailureReason =
@@ -261,11 +266,6 @@ const runAuditGate = (args) => {
         : `high severity vulnerability ${highAdvisories.join(", ")}`;
     writeStdout("audit_gate=fail\n");
     fail(highFailureReason, 1);
-  }
-
-  if (criticalCount > 0) {
-    writeStdout("audit_gate=fail\n");
-    fail("pnpm audit reported critical vulnerabilities", 1);
   }
 
   writeStdout("audit_gate=pass\n");
