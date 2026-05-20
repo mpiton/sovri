@@ -228,20 +228,41 @@ const runForbiddenJobsDurationBudget = (args) => {
   );
 };
 
+const parseYamlScalarListValue = (value) => {
+  const trimmedValue = value.trim();
+  if (!trimmedValue.startsWith("[") || !trimmedValue.endsWith("]")) {
+    return [stripYamlQuotes(trimmedValue)];
+  }
+
+  return trimmedValue
+    .slice(1, -1)
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+    .map((entry) => stripYamlQuotes(entry));
+};
+
+const readYamlNeedsValues = (needsBlock) => {
+  const inlineValue = needsBlock.match(/^[ \t]*needs:[ \t]*(.*?)[ \t]*(?:#.*)?$/m)?.[1]?.trim();
+  if (inlineValue !== undefined && inlineValue.length > 0) {
+    return parseYamlScalarListValue(inlineValue);
+  }
+
+  return needsBlock
+    .split(/\r?\n/)
+    .map((line) => line.match(/^\s*-\s+(.+?)\s*(?:#.*)?$/)?.[1])
+    .filter((value) => value !== undefined)
+    .map((value) => stripYamlQuotes(value));
+};
+
 const runBuildDockerNeeds = (args) => {
   const options = parseOptions(args);
   const workflowPath = readRequiredOption(options, "workflow", buildDockerNeedsUsage);
   const workflow = readWorkflowFile(workflowPath);
   const jobsBlock = getIndentedBlock(workflow, /^\s*jobs:\s*(?:#.*)?$/);
   const buildDockerJob = getIndentedBlock(jobsBlock, /^\s+build-docker:\s*(?:#.*)?$/);
-  const needsBlock = getIndentedBlock(buildDockerJob, /^\s+needs:\s*(?:#.*)?$/);
-  const needs = new Set(
-    needsBlock
-      .split(/\r?\n/)
-      .map((line) => line.match(/^\s*-\s+(.+?)\s*(?:#.*)?$/)?.[1])
-      .filter((value) => value !== undefined)
-      .map((value) => stripYamlQuotes(value)),
-  );
+  const needsBlock = getIndentedBlock(buildDockerJob, /^\s+needs:\s*(?:.*)?$/);
+  const needs = new Set(readYamlNeedsValues(needsBlock));
   const missingNeeds = REQUIRED_BUILD_DOCKER_NEEDS.filter((job) => !needs.has(job));
 
   if (missingNeeds.length === 0) {
