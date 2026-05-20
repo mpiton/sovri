@@ -1880,6 +1880,74 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_secrets_no_secrets_reuse_symlink_script_file_case() {
+  local sandbox repo_root outside_root script_file workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  sandbox=$(mktemp -d)
+  repo_root="$sandbox/repo"
+  outside_root="$sandbox/outside"
+  script_file="$outside_root/no-secrets.sh"
+  workflow_file="$repo_root/.github/workflows/ci.yml"
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+  mkdir -p "$repo_root/.github/workflows" "$repo_root/scripts" "$outside_root"
+  printf '#!/bin/sh\nexit 0\n' >"$script_file"
+  ln -s "$script_file" "$repo_root/scripts/no-secrets.sh"
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Secret filename and API key patterns
+        run: scripts/no-secrets.sh
+YAML
+
+  # Given the repo-local script path is a symlink to a file outside the repository
+  node "$SCRIPT" secrets-no-secrets-reuse \
+    --workflow "$workflow_file" \
+    --script-path scripts/no-secrets.sh \
+    --repo-root "$repo_root" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -rf "$sandbox"
+  rm -f "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # Then the no-secrets reuse assertion treats it as a missing repo script
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets no-secrets reuse symlink script file: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "script_file=missing"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets no-secrets reuse symlink script file: missing script file marker
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stderr" | grep -Fq "scripts/no-secrets.sh is required"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets no-secrets reuse symlink script file: missing required script message
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_no_secrets_reuse_fake_step_in_run_block_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec combined
 
@@ -4037,6 +4105,7 @@ run_secrets_no_secrets_reuse_inline_patterns_with_script_case
 run_secrets_no_secrets_reuse_missing_script_file_case
 run_secrets_no_secrets_reuse_parent_traversal_script_file_case
 run_secrets_no_secrets_reuse_absolute_script_file_case
+run_secrets_no_secrets_reuse_symlink_script_file_case
 run_secrets_no_secrets_reuse_fake_step_in_run_block_case
 run_secrets_no_secrets_reuse_folded_scalar_bypass_case
 run_secrets_no_secrets_reuse_nested_run_field_case

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync, statSync, writeSync } from "node:fs";
+import { readFileSync, realpathSync, statSync, writeSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { argv, exit } from "node:process";
 
@@ -181,6 +181,14 @@ const isRegularFile = (path) => {
   }
 };
 
+const readRealPath = (path) => {
+  try {
+    return realpathSync(path);
+  } catch {
+    return undefined;
+  }
+};
+
 const isPathInsideDirectory = (directory, path) => {
   const relativePath = relative(directory, path);
   return relativePath.length === 0 || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
@@ -191,7 +199,17 @@ const isRepoRelativeRegularFile = (repoRoot, path) => {
 
   const resolvedRepoRoot = resolve(repoRoot);
   const resolvedPath = resolve(resolvedRepoRoot, path);
-  return isPathInsideDirectory(resolvedRepoRoot, resolvedPath) && isRegularFile(resolvedPath);
+  if (!isPathInsideDirectory(resolvedRepoRoot, resolvedPath) || !isRegularFile(resolvedPath)) {
+    return false;
+  }
+
+  const realRepoRoot = readRealPath(resolvedRepoRoot);
+  const realPath = readRealPath(resolvedPath);
+  return (
+    realRepoRoot !== undefined &&
+    realPath !== undefined &&
+    isPathInsideDirectory(realRepoRoot, realPath)
+  );
 };
 
 const extractActionReferences = (workflow) => {
