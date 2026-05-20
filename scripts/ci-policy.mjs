@@ -16,6 +16,7 @@ const HEX_SHA_SUFFIX_PATTERN = /@([0-9a-f]+)$/;
 const USES_LINE_PATTERN = /^\s*(?:-\s*)?uses:\s*['"]?([^'"\s#]+)['"]?\s*(?:#.*)?$/;
 const BLOCK_SCALAR_PATTERN = /:\s*[>|](?:[+-]?[1-9]?|[1-9][+-]?)?\s*(?:#.*)?$/;
 const GITLEAKS_ACTION_REPOSITORY = "gitleaks/gitleaks-action";
+const DOCKER_BUILD_ACTION_REPOSITORY = "docker/build-push-action";
 const REQUIRED_BUILD_DOCKER_NEEDS = [
   "backend-checks",
   "supply-chain",
@@ -32,6 +33,8 @@ const forbiddenJobsDurationBudgetUsage =
   "Usage: node scripts/ci-policy.mjs forbidden-jobs-duration-budget --forbidden-tools-ms <ms|missing|unknown> --forbidden-imports-ms <ms|missing|unknown>";
 const buildDockerDurationBudgetUsage =
   "Usage: node scripts/ci-policy.mjs build-docker-duration-budget --job-start-ms <ms> --job-end-ms <ms> --github-actions-cache <enabled|missing>";
+const dockerBuildActionUsage =
+  "Usage: node scripts/ci-policy.mjs docker-build-action --workflow <path>";
 const buildDockerNeedsUsage =
   "Usage: node scripts/ci-policy.mjs build-docker-needs --workflow <path>";
 const buildDockerSchedulerUsage =
@@ -47,7 +50,7 @@ const secretsFixtureEvidenceUsage =
   "Usage: node scripts/ci-policy.mjs secrets-fixture-evidence --input <fixture-evidence.json> --false-positive-fixture <path>";
 const secretsNoSecretsReuseUsage =
   "Usage: node scripts/ci-policy.mjs secrets-no-secrets-reuse --workflow <path> --script-path <path> [--repo-root <path>]";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -276,6 +279,80 @@ const runBuildDockerDurationBudget = (args) => {
     `measured_duration_ms=${elapsedMs}\nduration_budget=fail\nreported_duration=${formatBuildDockerDuration(elapsedMs)}\n`,
   );
   fail("build-docker must finish in under 10 minutes", 1);
+};
+
+const getBuildDockerStepsBlock = (workflow) => {
+  const jobsBlock = getIndentedBlock(workflow, /^\s*jobs:\s*(?:#.*)?$/);
+  const buildDockerJob = getIndentedBlock(jobsBlock, /^\s+build-docker:\s*(?:#.*)?$/);
+  return getIndentedBlock(buildDockerJob, /^\s+steps:\s*(?:#.*)?$/);
+};
+
+const getStepInput = (step, inputName) => {
+  const inputPattern = new RegExp(`^\\s*${inputName}:\\s*(.+?)\\s*(?:#.*)?$`, "m");
+  const value = step.match(inputPattern)?.[1]?.trim();
+  return value === undefined ? undefined : stripYamlQuotes(value);
+};
+
+const getDockerPlatformBoundary = (platformsValue) => {
+  const platforms = platformsValue
+    .split(",")
+    .map((platform) => platform.trim())
+    .filter((platform) => platform.length > 0);
+  const hasAmd64 = platforms.includes("linux/amd64");
+  const hasArm64 = platforms.includes("linux/arm64");
+
+  if (!hasArm64) {
+    return { outcome: "rejected", reason: "arm64 platform is missing" };
+  }
+  if (!hasAmd64) {
+    return { outcome: "rejected", reason: "amd64 platform is missing" };
+  }
+  if (platforms.length !== 2) {
+    return { outcome: "rejected", reason: "extra platform is outside the v0.1 contract" };
+  }
+  return { outcome: "accepted", reason: "required amd64 and arm64 platforms present" };
+};
+
+const runDockerBuildAction = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", dockerBuildActionUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const stepsBlock = getBuildDockerStepsBlock(workflow);
+  const buildStep = getListItemBlocks(stepsBlock).find((step) =>
+    new RegExp(`^\\s*(?:-\\s*)?uses:\\s*['"]?${DOCKER_BUILD_ACTION_REPOSITORY}@`, "m").test(step),
+  );
+
+  if (buildStep === undefined) {
+    writeStdout("docker_build_action=fail\n");
+    fail(`build-docker must use ${DOCKER_BUILD_ACTION_REPOSITORY}`, 1);
+  }
+
+  const push = getStepInput(buildStep, "push");
+  const platforms = getStepInput(buildStep, "platforms") ?? "";
+  const cacheFrom = getStepInput(buildStep, "cache-from");
+  const cacheTo = getStepInput(buildStep, "cache-to");
+  const platformBoundary = getDockerPlatformBoundary(platforms);
+
+  if (push !== "false") {
+    writeStdout("docker_build_action=fail\n");
+    fail("build-docker must use push: false", 1);
+  }
+
+  if (platformBoundary.outcome === "rejected") {
+    writeStdout(
+      `docker_build_action=fail\nplatform_outcome=rejected\nboundary_reason=${platformBoundary.reason}\n`,
+    );
+    fail(platformBoundary.reason, 1);
+  }
+
+  if (cacheFrom !== "type=gha" || cacheTo !== "type=gha,mode=max") {
+    writeStdout("docker_build_action=fail\n");
+    fail("Docker build must use GitHub Actions cache", 1);
+  }
+
+  writeStdout(
+    `docker_build_action=pass\nbuild_classification=ci-verification\nplatform_outcome=accepted\nboundary_reason=${platformBoundary.reason}\n`,
+  );
 };
 
 const parseYamlScalarListValue = (value) => {
@@ -1238,6 +1315,8 @@ if (command === "duration-budget") {
   runForbiddenJobsDurationBudget(args);
 } else if (command === "build-docker-duration-budget") {
   runBuildDockerDurationBudget(args);
+} else if (command === "docker-build-action") {
+  runDockerBuildAction(args);
 } else if (command === "build-docker-needs") {
   runBuildDockerNeeds(args);
 } else if (command === "build-docker-scheduler") {
