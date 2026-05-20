@@ -206,6 +206,19 @@ const getAuditSeverityCount = (vulnerabilities, severity) => {
   return count;
 };
 
+const getAuditAdvisoryNames = (report, severity) => {
+  if (typeof report !== "object" || report === null) return [];
+  const advisories = report.advisories;
+  if (typeof advisories !== "object" || advisories === null) return [];
+
+  return Object.entries(advisories)
+    .filter(([, advisory]) => {
+      if (typeof advisory !== "object" || advisory === null) return false;
+      return advisory.severity === severity;
+    })
+    .map(([name]) => name);
+};
+
 const runActionPinning = (args) => {
   const options = parseOptions(args);
   const workflowPath = readRequiredOption(options, "workflow", actionPinningUsage);
@@ -240,8 +253,19 @@ const runAuditGate = (args) => {
   const highCount = getAuditSeverityCount(vulnerabilities, "high");
   const criticalCount = getAuditSeverityCount(vulnerabilities, "critical");
 
-  if (highCount > 0 || criticalCount > 0) {
-    fail("pnpm audit reported high or critical vulnerabilities", 1);
+  if (criticalCount > 0) {
+    writeStdout("audit_gate=fail\n");
+    fail("pnpm audit reported critical vulnerabilities", 1);
+  }
+
+  if (highCount > 0) {
+    const highAdvisories = getAuditAdvisoryNames(report, "high");
+    const highFailureReason =
+      highAdvisories.length === 0
+        ? `pnpm audit reported ${highCount} high severity vulnerability`
+        : `high severity vulnerability ${highAdvisories.join(", ")}`;
+    writeStdout("audit_gate=fail\n");
+    fail(highFailureReason, 1);
   }
 
   writeStdout("audit_gate=pass\n");
