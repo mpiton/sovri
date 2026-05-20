@@ -128,6 +128,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `ci`: add a secrets-scan duration budget policy that accepts runs strictly
+  below one minute (#678).
+
 - `ci`: add a Gitleaks action pinning policy for the `secrets-scan` job that
   accepts full commit SHA pins with v2 release-line provenance (#672).
 

@@ -6,6 +6,7 @@ const writeStdout = (chunk) => writeSync(1, chunk);
 const writeStderr = (chunk) => writeSync(2, chunk);
 
 const DURATION_BUDGET_MS = 300000;
+const SECRETS_SCAN_DURATION_BUDGET_MS = 60000;
 const FULL_COMMIT_SHA_LENGTH = 40;
 const PINNED_EXTERNAL_ACTION_PATTERN = /@[0-9a-f]{40}$/;
 const HEX_SHA_SUFFIX_PATTERN = /@([0-9a-f]+)$/;
@@ -15,6 +16,8 @@ const GITLEAKS_ACTION_REPOSITORY = "gitleaks/gitleaks-action";
 
 const durationBudgetUsage =
   "Usage: node scripts/ci-policy.mjs duration-budget --job-start-ms <ms> --job-end-ms <ms> --pnpm-cache hit --turbo-cache hit";
+const secretsDurationBudgetUsage =
+  "Usage: node scripts/ci-policy.mjs secrets-duration-budget --job-start-ms <ms> --job-end-ms <ms>";
 const actionPinningUsage = "Usage: node scripts/ci-policy.mjs action-pinning --workflow <path>";
 const gitleaksActionPinningUsage =
   "Usage: node scripts/ci-policy.mjs gitleaks-action-pinning --workflow <path> --metadata <gitleaks-pin-metadata.json>";
@@ -24,7 +27,7 @@ const secretsCheckoutDepthUsage =
   "Usage: node scripts/ci-policy.mjs secrets-checkout-depth --workflow <path>";
 const secretsFixtureEvidenceUsage =
   "Usage: node scripts/ci-policy.mjs secrets-fixture-evidence --input <fixture-evidence.json> --false-positive-fixture <path>";
-const usage = `${durationBudgetUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -134,6 +137,29 @@ const runDurationBudget = (args) => {
     `measured_duration_ms=${elapsedMs}\nduration_budget=unsupported\nreported_duration=${formatDuration(elapsedMs)}\n`,
   );
   exit(2);
+};
+
+const runSecretsDurationBudget = (args) => {
+  const options = parseOptions(args);
+  const startMs = readInteger(options, "job-start-ms");
+  const endMs = readInteger(options, "job-end-ms");
+  const elapsedMs = endMs - startMs;
+
+  if (elapsedMs < 0) {
+    fail("ERROR: --job-end-ms must be greater than or equal to --job-start-ms.", 2);
+  }
+
+  if (elapsedMs < SECRETS_SCAN_DURATION_BUDGET_MS) {
+    writeStdout(
+      `measured_duration_ms=${elapsedMs}\nduration_budget=pass\nreported_duration=${formatDuration(elapsedMs)}\n`,
+    );
+    return;
+  }
+
+  writeStdout(
+    `measured_duration_ms=${elapsedMs}\nduration_budget=fail\nreported_duration=${formatDuration(elapsedMs)}\n`,
+  );
+  fail("secrets-scan must finish in under 1 minute", 1);
 };
 
 const readWorkflowFile = (workflowPath) => {
@@ -607,6 +633,8 @@ const [command, ...args] = argv.slice(2);
 
 if (command === "duration-budget") {
   runDurationBudget(args);
+} else if (command === "secrets-duration-budget") {
+  runSecretsDurationBudget(args);
 } else if (command === "action-pinning") {
   runActionPinning(args);
 } else if (command === "gitleaks-action-pinning") {

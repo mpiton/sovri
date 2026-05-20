@@ -240,6 +240,59 @@ $(printf '%s\n' "$stdout" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_secrets_duration_pass_case() {
+  local elapsed_ms="$1"
+  local reported_duration="$2"
+  local end_ms stdout stderr stdout_file stderr_file ec
+
+  end_ms=$((100000 + elapsed_ms))
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the secrets-scan job starts at monotonic time 100000 ms
+  # And the secrets-scan job completes after <elapsed_ms> ms
+  node "$SCRIPT" secrets-duration-budget \
+    --job-start-ms 100000 \
+    --job-end-ms "$end_ms" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the secrets-scan duration budget is evaluated
+  # Then the duration budget assertion passes
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets duration pass ${elapsed_ms} ms: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "duration_budget=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets duration pass ${elapsed_ms} ms: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the reported secrets-scan duration is "<reported_duration>"
+  if ! printf '%s\n' "$stdout" | grep -Fq "reported_duration=${reported_duration}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets duration pass ${elapsed_ms} ms: missing reported duration ${reported_duration}
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_invalid_cache_state_case() {
   local stdout stderr stdout_file stderr_file ec
 
@@ -2434,6 +2487,8 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
 
 run_duration_pass_case 180000 "180 s"
 run_duration_pass_case 299999 "299.999 s"
+run_secrets_duration_pass_case 15000 "15 s"
+run_secrets_duration_pass_case 59999 "59.999 s"
 run_duration_fail_case 300000
 run_duration_fail_case 360000
 run_duration_queue_exclusion_case
