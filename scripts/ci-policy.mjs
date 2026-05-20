@@ -306,7 +306,8 @@ const getStepInput = (step, inputName) => {
     if (getIndent(line) <= inputIndent) break;
     scalarLines.push(line.trim());
   }
-  return scalarLines.join("\n");
+  const scalarSeparator = /:\s*>/.test(inputLine) ? " " : "\n";
+  return scalarLines.join(scalarSeparator);
 };
 
 const getDockerPlatformBoundary = (platformsValue) => {
