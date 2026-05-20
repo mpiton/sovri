@@ -563,6 +563,75 @@ $(printf '%s\n' "$stderr" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_build_docker_needs_required_gates_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    needs:
+      - backend-checks
+      - supply-chain
+      - secrets-scan
+      - forbidden-tools
+      - forbidden-imports
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+YAML
+
+  # Given the build-docker job has these `needs` entries:
+  #   | job               |
+  #   | backend-checks    |
+  #   | supply-chain      |
+  #   | secrets-scan      |
+  #   | forbidden-tools   |
+  #   | forbidden-imports |
+  node "$SCRIPT" build-docker-needs --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker required gates pass: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the build-docker dependency rule is evaluated
+  # Then the build-docker dependency assertion passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_needs=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker required gates pass: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And no required upstream job is reported missing
+  if printf '%s\n' "$stdout" | grep -Fq "missing_required_job="; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker required gates pass: unexpected missing required job
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_action_pinning_sha_pass_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec
 
@@ -4162,6 +4231,7 @@ run_forbidden_jobs_duration_fail_case 12000 missing "missing monitored job: forb
 run_forbidden_jobs_duration_fail_case missing 18000 "missing monitored job: forbidden-tools"
 run_forbidden_jobs_duration_fail_case 12000 unknown "missing duration evidence for forbidden-imports"
 run_forbidden_jobs_duration_fail_case unknown 18000 "missing duration evidence for forbidden-tools"
+run_build_docker_needs_required_gates_case
 run_duration_fail_case 300000
 run_duration_fail_case 360000
 run_duration_queue_exclusion_case
