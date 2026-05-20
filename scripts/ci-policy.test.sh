@@ -1720,6 +1720,64 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_false_positive_fixture_empty_reason_case() {
+  local evidence_file stdout stderr stdout_file stderr_file ec combined
+
+  evidence_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$evidence_file" <<'JSON'
+{
+  "fixtures": [
+    {
+      "path": "tests/fixtures/secrets/benign-github-token-like-string.txt",
+      "matches": [
+        {
+          "id": "github-token-benign-fixture",
+          "status": "resolved",
+          "resolution_reason": ""
+        }
+      ]
+    }
+  ]
+}
+JSON
+
+  # Given the false-positive fixture has an empty resolution reason
+  node "$SCRIPT" secrets-fixture-evidence \
+    --input "$evidence_file" \
+    --false-positive-fixture "tests/fixtures/secrets/benign-github-token-like-string.txt" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$evidence_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # Then the false-positive fixture assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x false-positive fixture empty reason: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$combined" | grep -Fq "fixture_evidence=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x false-positive fixture empty reason: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_duration_pass_case 180000 "180 s"
 run_duration_pass_case 299999 "299.999 s"
 run_duration_fail_case 300000
@@ -1754,6 +1812,7 @@ run_secrets_checkout_ignores_scalar_job_key_case
 run_secrets_checkout_ignores_scalar_step_case
 run_false_positive_fixture_resolved_case "benign documentation token shape"
 run_false_positive_fixture_resolved_case "intentionally fake token test value"
+run_false_positive_fixture_empty_reason_case
 
 if [ "$FAIL" -ne 0 ]; then
   printf 'ci-policy tests: %s passed, %s failed\n%s\n' "$PASS" "$FAIL" "$FAILURES" >&2

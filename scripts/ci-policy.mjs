@@ -352,7 +352,11 @@ const getFixtureMatches = (fixture) => {
 
 const isResolvedMatch = (match) => {
   if (typeof match !== "object" || match === null) return false;
-  return match.status === "resolved" && typeof match.resolution_reason === "string";
+  return (
+    match.status === "resolved" &&
+    typeof match.resolution_reason === "string" &&
+    match.resolution_reason.trim().length > 0
+  );
 };
 
 const getMatchId = (match) => {
