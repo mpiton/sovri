@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `ci`: report named high severity vulnerabilities from the supply-chain audit
+  gate failure output (#656).
+
 - `ci`: `scripts/ci-policy.mjs` now writes machine-readable output via
   `fs.writeSync` instead of the buffered `process.stdout`/`stderr` streams so
   the immediate `process.exit()` on failure paths cannot truncate the payload
