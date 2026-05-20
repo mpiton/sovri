@@ -255,8 +255,12 @@ const runAuditGate = (args) => {
 
   if (highCount > 0) {
     const highAdvisories = getAuditAdvisoryNames(report, "high");
+    const highFailureReason =
+      highAdvisories.length === 0
+        ? `pnpm audit reported ${highCount} high severity vulnerability`
+        : `high severity vulnerability ${highAdvisories.join(", ")}`;
     writeStdout("audit_gate=fail\n");
-    fail(`high severity vulnerability ${highAdvisories.join(", ")}`, 1);
+    fail(highFailureReason, 1);
   }
 
   if (criticalCount > 0) {
