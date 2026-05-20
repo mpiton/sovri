@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `ci`: add fixture coverage rejecting forty-character Gitleaks action pins
+  that contain non-lowercase-hex characters (#676).
+
 - `ci`: add fixture coverage for 39/40/41-character SHA boundary handling in
   the secrets-scan Gitleaks action policy (#675).
 

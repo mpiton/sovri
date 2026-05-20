@@ -647,6 +647,85 @@ run_gitleaks_action_pinning_sha_boundary_case() {
     "41 hexadecimal characters is too long"
 }
 
+run_gitleaks_action_pinning_invalid_sha_class_example() {
+  local sha_ref="$1"
+  local reason="$2"
+  local action_ref workflow_file metadata_file stdout stderr stdout_file stderr_file ec combined
+
+  action_ref="gitleaks/gitleaks-action@${sha_ref}"
+  workflow_file=$(mktemp)
+  metadata_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ${action_ref}
+YAML
+
+  cat >"$metadata_file" <<JSON
+{
+  "pins": [
+    {
+      "action_ref": "${action_ref}",
+      "source_release_line": "v2"
+    }
+  ]
+}
+JSON
+
+  # Given the secrets-scan job contains a forty-character non-lowercase-hex SHA
+  # And the action pin metadata records source release line "v2"
+  node "$SCRIPT" gitleaks-action-pinning \
+    --workflow "$workflow_file" \
+    --metadata "$metadata_file" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$metadata_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # Then the Gitleaks action assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x gitleaks action pinning invalid SHA ${sha_ref}: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "<reason>"
+  if ! printf '%s\n' "$combined" | grep -Fq "$reason"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x gitleaks action pinning invalid SHA ${sha_ref}: missing failure reason ${reason}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_gitleaks_action_pinning_invalid_sha_class_case() {
+  run_gitleaks_action_pinning_invalid_sha_class_example \
+    "123456789012345678901234567890123456789A" \
+    "SHA must use lowercase hexadecimal characters"
+  run_gitleaks_action_pinning_invalid_sha_class_example \
+    "123456789012345678901234567890123456789g" \
+    "SHA must use lowercase hexadecimal characters"
+  run_gitleaks_action_pinning_invalid_sha_class_example \
+    "123456789012345678901234567890123456789_" \
+    "SHA must use lowercase hexadecimal characters"
+}
+
 run_action_pinning_no_external_refs_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec
 
@@ -2300,6 +2379,7 @@ run_gitleaks_action_pinning_sha_pass_case
 run_gitleaks_action_pinning_missing_action_case
 run_gitleaks_action_pinning_moving_v2_case
 run_gitleaks_action_pinning_sha_boundary_case
+run_gitleaks_action_pinning_invalid_sha_class_case
 run_action_pinning_no_external_refs_case
 run_action_pinning_moving_refs_case
 run_action_pinning_sha_boundary_case
