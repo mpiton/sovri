@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `ci`: report a configuration error when the secrets-scan workflow references
+  the shared no-secrets guard but the script file is missing (#685).
+
 - `ci`: reject secrets-scan no-secrets script invocations that would mask a
   failing shared guard result (#684).
 

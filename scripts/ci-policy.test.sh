@@ -1684,6 +1684,69 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_secrets_no_secrets_reuse_missing_script_file_case() {
+  local repo_root workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  repo_root=$(mktemp -d)
+  workflow_file="$repo_root/.github/workflows/ci.yml"
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+  mkdir -p "$repo_root/.github/workflows"
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Secret filename and API key patterns
+        run: scripts/no-secrets.sh
+YAML
+
+  # Given the workflow runs the shared guard but the repository does not contain it
+  node "$SCRIPT" secrets-no-secrets-reuse \
+    --workflow "$workflow_file" \
+    --script-path scripts/no-secrets.sh \
+    --repo-root "$repo_root" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -rf "$repo_root"
+  rm -f "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # Then the no-secrets reuse assertion fails as a configuration error
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets no-secrets reuse missing script file: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "script_file=missing"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets no-secrets reuse missing script file: missing script file marker
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stderr" | grep -Fq "scripts/no-secrets.sh is required"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets no-secrets reuse missing script file: missing required script message
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_no_secrets_reuse_fake_step_in_run_block_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec combined
 
@@ -3838,6 +3901,7 @@ run_secrets_no_secrets_reuse_quoted_status_rethrow_case
 run_secrets_no_secrets_reuse_continue_on_error_expression_case
 run_secrets_no_secrets_reuse_continue_on_error_false_expression_case
 run_secrets_no_secrets_reuse_inline_patterns_with_script_case
+run_secrets_no_secrets_reuse_missing_script_file_case
 run_secrets_no_secrets_reuse_fake_step_in_run_block_case
 run_secrets_no_secrets_reuse_folded_scalar_bypass_case
 run_secrets_no_secrets_reuse_nested_run_field_case
