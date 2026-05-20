@@ -423,7 +423,8 @@ const getInputFromWithBlock = (withBlock, inputName) => {
 
   for (let inputIndex = 1; inputIndex < lines.length; inputIndex += 1) {
     const inputLine = lines[inputIndex];
-    if (inputLine.trim().length === 0) continue;
+    const trimmedInputLine = inputLine.trim();
+    if (trimmedInputLine.length === 0 || trimmedInputLine.startsWith("#")) continue;
 
     const indent = getIndent(inputLine);
     if (activeScalarIndent !== undefined) {
