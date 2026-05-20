@@ -1023,9 +1023,10 @@ jobs:
     secrets-scan:
       runs-on: ubuntu-latest
       steps:
-        - uses: actions/checkout@0123456789abcdef0123456789abcdef01234567 # pinned checkout
+        - name: Checkout repository
+          uses: actions/checkout@0123456789abcdef0123456789abcdef01234567 # pinned checkout
           with:
-            fetch-depth: 0
+            fetch-depth: "0" # full history
 YAML
 
   # Given the secrets-scan job contains a checkout step using "actions/checkout"

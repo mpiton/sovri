@@ -149,6 +149,33 @@ const getIndentedBlock = (workflow, parentPattern) => {
   return block.join("\n");
 };
 
+const getListItemBlocks = (workflow) => {
+  const lines = workflow.split(/\r?\n/);
+  const blocks = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!/^\s*-\s+/.test(lines[index])) continue;
+
+    const startIndent = lines[index].match(/^ */)?.[0].length ?? 0;
+    const block = [lines[index]];
+
+    for (const line of lines.slice(index + 1)) {
+      if (line.trim().length === 0) {
+        block.push(line);
+        continue;
+      }
+
+      const indent = line.match(/^ */)?.[0].length ?? 0;
+      if (indent <= startIndent) break;
+      block.push(line);
+    }
+
+    blocks.push(block.join("\n"));
+  }
+
+  return blocks;
+};
+
 const isExternalActionReference = (actionReference) => !actionReference.startsWith("./");
 
 const isGitHubMaintainedActionReference = (actionReference) =>
@@ -304,13 +331,16 @@ const runSecretsCheckoutDepth = (args) => {
   const options = parseOptions(args);
   const workflowPath = readRequiredOption(options, "workflow", secretsCheckoutDepthUsage);
   const workflow = readWorkflowFile(workflowPath);
-  const secretsJob = getIndentedBlock(workflow, /^\s*secrets-scan:\s*$/);
-  const checkoutStep = getIndentedBlock(
-    secretsJob,
-    /^\s*-\s*uses:\s*['"]?actions\/checkout@[^\s'"]+['"]?\s*(?:#.*)?$/,
+  const jobsBlock = getIndentedBlock(workflow, /^\s*jobs:\s*$/);
+  const secretsJob = getIndentedBlock(jobsBlock, /^\s+secrets-scan:\s*$/);
+  const checkoutUsesPattern =
+    /^\s*(?:-\s*)?uses:\s*['"]?actions\/checkout@[^\s'"]+['"]?\s*(?:#.*)?$/m;
+  const fullHistoryDepthPattern = /^\s*fetch-depth:\s*(?:0|["']0["'])\s*(?:#.*)?$/m;
+  const hasFullHistoryCheckout = getListItemBlocks(secretsJob).some(
+    (step) => checkoutUsesPattern.test(step) && fullHistoryDepthPattern.test(step),
   );
 
-  if (checkoutStep.includes("fetch-depth: 0")) {
+  if (hasFullHistoryCheckout) {
     writeStdout("checkout_depth=pass\nhistory_scope=full\n");
     return;
   }
