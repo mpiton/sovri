@@ -282,10 +282,28 @@ const runBuildDockerDurationBudget = (args) => {
 };
 
 const getBuildDockerStepsBlock = (workflow) => {
-  const jobsBlock = getIndentedBlockRaw(workflow, /^\s*jobs:\s*(?:#.*)?$/);
-  const buildDockerJob = getIndentedBlockRaw(jobsBlock, /^\s+build-docker:\s*(?:#.*)?$/);
-  return getIndentedBlockRaw(buildDockerJob, /^\s+steps:\s*(?:#.*)?$/);
+  const jobsPattern = /^jobs:\s*(?:#.*)?$/;
+  const jobsStructure = getIndentedBlock(workflow, jobsPattern);
+  const jobsBlock = getIndentedBlockRaw(workflow, jobsPattern);
+  const buildDockerHeader = jobsStructure
+    .split(/\r?\n/)
+    .find((line) => /^\s+build-docker:\s*(?:#.*)?$/.test(line));
+  if (buildDockerHeader === undefined) return "";
+
+  const buildDockerPattern = exactLinePattern(buildDockerHeader);
+  const buildDockerStructure = getIndentedBlock(jobsStructure, buildDockerPattern);
+  const buildDockerJob = getIndentedBlockRaw(jobsBlock, buildDockerPattern);
+  const stepsHeader = buildDockerStructure
+    .split(/\r?\n/)
+    .find((line) => /^\s+steps:\s*(?:#.*)?$/.test(line));
+  if (stepsHeader === undefined) return "";
+
+  return getIndentedBlockRaw(buildDockerJob, exactLinePattern(stepsHeader));
 };
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const exactLinePattern = (line) => new RegExp(`^${escapeRegExp(line)}$`);
 
 const splitFlowMappingEntries = (flowMapping) => {
   const entries = [];
