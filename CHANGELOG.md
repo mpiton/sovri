@@ -104,6 +104,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `ci`: add secrets-scan checkout depth policy coverage for full-history
+  `actions/checkout` configuration (#664).
+
 - `ci`: add a supply-chain audit shell gate that propagates
   `pnpm audit --audit-level=high` failures before reporting success (#658).
 

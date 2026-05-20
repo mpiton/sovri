@@ -16,7 +16,9 @@ const durationBudgetUsage =
 const actionPinningUsage = "Usage: node scripts/ci-policy.mjs action-pinning --workflow <path>";
 const auditGateUsage =
   "Usage: node scripts/ci-policy.mjs audit-gate --input <pnpm-audit-report.json> --audit-level high";
-const usage = `${durationBudgetUsage}\n${actionPinningUsage}\n${auditGateUsage}`;
+const secretsCheckoutDepthUsage =
+  "Usage: node scripts/ci-policy.mjs secrets-checkout-depth --workflow <path>";
+const usage = `${durationBudgetUsage}\n${actionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -123,6 +125,28 @@ const extractActionReferences = (workflow) => {
   }
 
   return actionReferences;
+};
+
+const getIndentedBlock = (workflow, parentPattern) => {
+  const lines = workflow.split(/\r?\n/);
+  const startIndex = lines.findIndex((line) => parentPattern.test(line));
+  if (startIndex === -1) return "";
+
+  const startIndent = lines[startIndex].match(/^ */)?.[0].length ?? 0;
+  const block = [lines[startIndex]];
+
+  for (const line of lines.slice(startIndex + 1)) {
+    if (line.trim().length === 0) {
+      block.push(line);
+      continue;
+    }
+
+    const indent = line.match(/^ */)?.[0].length ?? 0;
+    if (indent <= startIndent) break;
+    block.push(line);
+  }
+
+  return block.join("\n");
 };
 
 const isExternalActionReference = (actionReference) => !actionReference.startsWith("./");
@@ -276,6 +300,25 @@ const runAuditGate = (args) => {
   writeStdout("audit_gate=pass\n");
 };
 
+const runSecretsCheckoutDepth = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", secretsCheckoutDepthUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const secretsJob = getIndentedBlock(workflow, /^\s{2}secrets-scan:\s*$/);
+  const checkoutStep = getIndentedBlock(
+    secretsJob,
+    /^\s*-\s*uses:\s*['"]?actions\/checkout@[^\s'"]+['"]?\s*$/,
+  );
+
+  if (checkoutStep.includes("fetch-depth: 0")) {
+    writeStdout("checkout_depth=pass\nhistory_scope=full\n");
+    return;
+  }
+
+  writeStdout("checkout_depth=fail\n");
+  fail("secrets-scan must use actions/checkout with fetch-depth: 0", 1);
+};
+
 const [command, ...args] = argv.slice(2);
 
 if (command === "duration-budget") {
@@ -284,6 +327,8 @@ if (command === "duration-budget") {
   runActionPinning(args);
 } else if (command === "audit-gate") {
   runAuditGate(args);
+} else if (command === "secrets-checkout-depth") {
+  runSecretsCheckoutDepth(args);
 } else {
   fail(usage, 2);
 }
