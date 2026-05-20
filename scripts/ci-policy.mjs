@@ -333,14 +333,17 @@ const runSecretsCheckoutDepth = (args) => {
   const workflow = readWorkflowFile(workflowPath);
   const jobsBlock = getIndentedBlock(workflow, /^\s*jobs:\s*$/);
   const secretsJob = getIndentedBlock(jobsBlock, /^\s+secrets-scan:\s*$/);
+  const stepsBlock = getIndentedBlock(secretsJob, /^\s+steps:\s*$/);
   const checkoutUsesPattern =
     /^\s*(?:-\s*)?uses:\s*['"]?actions\/checkout@[^\s'"]+['"]?\s*(?:#.*)?$/m;
   const fullHistoryDepthPattern = /^\s*fetch-depth:\s*(?:0|["']0["'])\s*(?:#.*)?$/m;
-  const hasFullHistoryCheckout = getListItemBlocks(secretsJob).some(
-    (step) => checkoutUsesPattern.test(step) && fullHistoryDepthPattern.test(step),
+  const checkoutSteps = getListItemBlocks(stepsBlock).filter((step) =>
+    checkoutUsesPattern.test(step),
   );
+  const allCheckoutStepsUseFullHistory =
+    checkoutSteps.length > 0 && checkoutSteps.every((step) => fullHistoryDepthPattern.test(step));
 
-  if (hasFullHistoryCheckout) {
+  if (allCheckoutStepsUseFullHistory) {
     writeStdout("checkout_depth=pass\nhistory_scope=full\n");
     return;
   }
