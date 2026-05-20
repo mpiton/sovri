@@ -641,10 +641,10 @@ run_build_docker_duration_fail_case() {
 
   # When the build-docker duration budget is evaluated
   # Then the duration budget assertion fails
-  if [ "$ec" -eq 0 ]; then
+  if [ "$ec" -ne 1 ]; then
     FAIL=$((FAIL + 1))
     FAILURES="${FAILURES}
-  x build-docker duration fail ${elapsed_ms}: expected non-zero exit
+  x build-docker duration fail ${elapsed_ms}: expected exit 1, got ${ec}
       stdout:
 $(printf '%s\n' "$stdout" | sed 's/^/        /')
       stderr:
