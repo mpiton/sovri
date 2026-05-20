@@ -92,7 +92,7 @@ $(printf '%s\n' "$matched" | sed 's/^/  /')
   printf '%s' "$hits"
 }
 
-TS_ESCAPE_HATCHES=$(find_source_hits '@ts-ignore|@ts-expect-error|(^|[^[:alnum:]_])any([^[:alnum:]_]|$)')
+TS_ESCAPE_HATCHES=$(find_source_hits '@ts-ignore|@ts-expect-error|[:|<,&][[:space:]]*any([^[:alnum:]_]|$)|(^|[^[:alnum:]_])any[[:space:]]*[>|,&]|(^|[^[:alnum:]_])as[[:space:]]+any([^[:alnum:]_]|$)|=>?[[:space:]]*any([^[:alnum:]_]|$)')
 OXLINT_DISABLES=$(find_source_hits 'oxlint-disable')
 COMMONJS=$(find_source_hits 'require\(|module\.exports')
 

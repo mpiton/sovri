@@ -286,9 +286,34 @@ setup_any_union_in_source() {
 
 setup_any_word_inside_identifier() {
   # Identifiers containing the substring "any" (manyThings, anyhow, company)
-  # must not trigger the guard. The "(^|[^[:alnum:]_])any([^[:alnum:]_]|$)"
-  # boundary protects against false positives on user-defined names.
+  # must not trigger the guard. The contextual pattern only fires when "any"
+  # appears in a TS type position (`: any`, `<any>`, `|any`, `as any`, etc.).
   stage_file packages/core/src/types.ts 'export const manyThings = "anyhow"; export const company = 1;'
+}
+
+setup_any_english_in_line_comment() {
+  # English usage of "any" inside a `//` line comment is prose, not a type
+  # annotation. The pattern must require adjacent TS syntactic context
+  # (`:`, `<`, `|`, `,`, `&`, `as`, `=>`) so prose stays clean.
+  stage_file packages/core/src/foo.ts '// well below what any single LLM call expects
+export const x = 1;'
+}
+
+setup_any_english_in_jsdoc() {
+  # JSDoc continuation lines start with " *" and frequently contain "any of"
+  # as English; must not trigger.
+  stage_file packages/core/src/foo.ts '/**
+ * Filters out findings whose file matches any of the supplied patterns.
+ */
+export const x = 1;'
+}
+
+setup_any_english_after_comma_word() {
+  # Real-world example from llm-providers: "rate limit, transport errors, and
+  # any 5xx" — comma is followed by " and any", which must not match the
+  # `[:|<,&]\s*any` branch because "and" sits between the comma and "any".
+  stage_file packages/core/src/foo.ts '// rate limit, transport errors, and any 5xx
+export const x = 1;'
 }
 
 setup_ts_ignore_in_source() {
@@ -368,6 +393,9 @@ run_case "BLOCK-25a value:any (no space) flagged"       setup_any_no_space_in_so
 run_case "BLOCK-25b Array<any> flagged"                 setup_any_generic_in_source        1 "ADR-001"
 run_case "BLOCK-25c union with any flagged"             setup_any_union_in_source          1 "ADR-001"
 run_case "PASS-11a identifiers containing any allowed"  setup_any_word_inside_identifier   0 ""
+run_case "PASS-11b 'any' as English in line comment"    setup_any_english_in_line_comment  0 ""
+run_case "PASS-11c 'any of' in JSDoc continuation"      setup_any_english_in_jsdoc         0 ""
+run_case "PASS-11d ', and any' in line comment"         setup_any_english_after_comma_word 0 ""
 run_case "BLOCK-26 @ts-ignore in source references ADR-001" setup_ts_ignore_in_source 1 "ADR-001"
 run_case "BLOCK-27 @ts-expect-error in source references ADR-001" setup_ts_expect_error_in_source 1 "ADR-001"
 run_case "BLOCK-28 oxlint-disable in source references ADR-011" setup_oxlint_disable_in_source 1 "ADR-011"
