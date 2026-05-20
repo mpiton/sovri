@@ -672,6 +672,59 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_build_docker_duration_excludes_queue_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the build-docker workflow run waits in the GitHub Actions queue for 180000 ms
+  # And the build-docker job runs for 540000 ms after the runner starts
+  # And the Docker build step uses GitHub Actions cache
+  node "$SCRIPT" build-docker-duration-budget \
+    --job-start-ms 180000 \
+    --job-end-ms 720000 \
+    --github-actions-cache enabled \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration excludes queue: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the build-docker duration budget is evaluated
+  # Then the measured duration is 540000 ms
+  if ! printf '%s\n' "$stdout" | grep -Fq "measured_duration_ms=540000"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration excludes queue: missing measured duration
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the duration budget assertion passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "duration_budget=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration excludes queue: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_build_docker_needs_required_gates_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec combined
 
@@ -4749,6 +4802,7 @@ run_build_docker_duration_pass_case 120000 "2 min"
 run_build_docker_duration_pass_case 599999 "9 min 59.999 s"
 run_build_docker_duration_fail_case 600000
 run_build_docker_duration_fail_case 720000
+run_build_docker_duration_excludes_queue_case
 run_build_docker_needs_required_gates_case
 run_build_docker_needs_inline_gates_case
 run_build_docker_needs_multiline_flow_gates_case
