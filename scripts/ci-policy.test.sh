@@ -1020,12 +1020,12 @@ run_secrets_checkout_depth_zero_case() {
   cat >"$workflow_file" <<'YAML'
 name: ci
 jobs:
-  secrets-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@0123456789abcdef0123456789abcdef01234567
-        with:
-          fetch-depth: 0
+    secrets-scan:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@0123456789abcdef0123456789abcdef01234567 # pinned checkout
+          with:
+            fetch-depth: 0
 YAML
 
   # Given the secrets-scan job contains a checkout step using "actions/checkout"

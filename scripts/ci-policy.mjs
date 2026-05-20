@@ -304,10 +304,10 @@ const runSecretsCheckoutDepth = (args) => {
   const options = parseOptions(args);
   const workflowPath = readRequiredOption(options, "workflow", secretsCheckoutDepthUsage);
   const workflow = readWorkflowFile(workflowPath);
-  const secretsJob = getIndentedBlock(workflow, /^\s{2}secrets-scan:\s*$/);
+  const secretsJob = getIndentedBlock(workflow, /^\s*secrets-scan:\s*$/);
   const checkoutStep = getIndentedBlock(
     secretsJob,
-    /^\s*-\s*uses:\s*['"]?actions\/checkout@[^\s'"]+['"]?\s*$/,
+    /^\s*-\s*uses:\s*['"]?actions\/checkout@[^\s'"]+['"]?\s*(?:#.*)?$/,
   );
 
   if (checkoutStep.includes("fetch-depth: 0")) {
