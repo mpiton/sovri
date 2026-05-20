@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `ci`: add fixture coverage ensuring the secrets-scan duration budget ignores
+  faster sibling jobs such as backend-checks (#681).
+
 - `ci`: add fixture coverage proving secrets-scan duration measurement excludes
   GitHub Actions queue time (#680).
 

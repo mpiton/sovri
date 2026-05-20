@@ -396,6 +396,58 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_secrets_duration_counts_only_secrets_job_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the backend-checks job completes after 45000 ms
+  # And the secrets-scan job completes after 75000 ms
+  node "$SCRIPT" secrets-duration-budget \
+    --backend-job-start-ms 200000 \
+    --backend-job-end-ms 245000 \
+    --job-start-ms 100000 \
+    --job-end-ms 175000 \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # Then the measured duration is 75000 ms
+  if ! printf '%s\n' "$combined" | grep -Fq "measured_duration_ms=75000"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets duration counts only secrets job: missing measured duration
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the duration budget assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets duration counts only secrets job: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$combined" | grep -Fq "duration_budget=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x secrets duration counts only secrets job: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_invalid_cache_state_case() {
   local stdout stderr stdout_file stderr_file ec
 
@@ -2595,6 +2647,7 @@ run_secrets_duration_pass_case 59999 "59.999 s"
 run_secrets_duration_fail_case 60000
 run_secrets_duration_fail_case 90000
 run_secrets_duration_queue_exclusion_case
+run_secrets_duration_counts_only_secrets_job_case
 run_duration_fail_case 300000
 run_duration_fail_case 360000
 run_duration_queue_exclusion_case
