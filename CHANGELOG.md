@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `ci`: add fixture evidence coverage ensuring resolved false-positive fixtures
+  do not suppress unresolved real leak fixtures in the secrets-scan gate (#671).
+
 - `ci`: add fixture evidence policy coverage for resolved false-positive
   secret fixtures in the secrets-scan gate (#669).
 
