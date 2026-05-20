@@ -726,6 +726,71 @@ run_gitleaks_action_pinning_invalid_sha_class_case() {
     "SHA must use lowercase hexadecimal characters"
 }
 
+run_gitleaks_action_pinning_non_v2_provenance_case() {
+  local action_ref workflow_file metadata_file stdout stderr stdout_file stderr_file ec combined
+
+  action_ref="gitleaks/gitleaks-action@0123456789abcdef0123456789abcdef01234567"
+  workflow_file=$(mktemp)
+  metadata_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ${action_ref}
+YAML
+
+  cat >"$metadata_file" <<JSON
+{
+  "pins": [
+    {
+      "action_ref": "${action_ref}",
+      "source_release_line": "main"
+    }
+  ]
+}
+JSON
+
+  # Given the secrets-scan job contains a pinned Gitleaks action
+  # And the action pin metadata records source release line "main"
+  node "$SCRIPT" gitleaks-action-pinning \
+    --workflow "$workflow_file" \
+    --metadata "$metadata_file" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$metadata_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # Then the Gitleaks action assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x gitleaks action pinning non-v2 provenance: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions the v2 release-line requirement
+  if ! printf '%s\n' "$combined" | grep -Fq "Gitleaks pin must originate from the v2 release line"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x gitleaks action pinning non-v2 provenance: missing provenance failure message
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_action_pinning_no_external_refs_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec
 
@@ -2380,6 +2445,7 @@ run_gitleaks_action_pinning_missing_action_case
 run_gitleaks_action_pinning_moving_v2_case
 run_gitleaks_action_pinning_sha_boundary_case
 run_gitleaks_action_pinning_invalid_sha_class_case
+run_gitleaks_action_pinning_non_v2_provenance_case
 run_action_pinning_no_external_refs_case
 run_action_pinning_moving_refs_case
 run_action_pinning_sha_boundary_case

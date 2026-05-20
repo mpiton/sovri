@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `ci`: add fixture coverage rejecting Gitleaks action pins whose provenance
+  is not the v2 release line (#677).
+
 - `ci`: add fixture coverage rejecting forty-character Gitleaks action pins
   that contain non-lowercase-hex characters (#676).
 
