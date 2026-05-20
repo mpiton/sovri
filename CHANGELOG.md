@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `ci`: add fixture coverage rejecting the moving `gitleaks/gitleaks-action@v2`
+  tag in the secrets-scan Gitleaks action policy (#674).
+
 - `ci`: add fixture coverage ensuring the secrets-scan Gitleaks action is
   rejected when it is missing from the workflow (#673).
 

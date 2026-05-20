@@ -486,6 +486,73 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_gitleaks_action_pinning_moving_v2_case() {
+  local action_ref workflow_file metadata_file stdout stderr stdout_file stderr_file ec combined
+
+  action_ref="gitleaks/gitleaks-action@v2"
+  workflow_file=$(mktemp)
+  metadata_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ${action_ref}
+YAML
+
+  cat >"$metadata_file" <<'JSON'
+{
+  "pins": []
+}
+JSON
+
+  # Given the secrets-scan job contains the moving Gitleaks v2 tag
+  node "$SCRIPT" gitleaks-action-pinning \
+    --workflow "$workflow_file" \
+    --metadata "$metadata_file" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$metadata_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # Then the Gitleaks action assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x gitleaks action pinning moving v2: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$combined" | grep -Fq "$action_ref"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x gitleaks action pinning moving v2: missing action reference
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions the full commit SHA requirement
+  if ! printf '%s\n' "$combined" | grep -Fq "Gitleaks action must be pinned to a full commit SHA"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x gitleaks action pinning moving v2: missing pinning failure message
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_action_pinning_no_external_refs_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec
 
@@ -2137,6 +2204,7 @@ run_invalid_cache_state_case
 run_action_pinning_sha_pass_case
 run_gitleaks_action_pinning_sha_pass_case
 run_gitleaks_action_pinning_missing_action_case
+run_gitleaks_action_pinning_moving_v2_case
 run_action_pinning_no_external_refs_case
 run_action_pinning_moving_refs_case
 run_action_pinning_sha_boundary_case
