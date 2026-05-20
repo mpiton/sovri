@@ -6,11 +6,22 @@
 # Invoked at pre-commit via lefthook.yml.
 set -euo pipefail
 
+MODE="${1:---staged}"
+if [ "$MODE" != "--staged" ] && [ "$MODE" != "--all" ]; then
+  echo "Usage: ./scripts/check-boundary.sh [--staged|--all]" >&2
+  exit 2
+fi
+
 # Public-surface TypeScript only. Deletions are excluded — removing a stale
 # cloud import must pass.
-STAGED=$(git diff --cached --diff-filter=d --name-only \
-  | grep -E '^(packages/|apps/community-bot/).*\.(ts|tsx)$' || true)
-[ -z "$STAGED" ] && exit 0
+if [ "$MODE" = "--all" ]; then
+  TARGETS=$(git ls-files | grep -E '^(packages/|apps/community-bot/).*\.(ts|tsx)$' || true)
+else
+  TARGETS=$(git diff --cached --diff-filter=d --name-only \
+    | grep -E '^(packages/|apps/community-bot/).*\.(ts|tsx)$' || true)
+fi
+
+[ -z "$TARGETS" ] && exit 0
 
 # Forbidden module specifiers:
 #   - @sovri/cloud<anything>       (reserved npm scope for proprietary code)
@@ -66,7 +77,7 @@ STAGED=$(git diff --cached --diff-filter=d --name-only \
 # `if (ok) import("...")` are caught. The quote class on the dynamic
 # alternative also accepts a backtick so `import(`@sovri/cloud-api`)`
 # template-literal specifiers do not bypass the gate.
-PATTERN="^[[:space:]]*(import|export)[[:space:]].*from[[:space:]]+['\"](@sovri/cloud|\\.\\./(.*/)?cloud-api[/'\"])|^[[:space:]]*(import|from)[[:space:]]+['\"](@sovri/cloud|\\.\\./(.*/)?cloud-api[/'\"])|(^[[:space:]]*((await|return|yield|throw|new)[[:space:]]+)?|[()\\,;=?:{}!&|>+\\[\\-][[:space:]]*((await|return|yield|throw|new)[[:space:]]+)?|[[:space:]](await|return|yield|throw|new)[[:space:]]+)(import|require)[[:space:]]*\\([[:space:]]*['\"\`](@sovri/cloud|\\.\\./(.*/)?cloud-api[/'\"\`])"
+PATTERN="^[[:space:]]*(import|export)[[:space:]].*from[[:space:]]+['\"](@sovri/cloud([/-][^'\"[:space:]]*)?['\"]|\\.\\./(.*/)?cloud-api[/'\"])|^[[:space:]]*(import|from)[[:space:]]+['\"](@sovri/cloud([/-][^'\"[:space:]]*)?['\"]|\\.\\./(.*/)?cloud-api[/'\"])|(^[[:space:]]*((await|return|yield|throw|new)[[:space:]]+)?|[()\\,;=?:{}!&|>+\\[\\-][[:space:]]*((await|return|yield|throw|new)[[:space:]]+)?|[[:space:]](await|return|yield|throw|new)[[:space:]]+)(import|require)[[:space:]]*\\([[:space:]]*['\"\`](@sovri/cloud([/-][^'\"\`[:space:]]*)?['\"\`]|\\.\\./(.*/)?cloud-api[/'\"\`])"
 
 # Strip comments before scanning so commented-out example code that
 # happens to embed `import(...)` / `require(...)` / `from "..."` text
@@ -94,8 +105,12 @@ while IFS= read -r file; do
   # commit. Skip only on genuine `git show` failure (e.g. a race with
   # `git restore --staged`); an empty staged blob is still scanned and
   # passes naturally because it contains no imports.
-  if ! staged=$(git show ":$file" 2>/dev/null); then
-    continue
+  if [ "$MODE" = "--all" ]; then
+    staged=$(tr -d '\000' < "$file" 2>/dev/null || true)
+  else
+    if ! staged=$(git show ":$file" 2>/dev/null | tr -d '\000'); then
+      continue
+    fi
   fi
   cleaned=$(printf '%s\n' "$staged" | strip_comments)
   hits=$(printf '%s\n' "$cleaned" | grep -nE "$PATTERN" || true)
@@ -104,7 +119,7 @@ while IFS= read -r file; do
 $(printf '%s\n' "$hits" | sed 's/^/  /')
 "
   fi
-done <<< "$STAGED"
+done <<< "$TARGETS"
 
 if [ -n "$BAD" ]; then
   echo "BLOCKED: Cloud import in public surface (ADR-010 boundary breach):"

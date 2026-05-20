@@ -147,6 +147,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `ci`: add `forbidden-tools` and `forbidden-imports` workflow jobs with
+  full-tree policy guards for toolchain restrictions and the Community/Cloud
+  import boundary (#51, #709-#723).
+
 - `ci`: add a secrets-scan reuse policy ensuring the workflow calls the shared
   `scripts/no-secrets.sh` guard instead of duplicating secret patterns inline
   (#682).

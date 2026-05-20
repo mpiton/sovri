@@ -268,6 +268,40 @@ setup_multiple_forbidden() {
   stage_file biome.json '{}'
 }
 
+setup_any_in_source() {
+  stage_file packages/core/src/types.ts 'export const unsafe = (value: any) => value;'
+}
+
+setup_ts_ignore_in_source() {
+  stage_file packages/core/src/types.ts '// @ts-ignore
+export const ignored = missing;'
+}
+
+setup_ts_expect_error_in_source() {
+  stage_file packages/core/src/types.ts '// @ts-expect-error
+export const expected = missing;'
+}
+
+setup_oxlint_disable_in_source() {
+  stage_file packages/core/src/types.ts '// oxlint-disable-next-line no-console
+console.log("debug");'
+}
+
+setup_require_in_source() {
+  stage_file apps/community-bot/src/server.ts 'const fs = require("node:fs");
+export { fs };'
+}
+
+setup_module_exports_in_source() {
+  stage_file packages/config/src/index.ts 'module.exports = {};
+export {};'
+}
+
+setup_escape_hatch_in_test_file() {
+  stage_file packages/core/src/types.test.ts '// @ts-expect-error test fixture
+export const fixture = missing as any;'
+}
+
 # Cases.
 
 run_case "PASS-1  empty staged set"             setup_empty               0 ""
@@ -310,6 +344,13 @@ run_case "BLOCK-23 .prettierrc.json nested"     setup_prettier_nested     1 "BLO
 
 run_case "BLOCK-24 multiple forbidden at once"  setup_multiple_forbidden  1 "BLOCKED: forbidden tool files" \
   "package-lock.json" ".eslintrc.json" "biome.json"
+run_case "BLOCK-25 any in source references ADR-001" setup_any_in_source 1 "ADR-001"
+run_case "BLOCK-26 @ts-ignore in source references ADR-001" setup_ts_ignore_in_source 1 "ADR-001"
+run_case "BLOCK-27 @ts-expect-error in source references ADR-001" setup_ts_expect_error_in_source 1 "ADR-001"
+run_case "BLOCK-28 oxlint-disable in source references ADR-011" setup_oxlint_disable_in_source 1 "ADR-011"
+run_case "BLOCK-29 require() in source references ADR-003" setup_require_in_source 1 "ADR-003"
+run_case "BLOCK-30 module.exports in source references ADR-003" setup_module_exports_in_source 1 "ADR-003"
+run_case "PASS-11 test files may carry fixtures" setup_escape_hatch_in_test_file 0 ""
 
 TOTAL=$((PASS + FAIL))
 echo ""

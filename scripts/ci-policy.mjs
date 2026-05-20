@@ -8,6 +8,7 @@ const writeStderr = (chunk) => writeSync(2, chunk);
 
 const DURATION_BUDGET_MS = 300000;
 const SECRETS_SCAN_DURATION_BUDGET_MS = 60000;
+const FORBIDDEN_JOB_DURATION_BUDGET_MS = 30000;
 const FULL_COMMIT_SHA_LENGTH = 40;
 const PINNED_EXTERNAL_ACTION_PATTERN = /@[0-9a-f]{40}$/;
 const HEX_SHA_SUFFIX_PATTERN = /@([0-9a-f]+)$/;
@@ -19,6 +20,8 @@ const durationBudgetUsage =
   "Usage: node scripts/ci-policy.mjs duration-budget --job-start-ms <ms> --job-end-ms <ms> --pnpm-cache hit --turbo-cache hit";
 const secretsDurationBudgetUsage =
   "Usage: node scripts/ci-policy.mjs secrets-duration-budget --job-start-ms <ms> --job-end-ms <ms>";
+const forbiddenJobsDurationBudgetUsage =
+  "Usage: node scripts/ci-policy.mjs forbidden-jobs-duration-budget --forbidden-tools-ms <ms|missing|unknown> --forbidden-imports-ms <ms|missing|unknown>";
 const actionPinningUsage = "Usage: node scripts/ci-policy.mjs action-pinning --workflow <path>";
 const gitleaksActionPinningUsage =
   "Usage: node scripts/ci-policy.mjs gitleaks-action-pinning --workflow <path> --metadata <gitleaks-pin-metadata.json>";
@@ -30,7 +33,7 @@ const secretsFixtureEvidenceUsage =
   "Usage: node scripts/ci-policy.mjs secrets-fixture-evidence --input <fixture-evidence.json> --false-positive-fixture <path>";
 const secretsNoSecretsReuseUsage =
   "Usage: node scripts/ci-policy.mjs secrets-no-secrets-reuse --workflow <path> --script-path <path> [--repo-root <path>]";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -163,6 +166,57 @@ const runSecretsDurationBudget = (args) => {
     `measured_duration_ms=${elapsedMs}\nduration_budget=fail\nreported_duration=${formatDuration(elapsedMs)}\n`,
   );
   fail("secrets-scan must finish in under 1 minute", 1);
+};
+
+const readDurationEvidence = (options, key) => {
+  const value = options.get(key);
+  if (value === "missing" || value === "unknown") return value;
+  if (value === undefined || !/^\d+$/.test(value)) {
+    fail(`ERROR: --${key} must be a non-negative integer, "missing", or "unknown".`, 2);
+  }
+  return Number(value);
+};
+
+const runForbiddenJobsDurationBudget = (args) => {
+  const options = parseOptions(args);
+  const jobs = [
+    ["forbidden-tools", readDurationEvidence(options, "forbidden-tools-ms")],
+    ["forbidden-imports", readDurationEvidence(options, "forbidden-imports-ms")],
+  ];
+
+  for (const [jobName, evidence] of jobs) {
+    if (evidence === "missing") {
+      writeStdout(`duration_budget=fail\njob=${jobName}\njob_state=missing\n`);
+      fail(`missing monitored job: ${jobName}`, 1);
+    }
+
+    if (evidence === "unknown") {
+      writeStdout(`duration_budget=fail\njob=${jobName}\nduration_evidence=missing\n`);
+      fail(`missing duration evidence for ${jobName}`, 1);
+    }
+  }
+
+  const failures = jobs.filter(([, elapsedMs]) => elapsedMs >= FORBIDDEN_JOB_DURATION_BUDGET_MS);
+  if (failures.length > 0) {
+    writeStdout(
+      `duration_budget=fail\n${jobs
+        .map(
+          ([jobName, elapsedMs]) =>
+            `job=${jobName}\nmeasured_duration_ms=${elapsedMs}\nreported_duration=${formatDuration(elapsedMs)}\n`,
+        )
+        .join("")}`,
+    );
+    fail(failures.map(([jobName]) => `${jobName} must finish in under 30 seconds`).join("\n"), 1);
+  }
+
+  writeStdout(
+    `duration_budget=pass\n${jobs
+      .map(
+        ([jobName, elapsedMs]) =>
+          `job=${jobName}\nmeasured_duration_ms=${elapsedMs}\nreported_duration=${formatDuration(elapsedMs)}\n`,
+      )
+      .join("")}`,
+  );
 };
 
 const readWorkflowFile = (workflowPath) => {
@@ -1030,6 +1084,8 @@ if (command === "duration-budget") {
   runDurationBudget(args);
 } else if (command === "secrets-duration-budget") {
   runSecretsDurationBudget(args);
+} else if (command === "forbidden-jobs-duration-budget") {
+  runForbiddenJobsDurationBudget(args);
 } else if (command === "action-pinning") {
   runActionPinning(args);
 } else if (command === "gitleaks-action-pinning") {

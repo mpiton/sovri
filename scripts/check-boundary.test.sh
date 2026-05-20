@@ -134,6 +134,10 @@ setup_other_at_scope_in_core() {
   stage_file packages/core/src/index.ts 'import { X } from "@sovri/core";'
 }
 
+setup_clouded_package_in_core() {
+  stage_file packages/core/src/index.ts 'import { x } from "@sovri/clouded";'
+}
+
 setup_md_in_core() {
   # Non-TS file is not scanned even if it mentions @sovri/cloud-api literally.
   stage_file packages/core/notes.md 'see @sovri/cloud-api one day'
@@ -377,6 +381,7 @@ run_case "PASS-2  unrelated ts in packages/core"          setup_unrelated_ts_in_
 run_case "PASS-3  unrelated ts in apps/community-bot"     setup_unrelated_ts_in_bot              0 ""
 run_case "PASS-4  ./cloud-api-mock sibling import ok"     setup_local_cloud_api_name_in_core     0 ""
 run_case "PASS-5  @sovri/core scope ok"                   setup_other_at_scope_in_core           0 ""
+run_case "PASS-5b @sovri/clouded package ok"              setup_clouded_package_in_core          0 ""
 run_case "PASS-6  .md mentioning @sovri/cloud-api ok"     setup_md_in_core                       0 ""
 run_case "PASS-7  apps/cloud-api/ itself unrestricted"    setup_cloud_api_file_itself            0 ""
 run_case "PASS-8  apps/<other>/ outside boundary"         setup_apps_other_outside_bot           0 ""

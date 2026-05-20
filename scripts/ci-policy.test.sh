@@ -448,6 +448,82 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_forbidden_jobs_duration_pass_case() {
+  local tools_ms="$1"
+  local imports_ms="$2"
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the "forbidden-tools" job completes after <tools_ms> ms
+  # And the "forbidden-imports" job completes after <imports_ms> ms
+  node "$SCRIPT" forbidden-jobs-duration-budget \
+    --forbidden-tools-ms "$tools_ms" \
+    --forbidden-imports-ms "$imports_ms" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the forbidden job duration budget is evaluated
+  # Then the duration budget assertion passes
+  if [ "$ec" -ne 0 ] || ! printf '%s\n' "$combined" | grep -Fq "duration_budget=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x forbidden jobs duration pass ${tools_ms}/${imports_ms} ms: expected pass
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_forbidden_jobs_duration_fail_case() {
+  local tools_ms="$1"
+  local imports_ms="$2"
+  local expected_message="$3"
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the "forbidden-tools" job completes after <tools_ms> ms
+  # And the "forbidden-imports" job completes after <imports_ms> ms
+  node "$SCRIPT" forbidden-jobs-duration-budget \
+    --forbidden-tools-ms "$tools_ms" \
+    --forbidden-imports-ms "$imports_ms" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the forbidden job duration budget is evaluated
+  # Then the duration budget assertion fails
+  if [ "$ec" -ne 1 ] || ! printf '%s\n' "$combined" | grep -Fq "duration_budget=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x forbidden jobs duration fail ${tools_ms}/${imports_ms} ms: expected fail
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "<expected_message>"
+  if ! printf '%s\n' "$combined" | grep -Fq "$expected_message"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x forbidden jobs duration fail ${tools_ms}/${imports_ms} ms: missing ${expected_message}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_invalid_cache_state_case() {
   local stdout stderr stdout_file stderr_file ec
 
@@ -4078,6 +4154,14 @@ run_secrets_duration_fail_case 60000
 run_secrets_duration_fail_case 90000
 run_secrets_duration_queue_exclusion_case
 run_secrets_duration_counts_only_secrets_job_case
+run_forbidden_jobs_duration_pass_case 12000 29999
+run_forbidden_jobs_duration_fail_case 30000 12000 "forbidden-tools must finish in under 30 seconds"
+run_forbidden_jobs_duration_fail_case 12000 45000 "forbidden-imports must finish in under 30 seconds"
+run_forbidden_jobs_duration_fail_case 15000 30000 "forbidden-imports must finish in under 30 seconds"
+run_forbidden_jobs_duration_fail_case 12000 missing "missing monitored job: forbidden-imports"
+run_forbidden_jobs_duration_fail_case missing 18000 "missing monitored job: forbidden-tools"
+run_forbidden_jobs_duration_fail_case 12000 unknown "missing duration evidence for forbidden-imports"
+run_forbidden_jobs_duration_fail_case unknown 18000 "missing duration evidence for forbidden-tools"
 run_duration_fail_case 300000
 run_duration_fail_case 360000
 run_duration_queue_exclusion_case
