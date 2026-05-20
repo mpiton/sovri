@@ -287,7 +287,7 @@ const getBuildDockerStepsBlock = (workflow) => {
   const jobsBlock = getIndentedBlockRaw(workflow, jobsPattern);
   const buildDockerHeader = jobsStructure
     .split(/\r?\n/)
-    .find((line) => /^\s+build-docker:\s*(?:#.*)?$/.test(line));
+    .find((line) => /^\s+build-docker:\s*(?:&[^\s#]+)?\s*(?:#.*)?$/.test(line));
   if (buildDockerHeader === undefined) return "";
 
   const buildDockerPattern = exactLinePattern(buildDockerHeader);
@@ -357,7 +357,7 @@ const getStepPropertyBlockRaw = (step, propertyName) => {
   if (firstLine === undefined) return "";
 
   const stepIndent = getIndent(firstLine);
-  const propertyPattern = new RegExp(`^\\s*${propertyName}:\\s*(?:#.*)?$`);
+  const propertyPattern = new RegExp(`^\\s*${propertyName}:\\s*(?:&[^\\s#]+)?\\s*(?:#.*)?$`);
 
   for (let index = 1; index < lines.length; index += 1) {
     const line = lines[index];
