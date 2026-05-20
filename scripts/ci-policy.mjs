@@ -32,7 +32,7 @@ const forbiddenJobsDurationBudgetUsage =
 const buildDockerNeedsUsage =
   "Usage: node scripts/ci-policy.mjs build-docker-needs --workflow <path>";
 const buildDockerSchedulerUsage =
-  "Usage: node scripts/ci-policy.mjs build-docker-scheduler --backend-checks <success|failure> --supply-chain <success|failure> --secrets-scan <success|failure> --forbidden-tools <success|failure> --forbidden-imports <success|failure>";
+  "Usage: node scripts/ci-policy.mjs build-docker-scheduler --backend-checks <success|failure|cancelled|skipped> --supply-chain <success|failure|cancelled|skipped> --secrets-scan <success|failure|cancelled|skipped> --forbidden-tools <success|failure|cancelled|skipped> --forbidden-imports <success|failure|cancelled|skipped>";
 const actionPinningUsage = "Usage: node scripts/ci-policy.mjs action-pinning --workflow <path>";
 const gitleaksActionPinningUsage =
   "Usage: node scripts/ci-policy.mjs gitleaks-action-pinning --workflow <path> --metadata <gitleaks-pin-metadata.json>";
@@ -290,8 +290,8 @@ const runBuildDockerNeeds = (args) => {
 
 const readJobState = (options, jobName) => {
   const value = options.get(jobName);
-  if (value !== "success" && value !== "failure") {
-    fail(`ERROR: --${jobName} must be "success" or "failure".`, 2);
+  if (value !== "success" && value !== "failure" && value !== "cancelled" && value !== "skipped") {
+    fail(`ERROR: --${jobName} must be "success", "failure", "cancelled", or "skipped".`, 2);
   }
   return value;
 };

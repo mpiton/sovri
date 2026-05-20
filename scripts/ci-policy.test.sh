@@ -932,6 +932,57 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_build_docker_scheduler_non_success_gate_case() {
+  local state stdout stderr stdout_file stderr_file ec combined
+
+  for state in cancelled skipped; do
+    stdout_file=$(mktemp)
+    stderr_file=$(mktemp)
+
+    node "$SCRIPT" build-docker-scheduler \
+      --backend-checks success \
+      --supply-chain success \
+      --secrets-scan "$state" \
+      --forbidden-tools success \
+      --forbidden-imports success \
+      >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+    stdout=$(cat "$stdout_file" 2>/dev/null || true)
+    stderr=$(cat "$stderr_file" 2>/dev/null || true)
+    rm -f "$stdout_file" "$stderr_file"
+    combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+    if [ "$ec" -ne 0 ]; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  x build-docker scheduler ${state} gate: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+      continue
+    fi
+
+    if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_result=skipped"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  x build-docker scheduler ${state} gate: missing skipped result
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+      continue
+    fi
+
+    if ! printf '%s\n' "$stdout" | grep -Fq "failed_upstream_job=secrets-scan"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  x build-docker scheduler ${state} gate: missing upstream evidence
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+      continue
+    fi
+
+    PASS=$((PASS + 1))
+  done
+}
+
 run_action_pinning_sha_pass_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec
 
@@ -4537,6 +4588,7 @@ run_build_docker_needs_multiline_flow_gates_case
 run_build_docker_needs_scalar_gate_case
 run_build_docker_needs_missing_required_gate_case
 run_build_docker_scheduler_failed_gate_case
+run_build_docker_scheduler_non_success_gate_case
 run_duration_fail_case 300000
 run_duration_fail_case 360000
 run_duration_queue_exclusion_case
