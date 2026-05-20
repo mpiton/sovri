@@ -21,6 +21,49 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `ci`: report a configuration error when the secrets-scan workflow references
+  the shared no-secrets guard but the script file is missing or outside the
+  repository root, including symlink targets (#685).
+
+- `ci`: reject secrets-scan no-secrets script invocations that would mask a
+  failing shared guard result (#684).
+
+- `ci`: add fixture coverage rejecting inline duplicated API-key pattern scans
+  when secrets-scan does not run the shared no-secrets guard (#683).
+
+- `ci`: add fixture coverage ensuring the secrets-scan duration budget ignores
+  faster sibling jobs such as backend-checks (#681).
+
+- `ci`: add fixture coverage proving secrets-scan duration measurement excludes
+  GitHub Actions queue time (#680).
+
+- `ci`: add fixture coverage rejecting secrets-scan durations at or above one
+  minute in the duration budget policy (#679).
+
+- `ci`: add fixture coverage rejecting Gitleaks action pins whose provenance
+  is not the v2 release line (#677).
+
+- `ci`: add fixture coverage rejecting forty-character Gitleaks action pins
+  that contain non-lowercase-hex characters (#676).
+
+- `ci`: add fixture coverage for 39/40/41-character SHA boundary handling in
+  the secrets-scan Gitleaks action policy (#675).
+
+- `ci`: add fixture coverage rejecting the moving `gitleaks/gitleaks-action@v2`
+  tag in the secrets-scan Gitleaks action policy (#674).
+
+- `ci`: add fixture coverage ensuring the secrets-scan Gitleaks action is
+  rejected when it is missing from the workflow (#673).
+
+- `ci`: add fixture evidence coverage ensuring resolved false-positive fixtures
+  do not suppress unresolved real leak fixtures in the secrets-scan gate (#671).
+
+- `ci`: add fixture evidence policy coverage for resolved false-positive
+  secret fixtures in the secrets-scan gate (#669).
+
+- `ci`: mention the full-history checkout requirement when positive
+  `fetch-depth` values are rejected by the secrets-scan policy (#667).
+
 - `ci`: report named critical severity vulnerabilities from the supply-chain
   audit gate failure output (#657).
 
@@ -103,6 +146,19 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   strict base-10 integer contract.
 
 ### Added
+
+- `ci`: add a secrets-scan reuse policy ensuring the workflow calls the shared
+  `scripts/no-secrets.sh` guard instead of duplicating secret patterns inline
+  (#682).
+
+- `ci`: add a secrets-scan duration budget policy that accepts runs strictly
+  below one minute (#678).
+
+- `ci`: add a Gitleaks action pinning policy for the `secrets-scan` job that
+  accepts full commit SHA pins with v2 release-line provenance (#672).
+
+- `ci`: add secrets-scan checkout depth policy coverage for full-history
+  `actions/checkout` configuration (#664).
 
 - `ci`: add a supply-chain audit shell gate that propagates
   `pnpm audit --audit-level=high` failures before reporting success (#658).
