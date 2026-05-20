@@ -342,6 +342,82 @@ $(printf '%s\n' "$stdout" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_gitleaks_action_pinning_sha_pass_case() {
+  local action_ref workflow_file metadata_file stdout stderr stdout_file stderr_file ec combined
+
+  action_ref="gitleaks/gitleaks-action@0123456789abcdef0123456789abcdef01234567"
+  workflow_file=$(mktemp)
+  metadata_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
+        with:
+          fetch-depth: 0
+      - uses: ${action_ref}
+YAML
+
+  cat >"$metadata_file" <<JSON
+{
+  "pins": [
+    {
+      "action_ref": "${action_ref}",
+      "source_release_line": "v2"
+    }
+  ]
+}
+JSON
+
+  # Given the secrets-scan job contains the Gitleaks action pinned by full commit SHA
+  # And the action pin metadata records source release line "v2"
+  node "$SCRIPT" gitleaks-action-pinning \
+    --workflow "$workflow_file" \
+    --metadata "$metadata_file" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$metadata_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # Then the Gitleaks action assertion passes
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x gitleaks action pinning SHA pass: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "gitleaks_action=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x gitleaks action pinning SHA pass: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And no moving Gitleaks action reference is reported
+  if printf '%s\n' "$stdout" | grep -Fq "moving_reference="; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x gitleaks action pinning SHA pass: unexpected moving reference
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_action_pinning_no_external_refs_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec
 
@@ -1991,6 +2067,7 @@ run_duration_queue_exclusion_case
 run_duration_cache_miss_case
 run_invalid_cache_state_case
 run_action_pinning_sha_pass_case
+run_gitleaks_action_pinning_sha_pass_case
 run_action_pinning_no_external_refs_case
 run_action_pinning_moving_refs_case
 run_action_pinning_sha_boundary_case

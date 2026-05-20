@@ -113,6 +113,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `ci`: add a Gitleaks action pinning policy for the `secrets-scan` job that
+  accepts full commit SHA pins with v2 release-line provenance (#672).
+
 - `ci`: add secrets-scan checkout depth policy coverage for full-history
   `actions/checkout` configuration (#664).
 

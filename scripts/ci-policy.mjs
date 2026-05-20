@@ -11,17 +11,20 @@ const PINNED_EXTERNAL_ACTION_PATTERN = /@[0-9a-f]{40}$/;
 const HEX_SHA_SUFFIX_PATTERN = /@([0-9a-f]+)$/;
 const USES_LINE_PATTERN = /^\s*(?:-\s*)?uses:\s*['"]?([^'"\s#]+)['"]?\s*(?:#.*)?$/;
 const BLOCK_SCALAR_PATTERN = /:\s*[>|](?:[+-]?[1-9]?|[1-9][+-]?)?\s*(?:#.*)?$/;
+const GITLEAKS_ACTION_REPOSITORY = "gitleaks/gitleaks-action";
 
 const durationBudgetUsage =
   "Usage: node scripts/ci-policy.mjs duration-budget --job-start-ms <ms> --job-end-ms <ms> --pnpm-cache hit --turbo-cache hit";
 const actionPinningUsage = "Usage: node scripts/ci-policy.mjs action-pinning --workflow <path>";
+const gitleaksActionPinningUsage =
+  "Usage: node scripts/ci-policy.mjs gitleaks-action-pinning --workflow <path> --metadata <gitleaks-pin-metadata.json>";
 const auditGateUsage =
   "Usage: node scripts/ci-policy.mjs audit-gate --input <pnpm-audit-report.json> --audit-level high";
 const secretsCheckoutDepthUsage =
   "Usage: node scripts/ci-policy.mjs secrets-checkout-depth --workflow <path>";
 const secretsFixtureEvidenceUsage =
   "Usage: node scripts/ci-policy.mjs secrets-fixture-evidence --input <fixture-evidence.json> --false-positive-fixture <path>";
-const usage = `${durationBudgetUsage}\n${actionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}`;
+const usage = `${durationBudgetUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -266,6 +269,57 @@ const getFailureMessages = (movingReferences) => {
   return messages;
 };
 
+const getGitleaksActionReferences = (workflow) => {
+  const jobsBlock = getIndentedBlock(workflow, /^\s*jobs:\s*(?:#.*)?$/);
+  const secretsJob = getIndentedBlock(jobsBlock, /^\s+secrets-scan:\s*(?:#.*)?$/);
+  const stepsBlock = getIndentedBlock(secretsJob, /^\s+steps:\s*(?:#.*)?$/);
+  return extractActionReferences(stepsBlock).filter((actionReference) =>
+    actionReference.startsWith(`${GITLEAKS_ACTION_REPOSITORY}@`),
+  );
+};
+
+const getActionRef = (pin) => {
+  if (typeof pin !== "object" || pin === null || typeof pin.action_ref !== "string") {
+    fail("ERROR: Gitleaks pin metadata entries must contain action_ref.", 2);
+  }
+
+  return pin.action_ref;
+};
+
+const getSourceReleaseLine = (pin) => {
+  if (typeof pin !== "object" || pin === null || typeof pin.source_release_line !== "string") {
+    fail("ERROR: Gitleaks pin metadata entries must contain source_release_line.", 2);
+  }
+
+  return pin.source_release_line;
+};
+
+const getGitleaksPinMetadataEntries = (metadata) => {
+  if (typeof metadata !== "object" || metadata === null || !Array.isArray(metadata.pins)) {
+    fail("ERROR: Gitleaks pin metadata must contain pins.", 2);
+  }
+
+  return metadata.pins;
+};
+
+const findGitleaksSourceReleaseLine = (metadata, actionReference) => {
+  const pin = getGitleaksPinMetadataEntries(metadata).find(
+    (entry) => getActionRef(entry) === actionReference,
+  );
+
+  return pin === undefined ? undefined : getSourceReleaseLine(pin);
+};
+
+const getGitleaksActionPinFailure = (actionReference) => {
+  const ref = actionReference.slice(`${GITLEAKS_ACTION_REPOSITORY}@`.length);
+  const boundaryReason = getShaBoundaryReason(actionReference);
+
+  if (/^[0-9a-f]{40}$/.test(ref)) return undefined;
+  if (boundaryReason !== undefined) return boundaryReason;
+  if (ref.length === FULL_COMMIT_SHA_LENGTH) return "SHA must use lowercase hexadecimal characters";
+  return "Gitleaks action must be pinned to a full commit SHA";
+};
+
 const readAuditReport = (inputPath) => {
   try {
     return JSON.parse(readFileSync(inputPath, "utf8"));
@@ -388,6 +442,61 @@ const runActionPinning = (args) => {
   fail(getFailureMessages(movingReferences).join("\n"), 1);
 };
 
+const runGitleaksActionPinning = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", gitleaksActionPinningUsage);
+  const metadataPath = readRequiredOption(options, "metadata", gitleaksActionPinningUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const metadata = readJsonFile(metadataPath, "Gitleaks pin metadata");
+  const actionReferences = getGitleaksActionReferences(workflow);
+
+  if (actionReferences.length === 0) {
+    writeStdout("gitleaks_action=fail\n");
+    fail(`secrets-scan must run ${GITLEAKS_ACTION_REPOSITORY}`, 1);
+  }
+
+  const pinFailures = actionReferences
+    .map((actionReference) => ({
+      actionReference,
+      reason: getGitleaksActionPinFailure(actionReference),
+    }))
+    .filter((failure) => failure.reason !== undefined);
+
+  if (pinFailures.length > 0) {
+    writeStdout(
+      `gitleaks_action=fail\n${pinFailures
+        .map(
+          (failure) =>
+            `moving_reference=${failure.actionReference}\nboundary_reason=${failure.reason}\n`,
+        )
+        .join("")}`,
+    );
+    fail([...new Set(pinFailures.map((failure) => failure.reason))].join("\n"), 1);
+  }
+
+  const provenanceFailures = actionReferences.filter(
+    (actionReference) => findGitleaksSourceReleaseLine(metadata, actionReference) !== "v2",
+  );
+
+  if (provenanceFailures.length > 0) {
+    writeStdout(
+      `gitleaks_action=fail\n${provenanceFailures
+        .map((actionReference) => `pinned_reference=${actionReference}\n`)
+        .join("")}`,
+    );
+    fail("Gitleaks pin must originate from the v2 release line", 1);
+  }
+
+  writeStdout(
+    `gitleaks_action=pass\n${actionReferences
+      .map(
+        (actionReference) =>
+          `pinned_reference=${actionReference}\nsource_release_line=v2\nboundary_reason=40 hexadecimal characters is exactly valid\n`,
+      )
+      .join("")}`,
+  );
+};
+
 const runAuditGate = (args) => {
   const options = parseOptions(args);
   const inputPath = readRequiredOption(options, "input", auditGateUsage);
@@ -500,6 +609,8 @@ if (command === "duration-budget") {
   runDurationBudget(args);
 } else if (command === "action-pinning") {
   runActionPinning(args);
+} else if (command === "gitleaks-action-pinning") {
+  runGitleaksActionPinning(args);
 } else if (command === "audit-gate") {
   runAuditGate(args);
 } else if (command === "secrets-checkout-depth") {
