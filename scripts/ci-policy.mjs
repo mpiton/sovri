@@ -509,10 +509,21 @@ const masksSharedScriptFailure = (command, scriptPath) => {
   if (scriptIndex === undefined) return false;
 
   const trailingTokens = tokens.slice(scriptIndex + 1);
-  const orOperatorIndex = trailingTokens.indexOf("||");
+  const orOperatorIndex = trailingTokens.findIndex(
+    (token) => token === "||" || token.startsWith("||"),
+  );
   if (orOperatorIndex === -1) return false;
 
-  const fallbackCommand = trailingTokens.slice(orOperatorIndex + 1).join(" ");
+  const orOperatorToken = trailingTokens[orOperatorIndex];
+  const inlineFallbackToken =
+    orOperatorToken !== undefined && orOperatorToken.startsWith("||")
+      ? orOperatorToken.slice(2)
+      : "";
+  const fallbackTokens = [
+    ...(inlineFallbackToken.length > 0 ? [inlineFallbackToken] : []),
+    ...trailingTokens.slice(orOperatorIndex + 1),
+  ];
+  const fallbackCommand = fallbackTokens.join(" ");
   return !/^exit\s+(?:[1-9]\d*|\$\?)$/.test(fallbackCommand);
 };
 
@@ -940,6 +951,11 @@ const runSecretsNoSecretsReuse = (args) => {
     namedSecretGuardStep !== undefined &&
     callsSharedScript &&
     doesStepPropagateSharedScriptFailure(namedSecretGuardStep, scriptPath);
+  const scriptFailurePropagationStatus = callsSharedScript
+    ? scriptFailurePropagates
+      ? "pass"
+      : "fail"
+    : "missing";
   const duplicatesPatternsInline = hasInlineSecretPatternList(stepsBlock);
 
   if (callsSharedScript && scriptFailurePropagates && !duplicatesPatternsInline) {
@@ -950,7 +966,7 @@ const runSecretsNoSecretsReuse = (args) => {
   }
 
   writeStdout(
-    `no_secrets_reuse=fail\nshared_script=${callsSharedScript ? scriptPath : "missing"}\ninline_pattern_list=${duplicatesPatternsInline ? "present" : "absent"}\nscript_failure_propagation=${callsSharedScript && !scriptFailurePropagates ? "fail" : "missing"}\n`,
+    `no_secrets_reuse=fail\nshared_script=${callsSharedScript ? scriptPath : "missing"}\ninline_pattern_list=${duplicatesPatternsInline ? "present" : "absent"}\nscript_failure_propagation=${scriptFailurePropagationStatus}\n`,
   );
   if (callsSharedScript && !scriptFailurePropagates) {
     fail(`CI must fail when ${scriptPath} fails`, 1);
