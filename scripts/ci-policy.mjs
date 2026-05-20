@@ -19,7 +19,9 @@ const auditGateUsage =
   "Usage: node scripts/ci-policy.mjs audit-gate --input <pnpm-audit-report.json> --audit-level high";
 const secretsCheckoutDepthUsage =
   "Usage: node scripts/ci-policy.mjs secrets-checkout-depth --workflow <path>";
-const usage = `${durationBudgetUsage}\n${actionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}`;
+const secretsFixtureEvidenceUsage =
+  "Usage: node scripts/ci-policy.mjs secrets-fixture-evidence --input <fixture-evidence.json> --false-positive-fixture <path>";
+const usage = `${durationBudgetUsage}\n${actionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -272,6 +274,14 @@ const readAuditReport = (inputPath) => {
   }
 };
 
+const readJsonFile = (inputPath, label) => {
+  try {
+    return JSON.parse(readFileSync(inputPath, "utf8"));
+  } catch {
+    fail(`ERROR: Unable to read ${label} file: ${inputPath}.`, 2);
+  }
+};
+
 const getAuditVulnerabilities = (report) => {
   if (typeof report !== "object" || report === null) {
     fail("ERROR: audit report must contain metadata.vulnerabilities.", 2);
@@ -309,6 +319,48 @@ const getAuditAdvisoryNames = (report, severity) => {
       return advisory.severity === severity;
     })
     .map(([name]) => name);
+};
+
+const getFixtureEntries = (report) => {
+  if (typeof report !== "object" || report === null) {
+    fail("ERROR: fixture evidence must contain fixtures.", 2);
+  }
+
+  const fixtures = report.fixtures;
+  if (!Array.isArray(fixtures)) {
+    fail("ERROR: fixture evidence must contain fixtures.", 2);
+  }
+
+  return fixtures;
+};
+
+const getFixturePath = (fixture) => {
+  if (typeof fixture !== "object" || fixture === null || typeof fixture.path !== "string") {
+    fail("ERROR: fixture evidence entries must contain path.", 2);
+  }
+
+  return fixture.path;
+};
+
+const getFixtureMatches = (fixture) => {
+  if (typeof fixture !== "object" || fixture === null || !Array.isArray(fixture.matches)) {
+    fail("ERROR: fixture evidence entries must contain matches.", 2);
+  }
+
+  return fixture.matches;
+};
+
+const isResolvedMatch = (match) => {
+  if (typeof match !== "object" || match === null) return false;
+  return match.status === "resolved" && typeof match.resolution_reason === "string";
+};
+
+const getMatchId = (match) => {
+  if (typeof match !== "object" || match === null || typeof match.id !== "string") {
+    return "unknown-match";
+  }
+
+  return match.id;
 };
 
 const runActionPinning = (args) => {
@@ -368,6 +420,49 @@ const runAuditGate = (args) => {
   writeStdout("audit_gate=pass\n");
 };
 
+const runSecretsFixtureEvidence = (args) => {
+  const options = parseOptions(args);
+  const inputPath = readRequiredOption(options, "input", secretsFixtureEvidenceUsage);
+  const falsePositivePath = readRequiredOption(
+    options,
+    "false-positive-fixture",
+    secretsFixtureEvidenceUsage,
+  );
+  const report = readJsonFile(inputPath, "fixture evidence");
+  const fixtures = getFixtureEntries(report);
+  const falsePositiveFixture = fixtures.find(
+    (fixture) => getFixturePath(fixture) === falsePositivePath,
+  );
+
+  if (falsePositiveFixture === undefined) {
+    writeStdout("fixture_evidence=fail\n");
+    fail(`false-positive fixture must be present: ${falsePositivePath}`, 1);
+  }
+
+  const falsePositiveMatches = getFixtureMatches(falsePositiveFixture);
+  if (!falsePositiveMatches.some(isResolvedMatch)) {
+    writeStdout("fixture_evidence=fail\n");
+    fail(`false-positive fixture must be resolved before merge: ${falsePositivePath}`, 1);
+  }
+
+  const unresolvedMatches = fixtures.flatMap((fixture) =>
+    getFixtureMatches(fixture)
+      .filter((match) => !isResolvedMatch(match))
+      .map((match) => ({ id: getMatchId(match), path: getFixturePath(fixture) })),
+  );
+
+  if (unresolvedMatches.length > 0) {
+    writeStdout(
+      `fixture_evidence=fail\n${unresolvedMatches
+        .map((match) => `unresolved_match=${match.id}\nfixture_path=${match.path}\n`)
+        .join("")}`,
+    );
+    fail(unresolvedMatches.map((match) => `${match.id} in ${match.path}`).join("\n"), 1);
+  }
+
+  writeStdout(`fixture_evidence=pass\nresolved_fixture=${falsePositivePath}\n`);
+};
+
 const runSecretsCheckoutDepth = (args) => {
   const options = parseOptions(args);
   const workflowPath = readRequiredOption(options, "workflow", secretsCheckoutDepthUsage);
@@ -405,6 +500,8 @@ if (command === "duration-budget") {
   runAuditGate(args);
 } else if (command === "secrets-checkout-depth") {
   runSecretsCheckoutDepth(args);
+} else if (command === "secrets-fixture-evidence") {
+  runSecretsFixtureEvidence(args);
 } else {
   fail(usage, 2);
 }

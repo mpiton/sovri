@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `ci`: add fixture evidence policy coverage for resolved false-positive
+  secret fixtures in the secrets-scan gate (#669).
+
 - `ci`: mention the full-history checkout requirement when positive
   `fetch-depth` values are rejected by the secrets-scan policy (#667).
 
