@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Security
 
+- `ci`: add Docker build action policy coverage requiring `docker/build-push-action`,
+  `push: false`, exactly `linux/amd64` and `linux/arm64`, and GitHub Actions
+  cache configuration for `build-docker` (#734).
+
 - `ci`: pass `persist-credentials: false` to every `actions/checkout` step in
   the forbidden-tools and forbidden-imports workflows so `GITHUB_TOKEN` is no
   longer written to local git config and cannot leak into later steps or

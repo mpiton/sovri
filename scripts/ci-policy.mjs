@@ -282,20 +282,36 @@ const runBuildDockerDurationBudget = (args) => {
 };
 
 const getBuildDockerStepsBlock = (workflow) => {
-  const jobsBlock = getIndentedBlock(workflow, /^\s*jobs:\s*(?:#.*)?$/);
-  const buildDockerJob = getIndentedBlock(jobsBlock, /^\s+build-docker:\s*(?:#.*)?$/);
-  return getIndentedBlock(buildDockerJob, /^\s+steps:\s*(?:#.*)?$/);
+  const jobsBlock = getIndentedBlockRaw(workflow, /^\s*jobs:\s*(?:#.*)?$/);
+  const buildDockerJob = getIndentedBlockRaw(jobsBlock, /^\s+build-docker:\s*(?:#.*)?$/);
+  return getIndentedBlockRaw(buildDockerJob, /^\s+steps:\s*(?:#.*)?$/);
 };
 
 const getStepInput = (step, inputName) => {
-  const inputPattern = new RegExp(`^\\s*${inputName}:\\s*(.+?)\\s*(?:#.*)?$`, "m");
-  const value = step.match(inputPattern)?.[1]?.trim();
-  return value === undefined ? undefined : stripYamlQuotes(value);
+  const withBlock = getIndentedBlockRaw(step, /^\s+with:\s*(?:#.*)?$/);
+  const lines = withBlock.split(/\r?\n/);
+  const inputPattern = new RegExp(`^\\s*${inputName}:\\s*(.*?)\\s*(?:#.*)?$`);
+  const inputIndex = lines.findIndex((line) => inputPattern.test(line));
+  if (inputIndex === -1) return undefined;
+
+  const inputLine = lines[inputIndex];
+  const value = inputLine.match(inputPattern)?.[1]?.trim();
+  if (value === undefined) return undefined;
+  if (!BLOCK_SCALAR_PATTERN.test(inputLine)) return stripYamlQuotes(value);
+
+  const inputIndent = getIndent(inputLine);
+  const scalarLines = [];
+  for (const line of lines.slice(inputIndex + 1)) {
+    if (line.trim().length === 0) continue;
+    if (getIndent(line) <= inputIndent) break;
+    scalarLines.push(line.trim());
+  }
+  return scalarLines.join("\n");
 };
 
 const getDockerPlatformBoundary = (platformsValue) => {
   const platforms = platformsValue
-    .split(",")
+    .split(/[,\n]/)
     .map((platform) => platform.trim())
     .filter((platform) => platform.length > 0);
   const hasAmd64 = platforms.includes("linux/amd64");
@@ -318,7 +334,7 @@ const runDockerBuildAction = (args) => {
   const workflowPath = readRequiredOption(options, "workflow", dockerBuildActionUsage);
   const workflow = readWorkflowFile(workflowPath);
   const stepsBlock = getBuildDockerStepsBlock(workflow);
-  const buildStep = getListItemBlocks(stepsBlock).find((step) =>
+  const buildStep = getRawListItemBlocks(stepsBlock).find((step) =>
     new RegExp(`^\\s*(?:-\\s*)?uses:\\s*['"]?${DOCKER_BUILD_ACTION_REPOSITORY}@`, "m").test(step),
   );
 
@@ -577,6 +593,8 @@ const getListItemBlocksFromLines = (lines) => {
 };
 
 const getListItemBlocks = (workflow) => getListItemBlocksFromLines(getYamlStructureLines(workflow));
+
+const getRawListItemBlocks = (workflow) => getListItemBlocksFromLines(workflow.split(/\r?\n/));
 
 const getTopLevelListItemBlocks = (workflow) => {
   const lines = workflow.split(/\r?\n/);
