@@ -284,6 +284,18 @@ setup_any_union_in_source() {
   stage_file packages/core/src/types.ts 'export type T = string|any;'
 }
 
+setup_any_type_alias_in_source() {
+  # ADR-001 explicitly bans `any`. A bare type alias `type T = any` is one of
+  # the most common escape-hatch forms and must be caught. The `=>?` segment
+  # of the pattern keeps `>` optional so both `= any` (type alias) and
+  # `=> any` (arrow return) match.
+  stage_file packages/core/src/types.ts 'export type T = any;'
+}
+
+setup_any_arrow_return_in_source() {
+  stage_file packages/core/src/types.ts 'export type Fn = () => any;'
+}
+
 setup_any_word_inside_identifier() {
   # Identifiers containing the substring "any" (manyThings, anyhow, company)
   # must not trigger the guard. The contextual pattern only fires when "any"
@@ -392,6 +404,8 @@ run_case "BLOCK-25 any in source references ADR-001" setup_any_in_source 1 "ADR-
 run_case "BLOCK-25a value:any (no space) flagged"       setup_any_no_space_in_source       1 "ADR-001"
 run_case "BLOCK-25b Array<any> flagged"                 setup_any_generic_in_source        1 "ADR-001"
 run_case "BLOCK-25c union with any flagged"             setup_any_union_in_source          1 "ADR-001"
+run_case "BLOCK-25d type alias = any flagged"           setup_any_type_alias_in_source     1 "ADR-001"
+run_case "BLOCK-25e arrow return => any flagged"        setup_any_arrow_return_in_source   1 "ADR-001"
 run_case "PASS-11a identifiers containing any allowed"  setup_any_word_inside_identifier   0 ""
 run_case "PASS-11b 'any' as English in line comment"    setup_any_english_in_line_comment  0 ""
 run_case "PASS-11c 'any of' in JSDoc continuation"      setup_any_english_in_jsdoc         0 ""
