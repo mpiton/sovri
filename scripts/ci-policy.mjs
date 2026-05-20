@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync, writeSync } from "node:fs";
+import { readFileSync, realpathSync, statSync, writeSync } from "node:fs";
+import { isAbsolute, relative, resolve } from "node:path";
 import { argv, exit } from "node:process";
 
 const writeStdout = (chunk) => writeSync(1, chunk);
@@ -28,7 +29,7 @@ const secretsCheckoutDepthUsage =
 const secretsFixtureEvidenceUsage =
   "Usage: node scripts/ci-policy.mjs secrets-fixture-evidence --input <fixture-evidence.json> --false-positive-fixture <path>";
 const secretsNoSecretsReuseUsage =
-  "Usage: node scripts/ci-policy.mjs secrets-no-secrets-reuse --workflow <path> --script-path <path>";
+  "Usage: node scripts/ci-policy.mjs secrets-no-secrets-reuse --workflow <path> --script-path <path> [--repo-root <path>]";
 const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
 
 const fail = (message, code) => {
@@ -170,6 +171,45 @@ const readWorkflowFile = (workflowPath) => {
   } catch {
     fail(`ERROR: Unable to read workflow file: ${workflowPath}.`, 2);
   }
+};
+
+const isRegularFile = (path) => {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+};
+
+const readRealPath = (path) => {
+  try {
+    return realpathSync(path);
+  } catch {
+    return undefined;
+  }
+};
+
+const isPathInsideDirectory = (directory, path) => {
+  const relativePath = relative(directory, path);
+  return relativePath.length === 0 || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
+};
+
+const isRepoRelativeRegularFile = (repoRoot, path) => {
+  if (isAbsolute(path)) return false;
+
+  const resolvedRepoRoot = resolve(repoRoot);
+  const resolvedPath = resolve(resolvedRepoRoot, path);
+  if (!isPathInsideDirectory(resolvedRepoRoot, resolvedPath) || !isRegularFile(resolvedPath)) {
+    return false;
+  }
+
+  const realRepoRoot = readRealPath(resolvedRepoRoot);
+  const realPath = readRealPath(resolvedPath);
+  return (
+    realRepoRoot !== undefined &&
+    realPath !== undefined &&
+    isPathInsideDirectory(realRepoRoot, realPath)
+  );
 };
 
 const extractActionReferences = (workflow) => {
@@ -941,8 +981,10 @@ const runSecretsNoSecretsReuse = (args) => {
   const options = parseOptions(args);
   const workflowPath = readRequiredOption(options, "workflow", secretsNoSecretsReuseUsage);
   const scriptPath = readRequiredOption(options, "script-path", secretsNoSecretsReuseUsage);
+  const repoRoot = options.get("repo-root") ?? ".";
   const workflow = readWorkflowFile(workflowPath);
   const stepsBlock = getSecretsScanRawStepsBlock(workflow);
+  const scriptFileExists = isRepoRelativeRegularFile(repoRoot, scriptPath);
   const namedSecretGuardStep =
     getTopLevelListItemBlocks(stepsBlock).find(hasSecretFilenameStepName);
   const callsSharedScript =
@@ -958,16 +1000,24 @@ const runSecretsNoSecretsReuse = (args) => {
     : "missing";
   const duplicatesPatternsInline = hasInlineSecretPatternList(stepsBlock);
 
-  if (callsSharedScript && scriptFailurePropagates && !duplicatesPatternsInline) {
+  if (
+    callsSharedScript &&
+    scriptFileExists &&
+    scriptFailurePropagates &&
+    !duplicatesPatternsInline
+  ) {
     writeStdout(
-      `no_secrets_reuse=pass\nshared_script=${scriptPath}\ninline_pattern_list=absent\nscript_failure_propagation=pass\n`,
+      `no_secrets_reuse=pass\nshared_script=${scriptPath}\nscript_file=present\ninline_pattern_list=absent\nscript_failure_propagation=pass\n`,
     );
     return;
   }
 
   writeStdout(
-    `no_secrets_reuse=fail\nshared_script=${callsSharedScript ? scriptPath : "missing"}\ninline_pattern_list=${duplicatesPatternsInline ? "present" : "absent"}\nscript_failure_propagation=${scriptFailurePropagationStatus}\n`,
+    `no_secrets_reuse=fail\nshared_script=${callsSharedScript ? scriptPath : "missing"}\nscript_file=${scriptFileExists ? "present" : "missing"}\ninline_pattern_list=${duplicatesPatternsInline ? "present" : "absent"}\nscript_failure_propagation=${scriptFailurePropagationStatus}\n`,
   );
+  if (!scriptFileExists) {
+    fail(`${scriptPath} is required`, 1);
+  }
   if (callsSharedScript && !scriptFailurePropagates) {
     fail(`CI must fail when ${scriptPath} fails`, 1);
   }
