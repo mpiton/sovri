@@ -618,6 +618,60 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_build_docker_duration_fail_case() {
+  local elapsed_ms stdout stderr stdout_file stderr_file ec combined
+
+  elapsed_ms="$1"
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the build-docker job starts at monotonic time 100000 ms
+  # And the build-docker job completes after <elapsed_ms> ms
+  # And the Docker build step uses GitHub Actions cache
+  node "$SCRIPT" build-docker-duration-budget \
+    --job-start-ms 100000 \
+    --job-end-ms $((100000 + elapsed_ms)) \
+    --github-actions-cache enabled \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the build-docker duration budget is evaluated
+  # Then the duration budget assertion fails
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration fail ${elapsed_ms}: expected non-zero exit
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "duration_budget=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration fail ${elapsed_ms}: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "build-docker must finish in under 10 minutes"
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must finish in under 10 minutes"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration fail ${elapsed_ms}: missing failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_build_docker_needs_required_gates_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec combined
 
@@ -4693,6 +4747,8 @@ run_forbidden_jobs_duration_fail_case 12000 unknown "missing duration evidence f
 run_forbidden_jobs_duration_fail_case unknown 18000 "missing duration evidence for forbidden-tools"
 run_build_docker_duration_pass_case 120000 "2 min"
 run_build_docker_duration_pass_case 599999 "9 min 59.999 s"
+run_build_docker_duration_fail_case 600000
+run_build_docker_duration_fail_case 720000
 run_build_docker_needs_required_gates_case
 run_build_docker_needs_inline_gates_case
 run_build_docker_needs_multiline_flow_gates_case
