@@ -25,6 +25,15 @@ const TRIVY_REQUIRED_EXIT_CODE = "1";
 const TRIVY_REQUIRED_SARIF_FORMAT = "sarif";
 const TRIVY_REQUIRED_SARIF_PATH = "trivy-results.sarif";
 const TRIVY_BLOCKING_SEVERITIES = new Set(["HIGH", "CRITICAL"]);
+const RELEASE_REQUIRED_JOBS = ["verify-tag", "build-and-push", "sbom", "gh-release"];
+const RELEASE_VERSION = "0.1.0";
+const RELEASE_IMAGE_REPOSITORY = "ghcr.io/mpiton/sovri/community-bot";
+const RELEASE_REQUIRED_IMAGE_TAGS = [
+  `${RELEASE_IMAGE_REPOSITORY}:v0.1.0`,
+  `${RELEASE_IMAGE_REPOSITORY}:v0.1`,
+  `${RELEASE_IMAGE_REPOSITORY}:v0`,
+  `${RELEASE_IMAGE_REPOSITORY}:latest`,
+];
 const REQUIRED_BUILD_DOCKER_NEEDS = [
   "backend-checks",
   "supply-chain",
@@ -51,6 +60,15 @@ const buildDockerNeedsUsage =
   "Usage: node scripts/ci-policy.mjs build-docker-needs --workflow <path>";
 const buildDockerSchedulerUsage =
   "Usage: node scripts/ci-policy.mjs build-docker-scheduler --backend-checks <success|failure|cancelled|skipped> --supply-chain <success|failure|cancelled|skipped> --secrets-scan <success|failure|cancelled|skipped> --forbidden-tools <success|failure|cancelled|skipped> --forbidden-imports <success|failure|cancelled|skipped>";
+const releasePipelineResultUsage =
+  "Usage: node scripts/ci-policy.mjs release-pipeline-result --verify-tag <success|failure|cancelled|skipped> --build-and-push <success|failure|cancelled|skipped> --sbom <success|failure|cancelled|skipped> --gh-release <success|failure|cancelled|skipped> [--existing-release true] [--existing-tags true]";
+const releaseTriggerUsage = "Usage: node scripts/ci-policy.mjs release-trigger --workflow <path>";
+const releaseVerifyTagUsage =
+  "Usage: node scripts/ci-policy.mjs release-verify-tag --tag <vX.Y.Z> --package-files <comma-separated-package-json-paths> --changelog <path>";
+const releaseBuildAndPushUsage =
+  "Usage: node scripts/ci-policy.mjs release-build-and-push --workflow <path>";
+const cosignDeferralUsage =
+  "Usage: node scripts/ci-policy.mjs cosign-deferral --workflow <path> --changelog <path>";
 const actionPinningUsage = "Usage: node scripts/ci-policy.mjs action-pinning --workflow <path>";
 const gitleaksActionPinningUsage =
   "Usage: node scripts/ci-policy.mjs gitleaks-action-pinning --workflow <path> --metadata <gitleaks-pin-metadata.json>";
@@ -82,7 +100,7 @@ const changelogRemediationMessageUsage =
   "Usage: node scripts/ci-policy.mjs changelog-remediation-message --message <text>";
 const changelogDocumentationOnlyAssertUsage =
   "Usage: node scripts/ci-policy.mjs changelog-documentation-only-assert --changed-files <comma-separated-paths> --gate-result <success|failure>";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${cosignDeferralUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -352,20 +370,25 @@ const findRootEntry = (entries, rootPattern) => {
   );
 };
 
-const getBuildDockerStepsBlockEntry = (workflow) => {
+const getJobBlockEntry = (workflow, jobName) => {
   const jobsPattern = /^\s*jobs:\s*(?:#.*)?$/;
   const entries = getYamlStructureEntries(workflow);
   const jobsEntry = findRootEntry(entries, jobsPattern);
   if (jobsEntry === undefined) return undefined;
 
-  const buildDockerEntry = findDirectChildEntry(
+  return findDirectChildEntry(
     entries,
     jobsEntry,
-    /^\s+build-docker:\s*(?:&[^\s#]+)?\s*(?:#.*)?$/,
+    new RegExp(`^\\s+${escapeRegExp(jobName)}:\\s*(?:&[^\\s#]+)?\\s*(?:#.*)?$`),
   );
-  if (buildDockerEntry === undefined) return undefined;
+};
 
-  const stepsEntry = findDirectChildEntry(entries, buildDockerEntry, /^\s+steps:\s*(?:#.*)?$/);
+const getJobStepsBlockEntry = (workflow, jobName) => {
+  const jobEntry = getJobBlockEntry(workflow, jobName);
+  if (jobEntry === undefined) return undefined;
+
+  const entries = getYamlStructureEntries(workflow);
+  const stepsEntry = findDirectChildEntry(entries, jobEntry, /^\s+steps:\s*(?:#.*)?$/);
   if (stepsEntry === undefined) return undefined;
 
   return {
@@ -373,6 +396,8 @@ const getBuildDockerStepsBlockEntry = (workflow) => {
     startIndex: stepsEntry.index,
   };
 };
+
+const getBuildDockerStepsBlockEntry = (workflow) => getJobStepsBlockEntry(workflow, "build-docker");
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -1028,6 +1053,344 @@ const runBuildDockerScheduler = (args) => {
   }
 
   writeStdout("build_docker_eligible=true\nbuild_docker_result=eligible\n");
+};
+
+const readBooleanFlag = (options, key) => {
+  const value = options.get(key);
+  if (value === undefined) return false;
+  if (value !== "true" && value !== "false") {
+    fail(`ERROR: --${key} must be "true" or "false".`, 2);
+  }
+  return value === "true";
+};
+
+const runReleasePipelineResult = (args) => {
+  const options = parseOptions(args);
+  const jobStates = RELEASE_REQUIRED_JOBS.map((jobName) => [
+    jobName,
+    readJobState(options, jobName),
+  ]);
+  const failedJobs = jobStates.filter(([, state]) => state !== "success");
+
+  if (failedJobs.length > 0) {
+    writeStdout(
+      `release_pipeline_result=failed\n${failedJobs
+        .map(([jobName, state]) => `failed_job=${jobName}\njob_state=${state}\n`)
+        .join("")}`,
+    );
+    fail(failedJobs.map(([jobName]) => jobName).join("\n"), 1);
+  }
+
+  const existingRelease = readBooleanFlag(options, "existing-release");
+  const existingTags = readBooleanFlag(options, "existing-tags");
+  if (existingRelease && existingTags) {
+    writeStdout("release_pipeline_result=green\nrelease_update=existing-release-updated\n");
+    return;
+  }
+
+  writeStdout("release_pipeline_result=green\n");
+};
+
+const readWorkflowPushTagPatterns = (workflow) => {
+  const entries = getYamlStructureEntries(workflow);
+  const onEntry = findRootEntry(entries, /^\s*on:\s*(?:#.*)?$/);
+  if (onEntry === undefined) return [];
+
+  const pushEntry = findDirectChildEntry(entries, onEntry, /^\s+push:\s*(?:#.*)?$/);
+  if (pushEntry === undefined) return [];
+
+  const tagsEntry = findDirectChildEntry(entries, pushEntry, /^\s+tags:\s*(?:.*)?$/);
+  if (tagsEntry === undefined) return [];
+
+  const inlineValue = tagsEntry.line.match(/^\s*tags:\s*(.*?)\s*(?:#.*)?$/)?.[1]?.trim();
+  if (inlineValue !== undefined && inlineValue.length > 0) {
+    return parseYamlScalarListValue(inlineValue);
+  }
+
+  return getIndentedBlockRawFromIndex(workflow, tagsEntry.index)
+    .split(/\r?\n/)
+    .slice(1)
+    .map((line) => line.match(/^\s*-\s+(.+?)\s*(?:#.*)?$/)?.[1])
+    .filter((pattern) => pattern !== undefined)
+    .map((pattern) => stripYamlQuotes(pattern));
+};
+
+const readWorkflowRootEventNames = (workflow) => {
+  const onLine = getYamlStructureLines(workflow).find((line) => /^\s*on:\s*/.test(line));
+  const inlineValue = onLine?.match(/^\s*on:\s*(.*?)\s*(?:#.*)?$/)?.[1]?.trim();
+  if (inlineValue !== undefined && inlineValue.length > 0) {
+    return parseYamlScalarListValue(inlineValue);
+  }
+
+  const entries = getYamlStructureEntries(workflow);
+  const onEntry = findRootEntry(entries, /^\s*on:\s*(?:#.*)?$/);
+  if (onEntry === undefined) return [];
+
+  const onIndent = getIndent(onEntry.line);
+  let eventIndent;
+  const events = [];
+
+  for (const entry of entries.filter((candidate) => candidate.index > onEntry.index)) {
+    const trimmedLine = entry.line.trim();
+    if (trimmedLine.length === 0 || trimmedLine.startsWith("#")) continue;
+
+    const indent = getIndent(entry.line);
+    if (indent <= onIndent) break;
+
+    eventIndent ??= indent;
+    if (indent !== eventIndent) continue;
+
+    const eventName = entry.line.match(/^\s*([A-Za-z0-9_-]+):\s*(?:.*)?$/)?.[1];
+    if (eventName !== undefined) events.push(eventName);
+  }
+
+  return events;
+};
+
+const getReleaseTagPatternFailure = (tagPatterns) => {
+  if (tagPatterns.length === 0) return "push.tags must include v*";
+  if (tagPatterns.includes("v*")) return undefined;
+  if (tagPatterns.includes("*")) return "non-release tags can trigger";
+  if (tagPatterns.some((pattern) => pattern.startsWith("v0."))) {
+    return "future v1 tags would not trigger";
+  }
+  if (tagPatterns.some((pattern) => !pattern.startsWith("v"))) {
+    return "v prefix contract is missing";
+  }
+  return "push.tags must include v*";
+};
+
+const runReleaseTrigger = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", releaseTriggerUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const eventNames = readWorkflowRootEventNames(workflow);
+
+  if (eventNames.length !== 1 || eventNames[0] !== "push") {
+    writeStdout("release_trigger=fail\n");
+    fail("release workflow must only run on push tags v*", 1);
+  }
+
+  const tagPatterns = readWorkflowPushTagPatterns(workflow);
+  const tagPatternFailure = getReleaseTagPatternFailure(tagPatterns);
+  if (tagPatternFailure !== undefined) {
+    writeStdout(
+      `release_trigger=fail\n${tagPatterns.map((pattern) => `tag_pattern=${pattern}\n`).join("")}`,
+    );
+    fail(tagPatternFailure, 1);
+  }
+
+  writeStdout(
+    "release_trigger=pass\ntrigger_event=push\ntag_pattern=v*\nboundary_reason=required v prefix is present\n",
+  );
+};
+
+const readPackageVersion = (packagePath) => {
+  const packageJson = readJsonFile(packagePath, "package");
+  if (typeof packageJson !== "object" || packageJson === null) {
+    fail(`ERROR: package file must be an object: ${packagePath}.`, 2);
+  }
+  if (typeof packageJson.version !== "string" || packageJson.version.length === 0) {
+    fail(`ERROR: package file must contain a version: ${packagePath}.`, 2);
+  }
+  return packageJson.version;
+};
+
+const formatPackageDisplayName = (packagePath) => {
+  const normalizedPath = packagePath.replaceAll("\\", "/");
+  const match = normalizedPath.match(/(?:^|\/)((?:apps|packages)\/[^/]+)\/package\.json$/);
+  return match?.[1] ?? normalizedPath.replace(/\/package\.json$/, "");
+};
+
+const readPackageFiles = (options) =>
+  readRequiredOption(options, "package-files", releaseVerifyTagUsage)
+    .split(",")
+    .map((path) => path.trim())
+    .filter((path) => path.length > 0);
+
+const getExpectedVersionFromTag = (tag) => {
+  if (!tag.startsWith("v")) fail("tag lacks required v prefix", 1);
+  if (tag.startsWith("vv")) fail("tag has two leading v prefixes", 1);
+  return tag.slice(1);
+};
+
+const readTextFile = (path, label) => {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    fail(`ERROR: Unable to read ${label} file: ${path}.`, 2);
+  }
+};
+
+const hasChangelogReleaseSection = (changelog, version) =>
+  new RegExp(`^## \\[${escapeRegExp(version)}\\]\\s*$`, "m").test(changelog);
+
+const runReleaseVerifyTag = (args) => {
+  const options = parseOptions(args);
+  const tag = readRequiredOption(options, "tag", releaseVerifyTagUsage);
+  const expectedVersion = getExpectedVersionFromTag(tag);
+  const packageFiles = readPackageFiles(options);
+  const packageVersions = packageFiles.map((packagePath) => ({
+    path: packagePath,
+    version: readPackageVersion(packagePath),
+  }));
+  const versionSet = new Set(packageVersions.map((entry) => entry.version));
+
+  if (versionSet.size > 1) {
+    const mismatches = packageVersions.filter((entry) => entry.version !== expectedVersion);
+    writeStdout("verify_tag=fail\n");
+    fail(
+      [
+        "package version mismatch",
+        ...mismatches.map(
+          (entry) =>
+            `${formatPackageDisplayName(entry.path)} version ${entry.version} does not match tag ${tag}`,
+        ),
+      ].join("\n"),
+      1,
+    );
+  }
+
+  const packageVersion = packageVersions[0]?.version;
+  if (packageVersion === undefined) {
+    fail("ERROR: --package-files must contain at least one package file.", 2);
+  }
+
+  if (packageVersion !== expectedVersion) {
+    writeStdout("verify_tag=fail\n");
+    fail("tag does not match version\npackage version mismatch", 1);
+  }
+
+  const changelogPath = readRequiredOption(options, "changelog", releaseVerifyTagUsage);
+  const changelog = readTextFile(changelogPath, "changelog");
+  if (!hasChangelogReleaseSection(changelog, expectedVersion)) {
+    writeStdout("verify_tag=fail\n");
+    fail(`changelog section mismatch\nmissing changelog section ## [${expectedVersion}]`, 1);
+  }
+
+  writeStdout("verify_tag=pass\nboundary_reason=tag has one leading v and exact version\n");
+};
+
+const splitReleaseTags = (tagsValue) =>
+  tagsValue
+    .split(/[,\n]/)
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0);
+
+const isReleaseDockerBuildStep = (step) =>
+  getStepPropertyValue(step, "uses")?.startsWith(`${DOCKER_BUILD_ACTION_REPOSITORY}@`) ?? false;
+
+const getImageRepositoryFromTag = (tag) => tag.match(/^(.*):[^/:]+$/)?.[1];
+
+const runReleaseBuildAndPush = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", releaseBuildAndPushUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const stepsBlockEntry = getJobStepsBlockEntry(workflow, "build-and-push");
+  if (stepsBlockEntry === undefined) {
+    writeStdout("release_build_and_push=fail\n");
+    fail("missing build-and-push job", 1);
+  }
+
+  const buildStep = getTopLevelListItemBlockEntries(
+    stepsBlockEntry.block,
+    stepsBlockEntry.startIndex,
+  ).find((entry) => isReleaseDockerBuildStep(entry.block));
+  if (buildStep === undefined) {
+    writeStdout("release_build_and_push=fail\n");
+    fail(`build-and-push must use ${DOCKER_BUILD_ACTION_REPOSITORY}`, 1);
+  }
+
+  const push = getStepInput(buildStep.block, "push", workflow, buildStep.startIndex);
+  if (push !== "true") {
+    writeStdout("release_build_and_push=fail\n");
+    fail("build-and-push must push release images", 1);
+  }
+
+  const platforms =
+    getStepInput(buildStep.block, "platforms", workflow, buildStep.startIndex) ?? "";
+  const platformBoundary = getDockerPlatformBoundary(platforms);
+  if (platformBoundary.outcome === "rejected") {
+    writeStdout(
+      `release_build_and_push=fail\nplatform_outcome=rejected\nboundary_reason=${platformBoundary.reason}\n`,
+    );
+    fail(platformBoundary.reason, 1);
+  }
+
+  const imageTags = splitReleaseTags(
+    getStepInput(buildStep.block, "tags", workflow, buildStep.startIndex) ?? "",
+  );
+  const imageRepositories = new Set(
+    imageTags.map(getImageRepositoryFromTag).filter((repository) => repository !== undefined),
+  );
+  if (!imageRepositories.has(RELEASE_IMAGE_REPOSITORY)) {
+    writeStdout("release_build_and_push=fail\n");
+    fail(`image repository must be ${RELEASE_IMAGE_REPOSITORY}`, 1);
+  }
+
+  const missingTags = RELEASE_REQUIRED_IMAGE_TAGS.filter((tag) => !imageTags.includes(tag));
+  if (missingTags.length > 0) {
+    const missingTag = missingTags.toSorted(
+      (left, right) =>
+        left.slice(`${RELEASE_IMAGE_REPOSITORY}:`.length).length -
+        right.slice(`${RELEASE_IMAGE_REPOSITORY}:`.length).length,
+    )[0];
+    writeStdout("release_build_and_push=fail\n");
+    fail(`missing ${missingTag.slice(`${RELEASE_IMAGE_REPOSITORY}:`.length)} tag`, 1);
+  }
+
+  writeStdout(
+    `release_build_and_push=pass\nplatform_outcome=accepted\nboundary_reason=${platformBoundary.reason}\n`,
+  );
+};
+
+const getChangelogReleaseSection = (changelog, version) => {
+  const headingPattern = new RegExp(`^## \\[${escapeRegExp(version)}\\]\\s*$`, "m");
+  const headingMatch = headingPattern.exec(changelog);
+  if (headingMatch === null || headingMatch.index === undefined) return "";
+
+  const sectionStart = headingMatch.index + headingMatch[0].length;
+  const nextHeading = changelog.slice(sectionStart).match(/\n## \[[^\]]+\]\s*/);
+  const sectionEnd =
+    nextHeading?.index === undefined ? changelog.length : sectionStart + nextHeading.index;
+  return changelog.slice(sectionStart, sectionEnd);
+};
+
+const getCosignDeferralFailure = (sectionText, changelog) => {
+  if (!/Cosign signing is deferred to /.test(sectionText)) {
+    if (/Cosign signing is deferred to v0\.5\./.test(changelog)) {
+      return "deferral must be documented in ## [0.1.0]";
+    }
+    return "document cosign signing deferral to v0.5";
+  }
+
+  if (/Cosign signing is deferred to v0\.5\./.test(sectionText)) return undefined;
+  if (/Cosign signing is deferred to v1\.0\./.test(sectionText)) {
+    return "target version is too late";
+  }
+  return "target version is not concrete";
+};
+
+const runCosignDeferral = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", cosignDeferralUsage);
+  const changelogPath = readRequiredOption(options, "changelog", cosignDeferralUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const changelog = readTextFile(changelogPath, "changelog");
+  const releaseSection = getChangelogReleaseSection(changelog, RELEASE_VERSION);
+  const deferralFailure = getCosignDeferralFailure(releaseSection, changelog);
+
+  if (deferralFailure !== undefined) {
+    writeStdout("cosign_deferral=fail\n");
+    fail(deferralFailure, 1);
+  }
+
+  if (/sigstore\/cosign-installer@|(?:^|\s)cosign\s+sign(?:\s|$)/m.test(workflow)) {
+    writeStdout("cosign_deferral=fail\n");
+    fail("cosign signing is deferred to v0.5", 1);
+  }
+
+  writeStdout("cosign_deferral=pass\nboundary_reason=documented target version\n");
 };
 
 const runChangelogTrigger = (args) => {
@@ -2326,6 +2689,16 @@ if (command === "duration-budget") {
   runBuildDockerNeeds(args);
 } else if (command === "build-docker-scheduler") {
   runBuildDockerScheduler(args);
+} else if (command === "release-pipeline-result") {
+  runReleasePipelineResult(args);
+} else if (command === "release-trigger") {
+  runReleaseTrigger(args);
+} else if (command === "release-verify-tag") {
+  runReleaseVerifyTag(args);
+} else if (command === "release-build-and-push") {
+  runReleaseBuildAndPush(args);
+} else if (command === "cosign-deferral") {
+  runCosignDeferral(args);
 } else if (command === "action-pinning") {
   runActionPinning(args);
 } else if (command === "gitleaks-action-pinning") {

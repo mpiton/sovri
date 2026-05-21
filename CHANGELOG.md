@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Security
 
+- `ci`: add release workflow policy coverage and the v0.1.0 GHCR, SBOM, and
+  GitHub Release publishing workflow (#54).
+
 - `ci`: add changelog-check documentation classification coverage for Markdown
   files inside package folders (#813).
 
@@ -2445,6 +2448,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   incident (TanStack, Mistral SDK and OpenSearch compromised). Note that
   Dependabot security-update PRs bypass cooldown by design; merge-time
   review remains enforced by branch protection and human approval.
+
+---
+
+## [0.1.0]
+
+### Security
+
+- Cosign signing is deferred to v0.5.
 
 ---
 

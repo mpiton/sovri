@@ -9465,6 +9465,521 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_ci_policy_success_case() {
+  local name="$1"
+  local expected_stdout="$2"
+  local stdout stderr stdout_file stderr_file ec combined
+  shift 2
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  node "$SCRIPT" "$@" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x ${name}: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "$expected_stdout"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x ${name}: missing stdout ${expected_stdout}
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_ci_policy_failure_case() {
+  local name="$1"
+  local expected_message="$2"
+  local stdout stderr stdout_file stderr_file ec combined
+  shift 2
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  node "$SCRIPT" "$@" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x ${name}: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$combined" | grep -Fq "$expected_message"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x ${name}: missing message ${expected_message}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+write_release_trigger_workflow() {
+  local workflow_file="$1"
+  local trigger_body="$2"
+
+  cat >"$workflow_file" <<YAML
+name: Release
+
+on:
+${trigger_body}
+
+jobs:
+  verify-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify tag
+        run: node scripts/ci-policy.mjs release-verify-tag --tag v0.1.0 --package-files package.json --changelog CHANGELOG.md
+YAML
+}
+
+run_release_pipeline_result_case() {
+  run_ci_policy_success_case "release pipeline green" "release_pipeline_result=green" \
+    release-pipeline-result \
+    --verify-tag success \
+    --build-and-push success \
+    --sbom success \
+    --gh-release success
+}
+
+run_release_pipeline_failed_job_case() {
+  local job_name="$1"
+
+  run_ci_policy_failure_case "release pipeline failed ${job_name}" "${job_name}" \
+    release-pipeline-result \
+    --verify-tag "$([ "$job_name" = verify-tag ] && printf failure || printf success)" \
+    --build-and-push "$([ "$job_name" = build-and-push ] && printf failure || printf success)" \
+    --sbom "$([ "$job_name" = sbom ] && printf failure || printf success)" \
+    --gh-release "$([ "$job_name" = gh-release ] && printf failure || printf success)"
+}
+
+run_release_pipeline_idempotent_case() {
+  run_ci_policy_success_case "release pipeline idempotent rerun" "release_update=existing-release-updated" \
+    release-pipeline-result \
+    --verify-tag success \
+    --build-and-push success \
+    --sbom success \
+    --gh-release success \
+    --existing-release true \
+    --existing-tags true
+}
+
+run_release_trigger_push_tags_case() {
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_release_trigger_workflow "$workflow_file" "  push:
+    tags:
+      - \"v*\""
+
+  run_ci_policy_success_case "release trigger push tags" "release_trigger=pass" \
+    release-trigger --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_release_trigger_missing_tags_case() {
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_release_trigger_workflow "$workflow_file" "  push:"
+
+  run_ci_policy_failure_case "release trigger missing tags" "push.tags must include v*" \
+    release-trigger --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_release_trigger_extra_event_case() {
+  local extra_event="$1"
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_release_trigger_workflow "$workflow_file" "  push:
+    tags:
+      - \"v*\"
+  ${extra_event}:"
+
+  run_ci_policy_failure_case "release trigger extra ${extra_event}" "release workflow must only run on push tags v*" \
+    release-trigger --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_release_trigger_tag_pattern_boundary_case() {
+  local tag_pattern="$1"
+  local outcome="$2"
+  local reason="$3"
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_release_trigger_workflow "$workflow_file" "  push:
+    tags:
+      - \"${tag_pattern}\""
+
+  if [ "$outcome" = accepted ]; then
+    run_ci_policy_success_case "release trigger tag boundary ${tag_pattern}" "boundary_reason=${reason}" \
+      release-trigger --workflow "$workflow_file"
+  else
+    run_ci_policy_failure_case "release trigger tag boundary ${tag_pattern}" "$reason" \
+      release-trigger --workflow "$workflow_file"
+  fi
+
+  rm -f "$workflow_file"
+}
+
+write_release_metadata_fixture() {
+  local root="$1"
+  local core_version="$2"
+  local bot_version="$3"
+  local changelog_heading="$4"
+
+  mkdir -p "$root/packages/core" "$root/packages/review-engine" "$root/packages/llm-providers" \
+    "$root/packages/config" "$root/packages/observability" "$root/apps/community-bot"
+
+  for package_path in packages/core packages/review-engine packages/llm-providers packages/config packages/observability; do
+    printf '{ "version": "%s" }\n' "$core_version" >"$root/${package_path}/package.json"
+  done
+  printf '{ "version": "%s" }\n' "$bot_version" >"$root/apps/community-bot/package.json"
+  printf '# Changelog\n\n%s\n\n- Release notes.\n' "$changelog_heading" >"$root/CHANGELOG.md"
+}
+
+release_metadata_package_files() {
+  local root="$1"
+  printf '%s' "$root/packages/core/package.json,$root/packages/review-engine/package.json,$root/packages/llm-providers/package.json,$root/packages/config/package.json,$root/packages/observability/package.json,$root/apps/community-bot/package.json"
+}
+
+run_release_verify_tag_match_case() {
+  local root package_files
+
+  root=$(mktemp -d)
+  write_release_metadata_fixture "$root" "0.1.0" "0.1.0" "## [0.1.0]"
+  package_files=$(release_metadata_package_files "$root")
+
+  run_ci_policy_success_case "release verify tag match" "verify_tag=pass" \
+    release-verify-tag --tag v0.1.0 --package-files "$package_files" --changelog "$root/CHANGELOG.md"
+
+  rm -rf "$root"
+}
+
+run_release_verify_tag_mismatch_case() {
+  local git_tag="$1"
+  local package_version="$2"
+  local changelog_heading="$3"
+  local reason="$4"
+  local root package_files
+
+  root=$(mktemp -d)
+  write_release_metadata_fixture "$root" "$package_version" "$package_version" "$changelog_heading"
+  package_files=$(release_metadata_package_files "$root")
+
+  run_ci_policy_failure_case "release verify tag mismatch ${reason}" "$reason" \
+    release-verify-tag --tag "$git_tag" --package-files "$package_files" --changelog "$root/CHANGELOG.md"
+
+  rm -rf "$root"
+}
+
+run_release_verify_missing_changelog_case() {
+  local root package_files
+
+  root=$(mktemp -d)
+  write_release_metadata_fixture "$root" "0.1.0" "0.1.0" "## [0.1.1]"
+  package_files=$(release_metadata_package_files "$root")
+
+  run_ci_policy_failure_case "release verify missing changelog" "missing changelog section ## [0.1.0]" \
+    release-verify-tag --tag v0.1.0 --package-files "$package_files" --changelog "$root/CHANGELOG.md"
+
+  rm -rf "$root"
+}
+
+run_release_verify_mixed_package_versions_case() {
+  local root package_files
+
+  root=$(mktemp -d)
+  write_release_metadata_fixture "$root" "0.1.0" "0.1.1" "## [0.1.0]"
+  package_files=$(release_metadata_package_files "$root")
+
+  run_ci_policy_failure_case "release verify mixed package versions" "apps/community-bot version 0.1.1 does not match tag v0.1.0" \
+    release-verify-tag --tag v0.1.0 --package-files "$package_files" --changelog "$root/CHANGELOG.md"
+
+  rm -rf "$root"
+}
+
+run_release_verify_tag_normalization_case() {
+  local git_tag="$1"
+  local outcome="$2"
+  local reason="$3"
+  local root package_files
+
+  root=$(mktemp -d)
+  write_release_metadata_fixture "$root" "0.1.0" "0.1.0" "## [0.1.0]"
+  package_files=$(release_metadata_package_files "$root")
+
+  if [ "$outcome" = accepted ]; then
+    run_ci_policy_success_case "release verify tag normalization ${git_tag}" "boundary_reason=${reason}" \
+      release-verify-tag --tag "$git_tag" --package-files "$package_files" --changelog "$root/CHANGELOG.md"
+  else
+    run_ci_policy_failure_case "release verify tag normalization ${git_tag}" "$reason" \
+      release-verify-tag --tag "$git_tag" --package-files "$package_files" --changelog "$root/CHANGELOG.md"
+  fi
+
+  rm -rf "$root"
+}
+
+write_release_build_workflow() {
+  local workflow_file="$1"
+  local push_value="$2"
+  local platforms_value="$3"
+  local tags_value="$4"
+  local image_repository="$5"
+
+  cat >"$workflow_file" <<YAML
+name: Release
+on:
+  push:
+    tags:
+      - "v*"
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build and push
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          push: ${push_value}
+          platforms: ${platforms_value}
+          tags: |
+$(printf '%s\n' "$tags_value" | sed 's/^/            /')
+          labels: org.opencontainers.image.source=${image_repository}
+YAML
+}
+
+release_required_tags() {
+  printf '%s\n' \
+    "ghcr.io/mpiton/sovri/community-bot:v0.1.0" \
+    "ghcr.io/mpiton/sovri/community-bot:v0.1" \
+    "ghcr.io/mpiton/sovri/community-bot:v0" \
+    "ghcr.io/mpiton/sovri/community-bot:latest"
+}
+
+run_release_build_and_push_case() {
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_release_build_workflow "$workflow_file" "true" "linux/amd64,linux/arm64" "$(release_required_tags)" "ghcr.io/mpiton/sovri/community-bot"
+
+  run_ci_policy_success_case "release build-and-push" "release_build_and_push=pass" \
+    release-build-and-push --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_release_build_push_false_case() {
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_release_build_workflow "$workflow_file" "false" "linux/amd64,linux/arm64" "$(release_required_tags)" "ghcr.io/mpiton/sovri/community-bot"
+
+  run_ci_policy_failure_case "release build-and-push false" "build-and-push must push release images" \
+    release-build-and-push --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_release_build_platform_boundary_case() {
+  local platforms="$1"
+  local outcome="$2"
+  local reason="$3"
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_release_build_workflow "$workflow_file" "true" "$platforms" "$(release_required_tags)" "ghcr.io/mpiton/sovri/community-bot"
+
+  if [ "$outcome" = accepted ]; then
+    run_ci_policy_success_case "release build platform ${platforms}" "boundary_reason=${reason}" \
+      release-build-and-push --workflow "$workflow_file"
+  else
+    run_ci_policy_failure_case "release build platform ${platforms}" "$reason" \
+      release-build-and-push --workflow "$workflow_file"
+  fi
+
+  rm -f "$workflow_file"
+}
+
+run_release_build_missing_tag_case() {
+  local missing_tag="$1"
+  local workflow_file tags
+
+  workflow_file=$(mktemp)
+  tags=$(release_required_tags | grep -Fv "ghcr.io/mpiton/sovri/community-bot:${missing_tag}" || true)
+  write_release_build_workflow "$workflow_file" "true" "linux/amd64,linux/arm64" "$tags" "ghcr.io/mpiton/sovri/community-bot"
+
+  run_ci_policy_failure_case "release build missing ${missing_tag}" "missing ${missing_tag} tag" \
+    release-build-and-push --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_release_build_missing_job_case() {
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  cat >"$workflow_file" <<'YAML'
+name: Release
+on:
+  push:
+    tags:
+      - "v*"
+jobs:
+  verify-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok
+YAML
+
+  run_ci_policy_failure_case "release build missing job" "missing build-and-push job" \
+    release-build-and-push --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_release_build_wrong_repo_case() {
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_release_build_workflow "$workflow_file" "true" "linux/amd64,linux/arm64" "$(printf '%s\n' "ghcr.io/mpiton/sovri/wrong-bot:v0.1.0" "ghcr.io/mpiton/sovri/wrong-bot:v0.1" "ghcr.io/mpiton/sovri/wrong-bot:v0" "ghcr.io/mpiton/sovri/wrong-bot:latest")" "ghcr.io/mpiton/sovri/wrong-bot"
+
+  run_ci_policy_failure_case "release build wrong repo" "image repository must be ghcr.io/mpiton/sovri/community-bot" \
+    release-build-and-push --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+write_cosign_fixture() {
+  local root="$1"
+  local changelog_heading="$2"
+  local changelog_body="$3"
+  local workflow_body="$4"
+
+  mkdir -p "$root"
+  printf '# Changelog\n\n%s\n%s\n\n## [Unreleased]\n%s\n' "$changelog_heading" "$changelog_body" "$changelog_body" >"$root/CHANGELOG.md"
+  printf '%s\n' "$workflow_body" >"$root/release.yml"
+}
+
+run_cosign_deferral_pass_case() {
+  local root
+
+  root=$(mktemp -d)
+  write_cosign_fixture "$root" "## [0.1.0]" "- Cosign signing is deferred to v0.5." "jobs:
+  build-and-push:
+    steps:
+      - run: echo unsigned"
+
+  run_ci_policy_success_case "cosign deferral pass" "cosign_deferral=pass" \
+    cosign-deferral --workflow "$root/release.yml" --changelog "$root/CHANGELOG.md"
+
+  rm -rf "$root"
+}
+
+run_cosign_missing_note_case() {
+  local root
+
+  root=$(mktemp -d)
+  write_cosign_fixture "$root" "## [0.1.0]" "- Release without signing." "jobs:
+  build-and-push:
+    steps:
+      - run: echo unsigned"
+
+  run_ci_policy_failure_case "cosign missing note" "document cosign signing deferral to v0.5" \
+    cosign-deferral --workflow "$root/release.yml" --changelog "$root/CHANGELOG.md"
+
+  rm -rf "$root"
+}
+
+run_cosign_outside_section_case() {
+  local root
+
+  root=$(mktemp -d)
+  mkdir -p "$root"
+  cat >"$root/CHANGELOG.md" <<'MARKDOWN'
+# Changelog
+
+## [0.1.0]
+- Release without signing.
+
+## [Unreleased]
+- Cosign signing is deferred to v0.5.
+MARKDOWN
+  printf 'jobs:\n  build-and-push:\n    steps:\n      - run: echo unsigned\n' >"$root/release.yml"
+
+  run_ci_policy_failure_case "cosign outside section" "deferral must be documented in ## [0.1.0]" \
+    cosign-deferral --workflow "$root/release.yml" --changelog "$root/CHANGELOG.md"
+
+  rm -rf "$root"
+}
+
+run_cosign_usage_case() {
+  local cosign_usage="$1"
+  local root
+
+  root=$(mktemp -d)
+  write_cosign_fixture "$root" "## [0.1.0]" "- Cosign signing is deferred to v0.5." "jobs:
+  build-and-push:
+    steps:
+      - run: ${cosign_usage}"
+
+  run_ci_policy_failure_case "cosign usage ${cosign_usage}" "cosign signing is deferred to v0.5" \
+    cosign-deferral --workflow "$root/release.yml" --changelog "$root/CHANGELOG.md"
+
+  rm -rf "$root"
+}
+
+run_cosign_deferred_version_boundary_case() {
+  local deferred_version="$1"
+  local outcome="$2"
+  local reason="$3"
+  local root
+
+  root=$(mktemp -d)
+  write_cosign_fixture "$root" "## [0.1.0]" "- Cosign signing is deferred to ${deferred_version}." "jobs:
+  build-and-push:
+    steps:
+      - run: echo unsigned"
+
+  if [ "$outcome" = accepted ]; then
+    run_ci_policy_success_case "cosign version ${deferred_version}" "boundary_reason=${reason}" \
+      cosign-deferral --workflow "$root/release.yml" --changelog "$root/CHANGELOG.md"
+  else
+    run_ci_policy_failure_case "cosign version ${deferred_version}" "$reason" \
+      cosign-deferral --workflow "$root/release.yml" --changelog "$root/CHANGELOG.md"
+  fi
+
+  rm -rf "$root"
+}
+
 run_duration_pass_case 180000 "180 s"
 run_duration_pass_case 299999 "299.999 s"
 run_secrets_duration_pass_case 15000 "15 s"
@@ -9540,6 +10055,50 @@ run_build_docker_needs_missing_needs_case
 run_build_docker_needs_anchored_job_case
 run_build_docker_scheduler_failed_gate_case
 run_build_docker_scheduler_non_success_gate_case
+run_release_pipeline_result_case
+run_release_pipeline_failed_job_case verify-tag
+run_release_pipeline_failed_job_case build-and-push
+run_release_pipeline_failed_job_case sbom
+run_release_pipeline_failed_job_case gh-release
+run_release_pipeline_idempotent_case
+run_release_trigger_push_tags_case
+run_release_trigger_missing_tags_case
+run_release_trigger_extra_event_case pull_request
+run_release_trigger_extra_event_case workflow_dispatch
+run_release_trigger_extra_event_case schedule
+run_release_trigger_tag_pattern_boundary_case "v*" accepted "required v prefix is present"
+run_release_trigger_tag_pattern_boundary_case "*" rejected "non-release tags can trigger"
+run_release_trigger_tag_pattern_boundary_case "v0.*" rejected "future v1 tags would not trigger"
+run_release_trigger_tag_pattern_boundary_case "release-*" rejected "v prefix contract is missing"
+run_release_verify_tag_match_case
+run_release_verify_tag_mismatch_case "v0.1.1" "0.1.0" "## [0.1.0]" "tag does not match version"
+run_release_verify_tag_mismatch_case "v0.1.0" "0.1.1" "## [0.1.0]" "package version mismatch"
+run_release_verify_tag_mismatch_case "v0.1.0" "0.1.0" "## [0.1.1]" "changelog section mismatch"
+run_release_verify_missing_changelog_case
+run_release_verify_mixed_package_versions_case
+run_release_verify_tag_normalization_case "v0.1.0" accepted "tag has one leading v and exact version"
+run_release_verify_tag_normalization_case "0.1.0" rejected "tag lacks required v prefix"
+run_release_verify_tag_normalization_case "vv0.1.0" rejected "tag has two leading v prefixes"
+run_release_build_and_push_case
+run_release_build_push_false_case
+run_release_build_platform_boundary_case "linux/amd64,linux/arm64" accepted "required amd64 and arm64 platforms present"
+run_release_build_platform_boundary_case "linux/amd64" rejected "arm64 platform is missing"
+run_release_build_platform_boundary_case "linux/arm64" rejected "amd64 platform is missing"
+run_release_build_platform_boundary_case "linux/amd64,linux/arm64,linux/386" rejected "extra platform is outside the v0.1 contract"
+run_release_build_missing_tag_case "v0.1.0"
+run_release_build_missing_tag_case "v0.1"
+run_release_build_missing_tag_case "v0"
+run_release_build_missing_tag_case "latest"
+run_release_build_missing_job_case
+run_release_build_wrong_repo_case
+run_cosign_deferral_pass_case
+run_cosign_missing_note_case
+run_cosign_outside_section_case
+run_cosign_usage_case "sigstore/cosign-installer@v3"
+run_cosign_usage_case "cosign sign ghcr.io/mpiton/sovri/community-bot:v0.1.0"
+run_cosign_deferred_version_boundary_case "v0.5" accepted "documented target version"
+run_cosign_deferred_version_boundary_case "v1.0" rejected "target version is too late"
+run_cosign_deferred_version_boundary_case "a future release" rejected "target version is not concrete"
 run_duration_fail_case 300000
 run_duration_fail_case 360000
 run_duration_queue_exclusion_case
