@@ -3,7 +3,7 @@
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
+import { server } from "../../../../tests/msw/server.js";
 
 import {
   postReview,
@@ -24,8 +24,6 @@ const CommitSha = "1111111111111111111111111111111111111111";
 const ReviewId = 98765;
 const FallbackCommentId = 87654;
 const GitHubBaseUrl = "https://api.github.com";
-
-const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());

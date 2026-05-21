@@ -3,9 +3,9 @@
 
 import { z } from "@sovri/core";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { server } from "../../../../tests/msw/server.js";
 import { LLMResponseSchema, type LLMResponse } from "../schemas/LLMResponseSchema.js";
 import {
   AnthropicProvider,
@@ -57,8 +57,6 @@ const generateParams = {
   maxTokens: TestMaxTokens,
   temperature: 0,
 };
-
-const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 

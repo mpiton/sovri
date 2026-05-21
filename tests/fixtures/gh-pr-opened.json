@@ -1,0 +1,36 @@
+{
+  "action": "opened",
+  "installation": {
+    "id": 123456
+  },
+  "repository": {
+    "full_name": "octo-org/sovri-target",
+    "name": "sovri-target",
+    "owner": {
+      "login": "octo-org",
+      "type": "Organization"
+    }
+  },
+  "pull_request": {
+    "number": 42,
+    "title": "Wire shared MSW fixtures",
+    "body": "Add shared network-free test fixtures.",
+    "draft": false,
+    "additions": 3,
+    "deletions": 0,
+    "changed_files": 1,
+    "base": {
+      "ref": "main",
+      "sha": "dddddddddddddddddddddddddddddddddddddddd"
+    },
+    "head": {
+      "ref": "feature/shared-msw",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "user": {
+      "login": "octocat-reviewer",
+      "email": "maintainer@example.invalid",
+      "type": "User"
+    }
+  }
+}
