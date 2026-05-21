@@ -167,6 +167,23 @@ describe("Vitest root config explicit import policy", () => {
     },
   );
 
+  it("rejects enabled Vitest globals", () => {
+    // Given "vitest.config.ts" sets "test.globals" to true
+    const config = readVitestConfig().replace("globals: false", "globals: true");
+    expect(config).toContain("globals: true");
+    // And "vitest.config.ts" documents "Vitest globals stay disabled; tests import APIs from vitest"
+    expect(config).toContain("Vitest globals stay disabled; tests import APIs from vitest");
+    // When the Vitest API style rule is evaluated
+    const result = evaluateVitestApiStyle({
+      configSource: config,
+      files: [],
+    });
+    // Then the Vitest API style assertion fails
+    expect(result.passed).toBe(false);
+    // And the failure mentions "Vitest globals must stay disabled"
+    expect(result.messages.join("\n")).toContain("Vitest globals must stay disabled");
+  });
+
   it("accepts local Vitest import aliases and ignores object member calls", () => {
     const result = evaluateVitestApiStyle({
       configSource: readVitestConfig(),

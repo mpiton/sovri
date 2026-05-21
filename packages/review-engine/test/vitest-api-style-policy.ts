@@ -30,12 +30,23 @@ const trackedVitestApis: readonly string[] = [
 ];
 
 export function evaluateVitestApiStyle(input: VitestApiStyleInput): VitestApiStyleEvaluation {
-  const messages = input.files.flatMap((file) => evaluateFile(file));
+  const messages = [
+    ...evaluateConfig(input.configSource),
+    ...input.files.flatMap((file) => evaluateFile(file)),
+  ];
 
   return {
     messages,
     passed: messages.length === 0,
   };
+}
+
+function evaluateConfig(configSource: string): readonly string[] {
+  if (/globals\s*:\s*true/u.test(configSource)) {
+    return ["Vitest globals must stay disabled"];
+  }
+
+  return [];
 }
 
 function evaluateFile(file: VitestApiStyleFile): readonly string[] {

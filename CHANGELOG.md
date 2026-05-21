@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Security
 
+- `test`: add ATDD coverage and policy evaluation for rejecting enabled Vitest
+  globals (#931).
+
 - `test`: add ATDD coverage and policy evaluation for missing, partial,
   chained, and locally aliased Vitest explicit-import violations (#930).
 
