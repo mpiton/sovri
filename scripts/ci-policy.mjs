@@ -70,7 +70,9 @@ const secretsFixtureEvidenceUsage =
   "Usage: node scripts/ci-policy.mjs secrets-fixture-evidence --input <fixture-evidence.json> --false-positive-fixture <path>";
 const secretsNoSecretsReuseUsage =
   "Usage: node scripts/ci-policy.mjs secrets-no-secrets-reuse --workflow <path> --script-path <path> [--repo-root <path>]";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
+const changelogTriggerUsage =
+  "Usage: node scripts/ci-policy.mjs changelog-trigger --workflow <path>";
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -881,6 +883,26 @@ const runBuildDockerScheduler = (args) => {
   }
 
   writeStdout("build_docker_eligible=true\nbuild_docker_result=eligible\n");
+};
+
+const runChangelogTrigger = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", changelogTriggerUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const eventBlock = getIndentedBlock(workflow, /^\s*on:\s*(?:#.*)?$/);
+  const jobsBlock = getIndentedBlock(workflow, /^\s*jobs:\s*(?:#.*)?$/);
+  const changelogJob = getIndentedBlock(jobsBlock, /^\s+changelog-check:\s*(?:#.*)?$/);
+  const hasPullRequestEvent = /^\s*pull_request:\s*(?:#.*)?$/m.test(eventBlock);
+  const jobEligibleForPullRequest =
+    /^\s*if:\s*github\.event_name\s*==\s*['"]pull_request['"]\s*(?:#.*)?$/m.test(changelogJob);
+
+  if (hasPullRequestEvent && changelogJob.length > 0 && jobEligibleForPullRequest) {
+    writeStdout("changelog_trigger=pass\njob=changelog-check\neligible_event=pull_request\n");
+    return;
+  }
+
+  writeStdout("changelog_trigger=fail\njob=changelog-check\n");
+  fail("changelog-check must run on pull_request only", 1);
 };
 
 const readWorkflowFile = (workflowPath) => {
@@ -2171,6 +2193,8 @@ if (command === "duration-budget") {
   runSecretsFixtureEvidence(args);
 } else if (command === "secrets-no-secrets-reuse") {
   runSecretsNoSecretsReuse(args);
+} else if (command === "changelog-trigger") {
+  runChangelogTrigger(args);
 } else {
   fail(usage, 2);
 }
