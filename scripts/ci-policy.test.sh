@@ -697,6 +697,58 @@ $(printf '%s\n' "$stdout" | sed 's/^/      /')"
   PASS=$((PASS + 1))
 }
 
+run_changelog_ci_only_failure_assertion_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path                         |
+  #   | .github/workflows/release.yml |
+  #   | scripts/no-secrets.sh         |
+  # And pull request 53 does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-ci-only-assert \
+    --changed-files ".github/workflows/release.yml,scripts/no-secrets.sh" \
+    --gate-result failure \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the changelog-check gate evaluates the pull request diff
+  # Then the R-02 assertion fails if the gate result is "failure"
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog CI-only failure assertion: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "r02_assertion=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog CI-only failure assertion: missing R-02 failure status
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the failure mentions "CI-only PR must not require CHANGELOG.md"
+  if ! printf '%s\n' "$combined" | grep -Fq "CI-only PR must not require CHANGELOG.md"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog CI-only failure assertion: missing remediation text
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_duration_pass_case() {
   local elapsed_ms="$1"
   local reported_duration="$2"
@@ -8602,6 +8654,7 @@ run_changelog_trigger_non_pull_request_eligibility_case
 run_changelog_trigger_other_workflow_events_case
 run_changelog_trigger_pull_request_target_case
 run_changelog_diff_ci_only_pass_case
+run_changelog_ci_only_failure_assertion_case
 run_invalid_cache_state_case
 run_action_pinning_sha_pass_case
 run_gitleaks_action_pinning_sha_pass_case
