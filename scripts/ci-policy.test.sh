@@ -6072,6 +6072,78 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_trivy_scan_config_exit_code_boundary_case() {
+  local exit_code="$1"
+  local expected_outcome="$2"
+  local expected_reason="$3"
+  local expected_exit=1
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  if [ "$expected_outcome" = "accepted" ]; then
+    expected_exit=0
+  fi
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          severity: HIGH,CRITICAL
+          exit-code: "${exit_code}"
+YAML
+
+  # Given the build-docker job contains an aquasecurity/trivy-action step
+  # And the Trivy input severity is "HIGH,CRITICAL"
+  # And the Trivy input exit-code is "<exit_code>"
+  node "$SCRIPT" trivy-scan-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne "$expected_exit" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config exit-code boundary ${exit_code}: expected exit ${expected_exit}, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Trivy scan configuration is evaluated
+  # Then the Trivy scan configuration outcome is "<outcome>"
+  if ! printf '%s\n' "$stdout" | grep -Fq "exit_code_outcome=${expected_outcome}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config exit-code boundary ${exit_code}: missing expected outcome ${expected_outcome}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the boundary reason is "<reason>"
+  if ! printf '%s\n' "$stdout" | grep -Fq "boundary_reason=${expected_reason}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config exit-code boundary ${exit_code}: missing boundary reason ${expected_reason}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_trivy_vulnerability_gate_no_high_or_critical_case() {
   local trivy_file stdout stderr stdout_file stderr_file ec combined
 
@@ -7518,6 +7590,9 @@ run_trivy_scan_config_missing_blocking_severity_case "HIGH"
 run_trivy_scan_config_missing_blocking_severity_case "MEDIUM,HIGH"
 run_trivy_scan_config_missing_blocking_severity_case "HIGH,CRITICAL,LOW"
 run_trivy_scan_config_missing_action_case
+run_trivy_scan_config_exit_code_boundary_case "0" "rejected" "zero would not fail CI"
+run_trivy_scan_config_exit_code_boundary_case "1" "accepted" "one fails CI on blocking findings"
+run_trivy_scan_config_exit_code_boundary_case "2" "rejected" "only exit-code one is in scope"
 run_trivy_vulnerability_gate_no_high_or_critical_case
 run_trivy_vulnerability_gate_null_vulnerabilities_case
 run_trivy_vulnerability_gate_high_vulnerability_case
