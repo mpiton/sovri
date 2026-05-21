@@ -1486,7 +1486,7 @@ const getTrivyVulnerabilities = (report) =>
   getTrivyResults(report).flatMap((result) => {
     if (typeof result !== "object" || result === null) return [];
     const vulnerabilities = result.Vulnerabilities;
-    if (vulnerabilities === undefined) return [];
+    if (vulnerabilities === undefined || vulnerabilities === null) return [];
     if (!Array.isArray(vulnerabilities)) {
       fail("ERROR: Trivy result Vulnerabilities must be arrays.", 2);
     }
