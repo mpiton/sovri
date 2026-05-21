@@ -21,6 +21,10 @@ type ExplicitImportViolationExample = ExplicitImportExample & {
   readonly reason: string;
 };
 
+type DocumentationViolationExample = {
+  readonly documentation: string;
+};
+
 const explicitImportExamples: readonly ExplicitImportExample[] = [
   {
     calledApis: ["describe", "expect", "it"],
@@ -65,12 +69,29 @@ const explicitImportViolationExamples: readonly ExplicitImportViolationExample[]
   },
 ];
 
+const documentationViolationExamples: readonly DocumentationViolationExample[] = [
+  { documentation: "none" },
+  { documentation: "Vitest globals may be used in tests" },
+  { documentation: "Coverage provider is v8" },
+];
+
 function readRepoFile(relativePath: string): string {
   return readFileSync(resolve(repoRoot, relativePath), "utf8");
 }
 
 function readVitestConfig(): string {
   return readRepoFile("vitest.config.ts");
+}
+
+function buildConfigWithDocumentation(documentation: string): string {
+  const requiredDocumentation = "Vitest globals stay disabled; tests import APIs from vitest";
+  const config = readVitestConfig();
+
+  if (documentation === "none") {
+    return config.replace(`    // ${requiredDocumentation}.\n`, "");
+  }
+
+  return config.replace(requiredDocumentation, documentation);
 }
 
 function buildVitestSource(example: ExplicitImportExample): string {
@@ -183,6 +204,30 @@ describe("Vitest root config explicit import policy", () => {
     // And the failure mentions "Vitest globals must stay disabled"
     expect(result.messages.join("\n")).toContain("Vitest globals must stay disabled");
   });
+
+  it.each(documentationViolationExamples)(
+    "rejects missing or inaccurate documentation: $documentation",
+    (example) => {
+      // Given "vitest.config.ts" sets "test.globals" to false
+      const config = buildConfigWithDocumentation(example.documentation);
+      expect(config).toContain("globals: false");
+      // And "vitest.config.ts" documents "<documentation>"
+      if (example.documentation === "none") {
+        expect(config).not.toContain("Vitest globals stay disabled; tests import APIs from vitest");
+      } else {
+        expect(config).toContain(example.documentation);
+      }
+      // When the Vitest API style rule is evaluated
+      const result = evaluateVitestApiStyle({
+        configSource: config,
+        files: [],
+      });
+      // Then the Vitest API style assertion fails
+      expect(result.passed).toBe(false);
+      // And the failure mentions "document the Vitest API style choice"
+      expect(result.messages.join("\n")).toContain("document the Vitest API style choice");
+    },
+  );
 
   it("accepts local Vitest import aliases and ignores object member calls", () => {
     const result = evaluateVitestApiStyle({
