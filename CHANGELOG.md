@@ -37,6 +37,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   no high or critical vulnerabilities (#744).
 - `ci`: add Trivy image vulnerability gate coverage rejecting high
   vulnerabilities in built images (#745).
+- `ci`: add Trivy image vulnerability gate coverage rejecting critical
+  vulnerabilities in built images (#746).
 
 - `ci`: add Docker build action policy coverage requiring `docker/build-push-action`,
   `push: false`, exactly `linux/amd64` and `linux/arm64`, and GitHub Actions
