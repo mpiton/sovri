@@ -240,6 +240,1413 @@ $(printf '%s\n' "$stdout" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_changelog_trigger_pull_request_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+on:
+  pull_request:
+jobs:
+  changelog-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check changelog
+        run: node scripts/ci-policy.mjs changelog-diff --base origin/main --head HEAD
+YAML
+
+  # Given the CI workflow declares these events:
+  #   | event        |
+  #   | pull_request |
+  # And the CI workflow contains the "changelog-check" job
+  # And the "changelog-check" job is eligible for event "pull_request"
+  node "$SCRIPT" changelog-trigger --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger pull_request: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # When the changelog-check trigger rule is evaluated
+  # Then the changelog-check trigger assertion passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_trigger=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger pull_request: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the job is eligible to run for event "pull_request"
+  if ! printf '%s\n' "$stdout" | grep -Fq "eligible_event=pull_request"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger pull_request: missing pull_request eligibility
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_trigger_inline_event_syntax_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+on: [push, pull_request]
+jobs:
+  changelog-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check changelog
+        run: node scripts/ci-policy.mjs changelog-diff --base origin/main --head HEAD
+YAML
+
+  node "$SCRIPT" changelog-trigger --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger inline event syntax: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "eligible_event=pull_request"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger inline event syntax: missing pull_request eligibility
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_trigger_expression_condition_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+on:
+  pull_request:
+jobs:
+  changelog-check:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check changelog
+        run: node scripts/ci-policy.mjs changelog-diff --base origin/main --head HEAD
+YAML
+
+  node "$SCRIPT" changelog-trigger --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger expression condition: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "eligible_event=pull_request"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger expression condition: missing pull_request eligibility
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_trigger_missing_job_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+on:
+  pull_request:
+jobs:
+  forbidden-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check forbidden tools
+        run: node scripts/ci-policy.mjs forbidden-tools
+YAML
+
+  # Given the CI workflow declares these events:
+  #   | event        |
+  #   | pull_request |
+  # And the CI workflow does not contain the "changelog-check" job
+  node "$SCRIPT" changelog-trigger --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+
+  # When the changelog-check trigger rule is evaluated
+  # Then the changelog-check trigger assertion fails
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger missing job: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_trigger=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger missing job: missing fail assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the failure mentions "missing changelog-check job"
+  if ! printf '%s\n' "$combined" | grep -Fq "missing changelog-check job"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger missing job: missing remediation text
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_trigger_non_pull_request_eligibility_case() {
+  local event workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  for event in push workflow_dispatch schedule; do
+    workflow_file=$(mktemp)
+    stdout_file=$(mktemp)
+    stderr_file=$(mktemp)
+
+    cat >"$workflow_file" <<YAML
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+jobs:
+  changelog-check:
+    if: github.event_name == '${event}'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check changelog
+        run: node scripts/ci-policy.mjs changelog-diff --base origin/main --head HEAD
+YAML
+
+    # Given the CI workflow declares these events:
+    #   | event             |
+    #   | pull_request      |
+    #   | push              |
+    #   | workflow_dispatch |
+    #   | schedule          |
+    # And the CI workflow contains the "changelog-check" job
+    # And the "changelog-check" job is eligible for event "<event>"
+    node "$SCRIPT" changelog-trigger --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+    stdout=$(cat "$stdout_file" 2>/dev/null || true)
+    stderr=$(cat "$stderr_file" 2>/dev/null || true)
+    combined="${stdout}
+${stderr}"
+    rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+
+    # When the changelog-check trigger rule is evaluated
+    # Then the changelog-check trigger assertion fails
+    if [ "$ec" -eq 0 ]; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog trigger non-pull-request eligibility (${event}): expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+      return
+    fi
+
+    if ! printf '%s\n' "$stdout" | grep -Fq "changelog_trigger=fail"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog trigger non-pull-request eligibility (${event}): missing fail assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+      return
+    fi
+
+    # And the failure mentions "changelog-check must run on pull_request only"
+    if ! printf '%s\n' "$combined" | grep -Fq "changelog-check must run on pull_request only"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog trigger non-pull-request eligibility (${event}): missing remediation text
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+      return
+    fi
+
+    PASS=$((PASS + 1))
+  done
+}
+
+run_changelog_trigger_other_workflow_events_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+on:
+  pull_request:
+  push:
+  schedule:
+    - cron: "0 0 * * *"
+jobs:
+  changelog-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check changelog
+        run: node scripts/ci-policy.mjs changelog-diff --base origin/main --head HEAD
+YAML
+
+  # Given the CI workflow declares these events:
+  #   | event        |
+  #   | pull_request |
+  #   | push         |
+  #   | schedule     |
+  # And the CI workflow contains the "changelog-check" job
+  # And the "changelog-check" job is eligible for event "pull_request"
+  # And the "changelog-check" job is not eligible for event "push"
+  # And the "changelog-check" job is not eligible for event "schedule"
+  node "$SCRIPT" changelog-trigger --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger other workflow events: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # When the changelog-check trigger rule is evaluated
+  # Then the changelog-check trigger assertion passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_trigger=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger other workflow events: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_trigger_pull_request_target_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+on:
+  pull_request_target:
+jobs:
+  changelog-check:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check changelog
+        run: node scripts/ci-policy.mjs changelog-diff --base origin/main --head HEAD
+YAML
+
+  # Given the CI workflow declares these events:
+  #   | event               |
+  #   | pull_request_target |
+  # And the CI workflow contains the "changelog-check" job
+  # And the "changelog-check" job is eligible for event "pull_request_target"
+  node "$SCRIPT" changelog-trigger --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+
+  # When the changelog-check trigger rule is evaluated
+  # Then the changelog-check trigger assertion fails
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger pull_request_target: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_trigger=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger pull_request_target: missing fail assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the failure mentions "missing pull_request trigger"
+  if ! printf '%s\n' "$combined" | grep -Fq "missing pull_request trigger"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger pull_request_target: missing remediation text
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_diff_ci_only_pass_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path                     |
+  #   | .github/workflows/ci.yml |
+  #   | .github/dependabot.yml   |
+  # And pull request 53 does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-diff \
+    --changed-files ".github/workflows/ci.yml,.github/dependabot.yml" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff CI-only pass: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # When the changelog-check gate evaluates the pull request diff
+  # Then the changelog-check gate passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff CI-only pass: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the gate result is "success"
+  if ! printf '%s\n' "$stdout" | grep -Fq "gate_result=success"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff CI-only pass: missing success result
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_ci_only_failure_assertion_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path                         |
+  #   | .github/workflows/release.yml |
+  #   | scripts/no-secrets.sh         |
+  # And pull request 53 does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-ci-only-assert \
+    --changed-files ".github/workflows/release.yml,scripts/no-secrets.sh" \
+    --gate-result failure \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the changelog-check gate evaluates the pull request diff
+  # Then the R-02 assertion fails if the gate result is "failure"
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog CI-only failure assertion: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "r02_assertion=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog CI-only failure assertion: missing R-02 failure status
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the failure mentions "CI-only PR must not require CHANGELOG.md"
+  if ! printf '%s\n' "$combined" | grep -Fq "CI-only PR must not require CHANGELOG.md"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog CI-only failure assertion: missing remediation text
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_diff_workflow_classification_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path                         |
+  #   | .github/workflows/ci.yml     |
+  #   | .github/workflows/codeql.yml |
+  # And pull request 53 does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-diff \
+    --changed-files ".github/workflows/ci.yml,.github/workflows/codeql.yml" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff workflow classification: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # When the changelog-check gate classifies changed files
+  # Then ".github/workflows/ci.yml" is classified as "non-code-for-changelog"
+  if ! printf '%s\n' "$stdout" | grep -Fq "classification=.github/workflows/ci.yml:non-code-for-changelog"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff workflow classification: missing ci.yml classification
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And ".github/workflows/codeql.yml" is classified as "non-code-for-changelog"
+  if ! printf '%s\n' "$stdout" | grep -Fq "classification=.github/workflows/codeql.yml:non-code-for-changelog"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff workflow classification: missing codeql.yml classification
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the changelog-check gate passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff workflow classification: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_diff_failure_message_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path                                      |
+  #   | packages/review-engine/src/orchestrator.ts |
+  # And pull request 53 does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-diff \
+    --changed-files "packages/review-engine/src/orchestrator.ts" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff failure message: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # When the changelog-check gate builds the failure message
+  # Then the failure message mentions "CHANGELOG.md"
+  if ! printf '%s\n' "$combined" | grep -Fq "CHANGELOG.md"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff failure message: missing CHANGELOG.md
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the failure message mentions ".ts/.tsx"
+  if ! printf '%s\n' "$combined" | grep -Fq ".ts/.tsx"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff failure message: missing .ts/.tsx
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the failure message mentions "add a changelog entry"
+  if ! printf '%s\n' "$combined" | grep -Fq "add a changelog entry"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff failure message: missing remediation
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_remediation_message_vague_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes "packages/core/src/finding.ts"
+  # And pull request 53 does not change "CHANGELOG.md"
+  # And the produced failure message is "changelog check failed"
+  node "$SCRIPT" changelog-remediation-message \
+    --message "changelog check failed" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the remediation message is validated
+  # Then the remediation-message assertion fails
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog remediation vague message: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "remediation_message=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog remediation vague message: missing fail assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the failure mentions "message must name CHANGELOG.md"
+  if ! printf '%s\n' "$combined" | grep -Fq "message must name CHANGELOG.md"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog remediation vague message: missing CHANGELOG.md failure
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the failure mentions "message must explain the remediation"
+  if ! printf '%s\n' "$combined" | grep -Fq "message must explain the remediation"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog remediation vague message: missing remediation failure
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_diff_with_changelog_has_no_remediation_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path                         |
+  #   | packages/core/src/finding.ts |
+  #   | CHANGELOG.md                 |
+  node "$SCRIPT" changelog-diff \
+    --changed-files "packages/core/src/finding.ts,CHANGELOG.md" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff with changelog has no remediation: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # When the changelog-check gate evaluates the pull request diff
+  # Then the changelog-check gate passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff with changelog has no remediation: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And no remediation failure message is produced
+  if printf '%s\n%s\n' "$stdout" "$stderr" | grep -Fq "remediation_message=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff with changelog has no remediation: produced remediation failure
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_diff_typescript_with_changelog_pass_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path                                        |
+  #   | packages/review-engine/src/changelog-gate.ts |
+  #   | CHANGELOG.md                                |
+  node "$SCRIPT" changelog-diff \
+    --changed-files "packages/review-engine/src/changelog-gate.ts,CHANGELOG.md" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript with changelog pass: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # When the changelog-check gate evaluates the pull request diff
+  # Then the changelog-check gate passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript with changelog pass: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the gate result is "success"
+  if ! printf '%s\n' "$stdout" | grep -Fq "gate_result=success"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript with changelog pass: missing success result
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_diff_typescript_without_changelog_fails_case() {
+  local code_path stdout stderr stdout_file stderr_file ec combined
+
+  for code_path in \
+    packages/core/src/severity.ts \
+    apps/community-bot/src/server.ts \
+    packages/review-engine/src/panel.tsx; do
+    stdout_file=$(mktemp)
+    stderr_file=$(mktemp)
+
+    # Given pull request 53 changes these files:
+    #   | path        |
+    #   | <code_path> |
+    # And pull request 53 does not change "CHANGELOG.md"
+    node "$SCRIPT" changelog-diff \
+      --changed-files "$code_path" \
+      >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+    stdout=$(cat "$stdout_file" 2>/dev/null || true)
+    stderr=$(cat "$stderr_file" 2>/dev/null || true)
+    combined="${stdout}
+${stderr}"
+    rm -f "$stdout_file" "$stderr_file"
+
+    # When the changelog-check gate evaluates the pull request diff
+    # Then the changelog-check gate fails
+    if [ "$ec" -eq 0 ]; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript without changelog fails (${code_path}): expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+      return
+    fi
+
+    if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=fail"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript without changelog fails (${code_path}): missing failure assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+      return
+    fi
+
+    # And the failure mentions "CHANGELOG.md"
+    if ! printf '%s\n' "$combined" | grep -Fq "CHANGELOG.md"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript without changelog fails (${code_path}): missing CHANGELOG.md
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+      return
+    fi
+
+    PASS=$((PASS + 1))
+  done
+}
+
+run_changelog_diff_mixed_requires_changelog_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path                              |
+  #   | docs/usage.md                     |
+  #   | packages/config/src/load-config.ts |
+  # And pull request 53 does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-diff \
+    --changed-files "docs/usage.md,packages/config/src/load-config.ts" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the changelog-check gate evaluates the pull request diff
+  # Then the changed file set is classified as "requires-changelog"
+  if ! printf '%s\n' "$stdout" | grep -Fq "changed_file_set=requires-changelog"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff mixed requires changelog: missing file set classification
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the changelog-check gate fails
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff mixed requires changelog: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff mixed requires changelog: missing failure assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_diff_base_head_non_failure_conditions_pass_case() {
+  local head_commit changed_files expected_ts expected_changelog stdout stderr stdout_file stderr_file ec combined
+
+  for row in \
+    "2222222222222222222222222222222222222222|packages/core/src/finding.ts, CHANGELOG.md|true|true" \
+    "4444444444444444444444444444444444444444|docs/usage.md|false|false" \
+    "5555555555555555555555555555555555555555|CHANGELOG.md|false|true" \
+    "7777777777777777777777777777777777777777|(empty)|false|false"; do
+    head_commit=${row%%|*}
+    row=${row#*|}
+    changed_files=${row%%|*}
+    row=${row#*|}
+    expected_ts=${row%%|*}
+    expected_changelog=${row#*|}
+    stdout_file=$(mktemp)
+    stderr_file=$(mktemp)
+
+    # Given the base commit is "1111111111111111111111111111111111111111"
+    # And the head commit is "<head_commit>"
+    # And the base..head diff has changed files "<changed_files>"
+    node "$SCRIPT" changelog-diff \
+      --base 1111111111111111111111111111111111111111 \
+      --head "$head_commit" \
+      --changed-files "$changed_files" \
+      >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+    stdout=$(cat "$stdout_file" 2>/dev/null || true)
+    stderr=$(cat "$stderr_file" 2>/dev/null || true)
+    combined="${stdout}
+${stderr}"
+    rm -f "$stdout_file" "$stderr_file"
+
+    if [ "$ec" -ne 0 ]; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff base-head non-failure pass (${head_commit}): expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+      return
+    fi
+
+    # When the changelog-check gate evaluates the base..head diff
+    # Then the changed file set has TypeScript code changes "<has_typescript_code>"
+    if ! printf '%s\n' "$stdout" | grep -Fq "has_typescript_code=${expected_ts}"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff base-head non-failure pass (${head_commit}): wrong TypeScript flag
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+      return
+    fi
+
+    # And the changed file set has a root CHANGELOG.md change "<has_root_changelog>"
+    if ! printf '%s\n' "$stdout" | grep -Fq "has_root_changelog=${expected_changelog}"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff base-head non-failure pass (${head_commit}): wrong changelog flag
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+      return
+    fi
+
+    # And the changelog-check gate passes
+    if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=pass"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff base-head non-failure pass (${head_commit}): missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+      return
+    fi
+
+    PASS=$((PASS + 1))
+  done
+}
+
+run_changelog_diff_base_head_typescript_without_changelog_fails_case() {
+  local head_commit changed_files stdout stderr stdout_file stderr_file ec combined
+
+  for row in \
+    "3333333333333333333333333333333333333333|packages/review-engine/src/orchestrator.ts, docs/review.md" \
+    "6666666666666666666666666666666666666666|docs/CHANGELOG.md, packages/config/src/schema.ts" \
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|apps/community-bot/src/panel.tsx"; do
+    head_commit=${row%%|*}
+    changed_files=${row#*|}
+    stdout_file=$(mktemp)
+    stderr_file=$(mktemp)
+
+    # Given the base commit is "1111111111111111111111111111111111111111"
+    # And the head commit is "<head_commit>"
+    # And the base..head diff has changed files "<changed_files>"
+    node "$SCRIPT" changelog-diff \
+      --base 1111111111111111111111111111111111111111 \
+      --head "$head_commit" \
+      --changed-files "$changed_files" \
+      >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+    stdout=$(cat "$stdout_file" 2>/dev/null || true)
+    stderr=$(cat "$stderr_file" 2>/dev/null || true)
+    combined="${stdout}
+${stderr}"
+    rm -f "$stdout_file" "$stderr_file"
+
+    # When the changelog-check gate evaluates the base..head diff
+    # Then the changed file set has TypeScript code changes
+    if ! printf '%s\n' "$stdout" | grep -Fq "has_typescript_code=true"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff base-head TypeScript without changelog (${head_commit}): missing TypeScript flag
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+      return
+    fi
+
+    # And the changed file set does not have a root CHANGELOG.md change
+    if ! printf '%s\n' "$stdout" | grep -Fq "has_root_changelog=false"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff base-head TypeScript without changelog (${head_commit}): wrong changelog flag
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+      return
+    fi
+
+    # And the changelog-check gate fails
+    if [ "$ec" -eq 0 ]; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff base-head TypeScript without changelog (${head_commit}): expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+      return
+    fi
+
+    if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=fail"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff base-head TypeScript without changelog (${head_commit}): missing failure assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+      return
+    fi
+
+    PASS=$((PASS + 1))
+  done
+}
+
+run_changelog_diff_typescript_rename_without_changelog_fails_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the base commit is "1111111111111111111111111111111111111111"
+  # And the head commit is "8888888888888888888888888888888888888888"
+  # And the base..head diff renames "packages/core/src/old-severity.ts" to "packages/core/src/severity.ts"
+  # And the base..head diff does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-diff \
+    --base 1111111111111111111111111111111111111111 \
+    --head 8888888888888888888888888888888888888888 \
+    --changed-files "packages/core/src/severity.ts" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the changelog-check gate evaluates the base..head diff
+  # Then the changed file set has TypeScript code changes
+  if ! printf '%s\n' "$stdout" | grep -Fq "has_typescript_code=true"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript rename without changelog: missing TypeScript flag
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the changed file set does not have a CHANGELOG.md change
+  if ! printf '%s\n' "$stdout" | grep -Fq "has_root_changelog=false"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript rename without changelog: wrong changelog flag
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the changelog-check gate fails
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript rename without changelog: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript rename without changelog: missing failure assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_diff_typescript_deletion_without_changelog_fails_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the base commit is "1111111111111111111111111111111111111111"
+  # And the head commit is "9999999999999999999999999999999999999999"
+  # And the base..head diff deletes "packages/review-engine/src/legacy-parser.ts"
+  # And the base..head diff does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-diff \
+    --base 1111111111111111111111111111111111111111 \
+    --head 9999999999999999999999999999999999999999 \
+    --changed-files "packages/review-engine/src/legacy-parser.ts" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the changelog-check gate evaluates the base..head diff
+  # Then the deleted file is classified as a TypeScript code change
+  if ! printf '%s\n' "$stdout" | grep -Fq "classification=packages/review-engine/src/legacy-parser.ts:typescript-code"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript deletion without changelog: missing TypeScript classification
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the changelog-check gate fails
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript deletion without changelog: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript deletion without changelog: missing failure assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_diff_uses_base_head_changed_file_set_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the base commit is "1111111111111111111111111111111111111111"
+  # And the head commit is "4444444444444444444444444444444444444444"
+  # And the final commit changes only "README.md"
+  # And the base..head diff changes these files:
+  #   | path                          |
+  #   | packages/config/src/schema.ts |
+  #   | README.md                     |
+  # And the base..head diff does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-diff \
+    --base 1111111111111111111111111111111111111111 \
+    --head 4444444444444444444444444444444444444444 \
+    --final-commit-files "README.md" \
+    --changed-files "packages/config/src/schema.ts,README.md" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the changelog-check gate evaluates the pull request
+  # Then the gate uses the base..head changed file set
+  if ! printf '%s\n' "$stdout" | grep -Fq "diff_scope=base..head"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff uses base-head changed file set: missing diff scope
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the changelog-check gate fails
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff uses base-head changed file set: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff uses base-head changed file set: missing failure assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_diff_documentation_only_pass_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path            |
+  #   | README.md       |
+  #   | docs/install.md |
+  #   | docs/adr/012.md |
+  # And pull request 53 does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-diff \
+    --changed-files "README.md,docs/install.md,docs/adr/012.md" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff documentation-only pass: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # When the changelog-check gate evaluates the pull request diff
+  # Then the changelog-check gate passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff documentation-only pass: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the gate result is "success"
+  if ! printf '%s\n' "$stdout" | grep -Fq "gate_result=success"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff documentation-only pass: missing success result
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_diff_package_markdown_documentation_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path                         |
+  #   | packages/core/README.md      |
+  #   | packages/config/docs/yaml.md |
+  # And pull request 53 does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-diff \
+    --changed-files "packages/core/README.md,packages/config/docs/yaml.md" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the changelog-check gate evaluates the pull request diff
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff package markdown documentation: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # Then no changed file is classified as TypeScript code
+  if printf '%s\n' "$stdout" | grep -Fq ":typescript-code"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff package markdown documentation: package markdown classified as TypeScript
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the changelog-check gate passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff package markdown documentation: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_documentation_only_failure_assertion_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path          |
+  #   | README.md     |
+  #   | docs/usage.md |
+  # And pull request 53 does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-documentation-only-assert \
+    --changed-files "README.md,docs/usage.md" \
+    --gate-result failure \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the changelog-check gate evaluates the pull request diff
+  # Then the R-01 assertion fails if the gate result is "failure"
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog documentation-only failure assertion: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "r01_assertion=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog documentation-only failure assertion: missing R-01 failure status
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the failure mentions "documentation-only PR must not require CHANGELOG.md"
+  if ! printf '%s\n' "$combined" | grep -Fq "documentation-only PR must not require CHANGELOG.md"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog documentation-only failure assertion: missing remediation text
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_diff_failure_message_example_path_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path                             |
+  #   | packages/config/src/schema.ts    |
+  #   | apps/community-bot/src/server.ts |
+  # And pull request 53 does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-diff \
+    --changed-files "packages/config/src/schema.ts,apps/community-bot/src/server.ts" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff failure message example path: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # When the changelog-check gate builds the failure message
+  # Then the failure message mentions "packages/config/src/schema.ts"
+  if ! printf '%s\n' "$stderr" | grep -Fq "packages/config/src/schema.ts"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff failure message example path: missing TypeScript path
+$(printf '%s\n' "$stderr" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the failure message mentions "CHANGELOG.md"
+  if ! printf '%s\n' "$stderr" | grep -Fq "CHANGELOG.md"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff failure message example path: missing CHANGELOG.md
+$(printf '%s\n' "$stderr" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_duration_pass_case() {
   local elapsed_ms="$1"
   local reported_duration="$2"
@@ -8137,6 +9544,31 @@ run_duration_fail_case 300000
 run_duration_fail_case 360000
 run_duration_queue_exclusion_case
 run_duration_cache_miss_case
+run_changelog_trigger_pull_request_case
+run_changelog_trigger_inline_event_syntax_case
+run_changelog_trigger_expression_condition_case
+run_changelog_trigger_missing_job_case
+run_changelog_trigger_non_pull_request_eligibility_case
+run_changelog_trigger_other_workflow_events_case
+run_changelog_trigger_pull_request_target_case
+run_changelog_diff_ci_only_pass_case
+run_changelog_ci_only_failure_assertion_case
+run_changelog_diff_workflow_classification_case
+run_changelog_diff_failure_message_case
+run_changelog_remediation_message_vague_case
+run_changelog_diff_with_changelog_has_no_remediation_case
+run_changelog_diff_typescript_with_changelog_pass_case
+run_changelog_diff_typescript_without_changelog_fails_case
+run_changelog_diff_mixed_requires_changelog_case
+run_changelog_diff_base_head_non_failure_conditions_pass_case
+run_changelog_diff_base_head_typescript_without_changelog_fails_case
+run_changelog_diff_typescript_rename_without_changelog_fails_case
+run_changelog_diff_typescript_deletion_without_changelog_fails_case
+run_changelog_diff_uses_base_head_changed_file_set_case
+run_changelog_diff_documentation_only_pass_case
+run_changelog_diff_package_markdown_documentation_case
+run_changelog_documentation_only_failure_assertion_case
+run_changelog_diff_failure_message_example_path_case
 run_invalid_cache_state_case
 run_action_pinning_sha_pass_case
 run_gitleaks_action_pinning_sha_pass_case

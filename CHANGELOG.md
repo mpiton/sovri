@@ -21,6 +21,76 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Security
 
+- `ci`: add changelog-check documentation classification coverage for Markdown
+  files inside package folders (#813).
+
+- `ci`: add R-01 changelog-check assertion coverage rejecting failure results for
+  documentation-only pull requests (#812).
+
+- `ci`: add changelog-check trigger policy coverage requiring the gate to be
+  eligible on `pull_request` events (#791).
+
+- `ci`: add changelog-check trigger policy coverage rejecting workflows without
+  the required `changelog-check` job (#792).
+
+- `ci`: add changelog-check trigger policy coverage rejecting jobs eligible for
+  `push`, `workflow_dispatch`, or `schedule` (#793).
+
+- `ci`: add changelog-check trigger policy coverage allowing other workflow
+  triggers when the gate remains pull-request-only (#794).
+
+- `ci`: add changelog-check trigger policy coverage rejecting
+  `pull_request_target` as a substitute for `pull_request` (#795).
+
+- `ci`: add changelog-check diff gate coverage allowing CI-only pull requests
+  without a `CHANGELOG.md` entry (#796).
+
+- `ci`: add R-02 changelog-check assertion coverage rejecting failure results for
+  CI-only pull requests (#797).
+
+- `ci`: add changelog-check diff classification coverage for workflow files as
+  non-code for changelog enforcement (#798).
+
+- `ci`: add changelog-check remediation message coverage naming `CHANGELOG.md`,
+  `.ts/.tsx`, and the required changelog entry action (#799).
+
+- `ci`: add changelog remediation-message validation coverage rejecting vague
+  failure text (#800).
+
+- `ci`: add changelog-check remediation coverage proving passing TypeScript PRs
+  with `CHANGELOG.md` do not emit remediation failures (#801).
+
+- `ci`: add changelog-check remediation coverage including an example changed
+  TypeScript path in failure messages (#802).
+
+- `ci`: add changelog-check diff coverage allowing TypeScript changes when the
+  root `CHANGELOG.md` is updated (#803).
+
+- `ci`: add changelog-check diff coverage rejecting `.ts` and `.tsx` changes
+  without a root `CHANGELOG.md` update (#804).
+
+- `ci`: add changelog-check diff file-set classification coverage for mixed
+  documentation and TypeScript changes requiring `CHANGELOG.md` (#805).
+
+- `ci`: add changelog-check base-to-head diff coverage for passing combinations
+  where TypeScript and root changelog failure conditions are not both present
+  (#806).
+
+- `ci`: add changelog-check base-to-head diff coverage rejecting TypeScript
+  changes without a root `CHANGELOG.md` update (#807).
+
+- `ci`: add changelog-check base-to-head diff coverage for TypeScript renames
+  without a root `CHANGELOG.md` update (#808).
+
+- `ci`: add changelog-check base-to-head diff coverage for TypeScript deletions
+  without a root `CHANGELOG.md` update (#809).
+
+- `ci`: add changelog-check base-to-head diff scope coverage so earlier
+  TypeScript changes are not hidden by the final commit file set (#810).
+
+- `ci`: add changelog-check documentation-only diff coverage allowing README,
+  docs, and ADR changes without `CHANGELOG.md` (#811).
+
 - `ci`: add Docker setup action pinning policy coverage requiring the
   `build-docker` QEMU and Buildx setup actions to use full commit SHAs (#739).
 

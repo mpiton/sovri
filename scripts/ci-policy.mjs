@@ -32,6 +32,8 @@ const REQUIRED_BUILD_DOCKER_NEEDS = [
   "forbidden-tools",
   "forbidden-imports",
 ];
+const CHANGELOG_REMEDIATION_MESSAGE =
+  "CHANGELOG.md must be updated when .ts/.tsx files change; add a changelog entry.";
 
 const durationBudgetUsage =
   "Usage: node scripts/ci-policy.mjs duration-budget --job-start-ms <ms> --job-end-ms <ms> --pnpm-cache hit --turbo-cache hit";
@@ -70,7 +72,17 @@ const secretsFixtureEvidenceUsage =
   "Usage: node scripts/ci-policy.mjs secrets-fixture-evidence --input <fixture-evidence.json> --false-positive-fixture <path>";
 const secretsNoSecretsReuseUsage =
   "Usage: node scripts/ci-policy.mjs secrets-no-secrets-reuse --workflow <path> --script-path <path> [--repo-root <path>]";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
+const changelogTriggerUsage =
+  "Usage: node scripts/ci-policy.mjs changelog-trigger --workflow <path>";
+const changelogDiffUsage =
+  "Usage: node scripts/ci-policy.mjs changelog-diff --changed-files <comma-separated-paths> [--base <commit|ref>] [--head <commit|ref>]";
+const changelogCiOnlyAssertUsage =
+  "Usage: node scripts/ci-policy.mjs changelog-ci-only-assert --changed-files <comma-separated-paths> --gate-result <success|failure>";
+const changelogRemediationMessageUsage =
+  "Usage: node scripts/ci-policy.mjs changelog-remediation-message --message <text>";
+const changelogDocumentationOnlyAssertUsage =
+  "Usage: node scripts/ci-policy.mjs changelog-documentation-only-assert --changed-files <comma-separated-paths> --gate-result <success|failure>";
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -826,6 +838,141 @@ const readYamlNeedsValues = (needsBlock) => {
     .map((value) => stripYamlQuotes(value));
 };
 
+const readWorkflowEventNames = (workflow) => {
+  const onLine = getYamlStructureLines(workflow).find((line) => /^\s*on:\s*/.test(line));
+  const inlineValue = onLine?.match(/^\s*on:\s*(.*?)\s*(?:#.*)?$/)?.[1]?.trim();
+  if (inlineValue !== undefined && inlineValue.length > 0) {
+    return parseYamlScalarListValue(inlineValue);
+  }
+
+  const eventBlock = getIndentedBlock(workflow, /^\s*on:\s*(?:#.*)?$/);
+  return eventBlock
+    .split(/\r?\n/)
+    .slice(1)
+    .map((line) => line.match(/^\s*([A-Za-z0-9_-]+):\s*(?:#.*)?$/)?.[1])
+    .filter((eventName) => eventName !== undefined);
+};
+
+const stripGitHubExpression = (condition) =>
+  condition
+    .replace(/^\$\{\{\s*/, "")
+    .replace(/\s*\}\}$/, "")
+    .trim();
+
+const isPullRequestEventCondition = (condition) =>
+  /^github\.event_name\s*==\s*['"]pull_request['"]$/.test(stripGitHubExpression(condition));
+
+const readChangedFiles = (options) => {
+  const value = readRequiredOption(options, "changed-files", changelogDiffUsage);
+  if (value === "(empty)") return [];
+  return value
+    .split(",")
+    .map((path) => path.trim())
+    .filter((path) => path.length > 0);
+};
+
+const isTypescriptCodePath = (path) => path.endsWith(".ts") || path.endsWith(".tsx");
+
+const classifyChangelogPath = (path) =>
+  isTypescriptCodePath(path) ? "typescript-code" : "non-code-for-changelog";
+
+const formatChangelogClassifications = (changedFiles) =>
+  changedFiles.map((path) => `classification=${path}:${classifyChangelogPath(path)}\n`).join("");
+
+const buildChangelogRemediationMessage = (changedFiles) => {
+  const examplePath = changedFiles.find((path) => isTypescriptCodePath(path));
+  if (examplePath === undefined) return CHANGELOG_REMEDIATION_MESSAGE;
+  return `${CHANGELOG_REMEDIATION_MESSAGE} Example changed file: ${examplePath}`;
+};
+
+const isCiOnlyChangelogPath = (path) =>
+  path.startsWith(".github/workflows/") ||
+  path === ".github/dependabot.yml" ||
+  path === "scripts/no-secrets.sh";
+
+const isDocumentationOnlyChangelogPath = (path) =>
+  path !== "CHANGELOG.md" && !isTypescriptCodePath(path);
+
+const readGateResult = (options) => {
+  const value = readRequiredOption(options, "gate-result", changelogCiOnlyAssertUsage);
+  if (value !== "success" && value !== "failure") {
+    fail('ERROR: --gate-result must be "success" or "failure".', 2);
+  }
+  return value;
+};
+
+const runChangelogDiff = (args) => {
+  const options = parseOptions(args);
+  const changedFiles = readChangedFiles(options);
+  const diffScope = options.has("base") && options.has("head") ? "diff_scope=base..head\n" : "";
+  const hasTypescriptCode = changedFiles.some((path) => isTypescriptCodePath(path));
+  const hasRootChangelog = changedFiles.includes("CHANGELOG.md");
+  const classifications = formatChangelogClassifications(changedFiles);
+  const changedFileSet =
+    hasTypescriptCode && !hasRootChangelog ? "requires-changelog" : "no-changelog-required";
+
+  if (!hasTypescriptCode || hasRootChangelog) {
+    writeStdout(
+      `${diffScope}${classifications}changed_file_set=${changedFileSet}\nhas_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=pass\ngate_result=success\n`,
+    );
+    return;
+  }
+
+  writeStdout(
+    `${diffScope}${classifications}changed_file_set=${changedFileSet}\nhas_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=fail\ngate_result=failure\n`,
+  );
+  fail(buildChangelogRemediationMessage(changedFiles), 1);
+};
+
+const runChangelogCiOnlyAssert = (args) => {
+  const options = parseOptions(args);
+  const changedFiles = readChangedFiles(options);
+  const gateResult = readGateResult(options);
+  const isCiOnly =
+    changedFiles.length > 0 && changedFiles.every((path) => isCiOnlyChangelogPath(path));
+
+  if (isCiOnly && gateResult === "failure") {
+    writeStdout("r02_assertion=fail\n");
+    fail("CI-only PR must not require CHANGELOG.md", 1);
+  }
+
+  writeStdout("r02_assertion=pass\n");
+};
+
+const runChangelogDocumentationOnlyAssert = (args) => {
+  const options = parseOptions(args);
+  const changedFiles = readChangedFiles(options);
+  const gateResult = readGateResult(options);
+  const isDocumentationOnly =
+    changedFiles.length > 0 && changedFiles.every((path) => isDocumentationOnlyChangelogPath(path));
+
+  if (isDocumentationOnly && gateResult === "failure") {
+    writeStdout("r01_assertion=fail\n");
+    fail("documentation-only PR must not require CHANGELOG.md", 1);
+  }
+
+  writeStdout("r01_assertion=pass\n");
+};
+
+const runChangelogRemediationMessage = (args) => {
+  const options = parseOptions(args);
+  const message = readRequiredOption(options, "message", changelogRemediationMessageUsage);
+  const failures = [];
+
+  if (!message.includes("CHANGELOG.md")) failures.push("message must name CHANGELOG.md");
+  if (!message.includes("add a changelog entry")) {
+    failures.push("message must explain the remediation");
+  }
+
+  if (failures.length === 0) {
+    writeStdout("remediation_message=pass\n");
+    return;
+  }
+
+  writeStdout("remediation_message=fail\n");
+  fail(failures.join("\n"), 1);
+};
+
 const runBuildDockerNeeds = (args) => {
   const options = parseOptions(args);
   const workflowPath = readRequiredOption(options, "workflow", buildDockerNeedsUsage);
@@ -881,6 +1028,36 @@ const runBuildDockerScheduler = (args) => {
   }
 
   writeStdout("build_docker_eligible=true\nbuild_docker_result=eligible\n");
+};
+
+const runChangelogTrigger = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", changelogTriggerUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const jobsBlock = getIndentedBlock(workflow, /^\s*jobs:\s*(?:#.*)?$/);
+  const changelogJob = getIndentedBlock(jobsBlock, /^\s+changelog-check:\s*(?:#.*)?$/);
+  if (changelogJob.length === 0) {
+    writeStdout("changelog_trigger=fail\njob=missing\n");
+    fail("missing changelog-check job", 1);
+  }
+
+  const hasPullRequestEvent = readWorkflowEventNames(workflow).includes("pull_request");
+  if (!hasPullRequestEvent) {
+    writeStdout("changelog_trigger=fail\njob=changelog-check\n");
+    fail("missing pull_request trigger", 1);
+  }
+
+  const condition = getStepPropertyValue(changelogJob, "if");
+  const jobEligibleForPullRequest =
+    condition !== undefined && isPullRequestEventCondition(condition);
+
+  if (hasPullRequestEvent && changelogJob.length > 0 && jobEligibleForPullRequest) {
+    writeStdout("changelog_trigger=pass\njob=changelog-check\neligible_event=pull_request\n");
+    return;
+  }
+
+  writeStdout("changelog_trigger=fail\njob=changelog-check\n");
+  fail("changelog-check must run on pull_request only", 1);
 };
 
 const readWorkflowFile = (workflowPath) => {
@@ -2171,6 +2348,16 @@ if (command === "duration-budget") {
   runSecretsFixtureEvidence(args);
 } else if (command === "secrets-no-secrets-reuse") {
   runSecretsNoSecretsReuse(args);
+} else if (command === "changelog-trigger") {
+  runChangelogTrigger(args);
+} else if (command === "changelog-diff") {
+  runChangelogDiff(args);
+} else if (command === "changelog-ci-only-assert") {
+  runChangelogCiOnlyAssert(args);
+} else if (command === "changelog-remediation-message") {
+  runChangelogRemediationMessage(args);
+} else if (command === "changelog-documentation-only-assert") {
+  runChangelogDocumentationOnlyAssert(args);
 } else {
   fail(usage, 2);
 }
