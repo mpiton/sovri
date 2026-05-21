@@ -62,13 +62,15 @@ const trivyStepCompletionUsage =
   "Usage: node scripts/ci-policy.mjs trivy-step-completion --input <trivy-result.json> --image <image-ref> --exit-code <code>";
 const trivySarifUploadConfigUsage =
   "Usage: node scripts/ci-policy.mjs trivy-sarif-upload-config --workflow <path>";
+const trivySarifUploadAfterFailureUsage =
+  "Usage: node scripts/ci-policy.mjs trivy-sarif-upload-after-failure --workflow <path> --input <trivy-result.json> --image <image-ref> --exit-code <code>";
 const secretsCheckoutDepthUsage =
   "Usage: node scripts/ci-policy.mjs secrets-checkout-depth --workflow <path>";
 const secretsFixtureEvidenceUsage =
   "Usage: node scripts/ci-policy.mjs secrets-fixture-evidence --input <fixture-evidence.json> --false-positive-fixture <path>";
 const secretsNoSecretsReuseUsage =
   "Usage: node scripts/ci-policy.mjs secrets-no-secrets-reuse --workflow <path> --script-path <path> [--repo-root <path>]";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -1860,6 +1862,12 @@ const runTrivyStepCompletion = (args) => {
   );
 };
 
+const getBlockingTrivyVulnerabilitiesForImage = (report, imageRef) => {
+  const imageReport = getTrivyImageReport(report, imageRef);
+  if (imageReport === undefined) return undefined;
+  return getBlockingTrivyVulnerabilities(getTrivyVulnerabilities(imageReport));
+};
+
 const getGitHubConditionExpression = (condition) =>
   condition?.match(/^\$\{\{\s*(.*?)\s*\}\}$/)?.[1]?.trim() ?? condition;
 
@@ -1892,6 +1900,35 @@ const getSarifUploadBoundary = (
     return { outcome: "rejected", reason: "SARIF upload must run after Trivy failure" };
   }
   return { outcome: "accepted", reason: "producer and uploader use the SARIF path" };
+};
+
+const getSarifUploadBoundaryForWorkflow = (workflow) => {
+  const trivyStep = getBuildDockerTrivyStepEntries(workflow)[0];
+  const uploadStep = getBuildDockerCodeqlSarifUploadStepEntries(workflow)[0];
+
+  if (trivyStep === undefined) {
+    return {
+      marker: "trivy_action=missing",
+      outcome: "rejected",
+      reason: `build-docker must use ${TRIVY_ACTION_REPOSITORY}`,
+    };
+  }
+
+  if (uploadStep === undefined) {
+    return {
+      marker: "sarif_upload_step=missing",
+      outcome: "rejected",
+      reason: "build-docker must upload Trivy SARIF via CodeQL",
+    };
+  }
+
+  return getSarifUploadBoundary(
+    getStepInput(trivyStep.block, "format", workflow, trivyStep.startIndex),
+    getStepInput(trivyStep.block, "output", workflow, trivyStep.startIndex),
+    getStepInput(uploadStep.block, "sarif_file", workflow, uploadStep.startIndex),
+    getStepPropertyValue(uploadStep.block, "if"),
+    uploadStep.startIndex > trivyStep.startIndex,
+  );
 };
 
 const runTrivySarifUploadConfig = (args) => {
@@ -1933,6 +1970,46 @@ const runTrivySarifUploadConfig = (args) => {
 
   writeStdout(
     `sarif_upload=pass\nsarif_upload_outcome=${boundary.outcome}\ntrivy_format=${TRIVY_REQUIRED_SARIF_FORMAT}\ntrivy_output=${TRIVY_REQUIRED_SARIF_PATH}\nsarif_file=${TRIVY_REQUIRED_SARIF_PATH}\ngithub_security=${TRIVY_REQUIRED_SARIF_PATH}\nboundary_reason=${boundary.reason}\n`,
+  );
+};
+
+const runTrivySarifUploadAfterFailure = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", trivySarifUploadAfterFailureUsage);
+  const inputPath = readRequiredOption(options, "input", trivySarifUploadAfterFailureUsage);
+  const imageRef = readRequiredOption(options, "image", trivySarifUploadAfterFailureUsage);
+  const exitCode = readRequiredOption(options, "exit-code", trivySarifUploadAfterFailureUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const report = readJsonFile(inputPath, "Trivy result");
+  const blockingVulnerabilities = getBlockingTrivyVulnerabilitiesForImage(report, imageRef);
+
+  if (blockingVulnerabilities === undefined) {
+    writeStdout(`sarif_upload_after_failure=fail\nimage=${imageRef}\n`);
+    fail("missing Trivy result for built image", 1);
+  }
+
+  if (blockingVulnerabilities.length === 0 || exitCode !== TRIVY_REQUIRED_EXIT_CODE) {
+    writeStdout(
+      `sarif_upload_after_failure=fail\nimage=${imageRef}\ntrivy_step_exit=${exitCode}\n`,
+    );
+    fail("Trivy step must fail with exit-code 1 on a blocking vulnerability", 1);
+  }
+
+  const boundary = getSarifUploadBoundaryForWorkflow(workflow);
+
+  if (boundary.outcome === "rejected") {
+    const marker = boundary.marker === undefined ? "" : `${boundary.marker}\n`;
+    writeStdout(`sarif_upload_after_failure=fail\n${marker}boundary_reason=${boundary.reason}\n`);
+    fail(boundary.message ?? boundary.reason, 1);
+  }
+
+  writeStdout(
+    `sarif_upload_after_failure=pass\nimage=${imageRef}\ntrivy_step_exit=1\nsarif_upload_step=ran\ngithub_security=${TRIVY_REQUIRED_SARIF_PATH}\n${blockingVulnerabilities
+      .map(
+        (vulnerability) =>
+          `blocking_vulnerability=${getTrivyVulnerabilityId(vulnerability)}\nblocking_severity=${getTrivyVulnerabilitySeverity(vulnerability)}\n`,
+      )
+      .join("")}`,
   );
 };
 
@@ -2083,6 +2160,8 @@ if (command === "duration-budget") {
   runTrivyStepCompletion(args);
 } else if (command === "trivy-sarif-upload-config") {
   runTrivySarifUploadConfig(args);
+} else if (command === "trivy-sarif-upload-after-failure") {
+  runTrivySarifUploadAfterFailure(args);
 } else if (command === "secrets-checkout-depth") {
   runSecretsCheckoutDepth(args);
 } else if (command === "secrets-fixture-evidence") {

@@ -6931,6 +6931,105 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_trivy_sarif_upload_after_failure_case() {
+  local workflow_file trivy_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  trivy_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          format: sarif
+          output: trivy-results.sarif
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@89abcdef0123456789abcdef0123456789abcdef
+        with:
+          sarif_file: trivy-results.sarif
+YAML
+
+  cat >"$trivy_file" <<'JSON'
+{
+  "ArtifactName": "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "Results": [
+    {
+      "Target": "sovri/community-bot",
+      "Vulnerabilities": [
+        { "VulnerabilityID": "CVE-2026-3003", "Severity": "HIGH" }
+      ]
+    }
+  ]
+}
+JSON
+
+  node "$SCRIPT" trivy-sarif-upload-after-failure \
+    --workflow "$workflow_file" \
+    --input "$trivy_file" \
+    --image "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+    --exit-code "1" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$trivy_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload after failure: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "trivy_step_exit=1"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload after failure: missing Trivy exit status
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "blocking_vulnerability=CVE-2026-3003"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload after failure: missing blocking vulnerability
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "sarif_upload_step=ran"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload after failure: missing upload step run marker
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "github_security=trivy-results.sarif"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload after failure: missing GitHub Security SARIF result
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_checkout_depth_zero_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec combined
 
@@ -8052,6 +8151,7 @@ run_trivy_vulnerability_gate_high_vulnerability_case
 run_trivy_vulnerability_gate_critical_vulnerability_case
 run_trivy_vulnerability_gate_missing_result_case
 run_trivy_step_completion_nonzero_result_case
+run_trivy_sarif_upload_after_failure_case
 run_secrets_checkout_depth_zero_case
 run_secrets_checkout_missing_step_case
 run_secrets_checkout_missing_fetch_depth_case
