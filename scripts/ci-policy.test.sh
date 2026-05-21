@@ -9539,6 +9539,9 @@ $(printf '%s\n' "$combined" | sed 's/^/      /')"
 
 CODEQL_TEST_CHECKOUT_SHA="1234567890123456789012345678901234567890"
 CODEQL_TEST_ACTION_SHA="abcdefabcdefabcdefabcdefabcdefabcdefabcd"
+DEPENDENCY_REVIEW_TEST_ACTION_SHA="a1d282b36b6f3519aa1f3fc636f609c47dddb294"
+DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES="Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC0-1.0, Unlicense, BlueOak-1.0.0"
+DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES="AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later, GPL-2.0-only, GPL-2.0-or-later, GPL-3.0-only, GPL-3.0-or-later, LGPL-2.0-only, LGPL-2.0-or-later, LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only, LGPL-3.0-or-later"
 
 codeql_standard_trigger_body() {
   printf '%s\n' \
@@ -9852,6 +9855,330 @@ run_codeql_workflow_pinning_case() {
 
   run_ci_policy_failure_case "codeql pinning ${name}" "$expected_message" \
     codeql-workflow-config --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+dependency_review_standard_trigger_body() {
+  printf '%s\n' \
+    "  pull_request:" \
+    "    branches:" \
+    "      - main"
+}
+
+write_dependency_review_workflow_fixture() {
+  local workflow_file="$1"
+  local trigger_body="$2"
+  local action_ref="$3"
+  local fail_on_severity="$4"
+  local allow_licenses="$5"
+  local deny_licenses="$6"
+  local action_step="$7"
+
+  cat >"$workflow_file" <<YAML
+name: Dependency Review
+
+on:
+${trigger_body}
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+${action_step}
+YAML
+
+  if [ "$action_step" = standard ]; then
+    cat >"$workflow_file" <<YAML
+name: Dependency Review
+
+on:
+${trigger_body}
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dependency Review
+        uses: actions/dependency-review-action@${action_ref}
+        with:
+          fail-on-severity: ${fail_on_severity}
+          allow-licenses: ${allow_licenses}
+          deny-licenses: ${deny_licenses}
+YAML
+  fi
+}
+
+write_standard_dependency_review_workflow() {
+  local workflow_file="$1"
+
+  write_dependency_review_workflow_fixture \
+    "$workflow_file" \
+    "$(dependency_review_standard_trigger_body)" \
+    "$DEPENDENCY_REVIEW_TEST_ACTION_SHA" \
+    "high" \
+    "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" \
+    "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" \
+    standard
+}
+
+run_dependency_review_workflow_config_pass_case() {
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_standard_dependency_review_workflow "$workflow_file"
+
+  # Given ".github/workflows/dependency-review.yml" declares the required
+  # pull_request trigger, action pin, high severity threshold, allow list, and deny list
+  # When the Dependency Review workflow rule is evaluated
+  # Then the Dependency Review assertion passes
+  run_ci_policy_success_case "dependency review workflow config pass" "dependency_review_workflow=pass" \
+    dependency-review-workflow-config --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_dependency_review_mit_license_case() {
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_standard_dependency_review_workflow "$workflow_file"
+
+  # Given ".github/workflows/dependency-review.yml" declares allow-licenses containing "MIT"
+  # And ".github/workflows/dependency-review.yml" declares deny-licenses without "MIT"
+  # When the Dependency Review license gate evaluates "lodash@4.17.21"
+  # Then the license gate assertion passes
+  # And the pull request is not blocked for the MIT license
+  run_ci_policy_success_case "dependency review MIT allow" "allowed_license=MIT" \
+    dependency-review-workflow-config --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_dependency_review_gpl_block_case() {
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_standard_dependency_review_workflow "$workflow_file"
+
+  # Given the reviewed dependency license is "GPL-3.0-only"
+  # And ".github/workflows/dependency-review.yml" declares deny-licenses containing "GPL-3.0-only"
+  # When the Dependency Review license gate evaluates "gpl-only-fixture@1.0.0"
+  # Then the pull request is blocked for "GPL-3.0-only"
+  run_ci_policy_success_case "dependency review GPL 3 only deny" "denied_license=GPL-3.0-only" \
+    dependency-review-workflow-config --workflow "$workflow_file"
+
+  run_ci_policy_success_case "dependency review GPL 3 or later deny" "denied_license=GPL-3.0-or-later" \
+    dependency-review-workflow-config --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_dependency_review_trigger_failure_case() {
+  local name="$1"
+  local trigger_body="$2"
+  local expected_message="$3"
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_dependency_review_workflow_fixture \
+    "$workflow_file" \
+    "$trigger_body" \
+    "$DEPENDENCY_REVIEW_TEST_ACTION_SHA" \
+    "high" \
+    "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" \
+    "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" \
+    standard
+
+  run_ci_policy_failure_case "dependency review trigger ${name}" "$expected_message" \
+    dependency-review-workflow-config --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_dependency_review_action_pinning_case() {
+  local name="$1"
+  local action_ref="$2"
+  local expected_message="$3"
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_dependency_review_workflow_fixture \
+    "$workflow_file" \
+    "$(dependency_review_standard_trigger_body)" \
+    "$action_ref" \
+    "high" \
+    "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" \
+    "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" \
+    standard
+
+  run_ci_policy_failure_case "dependency review action pinning ${name}" "$expected_message" \
+    dependency-review-workflow-config --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_dependency_review_action_pinning_boundary_case() {
+  local sha_ref="$1"
+  local outcome="$2"
+  local reason="$3"
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_dependency_review_workflow_fixture \
+    "$workflow_file" \
+    "$(dependency_review_standard_trigger_body)" \
+    "$sha_ref" \
+    "high" \
+    "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" \
+    "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" \
+    standard
+
+  if [ "$outcome" = accepted ]; then
+    run_ci_policy_success_case "dependency review action pinning boundary ${sha_ref}" "boundary_reason=${reason}" \
+      dependency-review-workflow-config --workflow "$workflow_file"
+  else
+    run_ci_policy_failure_case "dependency review action pinning boundary ${sha_ref}" "$reason" \
+      dependency-review-workflow-config --workflow "$workflow_file"
+  fi
+
+  rm -f "$workflow_file"
+}
+
+run_dependency_review_severity_case() {
+  local configured_value="$1"
+  local expected_message="$2"
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_dependency_review_workflow_fixture \
+    "$workflow_file" \
+    "$(dependency_review_standard_trigger_body)" \
+    "$DEPENDENCY_REVIEW_TEST_ACTION_SHA" \
+    "$configured_value" \
+    "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" \
+    "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" \
+    standard
+
+  run_ci_policy_failure_case "dependency review severity ${configured_value}" "$expected_message" \
+    dependency-review-workflow-config --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_dependency_review_missing_severity_input_case() {
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_dependency_review_workflow_fixture \
+    "$workflow_file" \
+    "$(dependency_review_standard_trigger_body)" \
+    "$DEPENDENCY_REVIEW_TEST_ACTION_SHA" \
+    "" \
+    "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" \
+    "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" \
+    "      - name: Dependency Review
+        uses: actions/dependency-review-action@${DEPENDENCY_REVIEW_TEST_ACTION_SHA}
+        with:
+          allow-licenses: ${DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES}
+          deny-licenses: ${DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES}"
+
+  run_ci_policy_failure_case "dependency review missing severity input" "fail-on-severity: high is required" \
+    dependency-review-workflow-config --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_dependency_review_wrong_step_severity_case() {
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_dependency_review_workflow_fixture \
+    "$workflow_file" \
+    "$(dependency_review_standard_trigger_body)" \
+    "$DEPENDENCY_REVIEW_TEST_ACTION_SHA" \
+    "" \
+    "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" \
+    "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" \
+    "      - name: Shell severity
+        run: echo 'fail-on-severity: high'
+      - name: Dependency Review
+        uses: actions/dependency-review-action@${DEPENDENCY_REVIEW_TEST_ACTION_SHA}
+        with:
+          allow-licenses: ${DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES}
+          deny-licenses: ${DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES}"
+
+  run_ci_policy_failure_case "dependency review wrong severity step" "fail-on-severity must be configured on actions/dependency-review-action" \
+    dependency-review-workflow-config --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_dependency_review_license_failure_case() {
+  local name="$1"
+  local allow_licenses="$2"
+  local deny_licenses="$3"
+  local expected_message="$4"
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_dependency_review_workflow_fixture \
+    "$workflow_file" \
+    "$(dependency_review_standard_trigger_body)" \
+    "$DEPENDENCY_REVIEW_TEST_ACTION_SHA" \
+    "high" \
+    "$allow_licenses" \
+    "$deny_licenses" \
+    standard
+
+  run_ci_policy_failure_case "dependency review licenses ${name}" "$expected_message" \
+    dependency-review-workflow-config --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_dependency_review_allow_whitespace_case() {
+  local raw_allow_licenses="$1"
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_dependency_review_workflow_fixture \
+    "$workflow_file" \
+    "$(dependency_review_standard_trigger_body)" \
+    "$DEPENDENCY_REVIEW_TEST_ACTION_SHA" \
+    "high" \
+    "$raw_allow_licenses" \
+    "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" \
+    standard
+
+  run_ci_policy_success_case "dependency review allow whitespace" "allow_licenses=exact" \
+    dependency-review-workflow-config --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_dependency_review_deny_whitespace_case() {
+  local raw_deny_licenses="$1"
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_dependency_review_workflow_fixture \
+    "$workflow_file" \
+    "$(dependency_review_standard_trigger_body)" \
+    "$DEPENDENCY_REVIEW_TEST_ACTION_SHA" \
+    "high" \
+    "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" \
+    "$raw_deny_licenses" \
+    standard
+
+  run_ci_policy_success_case "dependency review deny whitespace" "deny_licenses=exact" \
+    dependency-review-workflow-config --workflow "$workflow_file"
 
   rm -f "$workflow_file"
 }
@@ -10407,6 +10734,49 @@ run_codeql_workflow_category_case "javascript" "CodeQL analyze category must be 
 run_codeql_workflow_timeout_case 10
 run_codeql_workflow_pinning_case "moving checkout" "v4" "$CODEQL_TEST_ACTION_SHA" "$CODEQL_TEST_ACTION_SHA" "CodeQL workflow actions must be pinned to a full commit SHA"
 run_codeql_workflow_pinning_case "uppercase codeql" "$CODEQL_TEST_CHECKOUT_SHA" "ABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD" "$CODEQL_TEST_ACTION_SHA" "SHA must use lowercase hexadecimal characters"
+run_dependency_review_workflow_config_pass_case
+run_dependency_review_mit_license_case
+run_dependency_review_gpl_block_case
+run_dependency_review_trigger_failure_case "missing pull_request" "" "pull_request trigger is required"
+run_dependency_review_trigger_failure_case "wrong branch" "$(printf '%s\n' \
+  "  pull_request:" \
+  "    branches:" \
+  "      - release")" "pull_request must target main"
+run_dependency_review_trigger_failure_case "extra push" "$(printf '%s\n' \
+  "  pull_request:" \
+  "    branches:" \
+  "      - main" \
+  "  push:")" "Dependency Review workflow must be pull_request-only"
+run_dependency_review_trigger_failure_case "extra schedule" "$(printf '%s\n' \
+  "  pull_request:" \
+  "    branches:" \
+  "      - main" \
+  "  schedule:" \
+  "    - cron: \"0 6 * * 1\"")" "Dependency Review workflow must be pull_request-only"
+run_dependency_review_action_pinning_case "moving tag" "v4" "actions/dependency-review-action must be pinned to a full commit SHA"
+run_dependency_review_action_pinning_case "moving branch" "main" "actions/dependency-review-action must be pinned to a full commit SHA"
+run_dependency_review_action_pinning_boundary_case "123456789012345678901234567890123456789" rejected "39 hexadecimal characters is too short"
+run_dependency_review_action_pinning_boundary_case "1234567890123456789012345678901234567890" accepted "40 hexadecimal characters is exactly valid"
+run_dependency_review_action_pinning_boundary_case "12345678901234567890123456789012345678901" rejected "41 hexadecimal characters is too long"
+run_dependency_review_action_pinning_case "uppercase sha" "ABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD" "full SHA must use lowercase hexadecimal"
+run_dependency_review_action_pinning_case "non hex sha" "123456789012345678901234567890123456789g" "full SHA must contain only hexadecimal chars"
+run_dependency_review_severity_case "critical" "high severity advisories must fail"
+run_dependency_review_missing_severity_input_case
+run_dependency_review_wrong_step_severity_case
+run_dependency_review_license_failure_case "missing MIT allow" "Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC0-1.0, Unlicense, BlueOak-1.0.0" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "missing allowed license MIT"
+run_dependency_review_license_failure_case "MIT denied" "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" "${DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES}, MIT" "unexpected denied license MIT"
+run_dependency_review_license_failure_case "GPL allowed" "${DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES}, GPL-3.0-only" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "unexpected allowed license GPL-3.0-only"
+run_dependency_review_license_failure_case "missing GPL deny" "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" "AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later, GPL-2.0-only, GPL-2.0-or-later, GPL-3.0-or-later, LGPL-2.0-only, LGPL-2.0-or-later, LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only, LGPL-3.0-or-later" "missing denied license GPL-3.0-only"
+run_dependency_review_allow_whitespace_case "Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC,MPL-2.0,CC0-1.0,Unlicense,BlueOak-1.0.0"
+run_dependency_review_allow_whitespace_case "Apache-2.0 ,  MIT , BSD-2-Clause , BSD-3-Clause , ISC , MPL-2.0 , CC0-1.0 , Unlicense , BlueOak-1.0.0"
+run_dependency_review_deny_whitespace_case "AGPL-1.0-only,AGPL-1.0-or-later,AGPL-3.0-only,AGPL-3.0-or-later,GPL-2.0-only,GPL-2.0-or-later,GPL-3.0-only,GPL-3.0-or-later,LGPL-2.0-only,LGPL-2.0-or-later,LGPL-2.1-only,LGPL-2.1-or-later,LGPL-3.0-only,LGPL-3.0-or-later"
+run_dependency_review_deny_whitespace_case "AGPL-1.0-only , AGPL-1.0-or-later , AGPL-3.0-only , AGPL-3.0-or-later , GPL-2.0-only , GPL-2.0-or-later , GPL-3.0-only , GPL-3.0-or-later , LGPL-2.0-only , LGPL-2.0-or-later , LGPL-2.1-only , LGPL-2.1-or-later , LGPL-3.0-only , LGPL-3.0-or-later"
+run_dependency_review_license_failure_case "duplicate allow" "Apache-2.0, MIT, MIT, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC0-1.0, Unlicense, BlueOak-1.0.0" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "duplicate allowed license MIT"
+run_dependency_review_license_failure_case "reordered allow" "MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC0-1.0, Unlicense, BlueOak-1.0.0" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "allowed licenses must follow the required order"
+run_dependency_review_license_failure_case "duplicate deny" "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" "AGPL-1.0-only, AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later, GPL-2.0-only, GPL-2.0-or-later, GPL-3.0-only, GPL-3.0-or-later, LGPL-2.0-only, LGPL-2.0-or-later, LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only, LGPL-3.0-or-later" "duplicate denied license AGPL-1.0-only"
+run_dependency_review_license_failure_case "reordered deny" "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" "GPL-3.0-only, AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later, GPL-2.0-only, GPL-2.0-or-later, GPL-3.0-or-later, LGPL-2.0-only, LGPL-2.0-or-later, LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only, LGPL-3.0-or-later" "denied licenses must follow the required order"
+run_dependency_review_license_failure_case "missing allow input" "" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "allow-licenses is required"
+run_dependency_review_license_failure_case "missing deny input" "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" "" "deny-licenses is required"
 run_docker_build_action_verification_case
 run_docker_build_action_push_true_case
 run_docker_build_action_missing_action_case

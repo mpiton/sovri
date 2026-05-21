@@ -23,12 +23,14 @@ const TRIVY_ACTION_REPOSITORY = "aquasecurity/trivy-action";
 const CODEQL_UPLOAD_SARIF_ACTION_REPOSITORY = "github/codeql-action/upload-sarif";
 const CODEQL_INIT_ACTION_REPOSITORY = "github/codeql-action/init";
 const CODEQL_ANALYZE_ACTION_REPOSITORY = "github/codeql-action/analyze";
+const DEPENDENCY_REVIEW_ACTION_REPOSITORY = "actions/dependency-review-action";
 const TRIVY_REQUIRED_SEVERITY = "HIGH,CRITICAL";
 const TRIVY_REQUIRED_EXIT_CODE = "1";
 const TRIVY_REQUIRED_SARIF_FORMAT = "sarif";
 const TRIVY_REQUIRED_SARIF_PATH = "trivy-results.sarif";
 const TRIVY_BLOCKING_SEVERITIES = new Set(["HIGH", "CRITICAL"]);
 const CODEQL_JOB_NAME = "codeql";
+const DEPENDENCY_REVIEW_JOB_NAME = "review";
 const CODEQL_REQUIRED_LANGUAGE = "javascript";
 const CODEQL_REQUIRED_CATEGORY = "/language:javascript";
 const CODEQL_REQUIRED_CRON = "0 6 * * 1";
@@ -38,6 +40,33 @@ const CODEQL_REQUIRED_PERMISSIONS = new Map([
   ["contents", "read"],
   ["security-events", "write"],
 ]);
+const DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES = [
+  "Apache-2.0",
+  "MIT",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "MPL-2.0",
+  "CC0-1.0",
+  "Unlicense",
+  "BlueOak-1.0.0",
+];
+const DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES = [
+  "AGPL-1.0-only",
+  "AGPL-1.0-or-later",
+  "AGPL-3.0-only",
+  "AGPL-3.0-or-later",
+  "GPL-2.0-only",
+  "GPL-2.0-or-later",
+  "GPL-3.0-only",
+  "GPL-3.0-or-later",
+  "LGPL-2.0-only",
+  "LGPL-2.0-or-later",
+  "LGPL-2.1-only",
+  "LGPL-2.1-or-later",
+  "LGPL-3.0-only",
+  "LGPL-3.0-or-later",
+];
 const RELEASE_REQUIRED_JOBS = ["verify-tag", "build-and-push", "sbom", "gh-release"];
 const RELEASE_VERSION = "0.1.0";
 const RELEASE_IMAGE_REPOSITORY = "ghcr.io/mpiton/sovri/community-bot";
@@ -91,6 +120,8 @@ const codeqlDurationBudgetUsage =
   "Usage: node scripts/ci-policy.mjs codeql-duration-budget --job-start-ms <ms> --job-end-ms <ms>";
 const codeqlWorkflowConfigUsage =
   "Usage: node scripts/ci-policy.mjs codeql-workflow-config --workflow <path>";
+const dependencyReviewWorkflowConfigUsage =
+  "Usage: node scripts/ci-policy.mjs dependency-review-workflow-config --workflow <path>";
 const dockerBuildActionUsage =
   "Usage: node scripts/ci-policy.mjs docker-build-action --workflow <path>";
 const dockerSetupActionPinningUsage =
@@ -139,7 +170,7 @@ const changelogRemediationMessageUsage =
   "Usage: node scripts/ci-policy.mjs changelog-remediation-message --message <text>";
 const changelogDocumentationOnlyAssertUsage =
   "Usage: node scripts/ci-policy.mjs changelog-documentation-only-assert --changed-files <comma-separated-paths> --gate-result <success|failure>";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${cosignDeferralUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dependencyReviewWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${cosignDeferralUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -1265,6 +1296,24 @@ const readCodeqlPushBranches = (workflow) => {
   return readYamlListEntryValues(workflow, branchesEntry);
 };
 
+const readWorkflowEventBranches = (workflow, eventName) => {
+  const entries = getYamlStructureEntries(workflow);
+  const onEntry = findRootEntry(entries, /^\s*on:\s*(?:#.*)?$/);
+  if (onEntry === undefined) return [];
+
+  const eventEntry = findDirectChildEntry(
+    entries,
+    onEntry,
+    new RegExp(`^\\s+${escapeRegExp(eventName)}:\\s*(?:#.*)?$`),
+  );
+  if (eventEntry === undefined) return [];
+
+  const branchesEntry = findDirectChildEntry(entries, eventEntry, /^\s+branches:\s*(?:.*)?$/);
+  if (branchesEntry === undefined) return [];
+
+  return readYamlListEntryValues(workflow, branchesEntry);
+};
+
 const readCodeqlScheduleCrons = (workflow) => {
   const entries = getYamlStructureEntries(workflow);
   const onEntry = findRootEntry(entries, /^\s*on:\s*(?:#.*)?$/);
@@ -1303,6 +1352,17 @@ const getCodeqlStepEntries = (workflow) => {
   return getTopLevelListItemBlockEntries(stepsBlockEntry.block, stepsBlockEntry.startIndex);
 };
 
+const getDependencyReviewStepEntries = (workflow) => {
+  const stepsBlockEntry = getJobStepsBlockEntry(workflow, DEPENDENCY_REVIEW_JOB_NAME);
+  if (stepsBlockEntry === undefined) return [];
+
+  return getTopLevelListItemBlockEntries(stepsBlockEntry.block, stepsBlockEntry.startIndex);
+};
+
+const isDependencyReviewActionStep = (step) =>
+  getStepPropertyValue(step, "uses")?.startsWith(`${DEPENDENCY_REVIEW_ACTION_REPOSITORY}@`) ??
+  false;
+
 const readCodeqlQuerySet = (queries) =>
   new Set(
     (queries ?? "")
@@ -1312,6 +1372,11 @@ const readCodeqlQuerySet = (queries) =>
   );
 
 const getCodeqlActionRef = (actionReference) => {
+  const separatorIndex = actionReference.lastIndexOf("@");
+  return separatorIndex === -1 ? "" : actionReference.slice(separatorIndex + 1);
+};
+
+const getActionReferenceRef = (actionReference) => {
   const separatorIndex = actionReference.lastIndexOf("@");
   return separatorIndex === -1 ? "" : actionReference.slice(separatorIndex + 1);
 };
@@ -1337,6 +1402,178 @@ const getCodeqlPinFailures = (workflow) =>
       reason: getCodeqlActionPinFailure(actionReference),
     }))
     .filter((failure) => failure.reason !== undefined);
+
+const getDependencyReviewActionPinFailure = (actionReference) => {
+  const ref = getActionReferenceRef(actionReference);
+  if (/^[0-9a-f]{40}$/.test(ref)) return undefined;
+
+  const boundaryReason = getShaBoundaryReason(actionReference);
+  if (
+    boundaryReason !== undefined &&
+    boundaryReason !== "40 hexadecimal characters is exactly valid"
+  ) {
+    return boundaryReason;
+  }
+  if (ref.length === FULL_COMMIT_SHA_LENGTH && /^[0-9a-fA-F]+$/.test(ref)) {
+    return "full SHA must use lowercase hexadecimal";
+  }
+  if (ref.length === FULL_COMMIT_SHA_LENGTH) {
+    return "full SHA must contain only hexadecimal chars";
+  }
+  return `${DEPENDENCY_REVIEW_ACTION_REPOSITORY} must be pinned to a full commit SHA`;
+};
+
+const getDuplicateValue = (values) => {
+  const seen = new Set();
+  for (const value of values) {
+    if (seen.has(value)) return value;
+    seen.add(value);
+  }
+  return undefined;
+};
+
+const parseCommaSeparatedList = (value) =>
+  (value ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+const getExactLicenseListFailures = (actual, required, inputName, adjective) => {
+  if (actual.length === 0) return [`${inputName} is required`];
+
+  const duplicate = getDuplicateValue(actual);
+  if (duplicate !== undefined) return [`duplicate ${adjective} license ${duplicate}`];
+
+  const missing = required.find((license) => !actual.includes(license));
+  if (missing !== undefined) return [`missing ${adjective} license ${missing}`];
+
+  const unexpected = actual.find((license) => !required.includes(license));
+  if (unexpected !== undefined) return [`unexpected ${adjective} license ${unexpected}`];
+
+  const exactOrder =
+    actual.length === required.length &&
+    actual.every((license, index) => license === required[index]);
+  if (!exactOrder) return [`${adjective} licenses must follow the required order`];
+
+  return [];
+};
+
+const getDependencyReviewWorkflowFailures = (workflow) => {
+  const failures = [];
+  const eventNames = readWorkflowRootEventNames(workflow);
+
+  if (!eventNames.includes("pull_request")) {
+    failures.push("pull_request trigger is required");
+  } else if (!readWorkflowEventBranches(workflow, "pull_request").includes("main")) {
+    failures.push("pull_request must target main");
+  }
+  if (eventNames.some((eventName) => eventName !== "pull_request")) {
+    failures.push("Dependency Review workflow must be pull_request-only");
+  }
+
+  const stepEntries = getDependencyReviewStepEntries(workflow);
+  const dependencyReviewStep = stepEntries.find((entry) =>
+    isDependencyReviewActionStep(entry.block),
+  );
+  if (dependencyReviewStep === undefined) {
+    failures.push(`${DEPENDENCY_REVIEW_ACTION_REPOSITORY} is required`);
+    return failures;
+  }
+
+  const actionReference = getStepPropertyValue(dependencyReviewStep.block, "uses") ?? "";
+  const pinFailure = getDependencyReviewActionPinFailure(actionReference);
+  if (pinFailure !== undefined) failures.push(pinFailure);
+
+  const failOnSeverity = getStepInput(
+    dependencyReviewStep.block,
+    "fail-on-severity",
+    workflow,
+    dependencyReviewStep.startIndex,
+  );
+  if (failOnSeverity === undefined) {
+    failures.push("fail-on-severity: high is required");
+    failures.push("fail-on-severity must be configured on actions/dependency-review-action");
+  } else if (failOnSeverity !== "high") {
+    failures.push("high severity advisories must fail");
+  }
+
+  const allowLicenses = parseCommaSeparatedList(
+    getStepInput(
+      dependencyReviewStep.block,
+      "allow-licenses",
+      workflow,
+      dependencyReviewStep.startIndex,
+    ),
+  );
+  const denyLicenses = parseCommaSeparatedList(
+    getStepInput(
+      dependencyReviewStep.block,
+      "deny-licenses",
+      workflow,
+      dependencyReviewStep.startIndex,
+    ),
+  );
+  failures.push(
+    ...getExactLicenseListFailures(
+      allowLicenses,
+      DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES,
+      "allow-licenses",
+      "allowed",
+    ),
+  );
+  failures.push(
+    ...getExactLicenseListFailures(
+      denyLicenses,
+      DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES,
+      "deny-licenses",
+      "denied",
+    ),
+  );
+
+  if (allowLicenses.includes("GPL-3.0-only")) {
+    failures.push("unexpected allowed license GPL-3.0-only");
+  }
+  if (denyLicenses.includes("MIT")) {
+    failures.push("unexpected denied license MIT");
+  }
+
+  return [...new Set(failures)];
+};
+
+const getDependencyReviewWorkflowActionReference = (workflow) => {
+  const dependencyReviewStep = getDependencyReviewStepEntries(workflow).find((entry) =>
+    isDependencyReviewActionStep(entry.block),
+  );
+  if (dependencyReviewStep === undefined) return undefined;
+
+  return getStepPropertyValue(dependencyReviewStep.block, "uses");
+};
+
+const runDependencyReviewWorkflowConfig = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", dependencyReviewWorkflowConfigUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const failures = getDependencyReviewWorkflowFailures(workflow);
+  const actionReference = getDependencyReviewWorkflowActionReference(workflow);
+  const pinFailure =
+    actionReference === undefined
+      ? undefined
+      : getDependencyReviewActionPinFailure(actionReference);
+  const boundaryReasons =
+    actionReference === undefined ? [] : [getShaBoundaryReason(actionReference)].filter(Boolean);
+
+  if (failures.length === 0) {
+    writeStdout(
+      `dependency_review_workflow=pass\nallowed_license=MIT\ndenied_license=GPL-3.0-only\ndenied_license=GPL-3.0-or-later\nallow_licenses=exact\ndeny_licenses=exact\n${boundaryReasons.map((reason) => `boundary_reason=${reason}\n`).join("")}`,
+    );
+    return;
+  }
+
+  writeStdout(
+    `dependency_review_workflow=fail\n${pinFailure === undefined ? "" : `moving_reference=${actionReference}\nboundary_reason=${pinFailure}\n`}`,
+  );
+  fail(failures.join("\n"), 1);
+};
 
 const getCodeqlPermissionFailures = (permissions) => {
   if (permissions === undefined) return ["CodeQL workflow must set least-privilege permissions"];
@@ -2994,6 +3231,8 @@ if (command === "duration-budget") {
   runCodeqlDurationBudget(args);
 } else if (command === "codeql-workflow-config") {
   runCodeqlWorkflowConfig(args);
+} else if (command === "dependency-review-workflow-config") {
+  runDependencyReviewWorkflowConfig(args);
 } else if (command === "docker-build-action") {
   runDockerBuildAction(args);
 } else if (command === "docker-setup-action-pinning") {

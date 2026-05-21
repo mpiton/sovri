@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Security
 
+- `ci`: add Dependency Review policy coverage and a pinned pull-request-only
+  workflow for license and advisory blocking (#56).
+
 - `ci`: add CodeQL policy coverage and a pinned GitHub Advanced Security
   workflow for JavaScript/TypeScript analysis (#55).
 
