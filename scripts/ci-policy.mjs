@@ -867,6 +867,12 @@ const readChangedFiles = (options) => {
 
 const isTypescriptCodePath = (path) => path.endsWith(".ts") || path.endsWith(".tsx");
 
+const classifyChangelogPath = (path) =>
+  isTypescriptCodePath(path) ? "typescript-code" : "non-code-for-changelog";
+
+const formatChangelogClassifications = (changedFiles) =>
+  changedFiles.map((path) => `classification=${path}:${classifyChangelogPath(path)}\n`).join("");
+
 const isCiOnlyChangelogPath = (path) =>
   path.startsWith(".github/workflows/") ||
   path === ".github/dependabot.yml" ||
@@ -885,16 +891,17 @@ const runChangelogDiff = (args) => {
   const changedFiles = readChangedFiles(options);
   const hasTypescriptCode = changedFiles.some((path) => isTypescriptCodePath(path));
   const hasRootChangelog = changedFiles.includes("CHANGELOG.md");
+  const classifications = formatChangelogClassifications(changedFiles);
 
   if (!hasTypescriptCode || hasRootChangelog) {
     writeStdout(
-      `has_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=pass\ngate_result=success\n`,
+      `${classifications}has_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=pass\ngate_result=success\n`,
     );
     return;
   }
 
   writeStdout(
-    `has_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=fail\ngate_result=failure\n`,
+    `${classifications}has_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=fail\ngate_result=failure\n`,
   );
   fail("CHANGELOG.md must be updated when TypeScript code changes", 1);
 };

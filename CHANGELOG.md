@@ -42,6 +42,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `ci`: add R-02 changelog-check assertion coverage rejecting failure results for
   CI-only pull requests (#797).
 
+- `ci`: add changelog-check diff classification coverage for workflow files as
+  non-code for changelog enforcement (#798).
+
 - `ci`: add Docker setup action pinning policy coverage requiring the
   `build-docker` QEMU and Buildx setup actions to use full commit SHAs (#739).
 

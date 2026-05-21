@@ -749,6 +749,66 @@ $(printf '%s\n' "$combined" | sed 's/^/      /')"
   PASS=$((PASS + 1))
 }
 
+run_changelog_diff_workflow_classification_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path                         |
+  #   | .github/workflows/ci.yml     |
+  #   | .github/workflows/codeql.yml |
+  # And pull request 53 does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-diff \
+    --changed-files ".github/workflows/ci.yml,.github/workflows/codeql.yml" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff workflow classification: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # When the changelog-check gate classifies changed files
+  # Then ".github/workflows/ci.yml" is classified as "non-code-for-changelog"
+  if ! printf '%s\n' "$stdout" | grep -Fq "classification=.github/workflows/ci.yml:non-code-for-changelog"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff workflow classification: missing ci.yml classification
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And ".github/workflows/codeql.yml" is classified as "non-code-for-changelog"
+  if ! printf '%s\n' "$stdout" | grep -Fq "classification=.github/workflows/codeql.yml:non-code-for-changelog"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff workflow classification: missing codeql.yml classification
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the changelog-check gate passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff workflow classification: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_duration_pass_case() {
   local elapsed_ms="$1"
   local reported_duration="$2"
@@ -8655,6 +8715,7 @@ run_changelog_trigger_other_workflow_events_case
 run_changelog_trigger_pull_request_target_case
 run_changelog_diff_ci_only_pass_case
 run_changelog_ci_only_failure_assertion_case
+run_changelog_diff_workflow_classification_case
 run_invalid_cache_state_case
 run_action_pinning_sha_pass_case
 run_gitleaks_action_pinning_sha_pass_case
