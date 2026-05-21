@@ -1860,7 +1860,18 @@ const runTrivyStepCompletion = (args) => {
   );
 };
 
-const getSarifUploadBoundary = (trivyFormat, trivyOutput, sarifFile, condition) => {
+const getGitHubConditionExpression = (condition) =>
+  condition?.match(/^\$\{\{\s*(.*?)\s*\}\}$/)?.[1]?.trim() ?? condition;
+
+const isAlwaysCondition = (condition) => getGitHubConditionExpression(condition) === "always()";
+
+const getSarifUploadBoundary = (
+  trivyFormat,
+  trivyOutput,
+  sarifFile,
+  condition,
+  uploadRunsAfterTrivy,
+) => {
   if (trivyFormat !== TRIVY_REQUIRED_SARIF_FORMAT) {
     return { outcome: "rejected", reason: "Trivy must emit SARIF" };
   }
@@ -1870,7 +1881,10 @@ const getSarifUploadBoundary = (trivyFormat, trivyOutput, sarifFile, condition) 
   if (sarifFile !== TRIVY_REQUIRED_SARIF_PATH) {
     return { outcome: "rejected", reason: "sarif_file must be trivy-results.sarif" };
   }
-  if (condition !== "always()") {
+  if (!uploadRunsAfterTrivy) {
+    return { outcome: "rejected", reason: "SARIF upload must run after Trivy scan" };
+  }
+  if (!isAlwaysCondition(condition)) {
     return { outcome: "rejected", reason: "SARIF upload must run after Trivy failure" };
   }
   return { outcome: "accepted", reason: "producer and uploader use the SARIF path" };
@@ -1897,7 +1911,14 @@ const runTrivySarifUploadConfig = (args) => {
   const trivyOutput = getStepInput(trivyStep.block, "output", workflow, trivyStep.startIndex);
   const sarifFile = getStepInput(uploadStep.block, "sarif_file", workflow, uploadStep.startIndex);
   const condition = getStepPropertyValue(uploadStep.block, "if");
-  const boundary = getSarifUploadBoundary(trivyFormat, trivyOutput, sarifFile, condition);
+  const uploadRunsAfterTrivy = uploadStep.startIndex > trivyStep.startIndex;
+  const boundary = getSarifUploadBoundary(
+    trivyFormat,
+    trivyOutput,
+    sarifFile,
+    condition,
+    uploadRunsAfterTrivy,
+  );
 
   if (boundary.outcome === "rejected") {
     writeStdout(
