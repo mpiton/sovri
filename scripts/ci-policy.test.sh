@@ -1384,6 +1384,63 @@ $(printf '%s\n' "$stdout" | sed 's/^/      /')"
   PASS=$((PASS + 1))
 }
 
+run_changelog_diff_uses_base_head_changed_file_set_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the base commit is "1111111111111111111111111111111111111111"
+  # And the head commit is "4444444444444444444444444444444444444444"
+  # And the final commit changes only "README.md"
+  # And the base..head diff changes these files:
+  #   | path                          |
+  #   | packages/config/src/schema.ts |
+  #   | README.md                     |
+  # And the base..head diff does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-diff \
+    --base 1111111111111111111111111111111111111111 \
+    --head 4444444444444444444444444444444444444444 \
+    --final-commit-files "README.md" \
+    --changed-files "packages/config/src/schema.ts,README.md" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the changelog-check gate evaluates the pull request
+  # Then the gate uses the base..head changed file set
+  if ! printf '%s\n' "$stdout" | grep -Fq "diff_scope=base..head"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff uses base-head changed file set: missing diff scope
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the changelog-check gate fails
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff uses base-head changed file set: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff uses base-head changed file set: missing failure assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_changelog_diff_failure_message_example_path_case() {
   local stdout stderr stdout_file stderr_file ec combined
 
@@ -9352,6 +9409,7 @@ run_changelog_diff_base_head_non_failure_conditions_pass_case
 run_changelog_diff_base_head_typescript_without_changelog_fails_case
 run_changelog_diff_typescript_rename_without_changelog_fails_case
 run_changelog_diff_typescript_deletion_without_changelog_fails_case
+run_changelog_diff_uses_base_head_changed_file_set_case
 run_changelog_diff_failure_message_example_path_case
 run_invalid_cache_state_case
 run_action_pinning_sha_pass_case
