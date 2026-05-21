@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Security
 
+- `test`: scope per-package `vitest run` discovery to the package directory by
+  passing `--root .` in workspace `test` scripts, so `pnpm --filter X test`
+  exercises only that package's suite rather than the entire monorepo (#937).
+
 - `test`: add ATDD coverage and policy evaluation for rejecting missing or
   inaccurate Vitest API style documentation (#932).
 
