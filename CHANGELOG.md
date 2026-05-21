@@ -46,6 +46,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   (#748).
 - `ci`: add Trivy scan configuration fixture coverage rejecting missing
   blocking severity sets in `build-docker` (#749).
+- `ci`: add Trivy scan configuration fixture coverage rejecting a missing
+  Trivy action in `build-docker` (#750).
 
 - `ci`: add Docker build action policy coverage requiring `docker/build-push-action`,
   `push: false`, exactly `linux/amd64` and `linux/arm64`, and GitHub Actions

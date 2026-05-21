@@ -6012,6 +6012,66 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_trivy_scan_config_missing_action_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build image
+        uses: docker/build-push-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          push: false
+YAML
+
+  # Given the build-docker job contains no action reference starting with "aquasecurity/trivy-action@"
+  node "$SCRIPT" trivy-scan-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the Trivy scan configuration is evaluated
+  # Then the Trivy scan configuration assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config missing action: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "trivy_scan_config=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config missing action: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "build-docker must use aquasecurity/trivy-action"
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use aquasecurity/trivy-action"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config missing action: missing action failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_trivy_vulnerability_gate_no_high_or_critical_case() {
   local trivy_file stdout stderr stdout_file stderr_file ec combined
 
@@ -7457,6 +7517,7 @@ run_trivy_scan_config_missing_blocking_severity_case "CRITICAL"
 run_trivy_scan_config_missing_blocking_severity_case "HIGH"
 run_trivy_scan_config_missing_blocking_severity_case "MEDIUM,HIGH"
 run_trivy_scan_config_missing_blocking_severity_case "HIGH,CRITICAL,LOW"
+run_trivy_scan_config_missing_action_case
 run_trivy_vulnerability_gate_no_high_or_critical_case
 run_trivy_vulnerability_gate_null_vulnerabilities_case
 run_trivy_vulnerability_gate_high_vulnerability_case
