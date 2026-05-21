@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Security
 
+- `test`: add shared MSW handlers and anonymized GitHub/Anthropic fixtures for
+  network-free package and bot tests (#58).
+
 - `test`: scope per-package `vitest run` discovery to the package directory by
   passing `--root .` in workspace `test` scripts, so `pnpm --filter X test`
   exercises only that package's suite rather than the entire monorepo (#937).

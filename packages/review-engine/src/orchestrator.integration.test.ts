@@ -8,9 +8,9 @@ import type {
   StructuredGeneration,
 } from "@sovri/llm-providers";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { server } from "../../../tests/msw/server.js";
 import { parseUnifiedDiff } from "./diff/index.js";
 import { reviewPullRequest } from "./orchestrator.js";
 import { buildInlineComments } from "./walkthrough/index.js";
@@ -27,8 +27,6 @@ class RetryableProviderError extends Error {
   public readonly retryableWithCorrectivePrompt = true;
   public readonly tokenUsage = { prompt: 7, completion: 3 };
 }
-
-const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 

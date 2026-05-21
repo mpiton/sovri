@@ -3,7 +3,6 @@
 
 import { Probot } from "probot";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { z } from "@sovri/core";
@@ -12,6 +11,7 @@ import { ProviderReviewResponseSchema, type ProviderReviewResponse } from "@sovr
 
 import { app } from "../../src/app.js";
 import { validatePullRequestReviewRequest } from "../../src/github/comment-poster.js";
+import { server } from "../../../../tests/msw/server.js";
 
 const GitHubBaseUrl = "https://api.github.com";
 const AnthropicMessagesUrl = "https://api.anthropic.com/v1/messages";
@@ -68,7 +68,6 @@ type UnhandledRequest = {
   readonly url: string;
 };
 
-const server = setupServer();
 let unhandledRequests: UnhandledRequest[] = [];
 let openedReviewFlow: Promise<ObservedRuntime> | undefined;
 const synchronizeReviewFlows = new Map<string, Promise<ObservedRuntime>>();
