@@ -2550,6 +2550,67 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_docker_setup_action_pinning_missing_action_case() {
+  local present_action="$1"
+  local missing_action="$2"
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Present Docker setup action
+        uses: ${present_action}@0123456789abcdef0123456789abcdef01234567
+YAML
+
+  # Given the build-docker job contains the action reference "<present_action>@0123456789abcdef0123456789abcdef01234567"
+  # And the build-docker job contains no action reference starting with "<missing_action>@"
+  node "$SCRIPT" docker-setup-action-pinning --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action missing ${missing_action}: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker setup action pinning rule is evaluated
+  # Then the Docker setup action pinning assertion fails
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_setup_action_pinning=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action missing ${missing_action}: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "build-docker must use <missing_action>"
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use ${missing_action}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action missing ${missing_action}: missing missing-action failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_build_docker_needs_required_gates_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec combined
 
@@ -6665,6 +6726,8 @@ run_docker_setup_action_pinning_moving_ref_case "docker/setup-qemu-action@v3"
 run_docker_setup_action_pinning_moving_ref_case "docker/setup-buildx-action@v3"
 run_docker_setup_action_pinning_moving_ref_case "docker/setup-buildx-action@master"
 run_docker_setup_action_pinning_moving_ref_case "docker/setup-qemu-action@3df4ab1"
+run_docker_setup_action_pinning_missing_action_case "docker/setup-qemu-action" "docker/setup-buildx-action"
+run_docker_setup_action_pinning_missing_action_case "docker/setup-buildx-action" "docker/setup-qemu-action"
 run_build_docker_needs_required_gates_case
 run_build_docker_needs_inline_gates_case
 run_build_docker_needs_multiline_flow_gates_case
