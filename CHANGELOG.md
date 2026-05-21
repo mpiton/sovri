@@ -41,6 +41,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   vulnerabilities in built images (#746).
 - `ci`: add Trivy image vulnerability gate coverage rejecting missing scan
   results for built images (#747).
+- `ci`: add Trivy scan configuration policy coverage requiring HIGH/CRITICAL
+  severities, equivalent severity ordering, and exit-code 1 in `build-docker`
+  (#748).
 
 - `ci`: add Docker build action policy coverage requiring `docker/build-push-action`,
   `push: false`, exactly `linux/amd64` and `linux/arm64`, and GitHub Actions

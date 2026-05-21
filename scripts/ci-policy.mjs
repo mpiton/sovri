@@ -18,6 +18,9 @@ const BLOCK_SCALAR_PATTERN = /:\s*[>|](?:[+-]?[1-9]?|[1-9][+-]?)?\s*(?:#.*)?$/;
 const GITLEAKS_ACTION_REPOSITORY = "gitleaks/gitleaks-action";
 const DOCKER_BUILD_ACTION_REPOSITORY = "docker/build-push-action";
 const DOCKER_SETUP_ACTION_REPOSITORIES = ["docker/setup-qemu-action", "docker/setup-buildx-action"];
+const TRIVY_ACTION_REPOSITORY = "aquasecurity/trivy-action";
+const TRIVY_REQUIRED_SEVERITY = "HIGH,CRITICAL";
+const TRIVY_REQUIRED_EXIT_CODE = "1";
 const TRIVY_BLOCKING_SEVERITIES = new Set(["HIGH", "CRITICAL"]);
 const REQUIRED_BUILD_DOCKER_NEEDS = [
   "backend-checks",
@@ -50,13 +53,15 @@ const auditGateUsage =
   "Usage: node scripts/ci-policy.mjs audit-gate --input <pnpm-audit-report.json> --audit-level high";
 const trivyVulnerabilityGateUsage =
   "Usage: node scripts/ci-policy.mjs trivy-vulnerability-gate --input <trivy-result.json> --image <image-ref>";
+const trivyScanConfigUsage =
+  "Usage: node scripts/ci-policy.mjs trivy-scan-config --workflow <path>";
 const secretsCheckoutDepthUsage =
   "Usage: node scripts/ci-policy.mjs secrets-checkout-depth --workflow <path>";
 const secretsFixtureEvidenceUsage =
   "Usage: node scripts/ci-policy.mjs secrets-fixture-evidence --input <fixture-evidence.json> --false-positive-fixture <path>";
 const secretsNoSecretsReuseUsage =
   "Usage: node scripts/ci-policy.mjs secrets-no-secrets-reuse --workflow <path> --script-path <path> [--repo-root <path>]";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -626,6 +631,9 @@ const getStepPropertyValue = (step, propertyName) => {
 const isDockerBuildActionStep = (step) =>
   getStepPropertyValue(step, "uses")?.startsWith(`${DOCKER_BUILD_ACTION_REPOSITORY}@`) ?? false;
 
+const isTrivyActionStep = (step) =>
+  getStepPropertyValue(step, "uses")?.startsWith(`${TRIVY_ACTION_REPOSITORY}@`) ?? false;
+
 const getBuildDockerActionReferences = (workflow) => {
   const stepsBlockEntry = getBuildDockerStepsBlockEntry(workflow);
   if (stepsBlockEntry === undefined) return [];
@@ -633,6 +641,15 @@ const getBuildDockerActionReferences = (workflow) => {
   return getTopLevelListItemBlockEntries(stepsBlockEntry.block, stepsBlockEntry.startIndex)
     .map((entry) => getStepPropertyValue(entry.block, "uses"))
     .filter((actionReference) => actionReference !== undefined);
+};
+
+const getBuildDockerTrivyStepEntries = (workflow) => {
+  const stepsBlockEntry = getBuildDockerStepsBlockEntry(workflow);
+  if (stepsBlockEntry === undefined) return [];
+
+  return getTopLevelListItemBlockEntries(stepsBlockEntry.block, stepsBlockEntry.startIndex).filter(
+    (entry) => isTrivyActionStep(entry.block),
+  );
 };
 
 const isDockerSetupActionReference = (actionReference) =>
@@ -1723,6 +1740,65 @@ const runTrivyVulnerabilityGate = (args) => {
   );
 };
 
+const getTrivyExitCodeBoundary = (exitCode) => {
+  if (exitCode === "0") return { outcome: "rejected", reason: "zero would not fail CI" };
+  if (exitCode === TRIVY_REQUIRED_EXIT_CODE) {
+    return { outcome: "accepted", reason: "one fails CI on blocking findings" };
+  }
+  return { outcome: "rejected", reason: "only exit-code one is in scope" };
+};
+
+const hasRequiredTrivySeveritySet = (severity) => {
+  if (severity === undefined) return false;
+
+  const severitySet = new Set(
+    severity
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0),
+  );
+
+  return (
+    severitySet.size === TRIVY_BLOCKING_SEVERITIES.size &&
+    [...TRIVY_BLOCKING_SEVERITIES].every((entry) => severitySet.has(entry))
+  );
+};
+
+const runTrivyScanConfig = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", trivyScanConfigUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const trivySteps = getBuildDockerTrivyStepEntries(workflow);
+
+  if (trivySteps.length === 0) {
+    writeStdout("trivy_scan_config=fail\ntrivy_action=missing\n");
+    fail(`build-docker must use ${TRIVY_ACTION_REPOSITORY}`, 1);
+  }
+
+  for (const trivyStep of trivySteps) {
+    const severity = getStepInput(trivyStep.block, "severity", workflow, trivyStep.startIndex);
+    const exitCode = getStepInput(trivyStep.block, "exit-code", workflow, trivyStep.startIndex);
+    const exitCodeBoundary = getTrivyExitCodeBoundary(exitCode);
+
+    if (!hasRequiredTrivySeveritySet(severity)) {
+      writeStdout(`trivy_scan_config=fail\ntrivy_severity=${severity ?? "missing"}\n`);
+      fail(`Trivy severity must be ${TRIVY_REQUIRED_SEVERITY}`, 1);
+    }
+
+    if (exitCodeBoundary.outcome === "rejected") {
+      writeStdout(
+        `trivy_scan_config=fail\nexit_code=${exitCode ?? "missing"}\nexit_code_outcome=${exitCodeBoundary.outcome}\nboundary_reason=${exitCodeBoundary.reason}\n`,
+      );
+      fail("Trivy exit-code must be 1", 1);
+    }
+  }
+
+  const acceptedBoundary = getTrivyExitCodeBoundary(TRIVY_REQUIRED_EXIT_CODE);
+  writeStdout(
+    `trivy_scan_config=pass\nblocking_severities=${TRIVY_REQUIRED_SEVERITY}\nexit_code=${TRIVY_REQUIRED_EXIT_CODE}\nexit_code_outcome=${acceptedBoundary.outcome}\nboundary_reason=${acceptedBoundary.reason}\n`,
+  );
+};
+
 const runSecretsFixtureEvidence = (args) => {
   const options = parseOptions(args);
   const inputPath = readRequiredOption(options, "input", secretsFixtureEvidenceUsage);
@@ -1864,6 +1940,8 @@ if (command === "duration-budget") {
   runAuditGate(args);
 } else if (command === "trivy-vulnerability-gate") {
   runTrivyVulnerabilityGate(args);
+} else if (command === "trivy-scan-config") {
+  runTrivyScanConfig(args);
 } else if (command === "secrets-checkout-depth") {
   runSecretsCheckoutDepth(args);
 } else if (command === "secrets-fixture-evidence") {
