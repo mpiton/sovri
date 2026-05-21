@@ -584,6 +584,68 @@ $(printf '%s\n' "$stdout" | sed 's/^/      /')"
   PASS=$((PASS + 1))
 }
 
+run_changelog_trigger_pull_request_target_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+on:
+  pull_request_target:
+jobs:
+  changelog-check:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check changelog
+        run: node scripts/ci-policy.mjs changelog-diff --base origin/main --head HEAD
+YAML
+
+  # Given the CI workflow declares these events:
+  #   | event               |
+  #   | pull_request_target |
+  # And the CI workflow contains the "changelog-check" job
+  # And the "changelog-check" job is eligible for event "pull_request_target"
+  node "$SCRIPT" changelog-trigger --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+
+  # When the changelog-check trigger rule is evaluated
+  # Then the changelog-check trigger assertion fails
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger pull_request_target: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_trigger=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger pull_request_target: missing fail assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the failure mentions "missing pull_request trigger"
+  if ! printf '%s\n' "$combined" | grep -Fq "missing pull_request trigger"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger pull_request_target: missing remediation text
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_duration_pass_case() {
   local elapsed_ms="$1"
   local reported_duration="$2"
@@ -8487,6 +8549,7 @@ run_changelog_trigger_expression_condition_case
 run_changelog_trigger_missing_job_case
 run_changelog_trigger_non_pull_request_eligibility_case
 run_changelog_trigger_other_workflow_events_case
+run_changelog_trigger_pull_request_target_case
 run_invalid_cache_state_case
 run_action_pinning_sha_pass_case
 run_gitleaks_action_pinning_sha_pass_case
