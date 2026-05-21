@@ -72,7 +72,9 @@ const secretsNoSecretsReuseUsage =
   "Usage: node scripts/ci-policy.mjs secrets-no-secrets-reuse --workflow <path> --script-path <path> [--repo-root <path>]";
 const changelogTriggerUsage =
   "Usage: node scripts/ci-policy.mjs changelog-trigger --workflow <path>";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}`;
+const changelogDiffUsage =
+  "Usage: node scripts/ci-policy.mjs changelog-diff --changed-files <comma-separated-paths>";
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -851,6 +853,36 @@ const stripGitHubExpression = (condition) =>
 
 const isPullRequestEventCondition = (condition) =>
   /^github\.event_name\s*==\s*['"]pull_request['"]$/.test(stripGitHubExpression(condition));
+
+const readChangedFiles = (options) => {
+  const value = readRequiredOption(options, "changed-files", changelogDiffUsage);
+  if (value === "(empty)") return [];
+  return value
+    .split(",")
+    .map((path) => path.trim())
+    .filter((path) => path.length > 0);
+};
+
+const isTypescriptCodePath = (path) => path.endsWith(".ts") || path.endsWith(".tsx");
+
+const runChangelogDiff = (args) => {
+  const options = parseOptions(args);
+  const changedFiles = readChangedFiles(options);
+  const hasTypescriptCode = changedFiles.some((path) => isTypescriptCodePath(path));
+  const hasRootChangelog = changedFiles.includes("CHANGELOG.md");
+
+  if (!hasTypescriptCode || hasRootChangelog) {
+    writeStdout(
+      `has_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=pass\ngate_result=success\n`,
+    );
+    return;
+  }
+
+  writeStdout(
+    `has_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=fail\ngate_result=failure\n`,
+  );
+  fail("CHANGELOG.md must be updated when TypeScript code changes", 1);
+};
 
 const runBuildDockerNeeds = (args) => {
   const options = parseOptions(args);
@@ -2229,6 +2261,8 @@ if (command === "duration-budget") {
   runSecretsNoSecretsReuse(args);
 } else if (command === "changelog-trigger") {
   runChangelogTrigger(args);
+} else if (command === "changelog-diff") {
+  runChangelogDiff(args);
 } else {
   fail(usage, 2);
 }
