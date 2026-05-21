@@ -10285,6 +10285,9 @@ run_dependency_review_multiline_license_inputs_case() {
   run_ci_policy_success_case "dependency review multiline license inputs" "allow_licenses=exact" \
     dependency-review-workflow-config --workflow "$workflow_file"
 
+  run_ci_policy_success_case "dependency review multiline license inputs" "deny_licenses=exact" \
+    dependency-review-workflow-config --workflow "$workflow_file"
+
   rm -f "$workflow_file"
 }
 
