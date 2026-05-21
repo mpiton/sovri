@@ -19,8 +19,11 @@ const GITLEAKS_ACTION_REPOSITORY = "gitleaks/gitleaks-action";
 const DOCKER_BUILD_ACTION_REPOSITORY = "docker/build-push-action";
 const DOCKER_SETUP_ACTION_REPOSITORIES = ["docker/setup-qemu-action", "docker/setup-buildx-action"];
 const TRIVY_ACTION_REPOSITORY = "aquasecurity/trivy-action";
+const CODEQL_UPLOAD_SARIF_ACTION_REPOSITORY = "github/codeql-action/upload-sarif";
 const TRIVY_REQUIRED_SEVERITY = "HIGH,CRITICAL";
 const TRIVY_REQUIRED_EXIT_CODE = "1";
+const TRIVY_REQUIRED_SARIF_FORMAT = "sarif";
+const TRIVY_REQUIRED_SARIF_PATH = "trivy-results.sarif";
 const TRIVY_BLOCKING_SEVERITIES = new Set(["HIGH", "CRITICAL"]);
 const REQUIRED_BUILD_DOCKER_NEEDS = [
   "backend-checks",
@@ -57,13 +60,15 @@ const trivyScanConfigUsage =
   "Usage: node scripts/ci-policy.mjs trivy-scan-config --workflow <path>";
 const trivyStepCompletionUsage =
   "Usage: node scripts/ci-policy.mjs trivy-step-completion --input <trivy-result.json> --image <image-ref> --exit-code <code>";
+const trivySarifUploadConfigUsage =
+  "Usage: node scripts/ci-policy.mjs trivy-sarif-upload-config --workflow <path>";
 const secretsCheckoutDepthUsage =
   "Usage: node scripts/ci-policy.mjs secrets-checkout-depth --workflow <path>";
 const secretsFixtureEvidenceUsage =
   "Usage: node scripts/ci-policy.mjs secrets-fixture-evidence --input <fixture-evidence.json> --false-positive-fixture <path>";
 const secretsNoSecretsReuseUsage =
   "Usage: node scripts/ci-policy.mjs secrets-no-secrets-reuse --workflow <path> --script-path <path> [--repo-root <path>]";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -636,6 +641,10 @@ const isDockerBuildActionStep = (step) =>
 const isTrivyActionStep = (step) =>
   getStepPropertyValue(step, "uses")?.startsWith(`${TRIVY_ACTION_REPOSITORY}@`) ?? false;
 
+const isCodeqlSarifUploadActionStep = (step) =>
+  getStepPropertyValue(step, "uses")?.startsWith(`${CODEQL_UPLOAD_SARIF_ACTION_REPOSITORY}@`) ??
+  false;
+
 const getBuildDockerActionReferences = (workflow) => {
   const stepsBlockEntry = getBuildDockerStepsBlockEntry(workflow);
   if (stepsBlockEntry === undefined) return [];
@@ -651,6 +660,15 @@ const getBuildDockerTrivyStepEntries = (workflow) => {
 
   return getTopLevelListItemBlockEntries(stepsBlockEntry.block, stepsBlockEntry.startIndex).filter(
     (entry) => isTrivyActionStep(entry.block),
+  );
+};
+
+const getBuildDockerCodeqlSarifUploadStepEntries = (workflow) => {
+  const stepsBlockEntry = getBuildDockerStepsBlockEntry(workflow);
+  if (stepsBlockEntry === undefined) return [];
+
+  return getTopLevelListItemBlockEntries(stepsBlockEntry.block, stepsBlockEntry.startIndex).filter(
+    (entry) => isCodeqlSarifUploadActionStep(entry.block),
   );
 };
 
@@ -1842,6 +1860,57 @@ const runTrivyStepCompletion = (args) => {
   );
 };
 
+const getSarifUploadBoundary = (trivyFormat, trivyOutput, sarifFile, condition) => {
+  if (trivyFormat !== TRIVY_REQUIRED_SARIF_FORMAT) {
+    return { outcome: "rejected", reason: "Trivy must emit SARIF" };
+  }
+  if (trivyOutput !== TRIVY_REQUIRED_SARIF_PATH) {
+    return { outcome: "rejected", reason: "Trivy output must be trivy-results.sarif" };
+  }
+  if (sarifFile !== TRIVY_REQUIRED_SARIF_PATH) {
+    return { outcome: "rejected", reason: "sarif_file must be trivy-results.sarif" };
+  }
+  if (condition !== "always()") {
+    return { outcome: "rejected", reason: "SARIF upload must run after Trivy failure" };
+  }
+  return { outcome: "accepted", reason: "producer and uploader use the SARIF path" };
+};
+
+const runTrivySarifUploadConfig = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", trivySarifUploadConfigUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const trivyStep = getBuildDockerTrivyStepEntries(workflow)[0];
+  const uploadStep = getBuildDockerCodeqlSarifUploadStepEntries(workflow)[0];
+
+  if (trivyStep === undefined) {
+    writeStdout("sarif_upload=fail\ntrivy_action=missing\n");
+    fail(`build-docker must use ${TRIVY_ACTION_REPOSITORY}`, 1);
+  }
+
+  if (uploadStep === undefined) {
+    writeStdout("sarif_upload=fail\nsarif_upload_step=missing\n");
+    fail("build-docker must upload Trivy SARIF via CodeQL", 1);
+  }
+
+  const trivyFormat = getStepInput(trivyStep.block, "format", workflow, trivyStep.startIndex);
+  const trivyOutput = getStepInput(trivyStep.block, "output", workflow, trivyStep.startIndex);
+  const sarifFile = getStepInput(uploadStep.block, "sarif_file", workflow, uploadStep.startIndex);
+  const condition = getStepPropertyValue(uploadStep.block, "if");
+  const boundary = getSarifUploadBoundary(trivyFormat, trivyOutput, sarifFile, condition);
+
+  if (boundary.outcome === "rejected") {
+    writeStdout(
+      `sarif_upload=fail\nsarif_upload_outcome=${boundary.outcome}\nboundary_reason=${boundary.reason}\n`,
+    );
+    fail(boundary.reason, 1);
+  }
+
+  writeStdout(
+    `sarif_upload=pass\nsarif_upload_outcome=${boundary.outcome}\ntrivy_format=${TRIVY_REQUIRED_SARIF_FORMAT}\ntrivy_output=${TRIVY_REQUIRED_SARIF_PATH}\nsarif_file=${TRIVY_REQUIRED_SARIF_PATH}\ngithub_security=${TRIVY_REQUIRED_SARIF_PATH}\nboundary_reason=${boundary.reason}\n`,
+  );
+};
+
 const runSecretsFixtureEvidence = (args) => {
   const options = parseOptions(args);
   const inputPath = readRequiredOption(options, "input", secretsFixtureEvidenceUsage);
@@ -1987,6 +2056,8 @@ if (command === "duration-budget") {
   runTrivyScanConfig(args);
 } else if (command === "trivy-step-completion") {
   runTrivyStepCompletion(args);
+} else if (command === "trivy-sarif-upload-config") {
+  runTrivySarifUploadConfig(args);
 } else if (command === "secrets-checkout-depth") {
   runSecretsCheckoutDepth(args);
 } else if (command === "secrets-fixture-evidence") {

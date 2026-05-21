@@ -52,6 +52,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   that control whether blocking vulnerabilities fail CI (#751).
 - `ci`: add Trivy step completion policy coverage proving exit-code 1 turns
   blocking vulnerabilities into a failed `build-docker` job (#752).
+- `ci`: add Trivy SARIF upload policy coverage requiring CodeQL to publish
+  `trivy-results.sarif` to GitHub Security from `build-docker` (#753).
 
 - `ci`: add Docker build action policy coverage requiring `docker/build-push-action`,
   `push: false`, exactly `linux/amd64` and `linux/arm64`, and GitHub Actions

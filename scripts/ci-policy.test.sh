@@ -6144,6 +6144,76 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_trivy_sarif_upload_config_pass_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          format: sarif
+          output: trivy-results.sarif
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@89abcdef0123456789abcdef0123456789abcdef
+        with:
+          sarif_file: trivy-results.sarif
+YAML
+
+  # Given the Trivy input format is "sarif"
+  # And the Trivy input output is "trivy-results.sarif"
+  # And the build-docker job contains a github/codeql-action/upload-sarif step
+  # And the SARIF upload input sarif_file is "trivy-results.sarif"
+  node "$SCRIPT" trivy-sarif-upload-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config pass: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the SARIF upload configuration is evaluated
+  # Then the SARIF upload assertion passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "sarif_upload=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config pass: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the Trivy SARIF result is available to GitHub Security
+  if ! printf '%s\n' "$stdout" | grep -Fq "github_security=trivy-results.sarif"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config pass: missing GitHub Security SARIF result
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_trivy_vulnerability_gate_no_high_or_critical_case() {
   local trivy_file stdout stderr stdout_file stderr_file ec combined
 
@@ -7661,6 +7731,7 @@ run_trivy_scan_config_missing_action_case
 run_trivy_scan_config_exit_code_boundary_case "0" "rejected" "zero would not fail CI"
 run_trivy_scan_config_exit_code_boundary_case "1" "accepted" "one fails CI on blocking findings"
 run_trivy_scan_config_exit_code_boundary_case "2" "rejected" "only exit-code one is in scope"
+run_trivy_sarif_upload_config_pass_case
 run_trivy_vulnerability_gate_no_high_or_critical_case
 run_trivy_vulnerability_gate_null_vulnerabilities_case
 run_trivy_vulnerability_gate_high_vulnerability_case
