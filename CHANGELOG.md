@@ -55,6 +55,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `ci`: add Trivy SARIF upload policy coverage requiring CodeQL to publish
   `trivy-results.sarif` to GitHub Security after the Trivy step from
   `build-docker` (#753).
+- `ci`: add Trivy SARIF producer/uploader boundary coverage for format,
+  output path, upload path, and upload condition agreement (#754).
 
 - `ci`: add Docker build action policy coverage requiring `docker/build-push-action`,
   `push: false`, exactly `linux/amd64` and `linux/arm64`, and GitHub Actions

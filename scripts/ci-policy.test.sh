@@ -6324,6 +6324,80 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_trivy_sarif_upload_config_boundary_case() {
+  local trivy_format="$1"
+  local trivy_output="$2"
+  local upload_path="$3"
+  local condition="$4"
+  local expected_outcome="$5"
+  local expected_reason="$6"
+  local expected_exit=1
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  if [ "$expected_outcome" = "accepted" ]; then
+    expected_exit=0
+  fi
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          format: ${trivy_format}
+          output: ${trivy_output}
+      - name: Upload Trivy SARIF
+        if: ${condition}
+        uses: github/codeql-action/upload-sarif@89abcdef0123456789abcdef0123456789abcdef
+        with:
+          sarif_file: ${upload_path}
+YAML
+
+  node "$SCRIPT" trivy-sarif-upload-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne "$expected_exit" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config boundary ${trivy_format}/${trivy_output}/${upload_path}/${condition}: expected exit ${expected_exit}, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "sarif_upload_outcome=${expected_outcome}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config boundary ${trivy_format}/${trivy_output}/${upload_path}/${condition}: missing expected outcome ${expected_outcome}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "boundary_reason=${expected_reason}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config boundary ${trivy_format}/${trivy_output}/${upload_path}/${condition}: missing boundary reason ${expected_reason}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_trivy_vulnerability_gate_no_high_or_critical_case() {
   local trivy_file stdout stderr stdout_file stderr_file ec combined
 
@@ -7844,6 +7918,11 @@ run_trivy_scan_config_exit_code_boundary_case "2" "rejected" "only exit-code one
 run_trivy_sarif_upload_config_pass_case
 run_trivy_sarif_upload_config_expression_condition_case
 run_trivy_sarif_upload_config_upload_before_trivy_case
+run_trivy_sarif_upload_config_boundary_case "sarif" "trivy-results.sarif" "trivy-results.sarif" "always()" "accepted" "producer and uploader use the SARIF path"
+run_trivy_sarif_upload_config_boundary_case "table" "trivy-results.sarif" "trivy-results.sarif" "always()" "rejected" "Trivy must emit SARIF"
+run_trivy_sarif_upload_config_boundary_case "sarif" "container.sarif" "container.sarif" "always()" "rejected" "Trivy output must be trivy-results.sarif"
+run_trivy_sarif_upload_config_boundary_case "sarif" "trivy-results.sarif" "container.sarif" "always()" "rejected" "SARIF upload path must be trivy-results.sarif"
+run_trivy_sarif_upload_config_boundary_case "sarif" "trivy-results.sarif" "trivy-results.sarif" "success()" "rejected" "SARIF upload must run after Trivy failure"
 run_trivy_vulnerability_gate_no_high_or_critical_case
 run_trivy_vulnerability_gate_null_vulnerabilities_case
 run_trivy_vulnerability_gate_high_vulnerability_case
