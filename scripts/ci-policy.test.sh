@@ -1026,6 +1026,61 @@ $(printf '%s\n' "$stdout" | sed 's/^/      /')"
   PASS=$((PASS + 1))
 }
 
+run_changelog_diff_typescript_without_changelog_fails_case() {
+  local code_path stdout stderr stdout_file stderr_file ec combined
+
+  for code_path in \
+    packages/core/src/severity.ts \
+    apps/community-bot/src/server.ts \
+    packages/review-engine/src/panel.tsx; do
+    stdout_file=$(mktemp)
+    stderr_file=$(mktemp)
+
+    # Given pull request 53 changes these files:
+    #   | path        |
+    #   | <code_path> |
+    # And pull request 53 does not change "CHANGELOG.md"
+    node "$SCRIPT" changelog-diff \
+      --changed-files "$code_path" \
+      >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+    stdout=$(cat "$stdout_file" 2>/dev/null || true)
+    stderr=$(cat "$stderr_file" 2>/dev/null || true)
+    combined="${stdout}
+${stderr}"
+    rm -f "$stdout_file" "$stderr_file"
+
+    # When the changelog-check gate evaluates the pull request diff
+    # Then the changelog-check gate fails
+    if [ "$ec" -eq 0 ]; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript without changelog fails (${code_path}): expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+      return
+    fi
+
+    if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=fail"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript without changelog fails (${code_path}): missing failure assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+      return
+    fi
+
+    # And the failure mentions "CHANGELOG.md"
+    if ! printf '%s\n' "$combined" | grep -Fq "CHANGELOG.md"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript without changelog fails (${code_path}): missing CHANGELOG.md
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+      return
+    fi
+
+    PASS=$((PASS + 1))
+  done
+}
+
 run_changelog_diff_failure_message_example_path_case() {
   local stdout stderr stdout_file stderr_file ec combined
 
@@ -8988,6 +9043,7 @@ run_changelog_diff_failure_message_case
 run_changelog_remediation_message_vague_case
 run_changelog_diff_with_changelog_has_no_remediation_case
 run_changelog_diff_typescript_with_changelog_pass_case
+run_changelog_diff_typescript_without_changelog_fails_case
 run_changelog_diff_failure_message_example_path_case
 run_invalid_cache_state_case
 run_action_pinning_sha_pass_case
