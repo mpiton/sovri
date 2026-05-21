@@ -80,7 +80,9 @@ const changelogCiOnlyAssertUsage =
   "Usage: node scripts/ci-policy.mjs changelog-ci-only-assert --changed-files <comma-separated-paths> --gate-result <success|failure>";
 const changelogRemediationMessageUsage =
   "Usage: node scripts/ci-policy.mjs changelog-remediation-message --message <text>";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}`;
+const changelogDocumentationOnlyAssertUsage =
+  "Usage: node scripts/ci-policy.mjs changelog-documentation-only-assert --changed-files <comma-separated-paths> --gate-result <success|failure>";
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -888,6 +890,9 @@ const isCiOnlyChangelogPath = (path) =>
   path === ".github/dependabot.yml" ||
   path === "scripts/no-secrets.sh";
 
+const isDocumentationOnlyChangelogPath = (path) =>
+  path !== "CHANGELOG.md" && !isTypescriptCodePath(path);
+
 const readGateResult = (options) => {
   const value = readRequiredOption(options, "gate-result", changelogCiOnlyAssertUsage);
   if (value !== "success" && value !== "failure") {
@@ -932,6 +937,21 @@ const runChangelogCiOnlyAssert = (args) => {
   }
 
   writeStdout("r02_assertion=pass\n");
+};
+
+const runChangelogDocumentationOnlyAssert = (args) => {
+  const options = parseOptions(args);
+  const changedFiles = readChangedFiles(options);
+  const gateResult = readGateResult(options);
+  const isDocumentationOnly =
+    changedFiles.length > 0 && changedFiles.every((path) => isDocumentationOnlyChangelogPath(path));
+
+  if (isDocumentationOnly && gateResult === "failure") {
+    writeStdout("r01_assertion=fail\n");
+    fail("documentation-only PR must not require CHANGELOG.md", 1);
+  }
+
+  writeStdout("r01_assertion=pass\n");
 };
 
 const runChangelogRemediationMessage = (args) => {
@@ -2336,6 +2356,8 @@ if (command === "duration-budget") {
   runChangelogCiOnlyAssert(args);
 } else if (command === "changelog-remediation-message") {
   runChangelogRemediationMessage(args);
+} else if (command === "changelog-documentation-only-assert") {
+  runChangelogDocumentationOnlyAssert(args);
 } else {
   fail(usage, 2);
 }

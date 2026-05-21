@@ -1493,6 +1493,58 @@ $(printf '%s\n' "$stdout" | sed 's/^/      /')"
   PASS=$((PASS + 1))
 }
 
+run_changelog_documentation_only_failure_assertion_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path          |
+  #   | README.md     |
+  #   | docs/usage.md |
+  # And pull request 53 does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-documentation-only-assert \
+    --changed-files "README.md,docs/usage.md" \
+    --gate-result failure \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the changelog-check gate evaluates the pull request diff
+  # Then the R-01 assertion fails if the gate result is "failure"
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog documentation-only failure assertion: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "r01_assertion=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog documentation-only failure assertion: missing R-01 failure status
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the failure mentions "documentation-only PR must not require CHANGELOG.md"
+  if ! printf '%s\n' "$combined" | grep -Fq "documentation-only PR must not require CHANGELOG.md"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog documentation-only failure assertion: missing remediation text
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_changelog_diff_failure_message_example_path_case() {
   local stdout stderr stdout_file stderr_file ec combined
 
@@ -9463,6 +9515,7 @@ run_changelog_diff_typescript_rename_without_changelog_fails_case
 run_changelog_diff_typescript_deletion_without_changelog_fails_case
 run_changelog_diff_uses_base_head_changed_file_set_case
 run_changelog_diff_documentation_only_pass_case
+run_changelog_documentation_only_failure_assertion_case
 run_changelog_diff_failure_message_example_path_case
 run_invalid_cache_state_case
 run_action_pinning_sha_pass_case

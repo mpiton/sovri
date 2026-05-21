@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Security
 
+- `ci`: add R-01 changelog-check assertion coverage rejecting failure results for
+  documentation-only pull requests (#812).
+
 - `ci`: add changelog-check trigger policy coverage requiring the gate to be
   eligible on `pull_request` events (#791).
 
