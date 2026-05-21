@@ -31,6 +31,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   or Buildx setup actions in `build-docker` (#741).
 - `ci`: add Docker setup action pinning fixture coverage for Buildx SHA
   length boundaries in `build-docker` (#742).
+- `ci`: add Docker setup action pinning fixture coverage rejecting invalid
+  forty-character QEMU SHA character classes in `build-docker` (#743).
 
 - `ci`: add Docker build action policy coverage requiring `docker/build-push-action`,
   `push: false`, exactly `linux/amd64` and `linux/arm64`, and GitHub Actions
