@@ -1879,7 +1879,11 @@ const getSarifUploadBoundary = (
     return { outcome: "rejected", reason: "Trivy output must be trivy-results.sarif" };
   }
   if (sarifFile !== TRIVY_REQUIRED_SARIF_PATH) {
-    return { outcome: "rejected", reason: "sarif_file must be trivy-results.sarif" };
+    return {
+      message: "sarif_file must be trivy-results.sarif",
+      outcome: "rejected",
+      reason: "SARIF upload path must be trivy-results.sarif",
+    };
   }
   if (!uploadRunsAfterTrivy) {
     return { outcome: "rejected", reason: "SARIF upload must run after Trivy scan" };
@@ -1924,7 +1928,7 @@ const runTrivySarifUploadConfig = (args) => {
     writeStdout(
       `sarif_upload=fail\nsarif_upload_outcome=${boundary.outcome}\nboundary_reason=${boundary.reason}\n`,
     );
-    fail(boundary.reason, 1);
+    fail(boundary.message ?? boundary.reason, 1);
   }
 
   writeStdout(
