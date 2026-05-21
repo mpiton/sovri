@@ -57,6 +57,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `build-docker` (#753).
 - `ci`: add Trivy SARIF producer/uploader boundary coverage for format,
   output path, upload path, and upload condition agreement (#754).
+- `ci`: add Trivy SARIF upload fixture coverage rejecting a missing CodeQL
+  upload action in `build-docker` (#755).
 
 - `ci`: add Docker build action policy coverage requiring `docker/build-push-action`,
   `push: false`, exactly `linux/amd64` and `linux/arm64`, and GitHub Actions

@@ -6324,6 +6324,64 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_trivy_sarif_upload_config_missing_upload_action_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          format: sarif
+          output: trivy-results.sarif
+YAML
+
+  node "$SCRIPT" trivy-sarif-upload-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config missing CodeQL upload action: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "sarif_upload_step=missing"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config missing CodeQL upload action: missing upload-step marker
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must upload Trivy SARIF via CodeQL"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config missing CodeQL upload action: missing failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_trivy_sarif_upload_config_boundary_case() {
   local trivy_format="$1"
   local trivy_output="$2"
@@ -7918,6 +7976,7 @@ run_trivy_scan_config_exit_code_boundary_case "2" "rejected" "only exit-code one
 run_trivy_sarif_upload_config_pass_case
 run_trivy_sarif_upload_config_expression_condition_case
 run_trivy_sarif_upload_config_upload_before_trivy_case
+run_trivy_sarif_upload_config_missing_upload_action_case
 run_trivy_sarif_upload_config_boundary_case "sarif" "trivy-results.sarif" "trivy-results.sarif" "always()" "accepted" "producer and uploader use the SARIF path"
 run_trivy_sarif_upload_config_boundary_case "table" "trivy-results.sarif" "trivy-results.sarif" "always()" "rejected" "Trivy must emit SARIF"
 run_trivy_sarif_upload_config_boundary_case "sarif" "container.sarif" "container.sarif" "always()" "rejected" "Trivy output must be trivy-results.sarif"
