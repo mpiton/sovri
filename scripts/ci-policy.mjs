@@ -75,7 +75,7 @@ const secretsNoSecretsReuseUsage =
 const changelogTriggerUsage =
   "Usage: node scripts/ci-policy.mjs changelog-trigger --workflow <path>";
 const changelogDiffUsage =
-  "Usage: node scripts/ci-policy.mjs changelog-diff --changed-files <comma-separated-paths>";
+  "Usage: node scripts/ci-policy.mjs changelog-diff --changed-files <comma-separated-paths> [--base <commit|ref>] [--head <commit|ref>]";
 const changelogCiOnlyAssertUsage =
   "Usage: node scripts/ci-policy.mjs changelog-ci-only-assert --changed-files <comma-separated-paths> --gate-result <success|failure>";
 const changelogRemediationMessageUsage =
