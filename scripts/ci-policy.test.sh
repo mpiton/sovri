@@ -1132,6 +1132,78 @@ $(printf '%s\n' "$stdout" | sed 's/^/      /')"
   PASS=$((PASS + 1))
 }
 
+run_changelog_diff_base_head_non_failure_conditions_pass_case() {
+  local head_commit changed_files expected_ts expected_changelog stdout stderr stdout_file stderr_file ec combined
+
+  for row in \
+    "2222222222222222222222222222222222222222|packages/core/src/finding.ts, CHANGELOG.md|true|true" \
+    "4444444444444444444444444444444444444444|docs/usage.md|false|false" \
+    "5555555555555555555555555555555555555555|CHANGELOG.md|false|true" \
+    "7777777777777777777777777777777777777777|(empty)|false|false"; do
+    head_commit=${row%%|*}
+    row=${row#*|}
+    changed_files=${row%%|*}
+    row=${row#*|}
+    expected_ts=${row%%|*}
+    expected_changelog=${row#*|}
+    stdout_file=$(mktemp)
+    stderr_file=$(mktemp)
+
+    # Given the base commit is "1111111111111111111111111111111111111111"
+    # And the head commit is "<head_commit>"
+    # And the base..head diff has changed files "<changed_files>"
+    node "$SCRIPT" changelog-diff \
+      --base 1111111111111111111111111111111111111111 \
+      --head "$head_commit" \
+      --changed-files "$changed_files" \
+      >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+    stdout=$(cat "$stdout_file" 2>/dev/null || true)
+    stderr=$(cat "$stderr_file" 2>/dev/null || true)
+    combined="${stdout}
+${stderr}"
+    rm -f "$stdout_file" "$stderr_file"
+
+    if [ "$ec" -ne 0 ]; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff base-head non-failure pass (${head_commit}): expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+      return
+    fi
+
+    # When the changelog-check gate evaluates the base..head diff
+    # Then the changed file set has TypeScript code changes "<has_typescript_code>"
+    if ! printf '%s\n' "$stdout" | grep -Fq "has_typescript_code=${expected_ts}"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff base-head non-failure pass (${head_commit}): wrong TypeScript flag
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+      return
+    fi
+
+    # And the changed file set has a root CHANGELOG.md change "<has_root_changelog>"
+    if ! printf '%s\n' "$stdout" | grep -Fq "has_root_changelog=${expected_changelog}"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff base-head non-failure pass (${head_commit}): wrong changelog flag
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+      return
+    fi
+
+    # And the changelog-check gate passes
+    if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=pass"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ changelog diff base-head non-failure pass (${head_commit}): missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+      return
+    fi
+
+    PASS=$((PASS + 1))
+  done
+}
+
 run_changelog_diff_failure_message_example_path_case() {
   local stdout stderr stdout_file stderr_file ec combined
 
@@ -9096,6 +9168,7 @@ run_changelog_diff_with_changelog_has_no_remediation_case
 run_changelog_diff_typescript_with_changelog_pass_case
 run_changelog_diff_typescript_without_changelog_fails_case
 run_changelog_diff_mixed_requires_changelog_case
+run_changelog_diff_base_head_non_failure_conditions_pass_case
 run_changelog_diff_failure_message_example_path_case
 run_invalid_cache_state_case
 run_action_pinning_sha_pass_case
