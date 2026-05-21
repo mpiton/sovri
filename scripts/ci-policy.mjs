@@ -78,7 +78,9 @@ const changelogDiffUsage =
   "Usage: node scripts/ci-policy.mjs changelog-diff --changed-files <comma-separated-paths>";
 const changelogCiOnlyAssertUsage =
   "Usage: node scripts/ci-policy.mjs changelog-ci-only-assert --changed-files <comma-separated-paths> --gate-result <success|failure>";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}`;
+const changelogRemediationMessageUsage =
+  "Usage: node scripts/ci-policy.mjs changelog-remediation-message --message <text>";
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -921,6 +923,25 @@ const runChangelogCiOnlyAssert = (args) => {
   }
 
   writeStdout("r02_assertion=pass\n");
+};
+
+const runChangelogRemediationMessage = (args) => {
+  const options = parseOptions(args);
+  const message = readRequiredOption(options, "message", changelogRemediationMessageUsage);
+  const failures = [];
+
+  if (!message.includes("CHANGELOG.md")) failures.push("message must name CHANGELOG.md");
+  if (!message.includes("add a changelog entry")) {
+    failures.push("message must explain the remediation");
+  }
+
+  if (failures.length === 0) {
+    writeStdout("remediation_message=pass\n");
+    return;
+  }
+
+  writeStdout("remediation_message=fail\n");
+  fail(failures.join("\n"), 1);
 };
 
 const runBuildDockerNeeds = (args) => {
@@ -2304,6 +2325,8 @@ if (command === "duration-budget") {
   runChangelogDiff(args);
 } else if (command === "changelog-ci-only-assert") {
   runChangelogCiOnlyAssert(args);
+} else if (command === "changelog-remediation-message") {
+  runChangelogRemediationMessage(args);
 } else {
   fail(usage, 2);
 }

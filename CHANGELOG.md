@@ -48,6 +48,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `ci`: add changelog-check remediation message coverage naming `CHANGELOG.md`,
   `.ts/.tsx`, and the required changelog entry action (#799).
 
+- `ci`: add changelog remediation-message validation coverage rejecting vague
+  failure text (#800).
+
 - `ci`: add Docker setup action pinning policy coverage requiring the
   `build-docker` QEMU and Buildx setup actions to use full commit SHAs (#739).
 
