@@ -5825,6 +5825,77 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_trivy_vulnerability_gate_no_high_or_critical_case() {
+  local trivy_file stdout stderr stdout_file stderr_file ec combined
+
+  trivy_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the Trivy result for "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" contains 3 LOW vulnerabilities
+  # And the Trivy result contains 1 MEDIUM vulnerability
+  # And the Trivy result contains 0 HIGH vulnerabilities
+  # And the Trivy result contains 0 CRITICAL vulnerabilities
+  cat >"$trivy_file" <<'JSON'
+{
+  "ArtifactName": "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "Results": [
+    {
+      "Target": "sovri/community-bot",
+      "Vulnerabilities": [
+        { "VulnerabilityID": "CVE-2026-low-0001", "Severity": "LOW" },
+        { "VulnerabilityID": "CVE-2026-low-0002", "Severity": "LOW" },
+        { "VulnerabilityID": "CVE-2026-low-0003", "Severity": "LOW" },
+        { "VulnerabilityID": "CVE-2026-medium-0001", "Severity": "MEDIUM" }
+      ]
+    }
+  ]
+}
+JSON
+
+  node "$SCRIPT" trivy-vulnerability-gate \
+    --input "$trivy_file" \
+    --image "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$trivy_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the image vulnerability assertion is evaluated
+  # Then the image vulnerability assertion passes
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate no high or critical: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "image_vulnerability=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate no high or critical: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And no HIGH or CRITICAL vulnerability is reported for the built image
+  if printf '%s\n' "$combined" | grep -Fq "blocking_vulnerability="; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate no high or critical: unexpected blocking vulnerability
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_checkout_depth_zero_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec combined
 
@@ -6920,6 +6991,7 @@ run_audit_gate_high_vulnerability_case
 run_audit_gate_high_without_advisory_name_case
 run_audit_gate_mixed_high_and_critical_prioritizes_critical_case
 run_audit_gate_critical_vulnerability_case
+run_trivy_vulnerability_gate_no_high_or_critical_case
 run_secrets_checkout_depth_zero_case
 run_secrets_checkout_missing_step_case
 run_secrets_checkout_missing_fetch_depth_case

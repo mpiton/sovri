@@ -18,6 +18,7 @@ const BLOCK_SCALAR_PATTERN = /:\s*[>|](?:[+-]?[1-9]?|[1-9][+-]?)?\s*(?:#.*)?$/;
 const GITLEAKS_ACTION_REPOSITORY = "gitleaks/gitleaks-action";
 const DOCKER_BUILD_ACTION_REPOSITORY = "docker/build-push-action";
 const DOCKER_SETUP_ACTION_REPOSITORIES = ["docker/setup-qemu-action", "docker/setup-buildx-action"];
+const TRIVY_BLOCKING_SEVERITIES = new Set(["HIGH", "CRITICAL"]);
 const REQUIRED_BUILD_DOCKER_NEEDS = [
   "backend-checks",
   "supply-chain",
@@ -47,13 +48,15 @@ const gitleaksActionPinningUsage =
   "Usage: node scripts/ci-policy.mjs gitleaks-action-pinning --workflow <path> --metadata <gitleaks-pin-metadata.json>";
 const auditGateUsage =
   "Usage: node scripts/ci-policy.mjs audit-gate --input <pnpm-audit-report.json> --audit-level high";
+const trivyVulnerabilityGateUsage =
+  "Usage: node scripts/ci-policy.mjs trivy-vulnerability-gate --input <trivy-result.json> --image <image-ref>";
 const secretsCheckoutDepthUsage =
   "Usage: node scripts/ci-policy.mjs secrets-checkout-depth --workflow <path>";
 const secretsFixtureEvidenceUsage =
   "Usage: node scripts/ci-policy.mjs secrets-fixture-evidence --input <fixture-evidence.json> --false-positive-fixture <path>";
 const secretsNoSecretsReuseUsage =
   "Usage: node scripts/ci-policy.mjs secrets-no-secrets-reuse --workflow <path> --script-path <path> [--repo-root <path>]";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -1454,6 +1457,76 @@ const getAuditAdvisoryNames = (report, severity) => {
     .map(([name]) => name);
 };
 
+const getTrivyArtifactName = (report) => {
+  if (typeof report !== "object" || report === null) return undefined;
+  return typeof report.ArtifactName === "string" ? report.ArtifactName : undefined;
+};
+
+const getTrivyImageReport = (report, imageRef) => {
+  if (Array.isArray(report)) {
+    return report.find((entry) => getTrivyArtifactName(entry) === imageRef);
+  }
+
+  return getTrivyArtifactName(report) === imageRef ? report : undefined;
+};
+
+const getTrivyResults = (report) => {
+  if (typeof report !== "object" || report === null) {
+    fail("ERROR: Trivy result must contain Results.", 2);
+  }
+
+  const results = report.Results;
+  if (!Array.isArray(results)) {
+    fail("ERROR: Trivy result must contain Results.", 2);
+  }
+  return results;
+};
+
+const getTrivyVulnerabilities = (report) =>
+  getTrivyResults(report).flatMap((result) => {
+    if (typeof result !== "object" || result === null) return [];
+    const vulnerabilities = result.Vulnerabilities;
+    if (vulnerabilities === undefined) return [];
+    if (!Array.isArray(vulnerabilities)) {
+      fail("ERROR: Trivy result Vulnerabilities must be arrays.", 2);
+    }
+    return vulnerabilities;
+  });
+
+const getTrivyVulnerabilitySeverity = (vulnerability) => {
+  if (typeof vulnerability !== "object" || vulnerability === null) return "UNKNOWN";
+  return typeof vulnerability.Severity === "string"
+    ? vulnerability.Severity.toUpperCase()
+    : "UNKNOWN";
+};
+
+const getTrivyVulnerabilityId = (vulnerability) => {
+  if (typeof vulnerability !== "object" || vulnerability === null) return "unknown vulnerability";
+  return typeof vulnerability.VulnerabilityID === "string"
+    ? vulnerability.VulnerabilityID
+    : "unknown vulnerability";
+};
+
+const countTrivySeverity = (vulnerabilities, severity) =>
+  vulnerabilities.filter(
+    (vulnerability) => getTrivyVulnerabilitySeverity(vulnerability) === severity,
+  ).length;
+
+const getTrivySeveritySummary = (vulnerabilities) => ({
+  low: countTrivySeverity(vulnerabilities, "LOW"),
+  medium: countTrivySeverity(vulnerabilities, "MEDIUM"),
+  high: countTrivySeverity(vulnerabilities, "HIGH"),
+  critical: countTrivySeverity(vulnerabilities, "CRITICAL"),
+});
+
+const formatTrivySeveritySummary = (summary) =>
+  `low_vulnerabilities=${summary.low}\nmedium_vulnerabilities=${summary.medium}\nhigh_vulnerabilities=${summary.high}\ncritical_vulnerabilities=${summary.critical}\n`;
+
+const getBlockingTrivyVulnerabilities = (vulnerabilities) =>
+  vulnerabilities.filter((vulnerability) =>
+    TRIVY_BLOCKING_SEVERITIES.has(getTrivyVulnerabilitySeverity(vulnerability)),
+  );
+
 const getFixtureEntries = (report) => {
   if (typeof report !== "object" || report === null) {
     fail("ERROR: fixture evidence must contain fixtures.", 2);
@@ -1612,6 +1685,44 @@ const runAuditGate = (args) => {
   writeStdout("audit_gate=pass\n");
 };
 
+const runTrivyVulnerabilityGate = (args) => {
+  const options = parseOptions(args);
+  const inputPath = readRequiredOption(options, "input", trivyVulnerabilityGateUsage);
+  const imageRef = readRequiredOption(options, "image", trivyVulnerabilityGateUsage);
+  const report = readJsonFile(inputPath, "Trivy result");
+  const imageReport = getTrivyImageReport(report, imageRef);
+
+  if (imageReport === undefined) {
+    writeStdout(`image_vulnerability=fail\nimage=${imageRef}\n`);
+    fail("missing Trivy result for built image", 1);
+  }
+
+  const vulnerabilities = getTrivyVulnerabilities(imageReport);
+  const summary = getTrivySeveritySummary(vulnerabilities);
+  const blockingVulnerabilities = getBlockingTrivyVulnerabilities(vulnerabilities);
+
+  if (blockingVulnerabilities.length === 0) {
+    writeStdout(
+      `image_vulnerability=pass\nimage=${imageRef}\n${formatTrivySeveritySummary(summary)}`,
+    );
+    return;
+  }
+
+  writeStdout(
+    `image_vulnerability=fail\nimage=${imageRef}\n${formatTrivySeveritySummary(summary)}${blockingVulnerabilities
+      .map(
+        (vulnerability) =>
+          `blocking_vulnerability=${getTrivyVulnerabilityId(vulnerability)}\nblocking_severity=${getTrivyVulnerabilitySeverity(vulnerability)}\n`,
+      )
+      .join("")}`,
+  );
+  const firstBlockingVulnerability = blockingVulnerabilities[0];
+  fail(
+    `${getTrivyVulnerabilityId(firstBlockingVulnerability)} ${getTrivyVulnerabilitySeverity(firstBlockingVulnerability)} vulnerability found for built image`,
+    1,
+  );
+};
+
 const runSecretsFixtureEvidence = (args) => {
   const options = parseOptions(args);
   const inputPath = readRequiredOption(options, "input", secretsFixtureEvidenceUsage);
@@ -1751,6 +1862,8 @@ if (command === "duration-budget") {
   runGitleaksActionPinning(args);
 } else if (command === "audit-gate") {
   runAuditGate(args);
+} else if (command === "trivy-vulnerability-gate") {
+  runTrivyVulnerabilityGate(args);
 } else if (command === "secrets-checkout-depth") {
   runSecretsCheckoutDepth(args);
 } else if (command === "secrets-fixture-evidence") {
