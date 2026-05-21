@@ -5955,6 +5955,81 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_trivy_vulnerability_gate_high_vulnerability_case() {
+  local trivy_file stdout stderr stdout_file stderr_file ec combined
+
+  trivy_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the Trivy result for "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" contains 1 HIGH vulnerability named "CVE-2026-1001"
+  # And the Trivy result contains 0 CRITICAL vulnerabilities
+  cat >"$trivy_file" <<'JSON'
+{
+  "ArtifactName": "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "Results": [
+    {
+      "Target": "sovri/community-bot",
+      "Vulnerabilities": [
+        { "VulnerabilityID": "CVE-2026-1001", "Severity": "HIGH" }
+      ]
+    }
+  ]
+}
+JSON
+
+  node "$SCRIPT" trivy-vulnerability-gate \
+    --input "$trivy_file" \
+    --image "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$trivy_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the image vulnerability assertion is evaluated
+  # Then the image vulnerability assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate high vulnerability: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "image_vulnerability=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate high vulnerability: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "CVE-2026-1001"
+  if ! printf '%s\n' "$combined" | grep -Fq "CVE-2026-1001"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate high vulnerability: missing CVE
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "HIGH"
+  if ! printf '%s\n' "$combined" | grep -Fq "HIGH"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate high vulnerability: missing severity
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_checkout_depth_zero_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec combined
 
@@ -7052,6 +7127,7 @@ run_audit_gate_mixed_high_and_critical_prioritizes_critical_case
 run_audit_gate_critical_vulnerability_case
 run_trivy_vulnerability_gate_no_high_or_critical_case
 run_trivy_vulnerability_gate_null_vulnerabilities_case
+run_trivy_vulnerability_gate_high_vulnerability_case
 run_secrets_checkout_depth_zero_case
 run_secrets_checkout_missing_step_case
 run_secrets_checkout_missing_fetch_depth_case

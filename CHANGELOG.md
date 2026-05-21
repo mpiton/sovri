@@ -35,6 +35,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   forty-character QEMU SHA character classes in `build-docker` (#743).
 - `ci`: add Trivy image vulnerability gate coverage for built images with
   no high or critical vulnerabilities (#744).
+- `ci`: add Trivy image vulnerability gate coverage rejecting high
+  vulnerabilities in built images (#745).
 
 - `ci`: add Docker build action policy coverage requiring `docker/build-push-action`,
   `push: false`, exactly `linux/amd64` and `linux/arm64`, and GitHub Actions
