@@ -899,6 +899,7 @@ const readGateResult = (options) => {
 const runChangelogDiff = (args) => {
   const options = parseOptions(args);
   const changedFiles = readChangedFiles(options);
+  const diffScope = options.has("base") && options.has("head") ? "diff_scope=base..head\n" : "";
   const hasTypescriptCode = changedFiles.some((path) => isTypescriptCodePath(path));
   const hasRootChangelog = changedFiles.includes("CHANGELOG.md");
   const classifications = formatChangelogClassifications(changedFiles);
@@ -907,13 +908,13 @@ const runChangelogDiff = (args) => {
 
   if (!hasTypescriptCode || hasRootChangelog) {
     writeStdout(
-      `${classifications}changed_file_set=${changedFileSet}\nhas_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=pass\ngate_result=success\n`,
+      `${diffScope}${classifications}changed_file_set=${changedFileSet}\nhas_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=pass\ngate_result=success\n`,
     );
     return;
   }
 
   writeStdout(
-    `${classifications}changed_file_set=${changedFileSet}\nhas_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=fail\ngate_result=failure\n`,
+    `${diffScope}${classifications}changed_file_set=${changedFileSet}\nhas_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=fail\ngate_result=failure\n`,
   );
   fail(buildChangelogRemediationMessage(changedFiles), 1);
 };

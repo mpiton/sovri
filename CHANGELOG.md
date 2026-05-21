@@ -79,6 +79,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `ci`: add changelog-check base-to-head diff coverage for TypeScript deletions
   without a root `CHANGELOG.md` update (#809).
 
+- `ci`: add changelog-check base-to-head diff scope coverage so earlier
+  TypeScript changes are not hidden by the final commit file set (#810).
+
 - `ci`: add Docker setup action pinning policy coverage requiring the
   `build-docker` QEMU and Buildx setup actions to use full commit SHAs (#739).
 
