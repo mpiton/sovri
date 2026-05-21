@@ -10130,6 +10130,26 @@ run_dependency_review_wrong_step_severity_case() {
   rm -f "$workflow_file"
 }
 
+run_dependency_review_missing_action_step_case() {
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_dependency_review_workflow_fixture \
+    "$workflow_file" \
+    "$(dependency_review_standard_trigger_body)" \
+    "$DEPENDENCY_REVIEW_TEST_ACTION_SHA" \
+    "" \
+    "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" \
+    "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" \
+    "      - name: Placeholder
+        run: echo 'dependency review action is missing'"
+
+  run_ci_policy_failure_case "dependency review missing action step" "actions/dependency-review-action is required" \
+    dependency-review-workflow-config --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
 run_dependency_review_license_failure_case() {
   local name="$1"
   local allow_licenses="$2"
@@ -10776,6 +10796,13 @@ run_dependency_review_trigger_failure_case "wrong branch" "$(printf '%s\n' \
   "  pull_request:" \
   "    branches:" \
   "      - release")" "pull_request must target main"
+run_dependency_review_trigger_failure_case "missing branch filter" "$(printf '%s\n' \
+  "  pull_request:")" "pull_request must target main"
+run_dependency_review_trigger_failure_case "extra branch" "$(printf '%s\n' \
+  "  pull_request:" \
+  "    branches:" \
+  "      - main" \
+  "      - release")" "pull_request must target main"
 run_dependency_review_trigger_failure_case "extra push" "$(printf '%s\n' \
   "  pull_request:" \
   "    branches:" \
@@ -10797,6 +10824,7 @@ run_dependency_review_action_pinning_case "non hex sha" "12345678901234567890123
 run_dependency_review_severity_case "critical" "high severity advisories must fail"
 run_dependency_review_missing_severity_input_case
 run_dependency_review_wrong_step_severity_case
+run_dependency_review_missing_action_step_case
 run_dependency_review_license_failure_case "missing MIT allow" "Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC0-1.0, Unlicense, BlueOak-1.0.0" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "missing allowed license MIT"
 run_dependency_review_license_failure_case "MIT denied" "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" "${DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES}, MIT" "unexpected denied license MIT"
 run_dependency_review_license_failure_case "GPL allowed" "${DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES}, GPL-3.0-only" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "unexpected allowed license GPL-3.0-only"

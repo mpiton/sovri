@@ -1464,8 +1464,11 @@ const getDependencyReviewWorkflowFailures = (workflow) => {
 
   if (!eventNames.includes("pull_request")) {
     failures.push("pull_request trigger is required");
-  } else if (!readWorkflowEventBranches(workflow, "pull_request").includes("main")) {
-    failures.push("pull_request must target main");
+  } else {
+    const pullRequestBranches = readWorkflowEventBranches(workflow, "pull_request");
+    if (pullRequestBranches.length !== 1 || pullRequestBranches[0] !== "main") {
+      failures.push("pull_request must target main");
+    }
   }
   if (eventNames.some((eventName) => eventName !== "pull_request")) {
     failures.push("Dependency Review workflow must be pull_request-only");
