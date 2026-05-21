@@ -50,6 +50,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   Trivy action in `build-docker` (#750).
 - `ci`: add Trivy scan configuration boundary coverage for exit-code values
   that control whether blocking vulnerabilities fail CI (#751).
+- `ci`: add Trivy step completion policy coverage proving exit-code 1 turns
+  blocking vulnerabilities into a failed `build-docker` job (#752).
 
 - `ci`: add Docker build action policy coverage requiring `docker/build-push-action`,
   `push: false`, exactly `linux/amd64` and `linux/arm64`, and GitHub Actions

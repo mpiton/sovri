@@ -6488,6 +6488,74 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_trivy_step_completion_nonzero_result_case() {
+  local trivy_file stdout stderr stdout_file stderr_file ec combined
+
+  trivy_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$trivy_file" <<'JSON'
+{
+  "ArtifactName": "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "Results": [
+    {
+      "Target": "sovri/community-bot",
+      "Vulnerabilities": [
+        { "VulnerabilityID": "CVE-2026-3003", "Severity": "HIGH" }
+      ]
+    }
+  ]
+}
+JSON
+
+  # Given Trivy scans image "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  # And Trivy reports 1 HIGH vulnerability named "CVE-2026-3003"
+  # And the Trivy input exit-code is "1"
+  node "$SCRIPT" trivy-step-completion \
+    --input "$trivy_file" \
+    --image "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+    --exit-code "1" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$trivy_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy step completion nonzero result: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Trivy step completes
+  # Then the Trivy step exits with status 1
+  if ! printf '%s\n' "$stdout" | grep -Fq "trivy_step_exit=1"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy step completion nonzero result: missing step exit status
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the build-docker job fails
+  if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_result=failure"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy step completion nonzero result: missing build-docker failure result
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_checkout_depth_zero_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec combined
 
@@ -7598,6 +7666,7 @@ run_trivy_vulnerability_gate_null_vulnerabilities_case
 run_trivy_vulnerability_gate_high_vulnerability_case
 run_trivy_vulnerability_gate_critical_vulnerability_case
 run_trivy_vulnerability_gate_missing_result_case
+run_trivy_step_completion_nonzero_result_case
 run_secrets_checkout_depth_zero_case
 run_secrets_checkout_missing_step_case
 run_secrets_checkout_missing_fetch_depth_case

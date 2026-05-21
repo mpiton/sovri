@@ -55,13 +55,15 @@ const trivyVulnerabilityGateUsage =
   "Usage: node scripts/ci-policy.mjs trivy-vulnerability-gate --input <trivy-result.json> --image <image-ref>";
 const trivyScanConfigUsage =
   "Usage: node scripts/ci-policy.mjs trivy-scan-config --workflow <path>";
+const trivyStepCompletionUsage =
+  "Usage: node scripts/ci-policy.mjs trivy-step-completion --input <trivy-result.json> --image <image-ref> --exit-code <code>";
 const secretsCheckoutDepthUsage =
   "Usage: node scripts/ci-policy.mjs secrets-checkout-depth --workflow <path>";
 const secretsFixtureEvidenceUsage =
   "Usage: node scripts/ci-policy.mjs secrets-fixture-evidence --input <fixture-evidence.json> --false-positive-fixture <path>";
 const secretsNoSecretsReuseUsage =
   "Usage: node scripts/ci-policy.mjs secrets-no-secrets-reuse --workflow <path> --script-path <path> [--repo-root <path>]";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -1799,6 +1801,47 @@ const runTrivyScanConfig = (args) => {
   );
 };
 
+const runTrivyStepCompletion = (args) => {
+  const options = parseOptions(args);
+  const inputPath = readRequiredOption(options, "input", trivyStepCompletionUsage);
+  const imageRef = readRequiredOption(options, "image", trivyStepCompletionUsage);
+  const exitCode = readRequiredOption(options, "exit-code", trivyStepCompletionUsage);
+  const report = readJsonFile(inputPath, "Trivy result");
+  const imageReport = getTrivyImageReport(report, imageRef);
+
+  if (imageReport === undefined) {
+    writeStdout(`trivy_step_completion=fail\nimage=${imageRef}\n`);
+    fail("missing Trivy result for built image", 1);
+  }
+
+  const blockingVulnerabilities = getBlockingTrivyVulnerabilities(
+    getTrivyVulnerabilities(imageReport),
+  );
+
+  if (blockingVulnerabilities.length === 0) {
+    writeStdout(
+      `trivy_step_completion=fail\nimage=${imageRef}\ntrivy_step_exit=0\nbuild_docker_result=success\n`,
+    );
+    fail("Trivy step must report a blocking vulnerability", 1);
+  }
+
+  if (exitCode !== TRIVY_REQUIRED_EXIT_CODE) {
+    writeStdout(
+      `trivy_step_completion=fail\nimage=${imageRef}\ntrivy_step_exit=0\nbuild_docker_result=success\n`,
+    );
+    fail("Trivy exit-code must be 1", 1);
+  }
+
+  writeStdout(
+    `trivy_step_completion=pass\nimage=${imageRef}\ntrivy_step_exit=1\nbuild_docker_result=failure\n${blockingVulnerabilities
+      .map(
+        (vulnerability) =>
+          `blocking_vulnerability=${getTrivyVulnerabilityId(vulnerability)}\nblocking_severity=${getTrivyVulnerabilitySeverity(vulnerability)}\n`,
+      )
+      .join("")}`,
+  );
+};
+
 const runSecretsFixtureEvidence = (args) => {
   const options = parseOptions(args);
   const inputPath = readRequiredOption(options, "input", secretsFixtureEvidenceUsage);
@@ -1942,6 +1985,8 @@ if (command === "duration-budget") {
   runTrivyVulnerabilityGate(args);
 } else if (command === "trivy-scan-config") {
   runTrivyScanConfig(args);
+} else if (command === "trivy-step-completion") {
+  runTrivyStepCompletion(args);
 } else if (command === "secrets-checkout-depth") {
   runSecretsCheckoutDepth(args);
 } else if (command === "secrets-fixture-evidence") {
