@@ -21,12 +21,76 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Security
 
+- `ci`: add Docker setup action pinning policy coverage requiring the
+  `build-docker` QEMU and Buildx setup actions to use full commit SHAs (#739).
+
+- `ci`: add Docker setup action pinning fixture coverage rejecting moving QEMU
+  and Buildx setup action references (#740).
+
+- `ci`: add Docker setup action pinning fixture coverage rejecting missing QEMU
+  or Buildx setup actions in `build-docker` (#741).
+- `ci`: add Docker setup action pinning fixture coverage for Buildx SHA
+  length boundaries in `build-docker` (#742).
+- `ci`: add Docker setup action pinning fixture coverage rejecting invalid
+  forty-character QEMU SHA character classes in `build-docker` (#743).
+- `ci`: add Trivy image vulnerability gate coverage for built images with
+  no high or critical vulnerabilities (#744).
+- `ci`: add Trivy image vulnerability gate coverage rejecting high
+  vulnerabilities in built images (#745).
+- `ci`: add Trivy image vulnerability gate coverage rejecting critical
+  vulnerabilities in built images (#746).
+- `ci`: add Trivy image vulnerability gate coverage rejecting missing scan
+  results for built images (#747).
+- `ci`: add Trivy scan configuration policy coverage requiring HIGH/CRITICAL
+  severities, equivalent severity ordering, and exit-code 1 in `build-docker`
+  (#748).
+- `ci`: add Trivy scan configuration fixture coverage rejecting missing
+  blocking severity sets in `build-docker` (#749).
+- `ci`: add Trivy scan configuration fixture coverage rejecting a missing
+  Trivy action in `build-docker` (#750).
+- `ci`: add Trivy scan configuration boundary coverage for exit-code values
+  that control whether blocking vulnerabilities fail CI (#751).
+- `ci`: add Trivy step completion policy coverage proving exit-code 1 turns
+  blocking vulnerabilities into a failed `build-docker` job (#752).
+- `ci`: add Trivy SARIF upload policy coverage requiring CodeQL to publish
+  `trivy-results.sarif` to GitHub Security after the Trivy step from
+  `build-docker` (#753).
+- `ci`: add Trivy SARIF producer/uploader boundary coverage for format,
+  output path, upload path, and upload condition agreement (#754).
+- `ci`: add Trivy SARIF upload fixture coverage rejecting a missing CodeQL
+  upload action in `build-docker` (#755).
+- `ci`: add Trivy SARIF upload fixture coverage rejecting mismatched
+  `sarif_file` upload paths in `build-docker` (#756).
+- `ci`: add Trivy SARIF upload-after-failure policy coverage proving CodeQL
+  still publishes `trivy-results.sarif` after a blocking Trivy finding (#757).
+
+- `ci`: add Docker build action policy coverage requiring `docker/build-push-action`,
+  `push: false`, exactly `linux/amd64` and `linux/arm64`, and GitHub Actions
+  cache configuration for `build-docker` (#734).
+
+- `ci`: add Docker build action fixture coverage rejecting `push: true` in the
+  `build-docker` verification job (#735).
+
+- `ci`: add Docker build action fixture coverage rejecting a `build-docker` job
+  that omits `docker/build-push-action` (#736).
+
+- `ci`: add Docker build action platform boundary fixture coverage for the exact
+  `linux/amd64` and `linux/arm64` contract (#737).
+
+- `ci`: add Docker build action fixture coverage rejecting missing GitHub Actions
+  cache inputs in `build-docker` (#738).
+
 - `ci`: pass `persist-credentials: false` to every `actions/checkout` step in
   the forbidden-tools and forbidden-imports workflows so `GITHUB_TOKEN` is no
   longer written to local git config and cannot leak into later steps or
   uploaded artifacts (#724, zizmor `artipacked`).
 
 ### Fixed
+
+- `ci`: align the `build-docker-needs` job-header regex in
+  `scripts/ci-policy.mjs` with the rest of the policy so a workflow
+  declaring `build-docker: &anchor` is no longer reported as missing
+  required `needs` (#790).
 
 - `ci`: broaden the TypeScript escape-hatch detector in
   `scripts/no-forbidden-tools.sh` so `Array<any>`, `Promise<any>`, union

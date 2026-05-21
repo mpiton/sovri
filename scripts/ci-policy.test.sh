@@ -563,6 +563,2713 @@ $(printf '%s\n' "$stderr" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_build_docker_duration_pass_case() {
+  local elapsed_ms reported_duration stdout stderr stdout_file stderr_file ec combined
+
+  elapsed_ms="$1"
+  reported_duration="$2"
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the build-docker job starts at monotonic time 100000 ms
+  # And the build-docker job completes after <elapsed_ms> ms
+  # And the Docker build step uses GitHub Actions cache
+  node "$SCRIPT" build-docker-duration-budget \
+    --job-start-ms 100000 \
+    --job-end-ms $((100000 + elapsed_ms)) \
+    --github-actions-cache enabled \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration ${elapsed_ms}: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the build-docker duration budget is evaluated
+  # Then the duration budget assertion passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "duration_budget=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration ${elapsed_ms}: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the reported build-docker duration is "<reported_duration>"
+  if ! printf '%s\n' "$stdout" | grep -Fq "reported_duration=${reported_duration}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration ${elapsed_ms}: missing reported duration
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_build_docker_duration_fail_case() {
+  local elapsed_ms stdout stderr stdout_file stderr_file ec combined
+
+  elapsed_ms="$1"
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the build-docker job starts at monotonic time 100000 ms
+  # And the build-docker job completes after <elapsed_ms> ms
+  # And the Docker build step uses GitHub Actions cache
+  node "$SCRIPT" build-docker-duration-budget \
+    --job-start-ms 100000 \
+    --job-end-ms $((100000 + elapsed_ms)) \
+    --github-actions-cache enabled \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the build-docker duration budget is evaluated
+  # Then the duration budget assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration fail ${elapsed_ms}: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "duration_budget=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration fail ${elapsed_ms}: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "build-docker must finish in under 10 minutes"
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must finish in under 10 minutes"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration fail ${elapsed_ms}: missing failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_build_docker_duration_excludes_queue_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the build-docker workflow run waits in the GitHub Actions queue for 180000 ms
+  # And the build-docker job runs for 540000 ms after the runner starts
+  # And the Docker build step uses GitHub Actions cache
+  node "$SCRIPT" build-docker-duration-budget \
+    --job-start-ms 180000 \
+    --job-end-ms 720000 \
+    --github-actions-cache enabled \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration excludes queue: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the build-docker duration budget is evaluated
+  # Then the measured duration is 540000 ms
+  if ! printf '%s\n' "$stdout" | grep -Fq "measured_duration_ms=540000"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration excludes queue: missing measured duration
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the duration budget assertion passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "duration_budget=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration excludes queue: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_build_docker_duration_missing_cache_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the build-docker job completes after 300000 ms
+  # And the Docker build step does not declare GitHub Actions cache
+  node "$SCRIPT" build-docker-duration-budget \
+    --job-start-ms 100000 \
+    --job-end-ms 400000 \
+    --github-actions-cache missing \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the build-docker duration budget is evaluated
+  # Then the duration budget assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration missing cache: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "duration_budget=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration missing cache: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "GitHub Actions cache must be enabled for build-docker"
+  if ! printf '%s\n' "$combined" | grep -Fq "GitHub Actions cache must be enabled for build-docker"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker duration missing cache: missing failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_verification_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          push: false
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+YAML
+
+  # Given the build-docker job contains a `docker/build-push-action` step
+  # And the Docker build action input `push` is `false`
+  # And the Docker build action input `platforms` is "linux/amd64,linux/arm64"
+  # And the Docker build action input `cache-from` is "type=gha"
+  # And the Docker build action input `cache-to` is "type=gha,mode=max"
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action verification: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then the Docker build action configuration assertion passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action verification: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the job is classified as a CI verification build
+  if ! printf '%s\n' "$stdout" | grep -Fq "build_classification=ci-verification"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action verification: missing CI verification classification
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_push_true_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+YAML
+
+  # Given the build-docker job contains a `docker/build-push-action` step
+  # And the Docker build action input `push` is `true`
+  # And the Docker build action input `platforms` is "linux/amd64,linux/arm64"
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action push true: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then the Docker build action configuration assertion fails
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action push true: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "build-docker must use push: false"
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use push: false"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action push true: missing push failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_missing_action_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print build context
+        run: docker buildx version
+YAML
+
+  # Given the build-docker job contains no action reference starting with "docker/build-push-action@"
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action missing action: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then the Docker build action configuration assertion fails
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action missing action: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "build-docker must use docker/build-push-action"
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use docker/build-push-action"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action missing action: missing action failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_platform_boundary_case() {
+  local platforms="$1"
+  local expected_outcome="$2"
+  local expected_reason="$3"
+  local expected_ec=1
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  if [ "$expected_outcome" = "accepted" ]; then
+    expected_ec=0
+  fi
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          push: false
+          platforms: ${platforms}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+YAML
+
+  # Given the build-docker job contains a `docker/build-push-action` step
+  # And the Docker build action input `push` is `false`
+  # And the Docker build action input `platforms` is "<platforms>"
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne "$expected_ec" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action platforms ${platforms}: expected exit ${expected_ec}, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then the Docker build action configuration outcome is "<outcome>"
+  if ! printf '%s\n' "$stdout" | grep -Fq "platform_outcome=${expected_outcome}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action platforms ${platforms}: missing ${expected_outcome} platform outcome
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the boundary reason is "<reason>"
+  if ! printf '%s\n' "$combined" | grep -Fq "boundary_reason=${expected_reason}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action platforms ${platforms}: missing boundary reason ${expected_reason}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_missing_cache_input_case() {
+  local missing_input="$1"
+  local cache_from_line="          cache-from: type=gha"
+  local cache_to_line="          cache-to: type=gha,mode=max"
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  if [ "$missing_input" = "cache-from" ]; then
+    cache_from_line=""
+  fi
+  if [ "$missing_input" = "cache-to" ]; then
+    cache_to_line=""
+  fi
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          push: false
+          platforms: linux/amd64,linux/arm64
+${cache_from_line}
+${cache_to_line}
+YAML
+
+  # Given the build-docker job contains a `docker/build-push-action` step
+  # And the Docker build action input `push` is `false`
+  # And the Docker build action input `platforms` is "linux/amd64,linux/arm64"
+  # And the Docker build action input `<missing_input>` is absent
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action missing ${missing_input}: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then the Docker build action configuration assertion fails
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action missing ${missing_input}: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "Docker build must use GitHub Actions cache"
+  if ! printf '%s\n' "$combined" | grep -Fq "Docker build must use GitHub Actions cache"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action missing ${missing_input}: missing cache failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_ignores_env_inputs_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        env:
+          push: false
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+YAML
+
+  # Given the Docker build action has matching names outside the `with` inputs
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action env inputs: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then only the `with` inputs are considered
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action env inputs: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And matching names under `env` do not satisfy the required push input
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use push: false"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action env inputs: missing with-only failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_flow_with_mapping_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with: { push: false, platforms: "linux/amd64,linux/arm64", cache-from: type=gha, cache-to: "type=gha,mode=max" }
+YAML
+
+  # Given the Docker build action declares required inputs with a flow-style mapping
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action flow with mapping: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then the flow-style `with` inputs are accepted
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action flow with mapping: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_build_job_anchor_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker: &base_job
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          push: false
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+YAML
+
+  # Given the build-docker job header uses a YAML anchor
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action anchored job: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then the anchored build-docker job is accepted
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action anchored job: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_with_block_anchor_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with: &docker_inputs
+          push: false
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+YAML
+
+  # Given the Docker build action `with` block uses a YAML anchor
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action anchored with block: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then the anchored `with` block inputs are accepted
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action anchored with block: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_anchored_flow_with_mapping_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with: &docker_inputs { push: false, platforms: "linux/amd64,linux/arm64", cache-from: type=gha, cache-to: "type=gha,mode=max" }
+YAML
+
+  # Given the Docker build action declares a flow-style `with` mapping with an anchor
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action anchored flow with mapping: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then the anchored flow-style `with` inputs are accepted
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action anchored flow with mapping: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_with_alias_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build first Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with: &docker_inputs
+          push: false
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build second Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with: *docker_inputs
+YAML
+
+  # Given a later Docker build action reuses an anchored `with` mapping
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action with alias: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When every Docker build action step is evaluated
+  # Then aliased `with` inputs are resolved and accepted
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action with alias: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_with_redefined_alias_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build first Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with: &docker_inputs
+          push: false
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Redefine shared inputs
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        with: &docker_inputs
+          push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build second Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with: *docker_inputs
+YAML
+
+  # Given an alias references a redefined `with` anchor closer to the Docker step
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action redefined alias: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When every Docker build action step is evaluated
+  # Then the alias resolves to the nearest preceding anchor and rejects push
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use push: false"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action redefined alias: missing nearest-anchor failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_uses_current_alias_step_occurrence_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Define shared inputs
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        with: &docker_inputs
+          push: false
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with: *docker_inputs
+
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Redefine shared inputs
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        with: &docker_inputs
+          push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with: *docker_inputs
+YAML
+
+  # Given an identical alias Docker step exists before the build-docker job
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action current alias step occurrence: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the build-docker alias is resolved
+  # Then it uses the current step occurrence rather than the earlier identical step
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use push: false"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action current alias step occurrence: missing current-anchor failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_multiline_platforms_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          push: false
+          platforms: |
+            linux/amd64
+            linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+YAML
+
+  # Given the Docker build action declares required platforms with a block scalar
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action multiline platforms: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then newline-delimited required platforms are accepted
+  if ! printf '%s\n' "$stdout" | grep -Fq "platform_outcome=accepted"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action multiline platforms: missing accepted platform outcome
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the Docker build action configuration assertion passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action multiline platforms: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_rejects_folded_platforms_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          push: false
+          platforms: >
+            linux/amd64
+            linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+YAML
+
+  # Given the Docker build action declares platforms with a folded block scalar
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action folded platforms: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then folded platforms are not accepted as newline-delimited entries
+  if ! printf '%s\n' "$stdout" | grep -Fq "platform_outcome=rejected"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action folded platforms: missing rejected platform outcome
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the Docker build action configuration assertion fails
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action folded platforms: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_ignores_run_block_fake_step_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mention Docker action in shell text
+        run: |
+          cat <<'EOF'
+          - uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+            with:
+              push: false
+              platforms: linux/amd64,linux/arm64
+              cache-from: type=gha
+              cache-to: type=gha,mode=max
+          EOF
+YAML
+
+  # Given the Docker action only appears inside a run block
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action fake run step: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then shell text is not treated as a workflow step
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use docker/build-push-action"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action fake run step: missing real-step failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_ignores_fake_job_markers_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mention build-docker in shell text
+        run: |
+          build-docker:
+            steps:
+              - uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+                with:
+                  push: false
+                  platforms: linux/amd64,linux/arm64
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Real Docker build step pushes
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+YAML
+
+  # Given an earlier job shell script contains fake build-docker markers
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action fake job markers: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then the real build-docker job is selected
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use push: false"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action fake job markers: missing real-job failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_ignores_nested_build_job_key_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    env:
+      build-docker:
+        steps:
+          - uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+            with:
+              push: false
+              platforms: linux/amd64,linux/arm64
+              cache-from: type=gha
+              cache-to: type=gha,mode=max
+    steps:
+      - run: echo prepare
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Real Docker build step pushes
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+YAML
+
+  # Given a nested mapping under another job uses the build-docker key name
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action nested build job key: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then only the direct jobs.build-docker mapping is selected
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use push: false"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action nested build job key: missing direct-job failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_ignores_nested_steps_key_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    env:
+      steps:
+        - uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+          with:
+            push: false
+            platforms: linux/amd64,linux/arm64
+            cache-from: type=gha
+            cache-to: type=gha,mode=max
+    steps:
+      - name: Real Docker build step pushes
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+YAML
+
+  # Given a nested mapping under build-docker uses the steps key name
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action nested steps key: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then only the direct jobs.build-docker.steps mapping is selected
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use push: false"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action nested steps key: missing direct-steps failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_variable_indent_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+    build-docker:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Build Community bot image
+              uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+              with:
+                  push: false
+                  platforms: linux/amd64,linux/arm64
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+YAML
+
+  # Given the workflow uses a valid indentation width wider than two spaces
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action variable indent: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then direct child lookup accepts the workflow indentation width
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action variable indent: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_indented_root_jobs_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+  name: ci
+  jobs:
+    build-docker:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Build Community bot image
+          uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+          with:
+            push: false
+            platforms: linux/amd64,linux/arm64
+            cache-from: type=gha
+            cache-to: type=gha,mode=max
+YAML
+
+  # Given the workflow indents every root-level YAML key
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action indented root jobs: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action configuration is evaluated
+  # Then the root jobs mapping is found at the document root indentation
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action indented root jobs: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_inline_with_anchor_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - with: &docker_inputs
+          push: false
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with: *docker_inputs
+YAML
+
+  # Given the anchored `with` mapping is declared on an inline list item
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action inline with anchor: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When every Docker build action step is evaluated
+  # Then the inline anchored `with` mapping is resolved
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action inline with anchor: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_with_comment_before_inputs_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+            # Docker inputs stay below on the mapping's child indent.
+          push: false
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+YAML
+
+  # Given the first non-empty line under `with` is an over-indented comment
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action comment before inputs: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action inputs are evaluated
+  # Then comment indentation does not define the input child indent
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action comment before inputs: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_first_line_with_block_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - with:
+          push: false
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+        name: Build Community bot image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+YAML
+
+  # Given the Docker build action step starts with the `with` block
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action first-line with block: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action inputs are evaluated
+  # Then the first-line `with` block is read
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_build_action=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action first-line with block: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_rejects_later_push_step_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compliant image build
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          push: false
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Later image push
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+YAML
+
+  # Given a later Docker build action step attempts to push
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action later push step: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When every Docker build action step is evaluated
+  # Then the later push step is rejected
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use push: false"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action later push step: missing push failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_ignores_nested_with_scalar_inputs_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Spoof inputs inside another input scalar
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          context: |
+            push: false
+            cache-from: type=gha
+            cache-to: type=gha,mode=max
+          push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+YAML
+
+  # Given matching input names appear inside another input's block scalar
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action nested with scalar inputs: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action inputs are evaluated
+  # Then nested scalar text is not treated as a direct `with` input
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use push: false"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action nested with scalar inputs: missing direct-input failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_build_action_ignores_nested_with_block_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Spoof a with block inside another scalar
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        env:
+          DUMMY: |
+            with:
+              push: false
+              platforms: linux/amd64,linux/arm64
+              cache-from: type=gha
+              cache-to: type=gha,mode=max
+        with:
+          push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+YAML
+
+  # Given a fake `with` block appears inside another step property scalar
+  node "$SCRIPT" docker-build-action --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action nested with block: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker build action inputs are evaluated
+  # Then only a direct step-level `with` block is considered
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use push: false"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker build action nested with block: missing direct-with failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_setup_action_pinning_sha_pass_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@0123456789abcdef0123456789abcdef01234567
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@89abcdef0123456789abcdef0123456789abcdef
+YAML
+
+  # Given the build-docker job contains the action reference "docker/setup-qemu-action@0123456789abcdef0123456789abcdef01234567"
+  # And the build-docker job contains the action reference "docker/setup-buildx-action@89abcdef0123456789abcdef0123456789abcdef"
+  node "$SCRIPT" docker-setup-action-pinning --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action pinning SHA pass: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker setup action pinning rule is evaluated
+  # Then the Docker setup action pinning assertion passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_setup_action_pinning=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action pinning SHA pass: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And no moving Docker setup action reference is reported
+  if printf '%s\n' "$stdout" | grep -Fq "moving_reference="; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action pinning SHA pass: unexpected moving reference
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_setup_action_pinning_moving_ref_case() {
+  local action_ref="$1"
+  local other_action_ref="docker/setup-buildx-action@89abcdef0123456789abcdef0123456789abcdef"
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  if printf '%s\n' "$action_ref" | grep -Fq "docker/setup-buildx-action@"; then
+    other_action_ref="docker/setup-qemu-action@0123456789abcdef0123456789abcdef01234567"
+  fi
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Docker setup action under test
+        uses: ${action_ref}
+      - name: Other required Docker setup action
+        uses: ${other_action_ref}
+YAML
+
+  # Given the build-docker job contains the action reference "<action_ref>"
+  node "$SCRIPT" docker-setup-action-pinning --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action moving ref ${action_ref}: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker setup action pinning rule is evaluated
+  # Then the Docker setup action pinning assertion fails
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_setup_action_pinning=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action moving ref ${action_ref}: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "<action_ref>"
+  if ! printf '%s\n' "$combined" | grep -Fq "$action_ref"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action moving ref ${action_ref}: missing action reference
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "Docker setup actions must be pinned to a full commit SHA"
+  if ! printf '%s\n' "$combined" | grep -Fq "Docker setup actions must be pinned to a full commit SHA"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action moving ref ${action_ref}: missing pinning failure message
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_setup_action_pinning_missing_action_case() {
+  local present_action="$1"
+  local missing_action="$2"
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Present Docker setup action
+        uses: ${present_action}@0123456789abcdef0123456789abcdef01234567
+YAML
+
+  # Given the build-docker job contains the action reference "<present_action>@0123456789abcdef0123456789abcdef01234567"
+  # And the build-docker job contains no action reference starting with "<missing_action>@"
+  node "$SCRIPT" docker-setup-action-pinning --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action missing ${missing_action}: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker setup action pinning rule is evaluated
+  # Then the Docker setup action pinning assertion fails
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_setup_action_pinning=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action missing ${missing_action}: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "build-docker must use <missing_action>"
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use ${missing_action}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action missing ${missing_action}: missing missing-action failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_setup_action_pinning_sha_boundary_case() {
+  local sha_ref="$1"
+  local expected_outcome="$2"
+  local expected_reason="$3"
+  local expected_exit=1
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  if [ "$expected_outcome" = "accepted" ]; then
+    expected_exit=0
+  fi
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@0123456789abcdef0123456789abcdef01234567
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@${sha_ref}
+YAML
+
+  # Given the build-docker job contains the action reference "docker/setup-buildx-action@<sha_ref>"
+  node "$SCRIPT" docker-setup-action-pinning --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne "$expected_exit" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action SHA boundary ${sha_ref}: expected exit ${expected_exit}, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker setup action pinning rule is evaluated
+  # Then the Docker setup action pinning assertion outcome is "<outcome>"
+  if ! printf '%s\n' "$stdout" | grep -Fq "pinning_outcome=${expected_outcome}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action SHA boundary ${sha_ref}: missing expected outcome ${expected_outcome}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the boundary reason is "<reason>"
+  if ! printf '%s\n' "$stdout" | grep -Fq "boundary_reason=${expected_reason}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action SHA boundary ${sha_ref}: missing boundary reason ${expected_reason}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_docker_setup_action_pinning_invalid_sha_class_case() {
+  local sha_ref="$1"
+  local expected_reason="$2"
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@${sha_ref}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@89abcdef0123456789abcdef0123456789abcdef
+YAML
+
+  # Given the build-docker job contains the action reference "docker/setup-qemu-action@<sha_ref>"
+  node "$SCRIPT" docker-setup-action-pinning --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action invalid SHA class ${sha_ref}: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker setup action pinning rule is evaluated
+  # Then the Docker setup action pinning assertion fails
+  if ! printf '%s\n' "$stdout" | grep -Fq "docker_setup_action_pinning=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action invalid SHA class ${sha_ref}: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "<reason>"
+  if ! printf '%s\n' "$combined" | grep -Fq "$expected_reason"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action invalid SHA class ${sha_ref}: missing failure reason ${expected_reason}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_build_docker_needs_required_gates_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    needs:
+      - backend-checks
+      - supply-chain
+      - secrets-scan
+      - forbidden-tools
+      - forbidden-imports
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+YAML
+
+  # Given the build-docker job has these `needs` entries:
+  #   | job               |
+  #   | backend-checks    |
+  #   | supply-chain      |
+  #   | secrets-scan      |
+  #   | forbidden-tools   |
+  #   | forbidden-imports |
+  node "$SCRIPT" build-docker-needs --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker required gates pass: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the build-docker dependency rule is evaluated
+  # Then the build-docker dependency assertion passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_needs=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker required gates pass: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And no required upstream job is reported missing
+  if printf '%s\n' "$stdout" | grep -Fq "missing_required_job="; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker required gates pass: unexpected missing required job
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_build_docker_needs_inline_gates_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    needs: [backend-checks, supply-chain, secrets-scan, forbidden-tools, forbidden-imports]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+YAML
+
+  node "$SCRIPT" build-docker-needs --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker inline needs pass: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_needs=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker inline needs pass: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if printf '%s\n' "$stdout" | grep -Fq "missing_required_job="; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker inline needs pass: unexpected missing required job
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_build_docker_needs_multiline_flow_gates_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    needs: [
+      backend-checks,
+      supply-chain,
+      secrets-scan,
+      forbidden-tools,
+      forbidden-imports
+    ]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+YAML
+
+  node "$SCRIPT" build-docker-needs --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker multiline flow needs pass: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_needs=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker multiline flow needs pass: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if printf '%s\n' "$stdout" | grep -Fq "missing_required_job="; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker multiline flow needs pass: unexpected missing required job
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_build_docker_needs_scalar_gate_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    needs: backend-checks
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+YAML
+
+  node "$SCRIPT" build-docker-needs --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker scalar needs fail: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if printf '%s\n' "$stdout" | grep -Fq "missing_required_job=backend-checks"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker scalar needs fail: present scalar need was reported missing
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "missing_required_job=supply-chain"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker scalar needs fail: missing required job not reported
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_build_docker_needs_missing_required_gate_case() {
+  local missing_job workflow_file stdout stderr stdout_file stderr_file ec combined job
+
+  for missing_job in \
+    "backend-checks" \
+    "supply-chain" \
+    "secrets-scan" \
+    "forbidden-tools" \
+    "forbidden-imports"; do
+    workflow_file=$(mktemp)
+    stdout_file=$(mktemp)
+    stderr_file=$(mktemp)
+
+    {
+      printf 'name: ci\n'
+      printf 'jobs:\n'
+      printf '  build-docker:\n'
+      printf '    needs:\n'
+      for job in \
+        "backend-checks" \
+        "supply-chain" \
+        "secrets-scan" \
+        "forbidden-tools" \
+        "forbidden-imports"; do
+        if [ "$job" != "$missing_job" ]; then
+          printf '      - %s\n' "$job"
+        fi
+      done
+      printf '    runs-on: ubuntu-latest\n'
+      printf '    steps:\n'
+      printf '      - run: echo build\n'
+    } >"$workflow_file"
+
+    # Given the build-docker job needs every required upstream job except "<missing_job>"
+    node "$SCRIPT" build-docker-needs --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+    stdout=$(cat "$stdout_file" 2>/dev/null || true)
+    stderr=$(cat "$stderr_file" 2>/dev/null || true)
+    rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+    combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+    # When the build-docker dependency rule is evaluated
+    # Then the build-docker dependency assertion fails
+    if [ "$ec" -eq 0 ]; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  x build-docker missing required gate ${missing_job}: expected non-zero exit
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+      continue
+    fi
+
+    if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_needs=fail"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  x build-docker missing required gate ${missing_job}: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+      continue
+    fi
+
+    # And the failure mentions "build-docker must need <missing_job>"
+    if ! printf '%s\n' "$combined" | grep -Fq "build-docker must need ${missing_job}"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  x build-docker missing required gate ${missing_job}: missing failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+      continue
+    fi
+
+    PASS=$((PASS + 1))
+  done
+}
+
+run_build_docker_needs_missing_needs_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  backend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo backend
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+YAML
+
+  # Given the build-docker job has no `needs` entries
+  # And the backend-checks job is still running
+  node "$SCRIPT" build-docker-needs --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the build-docker dependency rule is evaluated
+  # Then the build-docker dependency assertion fails
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker missing needs: expected non-zero exit
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "build-docker must wait for required gates"
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must wait for required gates"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker missing needs: missing failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_build_docker_needs_anchored_job_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker: &base_job
+    needs:
+      - backend-checks
+      - supply-chain
+      - secrets-scan
+      - forbidden-tools
+      - forbidden-imports
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+YAML
+
+  # Given the build-docker job header uses a YAML anchor
+  # And the build-docker job has all required `needs` entries
+  node "$SCRIPT" build-docker-needs --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the build-docker dependency rule is evaluated
+  # Then the anchored build-docker job is accepted
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker needs anchored job: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_needs=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker needs anchored job: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_build_docker_scheduler_failed_gate_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the backend-checks job succeeds
+  # And the supply-chain job succeeds
+  # And the secrets-scan job fails
+  # And the forbidden-tools job succeeds
+  # And the forbidden-imports job succeeds
+  node "$SCRIPT" build-docker-scheduler \
+    --backend-checks success \
+    --supply-chain success \
+    --secrets-scan failure \
+    --forbidden-tools success \
+    --forbidden-imports success \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker scheduler failed gate: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the workflow scheduler evaluates the build-docker job dependencies
+  # Then the build-docker job is not eligible to run
+  if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_eligible=false"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker scheduler failed gate: missing ineligible result
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the build-docker job result is "skipped"
+  if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_result=skipped"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x build-docker scheduler failed gate: missing skipped result
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_build_docker_scheduler_non_success_gate_case() {
+  local state stdout stderr stdout_file stderr_file ec combined
+
+  for state in cancelled skipped; do
+    stdout_file=$(mktemp)
+    stderr_file=$(mktemp)
+
+    node "$SCRIPT" build-docker-scheduler \
+      --backend-checks success \
+      --supply-chain success \
+      --secrets-scan "$state" \
+      --forbidden-tools success \
+      --forbidden-imports success \
+      >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+    stdout=$(cat "$stdout_file" 2>/dev/null || true)
+    stderr=$(cat "$stderr_file" 2>/dev/null || true)
+    rm -f "$stdout_file" "$stderr_file"
+    combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+    if [ "$ec" -ne 0 ]; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  x build-docker scheduler ${state} gate: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+      continue
+    fi
+
+    if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_result=skipped"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  x build-docker scheduler ${state} gate: missing skipped result
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+      continue
+    fi
+
+    if ! printf '%s\n' "$stdout" | grep -Fq "failed_upstream_job=secrets-scan"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  x build-docker scheduler ${state} gate: missing upstream evidence
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+      continue
+    fi
+
+    PASS=$((PASS + 1))
+  done
+}
+
 run_action_pinning_sha_pass_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec
 
@@ -3173,6 +5880,1211 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_trivy_scan_config_pass_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+YAML
+
+  # Given the build-docker job contains an aquasecurity/trivy-action step
+  # And the Trivy input severity is "HIGH,CRITICAL"
+  # And the Trivy input exit-code is "1"
+  node "$SCRIPT" trivy-scan-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the Trivy scan configuration is evaluated
+  # Then the Trivy scan configuration assertion passes
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config pass: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "trivy_scan_config=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config pass: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the scan blocks HIGH and CRITICAL vulnerabilities
+  if ! printf '%s\n' "$stdout" | grep -Fq "blocking_severities=HIGH,CRITICAL"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config pass: missing blocking severities
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_scan_config_equivalent_severity_order_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+YAML
+
+  node "$SCRIPT" trivy-scan-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config equivalent severity order: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "trivy_scan_config=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config equivalent severity order: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "blocking_severities=HIGH,CRITICAL"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config equivalent severity order: missing normalized blocking severities
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_scan_config_missing_blocking_severity_case() {
+  local severity="$1"
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          severity: ${severity}
+          exit-code: "1"
+YAML
+
+  # Given the build-docker job contains an aquasecurity/trivy-action step
+  # And the Trivy input severity is "<severity>"
+  # And the Trivy input exit-code is "1"
+  node "$SCRIPT" trivy-scan-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the Trivy scan configuration is evaluated
+  # Then the Trivy scan configuration assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config missing blocking severity ${severity}: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "trivy_scan_config=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config missing blocking severity ${severity}: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "Trivy severity must be HIGH,CRITICAL"
+  if ! printf '%s\n' "$combined" | grep -Fq "Trivy severity must be HIGH,CRITICAL"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config missing blocking severity ${severity}: missing severity failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_scan_config_missing_action_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build image
+        uses: docker/build-push-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          push: false
+YAML
+
+  # Given the build-docker job contains no action reference starting with "aquasecurity/trivy-action@"
+  node "$SCRIPT" trivy-scan-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the Trivy scan configuration is evaluated
+  # Then the Trivy scan configuration assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config missing action: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "trivy_scan_config=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config missing action: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "build-docker must use aquasecurity/trivy-action"
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must use aquasecurity/trivy-action"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config missing action: missing action failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_scan_config_exit_code_boundary_case() {
+  local exit_code="$1"
+  local expected_outcome="$2"
+  local expected_reason="$3"
+  local expected_exit=1
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  if [ "$expected_outcome" = "accepted" ]; then
+    expected_exit=0
+  fi
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          severity: HIGH,CRITICAL
+          exit-code: "${exit_code}"
+YAML
+
+  # Given the build-docker job contains an aquasecurity/trivy-action step
+  # And the Trivy input severity is "HIGH,CRITICAL"
+  # And the Trivy input exit-code is "<exit_code>"
+  node "$SCRIPT" trivy-scan-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne "$expected_exit" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config exit-code boundary ${exit_code}: expected exit ${expected_exit}, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Trivy scan configuration is evaluated
+  # Then the Trivy scan configuration outcome is "<outcome>"
+  if ! printf '%s\n' "$stdout" | grep -Fq "exit_code_outcome=${expected_outcome}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config exit-code boundary ${exit_code}: missing expected outcome ${expected_outcome}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the boundary reason is "<reason>"
+  if ! printf '%s\n' "$stdout" | grep -Fq "boundary_reason=${expected_reason}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy scan config exit-code boundary ${exit_code}: missing boundary reason ${expected_reason}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_sarif_upload_config_pass_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          format: sarif
+          output: trivy-results.sarif
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@89abcdef0123456789abcdef0123456789abcdef
+        with:
+          sarif_file: trivy-results.sarif
+YAML
+
+  # Given the Trivy input format is "sarif"
+  # And the Trivy input output is "trivy-results.sarif"
+  # And the build-docker job contains a github/codeql-action/upload-sarif step
+  # And the SARIF upload input sarif_file is "trivy-results.sarif"
+  node "$SCRIPT" trivy-sarif-upload-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config pass: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the SARIF upload configuration is evaluated
+  # Then the SARIF upload assertion passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "sarif_upload=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config pass: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the Trivy SARIF result is available to GitHub Security
+  if ! printf '%s\n' "$stdout" | grep -Fq "github_security=trivy-results.sarif"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config pass: missing GitHub Security SARIF result
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_sarif_upload_config_expression_condition_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          format: sarif
+          output: trivy-results.sarif
+      - name: Upload Trivy SARIF
+        if: ${{ always() }}
+        uses: github/codeql-action/upload-sarif@89abcdef0123456789abcdef0123456789abcdef
+        with:
+          sarif_file: trivy-results.sarif
+YAML
+
+  node "$SCRIPT" trivy-sarif-upload-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config expression condition: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "sarif_upload=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config expression condition: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_sarif_upload_config_upload_before_trivy_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@89abcdef0123456789abcdef0123456789abcdef
+        with:
+          sarif_file: trivy-results.sarif
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          format: sarif
+          output: trivy-results.sarif
+YAML
+
+  node "$SCRIPT" trivy-sarif-upload-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config upload before Trivy: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$combined" | grep -Fq "SARIF upload must run after Trivy scan"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config upload before Trivy: missing ordering failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_sarif_upload_config_missing_upload_action_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          format: sarif
+          output: trivy-results.sarif
+YAML
+
+  node "$SCRIPT" trivy-sarif-upload-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config missing CodeQL upload action: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "sarif_upload_step=missing"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config missing CodeQL upload action: missing upload-step marker
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$combined" | grep -Fq "build-docker must upload Trivy SARIF via CodeQL"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config missing CodeQL upload action: missing failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_sarif_upload_config_different_upload_path_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          format: sarif
+          output: trivy-results.sarif
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@89abcdef0123456789abcdef0123456789abcdef
+        with:
+          sarif_file: container-results.sarif
+YAML
+
+  node "$SCRIPT" trivy-sarif-upload-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config different upload path: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "boundary_reason=SARIF upload path must be trivy-results.sarif"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config different upload path: missing boundary reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$combined" | grep -Fq "sarif_file must be trivy-results.sarif"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config different upload path: missing sarif_file failure message
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_sarif_upload_config_boundary_case() {
+  local trivy_format="$1"
+  local trivy_output="$2"
+  local upload_path="$3"
+  local condition="$4"
+  local expected_outcome="$5"
+  local expected_reason="$6"
+  local expected_exit=1
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  if [ "$expected_outcome" = "accepted" ]; then
+    expected_exit=0
+  fi
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          format: ${trivy_format}
+          output: ${trivy_output}
+      - name: Upload Trivy SARIF
+        if: ${condition}
+        uses: github/codeql-action/upload-sarif@89abcdef0123456789abcdef0123456789abcdef
+        with:
+          sarif_file: ${upload_path}
+YAML
+
+  node "$SCRIPT" trivy-sarif-upload-config --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne "$expected_exit" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config boundary ${trivy_format}/${trivy_output}/${upload_path}/${condition}: expected exit ${expected_exit}, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "sarif_upload_outcome=${expected_outcome}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config boundary ${trivy_format}/${trivy_output}/${upload_path}/${condition}: missing expected outcome ${expected_outcome}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "boundary_reason=${expected_reason}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload config boundary ${trivy_format}/${trivy_output}/${upload_path}/${condition}: missing boundary reason ${expected_reason}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_vulnerability_gate_no_high_or_critical_case() {
+  local trivy_file stdout stderr stdout_file stderr_file ec combined
+
+  trivy_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the Trivy result for "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" contains 3 LOW vulnerabilities
+  # And the Trivy result contains 1 MEDIUM vulnerability
+  # And the Trivy result contains 0 HIGH vulnerabilities
+  # And the Trivy result contains 0 CRITICAL vulnerabilities
+  cat >"$trivy_file" <<'JSON'
+{
+  "ArtifactName": "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "Results": [
+    {
+      "Target": "sovri/community-bot",
+      "Vulnerabilities": [
+        { "VulnerabilityID": "CVE-2026-low-0001", "Severity": "LOW" },
+        { "VulnerabilityID": "CVE-2026-low-0002", "Severity": "LOW" },
+        { "VulnerabilityID": "CVE-2026-low-0003", "Severity": "LOW" },
+        { "VulnerabilityID": "CVE-2026-medium-0001", "Severity": "MEDIUM" }
+      ]
+    }
+  ]
+}
+JSON
+
+  node "$SCRIPT" trivy-vulnerability-gate \
+    --input "$trivy_file" \
+    --image "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$trivy_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the image vulnerability assertion is evaluated
+  # Then the image vulnerability assertion passes
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate no high or critical: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "image_vulnerability=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate no high or critical: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And no HIGH or CRITICAL vulnerability is reported for the built image
+  if printf '%s\n' "$combined" | grep -Fq "blocking_vulnerability="; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate no high or critical: unexpected blocking vulnerability
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_vulnerability_gate_null_vulnerabilities_case() {
+  local trivy_file stdout stderr stdout_file stderr_file ec combined
+
+  trivy_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$trivy_file" <<'JSON'
+{
+  "ArtifactName": "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "Results": [
+    {
+      "Target": "sovri/community-bot",
+      "Vulnerabilities": null
+    }
+  ]
+}
+JSON
+
+  node "$SCRIPT" trivy-vulnerability-gate \
+    --input "$trivy_file" \
+    --image "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$trivy_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate null vulnerabilities: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "image_vulnerability=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate null vulnerabilities: missing pass assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if printf '%s\n' "$combined" | grep -Fq "blocking_vulnerability="; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate null vulnerabilities: unexpected blocking vulnerability
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_vulnerability_gate_high_vulnerability_case() {
+  local trivy_file stdout stderr stdout_file stderr_file ec combined
+
+  trivy_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the Trivy result for "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" contains 1 HIGH vulnerability named "CVE-2026-1001"
+  # And the Trivy result contains 0 CRITICAL vulnerabilities
+  cat >"$trivy_file" <<'JSON'
+{
+  "ArtifactName": "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "Results": [
+    {
+      "Target": "sovri/community-bot",
+      "Vulnerabilities": [
+        { "VulnerabilityID": "CVE-2026-1001", "Severity": "HIGH" }
+      ]
+    }
+  ]
+}
+JSON
+
+  node "$SCRIPT" trivy-vulnerability-gate \
+    --input "$trivy_file" \
+    --image "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$trivy_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the image vulnerability assertion is evaluated
+  # Then the image vulnerability assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate high vulnerability: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "image_vulnerability=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate high vulnerability: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "CVE-2026-1001"
+  if ! printf '%s\n' "$combined" | grep -Fq "CVE-2026-1001"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate high vulnerability: missing CVE
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "HIGH"
+  if ! printf '%s\n' "$combined" | grep -Fq "HIGH"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate high vulnerability: missing severity
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_vulnerability_gate_critical_vulnerability_case() {
+  local trivy_file stdout stderr stdout_file stderr_file ec combined
+
+  trivy_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the Trivy result for "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" contains 0 HIGH vulnerabilities
+  # And the Trivy result contains 1 CRITICAL vulnerability named "CVE-2026-2002"
+  cat >"$trivy_file" <<'JSON'
+{
+  "ArtifactName": "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "Results": [
+    {
+      "Target": "sovri/community-bot",
+      "Vulnerabilities": [
+        { "VulnerabilityID": "CVE-2026-2002", "Severity": "CRITICAL" }
+      ]
+    }
+  ]
+}
+JSON
+
+  node "$SCRIPT" trivy-vulnerability-gate \
+    --input "$trivy_file" \
+    --image "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$trivy_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the image vulnerability assertion is evaluated
+  # Then the image vulnerability assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate critical vulnerability: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "image_vulnerability=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate critical vulnerability: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "CVE-2026-2002"
+  if ! printf '%s\n' "$combined" | grep -Fq "CVE-2026-2002"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate critical vulnerability: missing CVE
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "CRITICAL"
+  if ! printf '%s\n' "$combined" | grep -Fq "CRITICAL"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate critical vulnerability: missing severity
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_vulnerability_gate_missing_result_case() {
+  local trivy_file stdout stderr stdout_file stderr_file ec combined
+
+  trivy_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$trivy_file" <<'JSON'
+{
+  "ArtifactName": "sovri/community-bot:ci-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "Results": [
+    {
+      "Target": "sovri/community-bot",
+      "Vulnerabilities": null
+    }
+  ]
+}
+JSON
+
+  # Given the Docker build step produces image "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  # And no Trivy result exists for image "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  node "$SCRIPT" trivy-vulnerability-gate \
+    --input "$trivy_file" \
+    --image "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$trivy_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  # When the image vulnerability assertion is evaluated
+  # Then the image vulnerability assertion fails
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate missing result: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "image_vulnerability=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate missing result: missing fail assertion
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the failure mentions "missing Trivy result for built image"
+  if ! printf '%s\n' "$combined" | grep -Fq "missing Trivy result for built image"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy vulnerability gate missing result: missing failure reason
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_step_completion_nonzero_result_case() {
+  local trivy_file stdout stderr stdout_file stderr_file ec combined
+
+  trivy_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$trivy_file" <<'JSON'
+{
+  "ArtifactName": "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "Results": [
+    {
+      "Target": "sovri/community-bot",
+      "Vulnerabilities": [
+        { "VulnerabilityID": "CVE-2026-3003", "Severity": "HIGH" }
+      ]
+    }
+  ]
+}
+JSON
+
+  # Given Trivy scans image "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  # And Trivy reports 1 HIGH vulnerability named "CVE-2026-3003"
+  # And the Trivy input exit-code is "1"
+  node "$SCRIPT" trivy-step-completion \
+    --input "$trivy_file" \
+    --image "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+    --exit-code "1" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$trivy_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy step completion nonzero result: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Trivy step completes
+  # Then the Trivy step exits with status 1
+  if ! printf '%s\n' "$stdout" | grep -Fq "trivy_step_exit=1"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy step completion nonzero result: missing step exit status
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the build-docker job fails
+  if ! printf '%s\n' "$stdout" | grep -Fq "build_docker_result=failure"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy step completion nonzero result: missing build-docker failure result
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_trivy_sarif_upload_after_failure_case() {
+  local workflow_file trivy_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  trivy_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan built image
+        uses: aquasecurity/trivy-action@0123456789abcdef0123456789abcdef01234567
+        with:
+          image-ref: sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          format: sarif
+          output: trivy-results.sarif
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@89abcdef0123456789abcdef0123456789abcdef
+        with:
+          sarif_file: trivy-results.sarif
+YAML
+
+  cat >"$trivy_file" <<'JSON'
+{
+  "ArtifactName": "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "Results": [
+    {
+      "Target": "sovri/community-bot",
+      "Vulnerabilities": [
+        { "VulnerabilityID": "CVE-2026-3003", "Severity": "HIGH" }
+      ]
+    }
+  ]
+}
+JSON
+
+  node "$SCRIPT" trivy-sarif-upload-after-failure \
+    --workflow "$workflow_file" \
+    --input "$trivy_file" \
+    --image "sovri/community-bot:ci-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+    --exit-code "1" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$trivy_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload after failure: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "trivy_step_exit=1"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload after failure: missing Trivy exit status
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "blocking_vulnerability=CVE-2026-3003"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload after failure: missing blocking vulnerability
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "sarif_upload_step=ran"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload after failure: missing upload step run marker
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "github_security=trivy-results.sarif"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x Trivy SARIF upload after failure: missing GitHub Security SARIF result
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_checkout_depth_zero_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec combined
 
@@ -4162,6 +8074,65 @@ run_forbidden_jobs_duration_fail_case 12000 missing "missing monitored job: forb
 run_forbidden_jobs_duration_fail_case missing 18000 "missing monitored job: forbidden-tools"
 run_forbidden_jobs_duration_fail_case 12000 unknown "missing duration evidence for forbidden-imports"
 run_forbidden_jobs_duration_fail_case unknown 18000 "missing duration evidence for forbidden-tools"
+run_build_docker_duration_pass_case 120000 "2 min"
+run_build_docker_duration_pass_case 599999 "9 min 59.999 s"
+run_build_docker_duration_fail_case 600000
+run_build_docker_duration_fail_case 720000
+run_build_docker_duration_excludes_queue_case
+run_build_docker_duration_missing_cache_case
+run_docker_build_action_verification_case
+run_docker_build_action_push_true_case
+run_docker_build_action_missing_action_case
+run_docker_build_action_platform_boundary_case "linux/amd64,linux/arm64" "accepted" "required amd64 and arm64 platforms present"
+run_docker_build_action_platform_boundary_case "linux/amd64" "rejected" "arm64 platform is missing"
+run_docker_build_action_platform_boundary_case "linux/arm64" "rejected" "amd64 platform is missing"
+run_docker_build_action_platform_boundary_case "linux/amd64,linux/arm64,linux/386" "rejected" "extra platform is outside the v0.1 contract"
+run_docker_build_action_missing_cache_input_case "cache-from"
+run_docker_build_action_missing_cache_input_case "cache-to"
+run_docker_build_action_ignores_env_inputs_case
+run_docker_build_action_flow_with_mapping_case
+run_docker_build_action_build_job_anchor_case
+run_docker_build_action_with_block_anchor_case
+run_docker_build_action_anchored_flow_with_mapping_case
+run_docker_build_action_with_alias_case
+run_docker_build_action_with_redefined_alias_case
+run_docker_build_action_uses_current_alias_step_occurrence_case
+run_docker_build_action_multiline_platforms_case
+run_docker_build_action_rejects_folded_platforms_case
+run_docker_build_action_ignores_run_block_fake_step_case
+run_docker_build_action_ignores_fake_job_markers_case
+run_docker_build_action_ignores_nested_build_job_key_case
+run_docker_build_action_ignores_nested_steps_key_case
+run_docker_build_action_variable_indent_case
+run_docker_build_action_indented_root_jobs_case
+run_docker_build_action_inline_with_anchor_case
+run_docker_build_action_with_comment_before_inputs_case
+run_docker_build_action_first_line_with_block_case
+run_docker_build_action_rejects_later_push_step_case
+run_docker_build_action_ignores_nested_with_scalar_inputs_case
+run_docker_build_action_ignores_nested_with_block_case
+run_docker_setup_action_pinning_sha_pass_case
+run_docker_setup_action_pinning_moving_ref_case "docker/setup-qemu-action@v3"
+run_docker_setup_action_pinning_moving_ref_case "docker/setup-buildx-action@v3"
+run_docker_setup_action_pinning_moving_ref_case "docker/setup-buildx-action@master"
+run_docker_setup_action_pinning_moving_ref_case "docker/setup-qemu-action@3df4ab1"
+run_docker_setup_action_pinning_missing_action_case "docker/setup-qemu-action" "docker/setup-buildx-action"
+run_docker_setup_action_pinning_missing_action_case "docker/setup-buildx-action" "docker/setup-qemu-action"
+run_docker_setup_action_pinning_sha_boundary_case "123456789012345678901234567890123456789" "rejected" "39 hexadecimal characters is too short"
+run_docker_setup_action_pinning_sha_boundary_case "1234567890123456789012345678901234567890" "accepted" "40 hexadecimal characters is exactly valid"
+run_docker_setup_action_pinning_sha_boundary_case "12345678901234567890123456789012345678901" "rejected" "41 hexadecimal characters is too long"
+run_docker_setup_action_pinning_invalid_sha_class_case "123456789012345678901234567890123456789A" "SHA must use lowercase hexadecimal characters"
+run_docker_setup_action_pinning_invalid_sha_class_case "123456789012345678901234567890123456789g" "SHA must use lowercase hexadecimal characters"
+run_docker_setup_action_pinning_invalid_sha_class_case "123456789012345678901234567890123456789_" "SHA must use lowercase hexadecimal characters"
+run_build_docker_needs_required_gates_case
+run_build_docker_needs_inline_gates_case
+run_build_docker_needs_multiline_flow_gates_case
+run_build_docker_needs_scalar_gate_case
+run_build_docker_needs_missing_required_gate_case
+run_build_docker_needs_missing_needs_case
+run_build_docker_needs_anchored_job_case
+run_build_docker_scheduler_failed_gate_case
+run_build_docker_scheduler_non_success_gate_case
 run_duration_fail_case 300000
 run_duration_fail_case 360000
 run_duration_queue_exclusion_case
@@ -4210,6 +8181,33 @@ run_audit_gate_high_vulnerability_case
 run_audit_gate_high_without_advisory_name_case
 run_audit_gate_mixed_high_and_critical_prioritizes_critical_case
 run_audit_gate_critical_vulnerability_case
+run_trivy_scan_config_pass_case
+run_trivy_scan_config_equivalent_severity_order_case
+run_trivy_scan_config_missing_blocking_severity_case "CRITICAL"
+run_trivy_scan_config_missing_blocking_severity_case "HIGH"
+run_trivy_scan_config_missing_blocking_severity_case "MEDIUM,HIGH"
+run_trivy_scan_config_missing_blocking_severity_case "HIGH,CRITICAL,LOW"
+run_trivy_scan_config_missing_action_case
+run_trivy_scan_config_exit_code_boundary_case "0" "rejected" "zero would not fail CI"
+run_trivy_scan_config_exit_code_boundary_case "1" "accepted" "one fails CI on blocking findings"
+run_trivy_scan_config_exit_code_boundary_case "2" "rejected" "only exit-code one is in scope"
+run_trivy_sarif_upload_config_pass_case
+run_trivy_sarif_upload_config_expression_condition_case
+run_trivy_sarif_upload_config_upload_before_trivy_case
+run_trivy_sarif_upload_config_missing_upload_action_case
+run_trivy_sarif_upload_config_different_upload_path_case
+run_trivy_sarif_upload_config_boundary_case "sarif" "trivy-results.sarif" "trivy-results.sarif" "always()" "accepted" "producer and uploader use the SARIF path"
+run_trivy_sarif_upload_config_boundary_case "table" "trivy-results.sarif" "trivy-results.sarif" "always()" "rejected" "Trivy must emit SARIF"
+run_trivy_sarif_upload_config_boundary_case "sarif" "container.sarif" "container.sarif" "always()" "rejected" "Trivy output must be trivy-results.sarif"
+run_trivy_sarif_upload_config_boundary_case "sarif" "trivy-results.sarif" "container.sarif" "always()" "rejected" "SARIF upload path must be trivy-results.sarif"
+run_trivy_sarif_upload_config_boundary_case "sarif" "trivy-results.sarif" "trivy-results.sarif" "success()" "rejected" "SARIF upload must run after Trivy failure"
+run_trivy_vulnerability_gate_no_high_or_critical_case
+run_trivy_vulnerability_gate_null_vulnerabilities_case
+run_trivy_vulnerability_gate_high_vulnerability_case
+run_trivy_vulnerability_gate_critical_vulnerability_case
+run_trivy_vulnerability_gate_missing_result_case
+run_trivy_step_completion_nonzero_result_case
+run_trivy_sarif_upload_after_failure_case
 run_secrets_checkout_depth_zero_case
 run_secrets_checkout_missing_step_case
 run_secrets_checkout_missing_fetch_depth_case
