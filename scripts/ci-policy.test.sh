@@ -2611,6 +2611,74 @@ $(printf '%s\n' "$combined" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_docker_setup_action_pinning_sha_boundary_case() {
+  local sha_ref="$1"
+  local expected_outcome="$2"
+  local expected_reason="$3"
+  local expected_exit=1
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  if [ "$expected_outcome" = "accepted" ]; then
+    expected_exit=0
+  fi
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<YAML
+name: ci
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@0123456789abcdef0123456789abcdef01234567
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@${sha_ref}
+YAML
+
+  # Given the build-docker job contains the action reference "docker/setup-buildx-action@<sha_ref>"
+  node "$SCRIPT" docker-setup-action-pinning --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+  combined=$(printf '%s\n%s\n' "$stdout" "$stderr")
+
+  if [ "$ec" -ne "$expected_exit" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action SHA boundary ${sha_ref}: expected exit ${expected_exit}, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # When the Docker setup action pinning rule is evaluated
+  # Then the Docker setup action pinning assertion outcome is "<outcome>"
+  if ! printf '%s\n' "$stdout" | grep -Fq "pinning_outcome=${expected_outcome}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action SHA boundary ${sha_ref}: missing expected outcome ${expected_outcome}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  # And the boundary reason is "<reason>"
+  if ! printf '%s\n' "$stdout" | grep -Fq "boundary_reason=${expected_reason}"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  x docker setup action SHA boundary ${sha_ref}: missing boundary reason ${expected_reason}
+$(printf '%s\n' "$combined" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_build_docker_needs_required_gates_case() {
   local workflow_file stdout stderr stdout_file stderr_file ec combined
 
@@ -6728,6 +6796,9 @@ run_docker_setup_action_pinning_moving_ref_case "docker/setup-buildx-action@mast
 run_docker_setup_action_pinning_moving_ref_case "docker/setup-qemu-action@3df4ab1"
 run_docker_setup_action_pinning_missing_action_case "docker/setup-qemu-action" "docker/setup-buildx-action"
 run_docker_setup_action_pinning_missing_action_case "docker/setup-buildx-action" "docker/setup-qemu-action"
+run_docker_setup_action_pinning_sha_boundary_case "123456789012345678901234567890123456789" "rejected" "39 hexadecimal characters is too short"
+run_docker_setup_action_pinning_sha_boundary_case "1234567890123456789012345678901234567890" "accepted" "40 hexadecimal characters is exactly valid"
+run_docker_setup_action_pinning_sha_boundary_case "12345678901234567890123456789012345678901" "rejected" "41 hexadecimal characters is too long"
 run_build_docker_needs_required_gates_case
 run_build_docker_needs_inline_gates_case
 run_build_docker_needs_multiline_flow_gates_case
