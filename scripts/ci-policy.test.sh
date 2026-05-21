@@ -240,6 +240,159 @@ $(printf '%s\n' "$stdout" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+run_changelog_trigger_pull_request_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+on:
+  pull_request:
+jobs:
+  changelog-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check changelog
+        run: node scripts/ci-policy.mjs changelog-diff --base origin/main --head HEAD
+YAML
+
+  # Given the CI workflow declares these events:
+  #   | event        |
+  #   | pull_request |
+  # And the CI workflow contains the "changelog-check" job
+  # And the "changelog-check" job is eligible for event "pull_request"
+  node "$SCRIPT" changelog-trigger --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger pull_request: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # When the changelog-check trigger rule is evaluated
+  # Then the changelog-check trigger assertion passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_trigger=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger pull_request: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the job is eligible to run for event "pull_request"
+  if ! printf '%s\n' "$stdout" | grep -Fq "eligible_event=pull_request"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger pull_request: missing pull_request eligibility
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_trigger_inline_event_syntax_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+on: [push, pull_request]
+jobs:
+  changelog-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check changelog
+        run: node scripts/ci-policy.mjs changelog-diff --base origin/main --head HEAD
+YAML
+
+  node "$SCRIPT" changelog-trigger --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger inline event syntax: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "eligible_event=pull_request"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger inline event syntax: missing pull_request eligibility
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_changelog_trigger_expression_condition_case() {
+  local workflow_file stdout stderr stdout_file stderr_file ec combined
+
+  workflow_file=$(mktemp)
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$workflow_file" <<'YAML'
+on:
+  pull_request:
+jobs:
+  changelog-check:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check changelog
+        run: node scripts/ci-policy.mjs changelog-diff --base origin/main --head HEAD
+YAML
+
+  node "$SCRIPT" changelog-trigger --workflow "$workflow_file" >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$workflow_file" "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger expression condition: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "eligible_event=pull_request"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog trigger expression condition: missing pull_request eligibility
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_duration_pass_case() {
   local elapsed_ms="$1"
   local reported_duration="$2"
@@ -8137,6 +8290,9 @@ run_duration_fail_case 300000
 run_duration_fail_case 360000
 run_duration_queue_exclusion_case
 run_duration_cache_miss_case
+run_changelog_trigger_pull_request_case
+run_changelog_trigger_inline_event_syntax_case
+run_changelog_trigger_expression_condition_case
 run_invalid_cache_state_case
 run_action_pinning_sha_pass_case
 run_gitleaks_action_pinning_sha_pass_case
