@@ -63,6 +63,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `ci`: add changelog-check diff coverage rejecting `.ts` and `.tsx` changes
   without a root `CHANGELOG.md` update (#804).
 
+- `ci`: add changelog-check diff file-set classification coverage for mixed
+  documentation and TypeScript changes requiring `CHANGELOG.md` (#805).
+
 - `ci`: add Docker setup action pinning policy coverage requiring the
   `build-docker` QEMU and Buildx setup actions to use full commit SHAs (#739).
 
