@@ -30,6 +30,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `ci`: add changelog-check trigger policy coverage rejecting jobs eligible for
   `push`, `workflow_dispatch`, or `schedule` (#793).
 
+- `ci`: add changelog-check trigger policy coverage allowing other workflow
+  triggers when the gate remains pull-request-only (#794).
+
 - `ci`: add Docker setup action pinning policy coverage requiring the
   `build-docker` QEMU and Buildx setup actions to use full commit SHAs (#739).
 
