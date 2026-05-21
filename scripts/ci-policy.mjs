@@ -915,6 +915,11 @@ const runChangelogTrigger = (args) => {
   const workflow = readWorkflowFile(workflowPath);
   const jobsBlock = getIndentedBlock(workflow, /^\s*jobs:\s*(?:#.*)?$/);
   const changelogJob = getIndentedBlock(jobsBlock, /^\s+changelog-check:\s*(?:#.*)?$/);
+  if (changelogJob.length === 0) {
+    writeStdout("changelog_trigger=fail\njob=missing\n");
+    fail("missing changelog-check job", 1);
+  }
+
   const hasPullRequestEvent = readWorkflowEventNames(workflow).includes("pull_request");
   const condition = getStepPropertyValue(changelogJob, "if");
   const jobEligibleForPullRequest =
