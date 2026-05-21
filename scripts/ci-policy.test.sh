@@ -1271,6 +1271,67 @@ $(printf '%s\n' "$stdout" | sed 's/^/      /')"
   done
 }
 
+run_changelog_diff_typescript_rename_without_changelog_fails_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the base commit is "1111111111111111111111111111111111111111"
+  # And the head commit is "8888888888888888888888888888888888888888"
+  # And the base..head diff renames "packages/core/src/old-severity.ts" to "packages/core/src/severity.ts"
+  # And the base..head diff does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-diff \
+    --base 1111111111111111111111111111111111111111 \
+    --head 8888888888888888888888888888888888888888 \
+    --changed-files "packages/core/src/severity.ts" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the changelog-check gate evaluates the base..head diff
+  # Then the changed file set has TypeScript code changes
+  if ! printf '%s\n' "$stdout" | grep -Fq "has_typescript_code=true"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript rename without changelog: missing TypeScript flag
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the changed file set does not have a CHANGELOG.md change
+  if ! printf '%s\n' "$stdout" | grep -Fq "has_root_changelog=false"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript rename without changelog: wrong changelog flag
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the changelog-check gate fails
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript rename without changelog: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff TypeScript rename without changelog: missing failure assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_changelog_diff_failure_message_example_path_case() {
   local stdout stderr stdout_file stderr_file ec combined
 
@@ -9237,6 +9298,7 @@ run_changelog_diff_typescript_without_changelog_fails_case
 run_changelog_diff_mixed_requires_changelog_case
 run_changelog_diff_base_head_non_failure_conditions_pass_case
 run_changelog_diff_base_head_typescript_without_changelog_fails_case
+run_changelog_diff_typescript_rename_without_changelog_fails_case
 run_changelog_diff_failure_message_example_path_case
 run_invalid_cache_state_case
 run_action_pinning_sha_pass_case

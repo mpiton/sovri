@@ -73,6 +73,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `ci`: add changelog-check base-to-head diff coverage rejecting TypeScript
   changes without a root `CHANGELOG.md` update (#807).
 
+- `ci`: add changelog-check base-to-head diff coverage for TypeScript renames
+  without a root `CHANGELOG.md` update (#808).
+
 - `ci`: add Docker setup action pinning policy coverage requiring the
   `build-docker` QEMU and Buildx setup actions to use full commit SHAs (#739).
 
