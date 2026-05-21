@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Security
 
+- `test`: add ATDD coverage and policy evaluation for missing, partial,
+  chained, and locally aliased Vitest explicit-import violations (#930).
+
 - `test`: add the root Vitest config with disabled globals, repo-root project
   resolution, workspace source aliases, and v8 coverage summary output (#929).
 

@@ -26,6 +26,7 @@ export default defineConfig({
     alias: workspaceSourceAliases,
   },
   test: {
+    alias: workspaceSourceAliases,
     coverage: {
       exclude: [
         "**/*.test.ts",
@@ -43,6 +44,5 @@ export default defineConfig({
     environment: "node",
     // Vitest globals stay disabled; tests import APIs from vitest.
     globals: false,
-    projects: ["packages/*", "apps/*"],
   },
 });
