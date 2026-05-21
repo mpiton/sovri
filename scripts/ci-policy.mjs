@@ -902,16 +902,18 @@ const runChangelogDiff = (args) => {
   const hasTypescriptCode = changedFiles.some((path) => isTypescriptCodePath(path));
   const hasRootChangelog = changedFiles.includes("CHANGELOG.md");
   const classifications = formatChangelogClassifications(changedFiles);
+  const changedFileSet =
+    hasTypescriptCode && !hasRootChangelog ? "requires-changelog" : "no-changelog-required";
 
   if (!hasTypescriptCode || hasRootChangelog) {
     writeStdout(
-      `${classifications}has_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=pass\ngate_result=success\n`,
+      `${classifications}changed_file_set=${changedFileSet}\nhas_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=pass\ngate_result=success\n`,
     );
     return;
   }
 
   writeStdout(
-    `${classifications}has_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=fail\ngate_result=failure\n`,
+    `${classifications}changed_file_set=${changedFileSet}\nhas_typescript_code=${hasTypescriptCode}\nhas_root_changelog=${hasRootChangelog}\nchangelog_gate=fail\ngate_result=failure\n`,
   );
   fail(buildChangelogRemediationMessage(changedFiles), 1);
 };
