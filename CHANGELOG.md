@@ -44,6 +44,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `ci`: add Trivy scan configuration policy coverage requiring HIGH/CRITICAL
   severities, equivalent severity ordering, and exit-code 1 in `build-docker`
   (#748).
+- `ci`: add Trivy scan configuration fixture coverage rejecting missing
+  blocking severity sets in `build-docker` (#749).
 
 - `ci`: add Docker build action policy coverage requiring `docker/build-push-action`,
   `push: false`, exactly `linux/amd64` and `linux/arm64`, and GitHub Actions
