@@ -926,6 +926,56 @@ $(printf '%s\n' "$combined" | sed 's/^/      /')"
   PASS=$((PASS + 1))
 }
 
+run_changelog_diff_with_changelog_has_no_remediation_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path                         |
+  #   | packages/core/src/finding.ts |
+  #   | CHANGELOG.md                 |
+  node "$SCRIPT" changelog-diff \
+    --changed-files "packages/core/src/finding.ts,CHANGELOG.md" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff with changelog has no remediation: expected exit 0, got ${ec}
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # When the changelog-check gate evaluates the pull request diff
+  # Then the changelog-check gate passes
+  if ! printf '%s\n' "$stdout" | grep -Fq "changelog_gate=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff with changelog has no remediation: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/      /')"
+    return
+  fi
+
+  # And no remediation failure message is produced
+  if printf '%s\n%s\n' "$stdout" "$stderr" | grep -Fq "remediation_message=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff with changelog has no remediation: produced remediation failure
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_duration_pass_case() {
   local elapsed_ms="$1"
   local reported_duration="$2"
@@ -8835,6 +8885,7 @@ run_changelog_ci_only_failure_assertion_case
 run_changelog_diff_workflow_classification_case
 run_changelog_diff_failure_message_case
 run_changelog_remediation_message_vague_case
+run_changelog_diff_with_changelog_has_no_remediation_case
 run_invalid_cache_state_case
 run_action_pinning_sha_pass_case
 run_gitleaks_action_pinning_sha_pass_case
