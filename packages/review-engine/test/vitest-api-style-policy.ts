@@ -56,7 +56,7 @@ function evaluateFile(file: VitestApiStyleFile): readonly string[] {
 }
 
 function callsVitestApi(source: string, api: string): boolean {
-  const pattern = new RegExp(`(^|[^\\w$.])${api}\\s*\\(`, "u");
+  const pattern = new RegExp(`(^|[^\\w$])${api}(?:\\s*\\(|\\s*\\.)`, "u");
   return pattern.test(source);
 }
 

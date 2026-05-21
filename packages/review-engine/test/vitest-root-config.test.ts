@@ -78,9 +78,25 @@ function buildVitestSource(example: ExplicitImportExample): string {
     example.importedApis.length === 0
       ? ""
       : `import { ${example.importedApis.join(", ")} } from "vitest";\n`;
-  const calls = example.calledApis.map((api) => `${api}();`).join("\n");
+  const calls = example.calledApis.map((api) => buildVitestCall(api)).join("\n");
 
   return `${importLine}${calls}\n`;
+}
+
+function buildVitestCall(api: string): string {
+  if (api === "describe") {
+    return 'describe.each([["case"]])("%s", () => {});';
+  }
+
+  if (api === "it") {
+    return 'it.each([[1]])("%i", () => {});';
+  }
+
+  if (api === "vi") {
+    return 'vi.mock("node:fs");';
+  }
+
+  return `${api}();`;
 }
 
 function extractVitestImports(source: string): Set<string> {
@@ -134,7 +150,7 @@ describe("Vitest root config explicit import policy", () => {
       // And "<file>" calls "<called_apis>"
       const source = buildVitestSource(example);
       for (const api of example.calledApis) {
-        expect(source).toContain(`${api}(`);
+        expect(source).toContain(api);
       }
       // And "<file>" imports "<imported_apis>" from "vitest"
       const imports = extractVitestImports(source);
