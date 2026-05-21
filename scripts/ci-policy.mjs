@@ -1434,7 +1434,7 @@ const getDuplicateValue = (values) => {
 
 const parseCommaSeparatedList = (value) =>
   (value ?? "")
-    .split(",")
+    .split(/[,\n]/)
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
 
@@ -1456,6 +1456,15 @@ const getExactLicenseListFailures = (actual, required, inputName, adjective) => 
   if (!exactOrder) return [`${adjective} licenses must follow the required order`];
 
   return [];
+};
+
+const getSingleLicenseInputFailures = (inputs, required, inputName, adjective) => {
+  if (inputs.length === 0) return [`${inputName} is required`];
+  if (inputs.length > 1) {
+    return [`${inputName} must be configured on exactly one actions/dependency-review-action step`];
+  }
+
+  return getExactLicenseListFailures(inputs[0] ?? [], required, inputName, adjective);
 };
 
 const getDependencyReviewWorkflowFailures = (workflow) => {
@@ -1525,41 +1534,38 @@ const getDependencyReviewWorkflowFailures = (workflow) => {
     );
   }
 
-  const allowLicenses = parseCommaSeparatedList(
-    dependencyReviewSteps
-      .map((dependencyReviewStep) =>
-        getStepInput(
-          dependencyReviewStep.block,
-          "allow-licenses",
-          workflow,
-          dependencyReviewStep.startIndex,
-        ),
-      )
-      .find((value) => value !== undefined),
-  );
-  const denyLicenses = parseCommaSeparatedList(
-    dependencyReviewSteps
-      .map((dependencyReviewStep) =>
-        getStepInput(
-          dependencyReviewStep.block,
-          "deny-licenses",
-          workflow,
-          dependencyReviewStep.startIndex,
-        ),
-      )
-      .find((value) => value !== undefined),
-  );
+  const allowLicenseInputs = dependencyReviewSteps.flatMap((dependencyReviewStep) => {
+    const value = getStepInput(
+      dependencyReviewStep.block,
+      "allow-licenses",
+      workflow,
+      dependencyReviewStep.startIndex,
+    );
+    return value === undefined ? [] : [parseCommaSeparatedList(value)];
+  });
+  const denyLicenseInputs = dependencyReviewSteps.flatMap((dependencyReviewStep) => {
+    const value = getStepInput(
+      dependencyReviewStep.block,
+      "deny-licenses",
+      workflow,
+      dependencyReviewStep.startIndex,
+    );
+    return value === undefined ? [] : [parseCommaSeparatedList(value)];
+  });
+  const allowLicenses = allowLicenseInputs[0] ?? [];
+  const denyLicenses = denyLicenseInputs[0] ?? [];
+
   failures.push(
-    ...getExactLicenseListFailures(
-      allowLicenses,
+    ...getSingleLicenseInputFailures(
+      allowLicenseInputs,
       DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES,
       "allow-licenses",
       "allowed",
     ),
   );
   failures.push(
-    ...getExactLicenseListFailures(
-      denyLicenses,
+    ...getSingleLicenseInputFailures(
+      denyLicenseInputs,
       DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES,
       "deny-licenses",
       "denied",

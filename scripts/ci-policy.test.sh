@@ -10237,6 +10237,90 @@ run_dependency_review_combined_license_inputs_case() {
   rm -f "$workflow_file"
 }
 
+run_dependency_review_multiline_license_inputs_case() {
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_dependency_review_workflow_fixture \
+    "$workflow_file" \
+    "$(dependency_review_standard_trigger_body)" \
+    "$DEPENDENCY_REVIEW_TEST_ACTION_SHA" \
+    "high" \
+    "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" \
+    "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" \
+    "      - name: Dependency Review allowed licenses
+        uses: actions/dependency-review-action@${DEPENDENCY_REVIEW_TEST_ACTION_SHA}
+        with:
+          fail-on-severity: high
+          allow-licenses: |
+            Apache-2.0,
+            MIT,
+            BSD-2-Clause,
+            BSD-3-Clause,
+            ISC,
+            MPL-2.0,
+            CC0-1.0,
+            Unlicense,
+            BlueOak-1.0.0
+      - name: Dependency Review denied licenses
+        uses: actions/dependency-review-action@${DEPENDENCY_REVIEW_TEST_ACTION_SHA}
+        with:
+          fail-on-severity: high
+          deny-licenses: |
+            AGPL-1.0-only,
+            AGPL-1.0-or-later,
+            AGPL-3.0-only,
+            AGPL-3.0-or-later,
+            GPL-2.0-only,
+            GPL-2.0-or-later,
+            GPL-3.0-only,
+            GPL-3.0-or-later,
+            LGPL-2.0-only,
+            LGPL-2.0-or-later,
+            LGPL-2.1-only,
+            LGPL-2.1-or-later,
+            LGPL-3.0-only,
+            LGPL-3.0-or-later"
+
+  run_ci_policy_success_case "dependency review multiline license inputs" "allow_licenses=exact" \
+    dependency-review-workflow-config --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
+run_dependency_review_duplicate_license_step_case() {
+  local workflow_file
+
+  workflow_file=$(mktemp)
+  write_dependency_review_workflow_fixture \
+    "$workflow_file" \
+    "$(dependency_review_standard_trigger_body)" \
+    "$DEPENDENCY_REVIEW_TEST_ACTION_SHA" \
+    "high" \
+    "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" \
+    "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" \
+    "      - name: Dependency Review allowed licenses
+        uses: actions/dependency-review-action@${DEPENDENCY_REVIEW_TEST_ACTION_SHA}
+        with:
+          fail-on-severity: high
+          allow-licenses: ${DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES}
+      - name: Dependency Review extra allowed licenses
+        uses: actions/dependency-review-action@${DEPENDENCY_REVIEW_TEST_ACTION_SHA}
+        with:
+          fail-on-severity: high
+          allow-licenses: MIT
+      - name: Dependency Review denied licenses
+        uses: actions/dependency-review-action@${DEPENDENCY_REVIEW_TEST_ACTION_SHA}
+        with:
+          fail-on-severity: high
+          deny-licenses: ${DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES}"
+
+  run_ci_policy_failure_case "dependency review duplicate license step" "allow-licenses must be configured on exactly one actions/dependency-review-action step" \
+    dependency-review-workflow-config --workflow "$workflow_file"
+
+  rm -f "$workflow_file"
+}
+
 write_release_trigger_workflow() {
   local workflow_file="$1"
   local trigger_body="$2"
@@ -10840,6 +10924,8 @@ run_dependency_review_license_failure_case "reordered deny" "$DEPENDENCY_REVIEW_
 run_dependency_review_license_failure_case "missing allow input" "" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "allow-licenses is required"
 run_dependency_review_license_failure_case "missing deny input" "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" "" "deny-licenses is required"
 run_dependency_review_combined_license_inputs_case
+run_dependency_review_multiline_license_inputs_case
+run_dependency_review_duplicate_license_step_case
 run_docker_build_action_verification_case
 run_docker_build_action_push_true_case
 run_docker_build_action_missing_action_case
