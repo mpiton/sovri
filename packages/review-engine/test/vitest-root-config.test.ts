@@ -126,10 +126,8 @@ function extractVitestImports(source: string): Set<string> {
   for (const match of matches) {
     const importList = match[1] ?? "";
     for (const name of importList.split(",")) {
-      const importedName = name
-        .trim()
-        .split(/\s+as\s+/u)[0]
-        ?.trim();
+      const importParts = name.trim().split(/\s+as\s+/u);
+      const importedName = importParts[1]?.trim() ?? importParts[0]?.trim();
       if (importedName !== undefined && importedName.length > 0) {
         imports.add(importedName);
       }
@@ -154,7 +152,12 @@ describe("Vitest root config explicit import policy", () => {
     const imports = extractVitestImports(source);
     expect([...imports].toSorted()).toEqual([...example.importedApis].toSorted());
     // When the Vitest API style rule is evaluated
+    const result = evaluateVitestApiStyle({
+      configSource: config,
+      files: [{ path: example.file, source }],
+    });
     // Then the Vitest API style assertion passes
+    expect(result).toEqual({ messages: [], passed: true });
     for (const api of example.calledApis) {
       expect(imports.has(api)).toBe(true);
     }
@@ -228,6 +231,21 @@ describe("Vitest root config explicit import policy", () => {
       expect(result.messages.join("\n")).toContain("document the Vitest API style choice");
     },
   );
+
+  it("detects Vitest APIs invoked with generic type parameters", () => {
+    const result = evaluateVitestApiStyle({
+      configSource: readVitestConfig(),
+      files: [
+        {
+          path: "packages/core/src/type-params.test.ts",
+          source: ["expectTypeOf<{ id: string }>().toMatchTypeOf<{ id: string }>();"].join("\n"),
+        },
+      ],
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.messages.join("\n")).toContain("test files must import Vitest APIs explicitly");
+  });
 
   it("accepts local Vitest import aliases and ignores object member calls", () => {
     const result = evaluateVitestApiStyle({
