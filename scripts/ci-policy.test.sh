@@ -976,6 +976,57 @@ $(printf '%s\n' "$combined" | sed 's/^/      /')"
   PASS=$((PASS + 1))
 }
 
+run_changelog_diff_failure_message_example_path_case() {
+  local stdout stderr stdout_file stderr_file ec combined
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given pull request 53 changes these files:
+  #   | path                             |
+  #   | packages/config/src/schema.ts    |
+  #   | apps/community-bot/src/server.ts |
+  # And pull request 53 does not change "CHANGELOG.md"
+  node "$SCRIPT" changelog-diff \
+    --changed-files "packages/config/src/schema.ts,apps/community-bot/src/server.ts" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  combined="${stdout}
+${stderr}"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff failure message example path: expected non-zero exit
+$(printf '%s\n' "$combined" | sed 's/^/      /')"
+    return
+  fi
+
+  # When the changelog-check gate builds the failure message
+  # Then the failure message mentions "packages/config/src/schema.ts"
+  if ! printf '%s\n' "$stderr" | grep -Fq "packages/config/src/schema.ts"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff failure message example path: missing TypeScript path
+$(printf '%s\n' "$stderr" | sed 's/^/      /')"
+    return
+  fi
+
+  # And the failure message mentions "CHANGELOG.md"
+  if ! printf '%s\n' "$stderr" | grep -Fq "CHANGELOG.md"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ changelog diff failure message example path: missing CHANGELOG.md
+$(printf '%s\n' "$stderr" | sed 's/^/      /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_secrets_duration_pass_case() {
   local elapsed_ms="$1"
   local reported_duration="$2"
@@ -8886,6 +8937,7 @@ run_changelog_diff_workflow_classification_case
 run_changelog_diff_failure_message_case
 run_changelog_remediation_message_vague_case
 run_changelog_diff_with_changelog_has_no_remediation_case
+run_changelog_diff_failure_message_example_path_case
 run_invalid_cache_state_case
 run_action_pinning_sha_pass_case
 run_gitleaks_action_pinning_sha_pass_case
