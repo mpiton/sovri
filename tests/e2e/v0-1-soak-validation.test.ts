@@ -1314,6 +1314,32 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.status, result.stderr).toBe(0);
   });
 
+  it("uses the target repository soak evidence table when an earlier complete table belongs to another repository", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "| PR URL | latency | finding count | manual quality rating |",
+        "| --- | --- | --- | --- |",
+        "| https://github.com/mpiton/other-repo/pull/101 | 12.000s | 0 | 3 |",
+        "",
+        "| PR URL | latency | finding count | manual quality rating |",
+        "| --- | --- | --- | --- |",
+        "| https://github.com/mpiton/forgent/pull/101 | 31.200s | 2 | 4 |",
+      ].join("\n"),
+    );
+
+    const result = runValidator([
+      "soak-log-content",
+      "--repo",
+      "mpiton/forgent",
+      "--qualifying-pr",
+      "101",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    expect(result.status, result.stderr).toBe(0);
+  });
+
   it("fails committed soak log evidence when no PR rows are present", () => {
     const soakLogPath = writeSoakLog(
       [

@@ -788,7 +788,7 @@ function writeSmokePrQualifications(stream, qualifications) {
 }
 
 function findMissingRequiredSoakLogField(content, expected) {
-  const table = readSoakLogEvidenceTable(content);
+  const table = readSoakLogEvidenceTable(content, expected.repoFullName);
   if (table === undefined) {
     return "PR URL";
   }
@@ -824,18 +824,34 @@ function findMissingRequiredSoakLogField(content, expected) {
   return undefined;
 }
 
-function readSoakLogEvidenceTable(content) {
+function readSoakLogEvidenceTable(content, repoFullName) {
   const tables = readMarkdownTables(content);
-  const completeTable = tables.find((table) =>
+  const completeTables = tables.filter((table) =>
     REQUIRED_SOAK_LOG_FIELDS.every((field) => table.header.includes(field)),
   );
-  if (completeTable !== undefined) {
-    return completeTable;
+  const targetRepoTable = completeTables.find((table) =>
+    tableContainsTargetRepoEvidence(table, repoFullName),
+  );
+  if (targetRepoTable !== undefined) {
+    return targetRepoTable;
+  }
+  if (completeTables[0] !== undefined) {
+    return completeTables[0];
   }
 
   return tables.find((table) =>
     table.header.some((cell) => REQUIRED_SOAK_LOG_FIELDS.includes(cell)),
   );
+}
+
+function tableContainsTargetRepoEvidence(table, repoFullName) {
+  const fieldIndexes = readSoakLogFieldIndexes(table.header);
+  return table.rows.some((row) => {
+    const prUrlCell = readRequiredSoakLogCell(row, fieldIndexes, "PR URL");
+    return (
+      prUrlCell !== undefined && readGitHubPullUrlPrNumber(prUrlCell, repoFullName) !== undefined
+    );
+  });
 }
 
 function readMarkdownTables(content) {
@@ -918,7 +934,7 @@ function findMissingSoakEvidencePr(content, expected) {
 }
 
 function findInvalidFindingCountPr(content, expected) {
-  const table = readSoakLogEvidenceTable(content);
+  const table = readSoakLogEvidenceTable(content, expected.repoFullName);
   if (table === undefined) {
     return undefined;
   }
@@ -941,7 +957,7 @@ function findInvalidFindingCountPr(content, expected) {
 }
 
 function findInvalidLatencyPr(content, expected) {
-  const table = readSoakLogEvidenceTable(content);
+  const table = readSoakLogEvidenceTable(content, expected.repoFullName);
   if (table === undefined) {
     return undefined;
   }
@@ -1028,7 +1044,7 @@ function isDecimalInteger(value) {
 }
 
 function readSoakEvidenceRowPrNumbers(content, repoFullName) {
-  const table = readSoakLogEvidenceTable(content);
+  const table = readSoakLogEvidenceTable(content, repoFullName);
   if (table === undefined) {
     return [];
   }

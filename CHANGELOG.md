@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: ensure soak-log validation selects the complete evidence
+  table for the target repository when other repository tables appear first
+  (#1022).
+
 - `test(e2e)`: restrict soak-log field, duplicate, latency, finding-count,
   and row-count checks to the complete PR evidence table (#1022).
 
