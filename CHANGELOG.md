@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add escaped private key newline startup evidence coverage and
+  validator support (#1058).
+
 - `test(e2e)`: add empty committed soak-log evidence coverage and
   validator support (#1053).
 

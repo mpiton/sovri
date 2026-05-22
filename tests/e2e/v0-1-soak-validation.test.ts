@@ -795,6 +795,27 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("soak log has no PR evidence rows");
   });
+
+  it("accepts escaped private key newline startup evidence", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "PRIVATE_KEY storage: escaped-newlines",
+        "PRIVATE_KEY decoded PEM key: valid 2048-bit RSA",
+        "Private key line break normalization: true",
+        "Community bot startup: success",
+      ].join("\n"),
+    );
+
+    // Given `PRIVATE_KEY` is stored as one environment value with literal "\n" line breaks
+    // And the value decodes to a valid 2048-bit RSA PEM key
+    // When the Community bot starts
+    const result = runValidator(["private-key-newlines", "--soak-log", soakLogPath]);
+
+    // Then Sovri normalizes the private key line breaks
+    // And startup succeeds
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("private key newline assertion passed");
+  });
 });
 
 function runValidator(args: readonly string[]): ReturnType<typeof spawnSync> {

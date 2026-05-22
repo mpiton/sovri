@@ -86,6 +86,14 @@ if (command === "image-provenance") {
   if (!hasExpectedGitHubAppInstallation(soakLog, { expectedApp, repoFullName })) {
     fail(`GitHub App installation assertion failed: ${expectedApp}`);
   }
+} else if (command === "private-key-newlines") {
+  const soakLogPath = readOption("--soak-log");
+  const soakLog = readFileSync(soakLogPath, "utf8");
+
+  if (!hasEscapedPrivateKeyNewlineStartupEvidence(soakLog)) {
+    fail("private key newline assertion failed");
+  }
+  process.stdout.write("private key newline assertion passed\n");
 } else if (command === "smoke-pr-count") {
   const targetBranch = readOption("--target-branch");
   const minimumCount = readIntegerOption("--minimum-count");
@@ -128,7 +136,7 @@ if (command === "image-provenance") {
   process.stdout.write("soak log commit assertion passed\n");
 } else {
   fail(
-    "usage: validate-v0-1-soak.mjs <image-provenance|anthropic-key|provider-logs|log-secrets|no-crash|github-app-installation|smoke-pr-count|soak-log-content|soak-log-commit> [options]",
+    "usage: validate-v0-1-soak.mjs <image-provenance|anthropic-key|provider-logs|log-secrets|no-crash|github-app-installation|private-key-newlines|smoke-pr-count|soak-log-content|soak-log-commit> [options]",
   );
 }
 
@@ -259,6 +267,16 @@ function hasExpectedGitHubAppInstallation(content, expected) {
   }
 
   return false;
+}
+
+function hasEscapedPrivateKeyNewlineStartupEvidence(content) {
+  const lines = content.split(/\r?\n/u);
+  return [
+    "PRIVATE_KEY storage: escaped-newlines",
+    "PRIVATE_KEY decoded PEM key: valid 2048-bit RSA",
+    "Private key line break normalization: true",
+    "Community bot startup: success",
+  ].every((expectedLine) => lines.includes(expectedLine));
 }
 
 function evaluateSmokePrCount(content, expected) {
