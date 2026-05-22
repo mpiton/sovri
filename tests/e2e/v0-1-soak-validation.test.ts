@@ -859,6 +859,53 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("app not installed on mpiton/forgent");
   });
 
+  it.each([
+    { access: "write", permission: "pull_requests" },
+    { access: "read", permission: "contents" },
+    { access: "write", permission: "issues" },
+    { access: "read", permission: "metadata" },
+  ])(
+    "rejects GitHub App installation evidence missing $permission:$access",
+    ({ access, permission }) => {
+      const permissionLines = [
+        "Sovri Community Bot permission: pull_requests=write",
+        "Sovri Community Bot permission: contents=read",
+        "Sovri Community Bot permission: issues=write",
+        "Sovri Community Bot permission: metadata=read",
+      ].filter((line) => line !== `Sovri Community Bot permission: ${permission}=${access}`);
+      const soakLogPath = writeSoakLog(
+        [
+          "Repository: mpiton/forgent",
+          "Installed GitHub App: Sovri Community Bot",
+          ...permissionLines,
+          "Sovri Community Bot webhook event: pull_request",
+          "Sovri Community Bot webhook event: issue_comment",
+          "GitHub webhook delivered: pull_request.opened repo=mpiton/forgent signed=true",
+          "GitHub API call: GET /repos/mpiton/forgent/pulls/101/files status=200",
+          "GitHub API call: POST /repos/mpiton/forgent/pulls/101/reviews status=201",
+        ].join("\n"),
+      );
+
+      // Given "Sovri Community Bot" is installed on "mpiton/forgent"
+      // And the installation is missing "<permission>: <access>"
+      // When the GitHub App installation assertion is evaluated
+      const result = runValidator([
+        "github-app-installation",
+        "--repo",
+        "mpiton/forgent",
+        "--expected-app",
+        "Sovri Community Bot",
+        "--soak-log",
+        soakLogPath,
+      ]);
+
+      // Then the GitHub App installation assertion fails
+      // And the failure mentions "<permission>: <access>"
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain(`${permission}: ${access}`);
+    },
+  );
+
   it("rejects the expected GitHub App when it is installed on a different repository", () => {
     const soakLogPath = writeSoakLog(
       [
