@@ -838,6 +838,34 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("p95 latency: 90.000 seconds");
     expect(result.stderr).toContain("p95 latency must be < 90 s");
   });
+
+  it("fails soak log validation when the finding count is negative", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "| PR URL | latency | finding count | manual quality rating |",
+        "| --- | --- | --- | --- |",
+        "| https://github.com/mpiton/forgent/pull/101 | 31.200s | -1 | 4 |",
+      ].join("\n"),
+    );
+
+    // Given "evals/v0.1-soak.md" contains a row for "https://github.com/mpiton/forgent/pull/101"
+    // And the finding count is "-1"
+    // When the soak log is validated
+    const result = runValidator([
+      "soak-log-content",
+      "--repo",
+      "mpiton/forgent",
+      "--qualifying-pr",
+      "101",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // Then the soak log content assertion fails
+    // And the failure mentions "finding count must be a non-negative integer"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("finding count must be a non-negative integer");
+  });
 });
 
 function runValidator(args: readonly string[]): ReturnType<typeof spawnSync> {

@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add non-negative soak-log finding count coverage and validator
+  support (#1024).
+
 - `test(e2e)`: add strict p95 latency boundary coverage and validator support
   for the 90-second limit (#1045).
 
