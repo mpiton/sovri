@@ -72,6 +72,30 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("Anthropic key wiring assertion failed");
   });
+
+  it("passes Anthropic key wiring when the smoke PR review completes", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "ANTHROPIC_API_KEY value: valid Anthropic API key",
+        "Repository: mpiton/forgent",
+        "PR: 101",
+        "Changed lines: 128",
+        "Structured Anthropic response received: true",
+        "First PR comment posted: true",
+      ].join("\n"),
+    );
+
+    // Given `ANTHROPIC_API_KEY` is set to a valid Anthropic API key
+    // And PR 101 in "mpiton/forgent" has 128 changed lines
+    // When Sovri reviews PR 101
+    const result = runValidator(["anthropic-key", "--pr", "101", "--soak-log", soakLogPath]);
+
+    // Then Sovri receives a structured Anthropic response
+    // And Sovri posts a first PR comment on PR 101
+    // And the Anthropic key wiring assertion passes
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("Anthropic key wiring assertion passed");
+  });
 });
 
 function runValidator(args: readonly string[]): ReturnType<typeof spawnSync> {
