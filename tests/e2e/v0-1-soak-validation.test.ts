@@ -48,6 +48,29 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.status, result.stderr).toBe(0);
   });
 
+  it("fails local build image provenance when the source commit is missing", () => {
+    const soakLogPath = writeSoakLog(
+      "Image provenance: built sovri/community-bot:smoke from Dockerfile\n",
+    );
+
+    // Given the running container image was prepared by "local build"
+    // And the soak log records "built sovri/community-bot:smoke from Dockerfile"
+    // But the soak log does not record a Sovri commit SHA
+    const result = runValidator([
+      "image-provenance",
+      "--provenance-mode",
+      "local build",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // When image provenance is evaluated
+    // Then the image provenance assertion fails
+    // And the failure mentions "local build must record the source commit"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("local build must record the source commit");
+  });
+
   it("fails Anthropic key wiring when Anthropic authentication fails without a crash", () => {
     const soakLogPath = writeSoakLog(
       [

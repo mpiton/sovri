@@ -25,6 +25,7 @@ const REQUIRED_GITHUB_APP_PERMISSIONS = [
 const REQUIRED_GITHUB_APP_EVENTS = ["pull_request", "issue_comment"];
 const LOCAL_BUILD_EVIDENCE =
   /built sovri\/community-bot:smoke from Dockerfile at commit [0-9a-f]{40}/u;
+const LOCAL_BUILD_EVIDENCE_PREFIX = "built sovri/community-bot:smoke from Dockerfile";
 const SOAK_LOG_LATENCY_DURATION_PATTERN = /^\d+(?:\.\d{1,3})?s$/u;
 
 const args = process.argv.slice(2);
@@ -36,6 +37,9 @@ if (command === "image-provenance") {
   const soakLog = readFileSync(soakLogPath, "utf8");
 
   if (!hasAcceptedImageProvenance(soakLog, provenanceMode)) {
+    if (provenanceMode === "local build" && hasLocalBuildEvidenceWithoutSourceCommit(soakLog)) {
+      fail("local build must record the source commit");
+    }
     fail("image provenance assertion failed");
   }
 } else if (command === "anthropic-key") {
@@ -239,6 +243,10 @@ function hasAcceptedImageProvenance(content, mode) {
   }
 
   return false;
+}
+
+function hasLocalBuildEvidenceWithoutSourceCommit(content) {
+  return content.includes(LOCAL_BUILD_EVIDENCE_PREFIX) && !LOCAL_BUILD_EVIDENCE.test(content);
 }
 
 function hasAnthropicAuthenticationFailure(content, prNumber) {

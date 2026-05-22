@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add local-build image provenance coverage for missing source
+  commit evidence and validator failure reason support (#1018).
+
 - `test(e2e)`: add soak-log latency duration validation coverage and validator
   support for invalid latency values (#1025).
 
