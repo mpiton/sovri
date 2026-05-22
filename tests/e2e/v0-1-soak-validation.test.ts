@@ -1760,6 +1760,40 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("soak log has no PR evidence rows");
   });
 
+  it("accepts committed soak log evidence with required PR rows", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Evidence repository: mpiton/sovri",
+        "Committed soak log path: evals/v0.1-soak.md",
+        "Latest evidence commit SHA: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "| PR URL | latency | finding count | manual quality rating |",
+        "| --- | --- | --- | --- |",
+        "| https://github.com/mpiton/sovri/pull/101 | 31.200s | 2 | 4 |",
+        "| https://github.com/mpiton/sovri/pull/102 | 44.800s | 1 | 4 |",
+        "| https://github.com/mpiton/sovri/pull/103 | 58.400s | 3 | 5 |",
+        "| https://github.com/mpiton/sovri/pull/104 | 76.300s | 2 | 4 |",
+      ].join("\n"),
+    );
+
+    // Given "evals/v0.1-soak.md" exists in commit "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    // And the latest evidence commit SHA is "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    // And the committed file contains entries for PRs 101, 102, 103, and 104
+    // When the committed evidence is inspected
+    const result = runValidator([
+      "soak-log-commit",
+      "--repo",
+      "mpiton/sovri",
+      "--path",
+      "evals/v0.1-soak.md",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // Then the soak log commit assertion passes
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("soak log commit assertion passed");
+  });
+
   it("fails committed soak log evidence when metadata only partially matches", () => {
     const soakLogPath = writeSoakLog(
       [

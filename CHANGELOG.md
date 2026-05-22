@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add nominal committed soak-log evidence coverage with PR
+  rows for v0.1 task evidence validation (#1050).
+
 - `test(e2e)`: add redacted secret placeholder coverage for captured log
   secret validation (#1035).
 
