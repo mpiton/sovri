@@ -143,7 +143,7 @@ function hasAnthropicAuthenticationFailure(content, prNumber) {
 }
 
 function hasMissingAnthropicKeyFailure(content, prNumber) {
-  const apiKeyEvidence = readAnthropicApiKeyEvidence(content);
+  const apiKeyEvidence = readAnthropicApiKeyEvidence(content, prNumber);
 
   return (
     apiKeyEvidence !== undefined &&
@@ -153,11 +153,25 @@ function hasMissingAnthropicKeyFailure(content, prNumber) {
   );
 }
 
-function readAnthropicApiKeyEvidence(content) {
+function readAnthropicApiKeyEvidence(content, prNumber) {
   const prefix = "ANTHROPIC_API_KEY value: ";
-  const line = content.split(/\r?\n/u).find((entry) => entry.startsWith(prefix));
+  let pendingApiKeyEvidence;
+  let matchedApiKeyEvidence;
 
-  return line === undefined ? undefined : line.slice(prefix.length);
+  for (const line of content.split(/\r?\n/u)) {
+    if (line.startsWith(prefix)) {
+      pendingApiKeyEvidence = line.slice(prefix.length);
+    }
+
+    if (line.startsWith("PR: ")) {
+      if (line === `PR: ${prNumber}`) {
+        matchedApiKeyEvidence = pendingApiKeyEvidence;
+      }
+      pendingApiKeyEvidence = undefined;
+    }
+  }
+
+  return matchedApiKeyEvidence;
 }
 
 function hasSuccessfulAnthropicWiring(content, expected) {
