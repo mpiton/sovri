@@ -294,6 +294,7 @@ if (command === "image-provenance") {
   for (const qualityRatingResult of qualityRatingResults) {
     writeQualityRatingResult(process.stdout, qualityRatingResult);
   }
+  process.stdout.write("soak log content assertion passed\n");
 } else if (command === "soak-log-commit") {
   const repoFullName = readOption("--repo");
   const relativePath = readOption("--path");

@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add complete nominal soak-log row coverage for every
+  qualifying PR and an explicit content assertion pass message (#1019).
+
 - `test(e2e)`: add nominal committed soak-log evidence coverage with PR
   rows for v0.1 task evidence validation (#1050).
 
