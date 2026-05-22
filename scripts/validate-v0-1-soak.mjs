@@ -11,16 +11,24 @@ const LOCAL_BUILD_EVIDENCE =
 const args = process.argv.slice(2);
 const command = args[0];
 
-if (command !== "image-provenance") {
-  fail("usage: validate-v0-1-soak.mjs image-provenance --provenance-mode <mode> --soak-log <path>");
-}
+if (command === "image-provenance") {
+  const provenanceMode = readOption("--provenance-mode");
+  const soakLogPath = readOption("--soak-log");
+  const soakLog = readFileSync(soakLogPath, "utf8");
 
-const provenanceMode = readOption("--provenance-mode");
-const soakLogPath = readOption("--soak-log");
-const soakLog = readFileSync(soakLogPath, "utf8");
+  if (!hasAcceptedImageProvenance(soakLog, provenanceMode)) {
+    fail("image provenance assertion failed");
+  }
+} else if (command === "anthropic-key") {
+  const prNumber = readOption("--pr");
+  const soakLogPath = readOption("--soak-log");
+  const soakLog = readFileSync(soakLogPath, "utf8");
 
-if (!hasAcceptedImageProvenance(soakLog, provenanceMode)) {
-  fail("image provenance assertion failed");
+  if (hasAnthropicAuthenticationFailure(soakLog, prNumber)) {
+    fail("Anthropic key wiring assertion failed");
+  }
+} else {
+  fail("usage: validate-v0-1-soak.mjs <image-provenance|anthropic-key> [options]");
 }
 
 function hasAcceptedImageProvenance(content, mode) {
@@ -33,6 +41,17 @@ function hasAcceptedImageProvenance(content, mode) {
   }
 
   return false;
+}
+
+function hasAnthropicAuthenticationFailure(content, prNumber) {
+  return (
+    content.includes("ANTHROPIC_API_KEY value: invalid") &&
+    content.includes(`PR: ${prNumber}`) &&
+    content.includes("Anthropic HTTP status: 401") &&
+    content.includes("Successful review comment posted: false") &&
+    content.includes("Container restart count: 0") &&
+    content.includes("Health status after failed review: 200")
+  );
 }
 
 function readOption(name) {
