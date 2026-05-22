@@ -493,6 +493,31 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("restart evidence is incomplete");
   });
 
+  it("fails no-crash validation when the process exits during the smoke set", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Smoke PR: 101 qualifying=true",
+        "Smoke PR: 102 qualifying=true",
+        "Smoke PR: 103 qualifying=true",
+        "Smoke PR: 104 qualifying=true",
+        "Container restart count before PR 101: 0",
+        "Container restart count after PR 104: 0",
+        "Community bot process exit code after PR 103: 137",
+        "Latest GET /health response status: 200",
+      ].join("\n"),
+    );
+
+    // Given the smoke set contains qualifying PRs 101, 102, 103, and 104
+    // And the container restart count is 0 before PR 101
+    // When the Community bot process exits with code 137 after PR 103
+    const result = runNoCrashValidator(soakLogPath);
+
+    // Then the no-crash assertion fails
+    // And the failure mentions "process exited with code 137"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("process exited with code 137");
+  });
+
   it("fails no-crash validation when the baseline restart count is malformed", () => {
     const soakLogPath = writeSoakLog(
       [

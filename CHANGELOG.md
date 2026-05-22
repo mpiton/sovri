@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add no-crash coverage and validator support for contextual
+  process exit evidence during the smoke PR set (#1030).
+
 - `test(e2e)`: add synchronize-event smoke PR count coverage and validator
   support for deduplicating repeated events by PR (#1042).
 
