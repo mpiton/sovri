@@ -1110,6 +1110,74 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("duplicate evidence row for PR 101");
   });
 
+  it("fails soak log validation when a qualifying PR row is missing", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "| PR URL | latency | finding count | manual quality rating |",
+        "| --- | --- | --- | --- |",
+        "| https://github.com/mpiton/forgent/pull/101 | 31.200s | 2 | 4 |",
+        "| https://github.com/mpiton/forgent/pull/102 | 44.800s | 1 | 3 |",
+        "| https://github.com/mpiton/forgent/pull/103 | 58.400s | 3 | 4 |",
+      ].join("\n"),
+    );
+
+    // Given the smoke set contains qualifying PRs 101, 102, 103, and 104
+    // And "evals/v0.1-soak.md" contains rows for PRs 101, 102, and 103
+    // When the soak log is validated
+    const result = runValidator([
+      "soak-log-content",
+      "--repo",
+      "mpiton/forgent",
+      "--qualifying-pr",
+      "101",
+      "--qualifying-pr",
+      "102",
+      "--qualifying-pr",
+      "103",
+      "--qualifying-pr",
+      "104",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // Then the soak log content assertion fails
+    // And the failure mentions "missing evidence row for PR 104"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("missing evidence row for PR 104");
+  });
+
+  it("does not count free-text PR URLs as soak log evidence rows", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Operator note: PR https://github.com/mpiton/forgent/pull/104 was reviewed manually",
+        "| PR URL | latency | finding count | manual quality rating |",
+        "| --- | --- | --- | --- |",
+        "| https://github.com/mpiton/forgent/pull/101 | 31.200s | 2 | 4 |",
+        "| https://github.com/mpiton/forgent/pull/102 | 44.800s | 1 | 3 |",
+        "| https://github.com/mpiton/forgent/pull/103 | 58.400s | 3 | 4 |",
+      ].join("\n"),
+    );
+
+    const result = runValidator([
+      "soak-log-content",
+      "--repo",
+      "mpiton/forgent",
+      "--qualifying-pr",
+      "101",
+      "--qualifying-pr",
+      "102",
+      "--qualifying-pr",
+      "103",
+      "--qualifying-pr",
+      "104",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("missing evidence row for PR 104");
+  });
+
   it("fails committed soak log evidence when no PR rows are present", () => {
     const soakLogPath = writeSoakLog(
       [

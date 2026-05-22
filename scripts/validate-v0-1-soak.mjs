@@ -218,6 +218,10 @@ if (command === "image-provenance") {
     qualifyingPrs,
     repoFullName,
   });
+  const missingPr = findMissingSoakEvidencePr(soakLog, {
+    qualifyingPrs,
+    repoFullName,
+  });
   const invalidLatencyPr = findInvalidLatencyPr(soakLog, {
     qualifyingPrs,
     repoFullName,
@@ -225,6 +229,9 @@ if (command === "image-provenance") {
 
   if (duplicatePr !== undefined) {
     fail(`duplicate evidence row for PR ${duplicatePr}`);
+  }
+  if (missingPr !== undefined) {
+    fail(`missing evidence row for PR ${missingPr}`);
   }
   if (invalidLatencyPr !== undefined) {
     fail("latency must be a duration in seconds");
@@ -787,6 +794,11 @@ function findDuplicateSoakEvidencePr(content, expected) {
   return undefined;
 }
 
+function findMissingSoakEvidencePr(content, expected) {
+  const evidencePrs = new Set(readSoakEvidenceRowPrNumbers(content, expected.repoFullName));
+  return expected.qualifyingPrs.find((prNumber) => !evidencePrs.has(prNumber));
+}
+
 function findInvalidFindingCountPr(content, expected) {
   for (const line of content.split(/\r?\n/u)) {
     const [prUrlCell, , findingCountCell] = readMarkdownTableCells(line);
@@ -911,6 +923,15 @@ function readSoakEvidencePrNumbers(content, repoFullName) {
     }
 
     const prNumber = readLeadingDigits(line.slice(prUrlStart + prUrlPrefix.length));
+    return prNumber === undefined ? [] : [prNumber];
+  });
+}
+
+function readSoakEvidenceRowPrNumbers(content, repoFullName) {
+  return content.split(/\r?\n/u).flatMap((line) => {
+    const [prUrlCell] = readMarkdownTableCells(line);
+    const prNumber =
+      prUrlCell === undefined ? undefined : readGitHubPullUrlPrNumber(prUrlCell, repoFullName);
     return prNumber === undefined ? [] : [prNumber];
   });
 }
