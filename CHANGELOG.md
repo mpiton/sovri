@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add Anthropic authentication failure smoke evidence coverage
+  (#1007).
+
 - `test(e2e)`: add v0.1 soak image provenance acceptance coverage (#1015).
 
 ### Fixed

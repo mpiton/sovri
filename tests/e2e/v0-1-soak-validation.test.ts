@@ -35,27 +35,51 @@ describe("v0.1 soak evidence validation", () => {
 
     // Given the running container image was prepared by "<provenance_mode>"
     // And the soak log records "<evidence>"
-    const result = spawnSync(
-      process.execPath,
-      [
-        validatorPath,
-        "image-provenance",
-        "--provenance-mode",
-        provenanceMode,
-        "--soak-log",
-        soakLogPath,
-      ],
-      {
-        cwd: repoRoot,
-        encoding: "utf8",
-      },
-    );
+    const result = runValidator([
+      "image-provenance",
+      "--provenance-mode",
+      provenanceMode,
+      "--soak-log",
+      soakLogPath,
+    ]);
 
     // When image provenance is evaluated
     // Then the image provenance assertion passes
     expect(result.status, result.stderr).toBe(0);
   });
+
+  it("fails Anthropic key wiring when Anthropic authentication fails without a crash", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "ANTHROPIC_API_KEY value: invalid",
+        "PR: 101",
+        "Anthropic HTTP status: 401",
+        "Successful review comment posted: false",
+        "Container restart count: 0",
+        "Health status after failed review: 200",
+      ].join("\n"),
+    );
+
+    // Given `ANTHROPIC_API_KEY` is set to an invalid value
+    // And Anthropic returns HTTP 401 for PR 101
+    // When Sovri reviews PR 101
+    const result = runValidator(["anthropic-key", "--pr", "101", "--soak-log", soakLogPath]);
+
+    // Then no successful review comment is posted on PR 101
+    // And the container restart count remains 0
+    // And `GET /health` returns 200 after the failed review attempt
+    // And the Anthropic key wiring assertion fails
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Anthropic key wiring assertion failed");
+  });
 });
+
+function runValidator(args: readonly string[]): ReturnType<typeof spawnSync> {
+  return spawnSync(process.execPath, [validatorPath, ...args], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+}
 
 function writeSoakLog(content: string): string {
   const dir = mkdtempSync(join(tmpdir(), "sovri-v0-1-soak-"));
