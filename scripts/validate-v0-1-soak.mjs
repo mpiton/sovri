@@ -146,6 +146,19 @@ if (command === "image-provenance") {
     fail("runtime startup failure assertion failed");
   }
   process.stdout.write("runtime startup failure assertion passed\n");
+} else if (command === "latency-pr-filter") {
+  const prNumber = readOption("--pr");
+  const additions = readIntegerOption("--additions");
+  const deletions = readIntegerOption("--deletions");
+  const changedLines = additions + deletions;
+
+  if (!Number.isSafeInteger(changedLines)) {
+    fail("changed line count is invalid");
+  }
+
+  process.stdout.write(`PR: ${prNumber}\n`);
+  process.stdout.write(`changed line count: ${changedLines}\n`);
+  process.stdout.write(`latency sample classification: ${classifyLatencySample(changedLines)}\n`);
 } else if (command === "latency-p95") {
   const soakLogPath = readOption("--soak-log");
   const soakLog = readFileSync(soakLogPath, "utf8");
@@ -265,7 +278,7 @@ if (command === "image-provenance") {
   process.stdout.write("soak log commit assertion passed\n");
 } else {
   fail(
-    "usage: validate-v0-1-soak.mjs <image-provenance|anthropic-key|provider-logs|log-secrets|no-crash|github-app-installation|private-key-newlines|private-key-startup-failure|app-id-startup-failure|runtime-startup-failure|latency-p95|latency-pr|smoke-pr-count|soak-log-content|soak-log-commit> [options]",
+    "usage: validate-v0-1-soak.mjs <image-provenance|anthropic-key|provider-logs|log-secrets|no-crash|github-app-installation|private-key-newlines|private-key-startup-failure|app-id-startup-failure|runtime-startup-failure|latency-pr-filter|latency-p95|latency-pr|smoke-pr-count|soak-log-content|soak-log-commit> [options]",
   );
 }
 
@@ -562,7 +575,7 @@ function isPositiveInteger(value) {
 
 function calculateLatencyP95(content) {
   const latencies = readLatencyMeasurements(content)
-    .filter((measurement) => measurement.changedLines >= 1 && measurement.changedLines < 500)
+    .filter((measurement) => classifyLatencySample(measurement.changedLines) === "included")
     .map((measurement) => measurement.latencySeconds)
     .toSorted((left, right) => left - right);
 
@@ -595,7 +608,7 @@ function formatSeconds(seconds) {
 
 function evaluatePrLatency(content, expected) {
   const metadata = readLatencyMetadata(content, expected);
-  if (metadata === undefined || metadata.changedLines < 1 || metadata.changedLines >= 500) {
+  if (metadata === undefined || classifyLatencySample(metadata.changedLines) === "excluded") {
     return rejectedLatency("latency evidence is missing");
   }
 
@@ -624,6 +637,10 @@ function evaluatePrLatency(content, expected) {
 
 function rejectedLatency(reason) {
   return { outcome: "rejected", reason };
+}
+
+function classifyLatencySample(changedLines) {
+  return changedLines >= 1 && changedLines < 500 ? "included" : "excluded";
 }
 
 function readLatencyMetadata(content, expected) {
