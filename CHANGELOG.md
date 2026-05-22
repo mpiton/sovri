@@ -19,7 +19,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Fixed
+
+- `test(msw)`: shared Anthropic handler now returns `anthropic-empty.json` for
+  non-`json_schema` requests so the structured-output branch is exercised
+  distinctly from the default response (#966 review feedback).
+
 ### Security
+
+- `test`: add shared MSW handlers and anonymized GitHub/Anthropic fixtures for
+  network-free package and bot tests (#58).
 
 - `test`: scope per-package `vitest run` discovery to the package directory by
   passing `--root .` in workspace `test` scripts, so `pnpm --filter X test`
@@ -183,6 +192,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   uploaded artifacts (#724, zizmor `artipacked`).
 
 ### Fixed
+
+- `test`: enforce per-fixture JSON parse success in
+  `packages/review-engine/src/shared-msw-contract.test.ts` "finds all required
+  fixture files" so malformed fixtures fail the contract instead of slipping
+  through a tautological length assertion (#965).
 
 - `ci`: align the `build-docker-needs` job-header regex in
   `scripts/ci-policy.mjs` with the rest of the policy so a workflow
