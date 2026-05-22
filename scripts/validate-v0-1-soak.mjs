@@ -49,7 +49,7 @@ if (command === "image-provenance") {
     if (provenanceMode === "GHCR pull" && hasGhcrPullEvidence(soakLog)) {
       fail(`image provenance assertion failed: expected ${GHCR_IMAGE}`);
     }
-    fail("image provenance assertion failed");
+    fail("image provenance must be recorded");
   }
 } else if (command === "anthropic-key") {
   const prNumber = readOption("--pr");

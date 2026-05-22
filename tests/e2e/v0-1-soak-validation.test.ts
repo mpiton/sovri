@@ -48,6 +48,29 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.status, result.stderr).toBe(0);
   });
 
+  it("fails image provenance when no image source is recorded", () => {
+    const soakLogPath = writeSoakLog(
+      "Running container image ID: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+    );
+
+    // Given the running container image ID is "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    // And the soak log does not mention "ghcr.io/mpiton/sovri/community-bot:v0.1.0"
+    // And the soak log does not mention "sovri/community-bot:smoke"
+    const result = runValidator([
+      "image-provenance",
+      "--provenance-mode",
+      "GHCR pull",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // When image provenance is evaluated
+    // Then the image provenance assertion fails
+    // And the failure mentions "image provenance must be recorded"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("image provenance must be recorded");
+  });
+
   it("fails local build image provenance when the source commit is missing", () => {
     const soakLogPath = writeSoakLog(
       "Image provenance: built sovri/community-bot:smoke from Dockerfile\n",
