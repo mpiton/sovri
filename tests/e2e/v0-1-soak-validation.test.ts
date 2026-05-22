@@ -1408,6 +1408,67 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.status, result.stderr).toBe(0);
   });
 
+  it.each([
+    {
+      outcome: "rejected",
+      rating: "0",
+      reason: "rating is below the 1-5 scale",
+    },
+    {
+      outcome: "rejected",
+      rating: "1",
+      reason: "review is not coherent enough",
+    },
+    {
+      outcome: "rejected",
+      rating: "2",
+      reason: "review is not coherent enough",
+    },
+    {
+      outcome: "accepted",
+      rating: "3",
+      reason: "coherent but noisy",
+    },
+    {
+      outcome: "accepted",
+      rating: "5",
+      reason: "merge-review quality",
+    },
+    {
+      outcome: "rejected",
+      rating: "6",
+      reason: "rating is above the 1-5 scale",
+    },
+  ])("classifies manual quality rating $rating as $outcome", ({ outcome, rating, reason }) => {
+    const soakLogPath = writeSoakLog(
+      [
+        "| PR URL | latency | finding count | manual quality rating |",
+        "| --- | --- | --- | --- |",
+        `| https://github.com/mpiton/forgent/pull/101 | 31.200s | 2 | ${rating} |`,
+      ].join("\n"),
+    );
+
+    // Given "evals/v0.1-soak.md" contains a row for "https://github.com/mpiton/forgent/pull/101"
+    // And the manual quality rating is <rating>
+    // When the soak log is validated
+    const result = runValidator([
+      "soak-log-content",
+      "--repo",
+      "mpiton/forgent",
+      "--qualifying-pr",
+      "101",
+      "--soak-log",
+      soakLogPath,
+    ]);
+    const output = outcome === "accepted" ? result.stdout : result.stderr;
+
+    // Then the quality rating outcome is "<outcome>"
+    // And the reason is "<reason>"
+    expect(result.status === 0 ? "accepted" : "rejected").toBe(outcome);
+    expect(output).toContain(`quality rating outcome: ${outcome}`);
+    expect(output).toContain(`reason: ${reason}`);
+  });
+
   it("uses the complete soak evidence table when an earlier Markdown table also has a PR URL column", () => {
     const soakLogPath = writeSoakLog(
       [

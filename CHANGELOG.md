@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add manual quality rating scale and minimum threshold
+  coverage for v0.1 soak-log validation (#1023).
+
 - `test(e2e)`: add wrong GitHub webhook secret rejection evidence coverage
   for the v0.1 smoke run (#1057).
 
