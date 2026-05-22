@@ -22,8 +22,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Added
 
 - `test(e2e)`: add malformed APP_ID startup failure coverage, runtime
-  validation, and soak evidence validator support with missing-value and
-  whitespace guards (#1056).
+  validation, and soak evidence validator support with missing-value,
+  whitespace, and oversized-number guards (#1056).
 
 - `test(e2e)`: add committed soak-log evidence coverage and validator support
   for rejecting untracked local soak logs (#1051).

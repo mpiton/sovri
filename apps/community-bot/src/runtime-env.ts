@@ -49,7 +49,8 @@ function readPrivateKey(env: NodeJS.ProcessEnv): string {
 
 function readAppId(env: NodeJS.ProcessEnv): string {
   const appId = readRequiredEnv(env, "APP_ID").trim();
-  if (!DECIMAL_INTEGER.test(appId) || Number.parseInt(appId, 10) < 1) {
+  const parsed = Number.parseInt(appId, 10);
+  if (!DECIMAL_INTEGER.test(appId) || !Number.isSafeInteger(parsed) || parsed < 1) {
     throw new RuntimeEnvironmentError("APP_ID must be a positive integer");
   }
   return appId;

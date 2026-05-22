@@ -1304,6 +1304,24 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("APP_ID startup failure assertion failed");
   });
 
+  it("accepts overflowed numeric APP_ID startup failure evidence", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        `APP_ID value: ${"9".repeat(400)}`,
+        "WEBHOOK_SECRET configured: true",
+        "PRIVATE_KEY decoded PEM key: valid 2048-bit RSA",
+        "Community bot startup: failed before webhook processing",
+        "Startup failure reason: APP_ID must be a positive integer",
+        "Webhook processing: not started",
+      ].join("\n"),
+    );
+
+    const result = runValidator(["app-id-startup-failure", "--soak-log", soakLogPath]);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("APP_ID startup failure assertion passed");
+  });
+
   it("passes latency validation when five qualifying PRs stay below ninety seconds", () => {
     const soakLogPath = writeSoakLog(
       [

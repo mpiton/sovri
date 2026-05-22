@@ -515,7 +515,8 @@ function readLineValue(lines, prefix) {
 }
 
 function isPositiveInteger(value) {
-  return isDecimalInteger(value) && Number.parseInt(value, 10) > 0;
+  const parsed = Number.parseInt(value, 10);
+  return isDecimalInteger(value) && Number.isSafeInteger(parsed) && parsed > 0;
 }
 
 function calculateLatencyP95(content) {

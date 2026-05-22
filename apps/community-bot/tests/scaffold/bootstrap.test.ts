@@ -154,6 +154,16 @@ describe("community bot Probot bootstrap", () => {
     expect(() => readRuntimeEnvironment(env)).toThrow("APP_ID");
   });
 
+  it("rejects APP_ID values that exceed finite safe integer bounds", () => {
+    // Given `APP_ID` is a decimal string too large for a finite safe JavaScript integer
+    const env = createRuntimeEnv({ APP_ID: "9".repeat(400) });
+    // When the operator starts the community bot
+    // Then startup fails before accepting webhook traffic
+    expect(() => readRuntimeEnvironment(env)).toThrow(RuntimeEnvironmentError);
+    // And the failure mentions "APP_ID"
+    expect(() => readRuntimeEnvironment(env)).toThrow("APP_ID");
+  });
+
   it("accepts escaped private key newlines from environment storage", () => {
     // Given `PRIVATE_KEY` is stored as a single environment value with literal "\n" line breaks
     const privateKey = createPrivateKey();
