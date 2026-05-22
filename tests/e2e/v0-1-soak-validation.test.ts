@@ -1207,6 +1207,61 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("missing evidence row for PR 104");
   });
 
+  it.each([
+    {
+      field: "PR URL",
+      rows: [
+        "| latency | finding count | manual quality rating |",
+        "| --- | --- | --- |",
+        "| 31.200s | 2 | 4 |",
+      ],
+    },
+    {
+      field: "latency",
+      rows: [
+        "| PR URL | finding count | manual quality rating |",
+        "| --- | --- | --- |",
+        "| https://github.com/mpiton/forgent/pull/101 | 2 | 4 |",
+      ],
+    },
+    {
+      field: "finding count",
+      rows: [
+        "| PR URL | latency | manual quality rating |",
+        "| --- | --- | --- |",
+        "| https://github.com/mpiton/forgent/pull/101 | 31.200s | 4 |",
+      ],
+    },
+    {
+      field: "manual quality rating",
+      rows: [
+        "| PR URL | latency | finding count |",
+        "| --- | --- | --- |",
+        "| https://github.com/mpiton/forgent/pull/101 | 31.200s | 2 |",
+      ],
+    },
+  ])("fails soak log validation when required field $field is omitted", ({ field, rows }) => {
+    const soakLogPath = writeSoakLog(rows.join("\n"));
+
+    // Given "evals/v0.1-soak.md" contains a row for "https://github.com/mpiton/forgent/pull/101"
+    // And the row omits "<field>"
+    // When the soak log is validated
+    const result = runValidator([
+      "soak-log-content",
+      "--repo",
+      "mpiton/forgent",
+      "--qualifying-pr",
+      "101",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // Then the soak log content assertion fails
+    // And the failure mentions "<field>"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(field);
+  });
+
   it("fails committed soak log evidence when no PR rows are present", () => {
     const soakLogPath = writeSoakLog(
       [

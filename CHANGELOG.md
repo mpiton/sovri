@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add missing required soak-log field coverage for PR URL,
+  latency, finding count, and manual quality rating (#1022).
+
 - `test(e2e)`: add missing target repository GitHub App installation failure
   coverage for the v0.1 smoke run (#1011).
 
