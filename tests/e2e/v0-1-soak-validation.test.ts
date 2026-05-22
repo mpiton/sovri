@@ -877,6 +877,28 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stdout).toContain("private key newline assertion passed");
   });
 
+  it("passes latency validation when five qualifying PRs stay below ninety seconds", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Latency PR: 101 delivery_id=delivery-60-101 changed_lines=128 latency_seconds=31.200",
+        "Latency PR: 102 delivery_id=delivery-60-102 changed_lines=240 latency_seconds=44.800",
+        "Latency PR: 103 delivery_id=delivery-60-103 changed_lines=499 latency_seconds=58.400",
+        "Latency PR: 104 delivery_id=delivery-60-104 changed_lines=42 latency_seconds=76.300",
+        "Latency PR: 105 delivery_id=delivery-60-105 changed_lines=312 latency_seconds=89.999",
+      ].join("\n"),
+    );
+
+    // Given the smoke set has five qualifying PR measurements below 90 seconds
+    // When the smoke latency assertion is evaluated
+    const result = runValidator(["latency-p95", "--soak-log", soakLogPath]);
+
+    // Then the nearest-rank p95 is the maximum observed latency
+    // And the latency assertion passes
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("p95 latency: 89.999 seconds");
+    expect(result.stdout).toContain("latency assertion passed");
+  });
+
   it("fails latency validation when p95 is exactly ninety seconds", () => {
     const soakLogPath = writeSoakLog(
       [
