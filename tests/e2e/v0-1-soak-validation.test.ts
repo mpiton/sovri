@@ -1146,6 +1146,38 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("missing evidence row for PR 104");
   });
 
+  it("does not count free-text PR URLs as soak log evidence rows", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Operator note: PR https://github.com/mpiton/forgent/pull/104 was reviewed manually",
+        "| PR URL | latency | finding count | manual quality rating |",
+        "| --- | --- | --- | --- |",
+        "| https://github.com/mpiton/forgent/pull/101 | 31.200s | 2 | 4 |",
+        "| https://github.com/mpiton/forgent/pull/102 | 44.800s | 1 | 3 |",
+        "| https://github.com/mpiton/forgent/pull/103 | 58.400s | 3 | 4 |",
+      ].join("\n"),
+    );
+
+    const result = runValidator([
+      "soak-log-content",
+      "--repo",
+      "mpiton/forgent",
+      "--qualifying-pr",
+      "101",
+      "--qualifying-pr",
+      "102",
+      "--qualifying-pr",
+      "103",
+      "--qualifying-pr",
+      "104",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("missing evidence row for PR 104");
+  });
+
   it("fails committed soak log evidence when no PR rows are present", () => {
     const soakLogPath = writeSoakLog(
       [
