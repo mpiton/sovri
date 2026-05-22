@@ -220,6 +220,9 @@ if (command === "image-provenance") {
   const soakLogPath = readOption("--soak-log");
   const soakLog = readFileSync(soakLogPath, "utf8");
 
+  if (hasUncommittedSoakLogStatus(soakLog, relativePath)) {
+    fail("soak log must be committed");
+  }
   if (!hasCommittedSoakLogMetadata(soakLog, { relativePath, repoFullName })) {
     fail(`soak log must be committed to ${repoFullName}`);
   }
@@ -777,6 +780,14 @@ function hasCommittedSoakLogMetadata(content, expected) {
     readMetadataValue(content, "Evidence repository") === expected.repoFullName &&
     readMetadataValue(content, "Committed soak log path") === expected.relativePath
   );
+}
+
+function hasUncommittedSoakLogStatus(content, relativePath) {
+  const statusCommand = `git status --short ${relativePath}`;
+  const untrackedStatus = `?? ${relativePath}`;
+  return content
+    .split(/\r?\n/u)
+    .some((line) => line.includes(statusCommand) && line.includes(untrackedStatus));
 }
 
 function readMetadataValue(content, label) {

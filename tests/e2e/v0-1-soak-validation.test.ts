@@ -1146,6 +1146,38 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("soak log has no PR evidence rows");
   });
 
+  it("fails committed soak log evidence when the soak log is untracked locally", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Evidence repository: mpiton/sovri",
+        "Committed soak log path: evals/v0.1-soak.md",
+        "Latest evidence commit SHA: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "git status --short evals/v0.1-soak.md: ?? evals/v0.1-soak.md",
+        "| PR URL | latency | finding count | manual quality rating |",
+        "| --- | --- | --- | --- |",
+        "| https://github.com/mpiton/sovri/pull/101 | 31.200s | 2 | 4 |",
+      ].join("\n"),
+    );
+
+    // Given "evals/v0.1-soak.md" exists only in the working tree
+    // And `git status --short evals/v0.1-soak.md` reports "?? evals/v0.1-soak.md"
+    // When the committed evidence is inspected
+    const result = runValidator([
+      "soak-log-commit",
+      "--repo",
+      "mpiton/sovri",
+      "--path",
+      "evals/v0.1-soak.md",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // Then the soak log commit assertion fails
+    // And the failure mentions "soak log must be committed"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("soak log must be committed");
+  });
+
   it("accepts escaped private key newline startup evidence", () => {
     const soakLogPath = writeSoakLog(
       [
