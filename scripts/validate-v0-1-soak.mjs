@@ -25,6 +25,7 @@ const REQUIRED_GITHUB_APP_PERMISSIONS = [
 const REQUIRED_GITHUB_APP_EVENTS = ["pull_request", "issue_comment"];
 const LOCAL_BUILD_EVIDENCE =
   /built sovri\/community-bot:smoke from Dockerfile at commit [0-9a-f]{40}/u;
+const SOAK_LOG_LATENCY_DURATION_PATTERN = /^\d+(?:\.\d{1,3})?s$/u;
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -195,9 +196,16 @@ if (command === "image-provenance") {
     qualifyingPrs,
     repoFullName,
   });
+  const invalidLatencyPr = findInvalidLatencyPr(soakLog, {
+    qualifyingPrs,
+    repoFullName,
+  });
 
   if (duplicatePr !== undefined) {
     fail(`duplicate evidence row for PR ${duplicatePr}`);
+  }
+  if (invalidLatencyPr !== undefined) {
+    fail("latency must be a duration in seconds");
   }
   if (invalidFindingCountPr !== undefined) {
     fail("finding count must be a non-negative integer");
@@ -724,6 +732,26 @@ function findInvalidFindingCountPr(content, expected) {
     }
 
     if (findingCountCell === undefined || !isDecimalInteger(findingCountCell)) {
+      return prNumber;
+    }
+  }
+
+  return undefined;
+}
+
+function findInvalidLatencyPr(content, expected) {
+  for (const line of content.split(/\r?\n/u)) {
+    const [prUrlCell, latencyCell] = readMarkdownTableCells(line);
+    if (prUrlCell === undefined) {
+      continue;
+    }
+
+    const prNumber = readGitHubPullUrlPrNumber(prUrlCell, expected.repoFullName);
+    if (prNumber === undefined || !expected.qualifyingPrs.includes(prNumber)) {
+      continue;
+    }
+
+    if (latencyCell === undefined || !SOAK_LOG_LATENCY_DURATION_PATTERN.test(latencyCell)) {
       return prNumber;
     }
   }
