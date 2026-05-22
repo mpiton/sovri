@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add GitHub App identity rejection coverage for the smoke
+  repository installation assertion (#1012).
+
 - `test(e2e)`: add crash evidence matrix, missing evidence, and latest-line
   outcome coverage for no-crash smoke validation (#1031).
 

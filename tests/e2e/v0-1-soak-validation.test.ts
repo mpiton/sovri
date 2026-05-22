@@ -516,6 +516,38 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stdout).toContain("no-crash outcome: accepted");
     expect(result.stdout).toContain("reason: no crash evidence");
   });
+
+  it("rejects a different GitHub App even when it has the required access", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Repository: mpiton/forgent",
+        "Installed GitHub App: Other Review Bot",
+        "Other Review Bot required permissions granted: true",
+        "Other Review Bot required webhook events subscribed: true",
+        "Installed GitHub App: Sovri Community Bot: false",
+      ].join("\n"),
+    );
+
+    // Given "Other Review Bot" is installed on "mpiton/forgent"
+    // And "Other Review Bot" grants every required permission
+    // And "Other Review Bot" subscribes to every required webhook event
+    // But "Sovri Community Bot" is not installed on "mpiton/forgent"
+    // When the GitHub App installation assertion is evaluated
+    const result = runValidator([
+      "github-app-installation",
+      "--repo",
+      "mpiton/forgent",
+      "--expected-app",
+      "Sovri Community Bot",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // Then the GitHub App installation assertion fails
+    // And the failure mentions "Sovri Community Bot"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Sovri Community Bot");
+  });
 });
 
 function runValidator(args: readonly string[]): ReturnType<typeof spawnSync> {
