@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add four-PR no-crash acceptance coverage with explicit
+  no-exit event evidence (#1027).
+
 - `test(e2e)`: add five-PR target smoke-count coverage and validator output
   for qualifying count plus target/minimum classification (#1037).
 

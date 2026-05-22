@@ -401,6 +401,30 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("restart evidence is incomplete");
   });
 
+  it("accepts four completed smoke PRs with no restart and no exit event", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Smoke PR: 101 qualifying=true",
+        "Smoke PR: 102 qualifying=true",
+        "Smoke PR: 103 qualifying=true",
+        "Smoke PR: 104 qualifying=true",
+        "Container restart count before PR 101: 0",
+        "Container restart count after PR 104: 0",
+        "Container exit event: none for sovri-community-bot-v0-1-soak",
+        "Latest GET /health response status: 200",
+      ].join("\n"),
+    );
+
+    // Given the smoke set contains qualifying PRs 101, 102, 103, and 104
+    // And no container exit event is recorded
+    const result = runNoCrashValidator(soakLogPath);
+
+    // Then the no-crash assertion passes
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("no-crash outcome: accepted");
+    expect(result.stdout).toContain("reason: no crash evidence");
+  });
+
   it("accepts five completed smoke PRs with no exit event and health after each review", () => {
     const soakLogPath = writeSoakLog(
       [
