@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add soak-log latency duration validation coverage and validator
+  support for invalid latency values (#1025).
+
 - `test(e2e)`: add invalid private key startup failure evidence coverage and
   validator support for fixture and non-fixture credential values (#1059).
 

@@ -1279,6 +1279,37 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("finding count must be a non-negative integer");
   });
 
+  it.each(["eighty", "80", "80ms", "2026-05-22", ""])(
+    "fails soak log validation when latency is %s",
+    (latency) => {
+      const soakLogPath = writeSoakLog(
+        [
+          "| PR URL | latency | finding count | manual quality rating |",
+          "| --- | --- | --- | --- |",
+          `| https://github.com/mpiton/forgent/pull/101 | ${latency} | 2 | 4 |`,
+        ].join("\n"),
+      );
+
+      // Given "evals/v0.1-soak.md" contains a row for "https://github.com/mpiton/forgent/pull/101"
+      // And the latency field is "<latency>"
+      // When the soak log is validated
+      const result = runValidator([
+        "soak-log-content",
+        "--repo",
+        "mpiton/forgent",
+        "--qualifying-pr",
+        "101",
+        "--soak-log",
+        soakLogPath,
+      ]);
+
+      // Then the soak log content assertion fails
+      // And the failure mentions "latency must be a duration in seconds"
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("latency must be a duration in seconds");
+    },
+  );
+
   it("uses the first Sovri PR comment when measuring latency", () => {
     const soakLogPath = writeSoakLog(
       [
