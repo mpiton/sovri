@@ -42,6 +42,9 @@ if (command === "image-provenance") {
     if (provenanceMode === "local build" && hasLocalBuildEvidenceWithoutSourceCommit(soakLog)) {
       fail("local build must record the source commit");
     }
+    if (provenanceMode === "GHCR pull" && hasGhcrPullEvidence(soakLog)) {
+      fail(`image provenance assertion failed: expected ${GHCR_IMAGE}`);
+    }
     fail("image provenance assertion failed");
   }
 } else if (command === "anthropic-key") {
@@ -323,6 +326,10 @@ function hasAcceptedImageProvenance(content, mode) {
 
 function hasLocalBuildEvidenceWithoutSourceCommit(content) {
   return content.includes(LOCAL_BUILD_EVIDENCE_PREFIX) && !LOCAL_BUILD_EVIDENCE.test(content);
+}
+
+function hasGhcrPullEvidence(content) {
+  return /pulled ghcr\.io\/\S+/u.test(content);
 }
 
 function hasAnthropicAuthenticationFailure(content, prNumber) {
