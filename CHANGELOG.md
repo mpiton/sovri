@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add redacted secret placeholder coverage for captured log
+  secret validation (#1035).
+
 - `test(e2e)`: add no-crash coverage and validator support for contextual
   process exit evidence during the smoke PR set, including latest in-range
   evidence precedence (#1030).

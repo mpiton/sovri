@@ -357,6 +357,40 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stdout).toContain("log secret assertion passed");
   });
 
+  it("accepts redacted secret placeholders in captured logs", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Captured log: webhookSecret=[Redacted]",
+        "Captured log: privateKey=[Redacted]",
+        "Captured log: anthropicApiKey=[Redacted]",
+      ].join("\n"),
+    );
+
+    // Given captured logs contain "webhookSecret=[Redacted]"
+    // And captured logs contain "privateKey=[Redacted]"
+    // And captured logs contain "anthropicApiKey=[Redacted]"
+    // When the captured container logs are reviewed
+    const result = runValidator([
+      "log-secrets",
+      "--secret-name",
+      "all smoke secrets",
+      "--secret-value",
+      "WEBHOOK_SECRET_SENTINEL_60",
+      "--secret-value",
+      "PRIVATE_KEY_SENTINEL_60",
+      "--secret-value",
+      "ANTHROPIC_API_KEY_SENTINEL_60",
+      "--secret-value",
+      "GITHUB_INSTALLATION_TOKEN_SENTINEL_60",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // Then the log secret assertion passes
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("log secret assertion passed");
+  });
+
   it("rejects a malformed repeated secret value argument", () => {
     const soakLogPath = writeSoakLog("Captured log: delivery_id=delivery-60-101 pr=101\n");
 
