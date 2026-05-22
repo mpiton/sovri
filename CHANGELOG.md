@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add four-PR minimum smoke-count coverage for the
+  `minimum count reached` classification (#1038).
+
 - `test(e2e)`: add four-PR p95 latency acceptance coverage for the strict
   below-90-second smoke target (#1044).
 
