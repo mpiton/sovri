@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add individual smoke PR qualification matrix coverage and
+  validator output for included and excluded reasons (#1041).
+
 - `test(e2e)`: add no-crash failure coverage for `/health` returning 503 during
   the smoke PR set (#1029).
 
