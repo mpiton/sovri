@@ -275,8 +275,8 @@ function hasMissingAnthropicKeyFailure(content, prNumber) {
   const evidence = readAnthropicReviewEvidence(content, prNumber);
 
   return (
-    evidence?.apiKeyEvidence !== undefined &&
-    evidence.apiKeyEvidence.trim().length === 0 &&
+    evidence !== undefined &&
+    (evidence.apiKeyEvidence === undefined || evidence.apiKeyEvidence.trim().length === 0) &&
     evidence.successfulReviewCommentPosted === "false"
   );
 }
