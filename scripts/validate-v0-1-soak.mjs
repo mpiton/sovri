@@ -128,6 +128,10 @@ if (command === "image-provenance") {
   if (result.outcome === "rejected") {
     fail(result.reason);
   }
+  if (result.latencySeconds < 0) {
+    process.stderr.write(`measured latency: ${formatSeconds(result.latencySeconds)} seconds\n`);
+    fail("latency must be >= 0 s");
+  }
   if (result.latencySeconds >= LATENCY_P95_THRESHOLD_SECONDS) {
     process.stderr.write(`measured latency: ${formatSeconds(result.latencySeconds)} seconds\n`);
     fail("latency must be < 90 s");

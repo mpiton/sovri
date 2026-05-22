@@ -899,6 +899,29 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stdout).toContain("measured latency: 80.000 seconds");
     expect(result.stdout).toContain("later PR comments ignored: true");
   });
+
+  it("rejects latency evidence when the first comment predates webhook receipt", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Latency PR metadata: pr=101 delivery_id=delivery-60-101 changed_lines=128",
+        "Webhook received: delivery_id=delivery-60-101 at=2026-05-22T10:01:20Z",
+        "Sovri PR comment: pr=101 created_at=2026-05-22T10:00:00Z",
+      ].join("\n"),
+    );
+
+    const result = runValidator([
+      "latency-pr",
+      "--pr",
+      "101",
+      "--delivery-id",
+      "delivery-60-101",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("latency must be >= 0 s");
+  });
 });
 
 function runValidator(args: readonly string[]): ReturnType<typeof spawnSync> {

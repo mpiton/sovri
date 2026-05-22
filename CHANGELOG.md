@@ -74,6 +74,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `test(e2e)`: reject impossible negative PR latency evidence when comment
+  timestamps precede webhook receipt timestamps (#1049 review feedback).
+
 - `test(e2e)`: require committed soak-log metadata and PR evidence rows to
   match the expected repository exactly (#1053).
 
