@@ -254,6 +254,13 @@ if (command === "image-provenance") {
     qualifyingPrs,
     repoFullName,
   });
+  const qualityRatingResults = evaluateSoakLogQualityRatings(soakLog, {
+    qualifyingPrs,
+    repoFullName,
+  });
+  const rejectedQualityRating = qualityRatingResults.find(
+    (result) => result.outcome === "rejected",
+  );
 
   if (missingRequiredField !== undefined) {
     failMissingRequiredSoakLogField(missingRequiredField);
@@ -269,6 +276,13 @@ if (command === "image-provenance") {
   }
   if (invalidFindingCountPr !== undefined) {
     fail("finding count must be a non-negative integer");
+  }
+  if (rejectedQualityRating !== undefined) {
+    writeQualityRatingResult(process.stderr, rejectedQualityRating);
+    fail("manual quality rating assertion failed");
+  }
+  for (const qualityRatingResult of qualityRatingResults) {
+    writeQualityRatingResult(process.stdout, qualityRatingResult);
   }
 } else if (command === "soak-log-commit") {
   const repoFullName = readOption("--repo");
@@ -1027,6 +1041,52 @@ function findInvalidLatencyPr(content, expected) {
   }
 
   return undefined;
+}
+
+function evaluateSoakLogQualityRatings(content, expected) {
+  const table = readSoakLogEvidenceTable(content, expected.repoFullName);
+  if (table === undefined) {
+    return [];
+  }
+
+  const fieldIndexes = readSoakLogFieldIndexes(table.header);
+  return table.rows.flatMap((row) => {
+    const prUrlCell = readRequiredSoakLogCell(row, fieldIndexes, "PR URL");
+    const prNumber = readGitHubPullUrlPrNumber(prUrlCell, expected.repoFullName);
+    if (prNumber === undefined || !expected.qualifyingPrs.includes(prNumber)) {
+      return [];
+    }
+
+    const ratingCell = readRequiredSoakLogCell(row, fieldIndexes, "manual quality rating");
+    return [classifyQualityRating(ratingCell ?? "")];
+  });
+}
+
+function classifyQualityRating(value) {
+  if (!isDecimalInteger(value)) {
+    return { outcome: "rejected", reason: "rating must be an integer" };
+  }
+
+  const rating = Number.parseInt(value, 10);
+  if (rating < 1) {
+    return { outcome: "rejected", reason: "rating is below the 1-5 scale" };
+  }
+  if (rating > 5) {
+    return { outcome: "rejected", reason: "rating is above the 1-5 scale" };
+  }
+  if (rating < 3) {
+    return { outcome: "rejected", reason: "review is not coherent enough" };
+  }
+  if (rating === 3) {
+    return { outcome: "accepted", reason: "coherent but noisy" };
+  }
+
+  return { outcome: "accepted", reason: "merge-review quality" };
+}
+
+function writeQualityRatingResult(stream, result) {
+  stream.write(`quality rating outcome: ${result.outcome}\n`);
+  stream.write(`reason: ${result.reason}\n`);
 }
 
 function countSoakLogPrEvidenceRows(content, repoFullName) {
