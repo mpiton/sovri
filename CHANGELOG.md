@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add missing webhook receipt timestamp coverage for v0.1
+  latency evidence validation (#1047).
+
 - `test(e2e)`: add three-PR below-minimum smoke-count coverage for v0.1
   smoke PR validation (#1039).
 

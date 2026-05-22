@@ -2143,6 +2143,34 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stdout).toContain("later PR comments ignored: true");
   });
 
+  it("fails latency evidence when the webhook receipt timestamp is missing", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Latency PR metadata: pr=101 delivery_id=delivery-60-101 changed_lines=128",
+        "Sovri PR comment: pr=101 created_at=2026-05-22T10:01:20Z",
+      ].join("\n"),
+    );
+
+    // Given PR 101 has 128 changed lines
+    // And Sovri posted a PR comment on PR 101 at "2026-05-22T10:01:20Z"
+    // But no container log line exists for delivery ID "delivery-60-101"
+    // When the smoke latency assertion is evaluated for PR 101
+    const result = runValidator([
+      "latency-pr",
+      "--pr",
+      "101",
+      "--delivery-id",
+      "delivery-60-101",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // Then the latency assertion fails
+    // And the failure mentions "missing webhook receipt timestamp"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("missing webhook receipt timestamp");
+  });
+
   it("fails latency evidence when the first Sovri PR comment is missing", () => {
     const soakLogPath = writeSoakLog(
       [
