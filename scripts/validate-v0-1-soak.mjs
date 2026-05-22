@@ -1293,9 +1293,10 @@ function readCommunityBotProcessExitCode(content, range) {
 }
 
 function readCommunityBotProcessExitCodeAfterPr(content, range) {
-  let acceptedExitCode;
+  const lines = content.split(/\r?\n/u);
 
-  for (const line of content.split(/\r?\n/u)) {
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
     const match = COMMUNITY_BOT_PROCESS_EXIT_AFTER_PR_PATTERN.exec(line);
     if (match?.groups === undefined) {
       continue;
@@ -1306,14 +1307,10 @@ function readCommunityBotProcessExitCodeAfterPr(content, range) {
       continue;
     }
 
-    const exitCode = Number.parseInt(match.groups.exitCode, 10);
-    if (exitCode !== 0) {
-      return exitCode;
-    }
-    acceptedExitCode = exitCode;
+    return Number.parseInt(match.groups.exitCode, 10);
   }
 
-  return acceptedExitCode;
+  return undefined;
 }
 
 function evaluateNoExitEvidence(content, range) {

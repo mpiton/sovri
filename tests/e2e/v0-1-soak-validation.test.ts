@@ -518,6 +518,27 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("process exited with code 137");
   });
 
+  it("uses the latest contextual process exit evidence in the smoke range", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Smoke PR: 101 qualifying=true",
+        "Smoke PR: 102 qualifying=true",
+        "Smoke PR: 103 qualifying=true",
+        "Smoke PR: 104 qualifying=true",
+        "Container restart count before PR 101: 0",
+        "Container restart count after PR 104: 0",
+        "Community bot process exit code after PR 103: 137",
+        "Community bot process exit code after PR 103: 0",
+        "Latest GET /health response status: 200",
+      ].join("\n"),
+    );
+
+    const result = runNoCrashValidator(soakLogPath);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("no-crash outcome: accepted");
+  });
+
   it("fails no-crash validation when the baseline restart count is malformed", () => {
     const soakLogPath = writeSoakLog(
       [
