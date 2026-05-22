@@ -5,6 +5,8 @@
 import { readFileSync } from "node:fs";
 
 const GHCR_IMAGE = "ghcr.io/mpiton/sovri/community-bot:v0.1.0";
+const COMMUNITY_BOT_PROCESS_EXIT_AFTER_PR_PATTERN =
+  /^Community bot process exit code after PR (?<prNumber>\d+): (?<exitCode>\d+)$/u;
 const LATENCY_P95_THRESHOLD_SECONDS = 90;
 const LATENCY_SAMPLE_PERCENTILE = 0.95;
 const LATENCY_LINE_PATTERN =
@@ -1223,7 +1225,7 @@ function evaluateNoCrashEvidence(content, range) {
     return rejectedNoCrash("restart evidence is incomplete");
   }
 
-  const exitResult = evaluateNoExitEvidence(content);
+  const exitResult = evaluateNoExitEvidence(content, prRange);
   if (exitResult.outcome === "missing") {
     return rejectedNoCrash("crash evidence is incomplete");
   }
@@ -1283,16 +1285,40 @@ function readRestartCountBeforePr(content, prNumber) {
   return restartCount;
 }
 
-function readCommunityBotProcessExitCode(content) {
-  return readIntegerLine(content, "Community bot process exit code: ");
+function readCommunityBotProcessExitCode(content, range) {
+  return (
+    readCommunityBotProcessExitCodeAfterPr(content, range) ??
+    readIntegerLine(content, "Community bot process exit code: ")
+  );
 }
 
-function evaluateNoExitEvidence(content) {
+function readCommunityBotProcessExitCodeAfterPr(content, range) {
+  const lines = content.split(/\r?\n/u);
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    const match = COMMUNITY_BOT_PROCESS_EXIT_AFTER_PR_PATTERN.exec(line);
+    if (match?.groups === undefined) {
+      continue;
+    }
+
+    const prNumber = Number.parseInt(match.groups.prNumber, 10);
+    if (prNumber < range.fromPr || prNumber > range.toPr) {
+      continue;
+    }
+
+    return Number.parseInt(match.groups.exitCode, 10);
+  }
+
+  return undefined;
+}
+
+function evaluateNoExitEvidence(content, range) {
   if (hasNoContainerExitEvent(content)) {
     return { outcome: "accepted" };
   }
 
-  const exitCode = readCommunityBotProcessExitCode(content);
+  const exitCode = readCommunityBotProcessExitCode(content, range);
   if (exitCode === undefined) {
     return { outcome: "missing" };
   }
