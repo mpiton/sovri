@@ -396,7 +396,10 @@ function hasExpectedGitHubAppInstallation(content, expected) {
 
 function evaluateGitHubAppInstallation(content, expected) {
   if (!hasExpectedGitHubAppInstallation(content, expected)) {
-    return { outcome: "rejected", reason: expected.expectedApp };
+    return {
+      outcome: "rejected",
+      reason: `app not installed on ${expected.repoFullName}: ${expected.expectedApp}`,
+    };
   }
 
   for (const permission of REQUIRED_GITHUB_APP_PERMISSIONS) {

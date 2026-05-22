@@ -830,6 +830,35 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("Sovri Community Bot");
   });
 
+  it("rejects a missing GitHub App installation on the target repository", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Repository: mpiton/other-repo",
+        "Installed GitHub App: Sovri Community Bot",
+        "GitHub installation token: unavailable repo=mpiton/forgent",
+      ].join("\n"),
+    );
+
+    // Given "Sovri Community Bot" is installed on "mpiton/other-repo"
+    // But "Sovri Community Bot" is not installed on "mpiton/forgent"
+    // When a pull request is opened in "mpiton/forgent"
+    const result = runValidator([
+      "github-app-installation",
+      "--repo",
+      "mpiton/forgent",
+      "--expected-app",
+      "Sovri Community Bot",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // Then GitHub does not deliver a usable installation token for "mpiton/forgent"
+    // And the GitHub App installation assertion fails
+    // And the failure mentions "app not installed on mpiton/forgent"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("app not installed on mpiton/forgent");
+  });
+
   it("rejects the expected GitHub App when it is installed on a different repository", () => {
     const soakLogPath = writeSoakLog(
       [
