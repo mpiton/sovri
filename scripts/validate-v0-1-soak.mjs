@@ -113,9 +113,22 @@ if (command === "image-provenance") {
   if (duplicatePr !== undefined) {
     fail(`duplicate evidence row for PR ${duplicatePr}`);
   }
+} else if (command === "soak-log-commit") {
+  const repoFullName = readOption("--repo");
+  const relativePath = readOption("--path");
+  const soakLogPath = readOption("--soak-log");
+  const soakLog = readFileSync(soakLogPath, "utf8");
+
+  if (!hasCommittedSoakLogMetadata(soakLog, { relativePath, repoFullName })) {
+    fail(`soak log must be committed to ${repoFullName}`);
+  }
+  if (countSoakLogPrEvidenceRows(soakLog, repoFullName) === 0) {
+    fail("soak log has no PR evidence rows");
+  }
+  process.stdout.write("soak log commit assertion passed\n");
 } else {
   fail(
-    "usage: validate-v0-1-soak.mjs <image-provenance|anthropic-key|provider-logs|log-secrets|no-crash|github-app-installation|smoke-pr-count|soak-log-content> [options]",
+    "usage: validate-v0-1-soak.mjs <image-provenance|anthropic-key|provider-logs|log-secrets|no-crash|github-app-installation|smoke-pr-count|soak-log-content|soak-log-commit> [options]",
   );
 }
 
@@ -318,6 +331,67 @@ function findDuplicateSoakEvidencePr(content, expected) {
   }
 
   return undefined;
+}
+
+function countSoakLogPrEvidenceRows(content, repoFullName) {
+  return content.split(/\r?\n/u).filter((line) => lineHasGitHubPullEvidenceCell(line, repoFullName))
+    .length;
+}
+
+function hasCommittedSoakLogMetadata(content, expected) {
+  return (
+    readMetadataValue(content, "Evidence repository") === expected.repoFullName &&
+    readMetadataValue(content, "Committed soak log path") === expected.relativePath
+  );
+}
+
+function readMetadataValue(content, label) {
+  const prefix = `${label}: `;
+  const line = content.split(/\r?\n/u).find((candidate) => candidate.startsWith(prefix));
+  return line?.slice(prefix.length).trim();
+}
+
+function lineHasGitHubPullEvidenceCell(line, repoFullName) {
+  const [prUrlCell] = readMarkdownTableCells(line);
+  return prUrlCell !== undefined && isGitHubPullUrl(prUrlCell, repoFullName);
+}
+
+function readMarkdownTableCells(line) {
+  const trimmedLine = line.trim();
+  if (!trimmedLine.startsWith("|") || !trimmedLine.endsWith("|")) {
+    return [];
+  }
+
+  return trimmedLine
+    .slice(1, -1)
+    .split("|")
+    .map((cell) => cell.trim());
+}
+
+function isGitHubPullUrl(value, repoFullName) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+
+  const [owner, repo, extraPart] = repoFullName.split("/");
+  const pathParts = url.pathname.split("/").filter((part) => part.length > 0);
+  return (
+    extraPart === undefined &&
+    url.protocol === "https:" &&
+    url.hostname === "github.com" &&
+    pathParts.length === 4 &&
+    pathParts[0] === owner &&
+    pathParts[1] === repo &&
+    pathParts[2] === "pull" &&
+    isDecimalInteger(pathParts[3])
+  );
+}
+
+function isDecimalInteger(value) {
+  return value.length > 0 && [...value].every((character) => character >= "0" && character <= "9");
 }
 
 function readSoakEvidencePrNumbers(content, repoFullName) {

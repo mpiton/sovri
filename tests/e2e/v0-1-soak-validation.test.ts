@@ -713,6 +713,88 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("duplicate evidence row for PR 101");
   });
+
+  it("fails committed soak log evidence when no PR rows are present", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Evidence repository: mpiton/sovri",
+        "Committed soak log path: evals/v0.1-soak.md",
+        "Latest evidence commit SHA: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "| PR URL | latency | finding count | manual quality rating |",
+        "| --- | --- | --- | --- |",
+      ].join("\n"),
+    );
+
+    // Given "evals/v0.1-soak.md" is committed in "mpiton/sovri"
+    // And the committed file has 0 PR evidence rows
+    // When the committed evidence is inspected
+    const result = runValidator([
+      "soak-log-commit",
+      "--repo",
+      "mpiton/sovri",
+      "--path",
+      "evals/v0.1-soak.md",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // Then the soak log commit assertion fails
+    // And the failure mentions "soak log has no PR evidence rows"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("soak log has no PR evidence rows");
+  });
+
+  it("fails committed soak log evidence when metadata only partially matches", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Evidence repository: mpiton/sovri-fork",
+        "Committed soak log path: evals/v0.1-soak.md.bak",
+        "Latest evidence commit SHA: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "| PR URL | latency | finding count | manual quality rating |",
+        "| --- | --- | --- | --- |",
+        "| https://github.com/mpiton/sovri/pull/101 | 31.200s | 2 | 4 |",
+      ].join("\n"),
+    );
+
+    const result = runValidator([
+      "soak-log-commit",
+      "--repo",
+      "mpiton/sovri",
+      "--path",
+      "evals/v0.1-soak.md",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("soak log must be committed to mpiton/sovri");
+  });
+
+  it("fails committed soak log evidence when PR rows belong to another repository", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Evidence repository: mpiton/sovri",
+        "Committed soak log path: evals/v0.1-soak.md",
+        "Latest evidence commit SHA: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "| PR URL | latency | finding count | manual quality rating |",
+        "| --- | --- | --- | --- |",
+        "| https://github.com/mpiton/forgent/pull/101 | 31.200s | 2 | 4 |",
+      ].join("\n"),
+    );
+
+    const result = runValidator([
+      "soak-log-commit",
+      "--repo",
+      "mpiton/sovri",
+      "--path",
+      "evals/v0.1-soak.md",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("soak log has no PR evidence rows");
+  });
 });
 
 function runValidator(args: readonly string[]): ReturnType<typeof spawnSync> {

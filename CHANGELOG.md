@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add empty committed soak-log evidence coverage and
+  validator support (#1053).
+
 - `test(e2e)`: add empty Anthropic API key smoke evidence coverage and
   validator support (#1009).
 
@@ -58,6 +61,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `test(e2e)`: add v0.1 soak image provenance acceptance coverage (#1015).
 
 ### Fixed
+
+- `test(e2e)`: require committed soak-log metadata and PR evidence rows to
+  match the expected repository exactly (#1053).
 
 - `test(msw)`: shared Anthropic handler now returns `anthropic-empty.json` for
   non-`json_schema` requests so the structured-output branch is exercised
