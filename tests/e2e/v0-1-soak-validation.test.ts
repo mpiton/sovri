@@ -574,6 +574,47 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("Sovri Community Bot");
   });
+
+  it("excludes draft, 500-line, and wrong-branch PRs from the smoke PR count", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Smoke PR: 101 target_branch=main draft=false changed_lines=128",
+        "Smoke PR: 102 target_branch=main draft=true changed_lines=240",
+        "Smoke PR: 103 target_branch=main draft=false changed_lines=500",
+        "Smoke PR: 104 target_branch=main draft=false changed_lines=42",
+        "Smoke PR: 105 target_branch=develop draft=false changed_lines=120",
+      ].join("\n"),
+    );
+
+    // Given the smoke run contains these PRs:
+    // | pr  | target_branch | draft | changed_lines |
+    // | 101 | main          | false | 128           |
+    // | 102 | main          | true  | 240           |
+    // | 103 | main          | false | 500           |
+    // | 104 | main          | false | 42            |
+    // | 105 | develop       | false | 120           |
+    // When the smoke PR count is evaluated
+    const result = runValidator([
+      "smoke-pr-count",
+      "--target-branch",
+      "main",
+      "--minimum-count",
+      "4",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // Then the qualifying PR count is 2
+    // And PR 102 is excluded because it is a draft
+    // And PR 103 is excluded because changed lines are not < 500
+    // And PR 105 is excluded because it does not target "main"
+    // And the smoke PR count assertion fails
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("qualifying PR count: 2");
+    expect(result.stderr).toContain("PR 102 is excluded because it is a draft");
+    expect(result.stderr).toContain("PR 103 is excluded because changed lines are not < 500");
+    expect(result.stderr).toContain('PR 105 is excluded because it does not target "main"');
+  });
 });
 
 function runValidator(args: readonly string[]): ReturnType<typeof spawnSync> {

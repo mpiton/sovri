@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add smoke PR count exclusion coverage for draft PRs, 500-line
+  PRs, and wrong-branch PRs (#1040).
+
 - `test(e2e)`: add GitHub App identity and repository-binding rejection
   coverage plus validator support for the smoke installation assertion (#1012).
 
