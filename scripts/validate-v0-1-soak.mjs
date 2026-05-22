@@ -829,11 +829,11 @@ function readSoakLogEvidenceTable(content, repoFullName) {
   const completeTables = tables.filter((table) =>
     REQUIRED_SOAK_LOG_FIELDS.every((field) => table.header.includes(field)),
   );
-  const targetRepoTable = completeTables.find((table) =>
-    tableContainsTargetRepoEvidence(table, repoFullName),
+  const targetRepoRows = completeTables.flatMap((table) =>
+    readTargetRepoEvidenceRows(table, repoFullName),
   );
-  if (targetRepoTable !== undefined) {
-    return targetRepoTable;
+  if (targetRepoRows.length > 0) {
+    return { header: REQUIRED_SOAK_LOG_FIELDS, rows: targetRepoRows };
   }
   if (completeTables[0] !== undefined) {
     return completeTables[0];
@@ -844,13 +844,22 @@ function readSoakLogEvidenceTable(content, repoFullName) {
   );
 }
 
-function tableContainsTargetRepoEvidence(table, repoFullName) {
+function readTargetRepoEvidenceRows(table, repoFullName) {
   const fieldIndexes = readSoakLogFieldIndexes(table.header);
-  return table.rows.some((row) => {
+  return table.rows.flatMap((row) => {
     const prUrlCell = readRequiredSoakLogCell(row, fieldIndexes, "PR URL");
-    return (
-      prUrlCell !== undefined && readGitHubPullUrlPrNumber(prUrlCell, repoFullName) !== undefined
-    );
+    if (
+      prUrlCell === undefined ||
+      readGitHubPullUrlPrNumber(prUrlCell, repoFullName) === undefined
+    ) {
+      return [];
+    }
+
+    return [
+      REQUIRED_SOAK_LOG_FIELDS.map(
+        (field) => readRequiredSoakLogCell(row, fieldIndexes, field) ?? "",
+      ),
+    ];
   });
 }
 

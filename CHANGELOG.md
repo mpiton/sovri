@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: aggregate target repository evidence rows across multiple
+  complete soak-log tables (#1022).
+
 - `test(e2e)`: ensure soak-log validation selects the complete evidence
   table for the target repository when other repository tables appear first
   (#1022).

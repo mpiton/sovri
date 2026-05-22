@@ -1340,6 +1340,34 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.status, result.stderr).toBe(0);
   });
 
+  it("aggregates target repository evidence rows across multiple complete soak tables", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "| PR URL | latency | finding count | manual quality rating |",
+        "| --- | --- | --- | --- |",
+        "| https://github.com/mpiton/forgent/pull/101 | 31.200s | 2 | 4 |",
+        "",
+        "| PR URL | latency | finding count | manual quality rating |",
+        "| --- | --- | --- | --- |",
+        "| https://github.com/mpiton/forgent/pull/102 | 44.800s | 1 | 3 |",
+      ].join("\n"),
+    );
+
+    const result = runValidator([
+      "soak-log-content",
+      "--repo",
+      "mpiton/forgent",
+      "--qualifying-pr",
+      "101",
+      "--qualifying-pr",
+      "102",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    expect(result.status, result.stderr).toBe(0);
+  });
+
   it("fails committed soak log evidence when no PR rows are present", () => {
     const soakLogPath = writeSoakLog(
       [
