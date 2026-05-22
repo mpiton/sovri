@@ -611,6 +611,33 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("reason: crash evidence is incomplete");
   });
 
+  it("rejects no-crash validation when health fails during the smoke set", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Smoke PR: 101 qualifying=true",
+        "Smoke PR: 102 qualifying=true",
+        "Smoke PR: 103 qualifying=true",
+        "Smoke PR: 104 qualifying=true",
+        "Container restart count before PR 101: 0",
+        "GET /health before PR 101: 200",
+        "Container restart count after PR 104: 0",
+        "Community bot process exit code: 0",
+        "GET /health after PR 101: 200",
+        "GET /health after PR 102: 503",
+      ].join("\n"),
+    );
+
+    // Given health is 200 before PR 101
+    // When health returns 503 after PR 102
+    const result = runNoCrashValidator(soakLogPath);
+
+    // Then the no-crash assertion fails
+    // And the failure mentions "/health failed during the smoke PR set"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("no-crash outcome: rejected");
+    expect(result.stderr).toContain("/health failed during the smoke PR set");
+  });
+
   it("uses the latest crash evidence line when duplicate fields are captured", () => {
     const soakLogPath = writeSoakLog(
       [

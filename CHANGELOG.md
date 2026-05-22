@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add no-crash failure coverage for `/health` returning 503 during
+  the smoke PR set (#1029).
+
 - `test(e2e)`: add nominal GitHub App installation evidence coverage and
   validator checks for required permissions, webhook subscriptions, signed PR
   webhook delivery, and required GitHub API access (#1010).
