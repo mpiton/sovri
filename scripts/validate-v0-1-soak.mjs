@@ -491,8 +491,10 @@ function hasInvalidPrivateKeyStartupFailureEvidence(content) {
 function hasMalformedAppIdStartupFailureEvidence(content) {
   const lines = content.split(/\r?\n/u);
   const appId = readLineValue(lines, "APP_ID value: ");
+  const failureReason = readLineValue(lines, "Startup failure reason: ");
   return (
     appId !== undefined &&
+    appId.trim().length > 0 &&
     !isPositiveInteger(appId) &&
     [
       "WEBHOOK_SECRET configured: true",
@@ -500,7 +502,9 @@ function hasMalformedAppIdStartupFailureEvidence(content) {
       "Community bot startup: failed before webhook processing",
       "Webhook processing: not started",
     ].every((expectedLine) => lines.includes(expectedLine)) &&
-    lines.some((line) => line.startsWith("Startup failure reason: ") && line.includes("APP_ID"))
+    failureReason !== undefined &&
+    failureReason.includes("APP_ID") &&
+    failureReason.includes("positive integer")
   );
 }
 
