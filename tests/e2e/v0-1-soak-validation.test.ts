@@ -281,6 +281,34 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("container restarted during the smoke PR set");
   });
+
+  it("fails no-crash validation when restart evidence is incomplete", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Smoke PR: 101 qualifying=true",
+        "Smoke PR: 102 qualifying=true",
+        "Smoke PR: 103 qualifying=true",
+        "Smoke PR: 104 qualifying=true",
+        "Captured log: delivery_id=delivery-60-101 pr=101 provider=anthropic",
+      ].join("\n"),
+    );
+
+    // Given the smoke set contains qualifying PRs 101, 102, 103, and 104
+    // But restart count evidence is missing for the smoke range
+    const result = runValidator([
+      "no-crash",
+      "--from-pr",
+      "101",
+      "--to-pr",
+      "104",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // Then the no-crash assertion fails instead of assuming no restart occurred
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("restart evidence is incomplete");
+  });
 });
 
 function runValidator(args: readonly string[]): ReturnType<typeof spawnSync> {

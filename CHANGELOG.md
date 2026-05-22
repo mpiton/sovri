@@ -21,8 +21,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
-- `test(e2e)`: add no-crash restart failure coverage for the smoke PR set
-  (#1028).
+- `test(e2e)`: add no-crash restart and incomplete restart evidence failure
+  coverage for the smoke PR set (#1028).
 
 - `test(e2e)`: add clean captured log metadata success coverage and malformed
   repeated secret argument rejection (#1033).

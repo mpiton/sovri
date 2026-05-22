@@ -64,9 +64,13 @@ if (command === "image-provenance") {
   const toPr = readOption("--to-pr");
   const soakLogPath = readOption("--soak-log");
   const soakLog = readFileSync(soakLogPath, "utf8");
+  const noCrashFailure = validateContainerDidNotRestartDuringSmokeSet(soakLog, {
+    fromPr,
+    toPr,
+  });
 
-  if (containerRestartedDuringSmokeSet(soakLog, { fromPr, toPr })) {
-    fail("container restarted during the smoke PR set");
+  if (noCrashFailure !== undefined) {
+    fail(noCrashFailure);
   }
 } else {
   fail(
@@ -125,24 +129,46 @@ function capturedLogsContain(capturedLogLines, needle) {
   return capturedLogLines.some((line) => line.includes(needle));
 }
 
-function containerRestartedDuringSmokeSet(content, range) {
+function validateContainerDidNotRestartDuringSmokeSet(content, range) {
   const before = readRestartCountBeforePr(content, range.fromPr);
+  const afterCounts = readRestartCountsAfterPr(content, range);
+
+  if (before === undefined || afterCounts.length === 0) {
+    return "restart evidence is incomplete";
+  }
+
+  if (afterCounts.some((after) => after.restartCount > before)) {
+    return "container restarted during the smoke PR set";
+  }
+
+  return undefined;
+}
+
+function readRestartCountsAfterPr(content, range) {
+  const fromPr = Number.parseInt(range.fromPr, 10);
+  const toPr = Number.parseInt(range.toPr, 10);
   const afterMatches = [...content.matchAll(/Container restart count after PR (\d+): (\d+)/gu)];
-  return afterMatches.some((match) => {
+
+  return afterMatches.flatMap((match) => {
     const prNumber = Number.parseInt(match[1], 10);
     const restartCount = Number.parseInt(match[2], 10);
-    return (
-      prNumber >= Number.parseInt(range.fromPr, 10) &&
-      prNumber <= Number.parseInt(range.toPr, 10) &&
-      restartCount > before
-    );
+
+    if (prNumber < fromPr || prNumber > toPr) {
+      return [];
+    }
+
+    return [{ prNumber, restartCount }];
   });
 }
 
 function readRestartCountBeforePr(content, prNumber) {
   const prefix = `Container restart count before PR ${prNumber}: `;
   const line = content.split(/\r?\n/u).find((candidate) => candidate.startsWith(prefix));
-  return line === undefined ? 0 : Number.parseInt(line.slice(prefix.length), 10);
+  if (line === undefined) {
+    return undefined;
+  }
+
+  return Number.parseInt(line.slice(prefix.length), 10);
 }
 
 function readOption(name) {
