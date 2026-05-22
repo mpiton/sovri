@@ -155,26 +155,45 @@ function hasMissingAnthropicKeyFailure(content, prNumber) {
 function readAnthropicReviewEvidence(content, prNumber) {
   const apiKeyPrefix = "ANTHROPIC_API_KEY value: ";
   const reviewCommentPrefix = "Successful review comment posted: ";
-  let currentEvidence = {};
+  let pendingEvidence = {};
+  let currentEvidence;
   let matchedEvidence;
 
   for (const line of content.split(/\r?\n/u)) {
     if (line.startsWith(apiKeyPrefix)) {
-      if (currentEvidence.prNumber === prNumber) {
+      if (currentEvidence?.prNumber === prNumber) {
         matchedEvidence = { ...currentEvidence };
       }
-      currentEvidence = { apiKeyEvidence: line.slice(apiKeyPrefix.length) };
+
+      const apiKeyEvidence = line.slice(apiKeyPrefix.length);
+      if (currentEvidence?.prNumber !== undefined && currentEvidence.apiKeyEvidence === undefined) {
+        Object.assign(currentEvidence, { apiKeyEvidence });
+      } else {
+        currentEvidence = undefined;
+        Object.assign(pendingEvidence, { apiKeyEvidence });
+      }
     }
 
     if (line.startsWith("PR: ")) {
-      currentEvidence.prNumber = line.slice("PR: ".length);
+      if (currentEvidence?.prNumber === prNumber) {
+        matchedEvidence = { ...currentEvidence };
+      }
+      currentEvidence = Object.assign({}, pendingEvidence, {
+        prNumber: line.slice("PR: ".length),
+      });
+      pendingEvidence = {};
     }
 
     if (line.startsWith(reviewCommentPrefix)) {
-      currentEvidence.successfulReviewCommentPosted = line.slice(reviewCommentPrefix.length);
+      const successfulReviewCommentPosted = line.slice(reviewCommentPrefix.length);
+      if (currentEvidence?.prNumber !== undefined) {
+        Object.assign(currentEvidence, { successfulReviewCommentPosted });
+      } else {
+        Object.assign(pendingEvidence, { successfulReviewCommentPosted });
+      }
     }
 
-    if (currentEvidence.prNumber === prNumber) {
+    if (currentEvidence?.prNumber === prNumber) {
       matchedEvidence = { ...currentEvidence };
     }
   }
