@@ -21,6 +21,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add empty committed soak-log evidence coverage (#1053).
+
 - `test(e2e)`: add empty Anthropic API key smoke evidence coverage and
   validator support (#1009).
 
