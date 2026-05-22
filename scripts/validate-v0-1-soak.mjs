@@ -122,7 +122,7 @@ if (command === "image-provenance") {
   if (!hasCommittedSoakLogMetadata(soakLog, { relativePath, repoFullName })) {
     fail(`soak log must be committed to ${repoFullName}`);
   }
-  if (countSoakLogPrEvidenceRows(soakLog) === 0) {
+  if (countSoakLogPrEvidenceRows(soakLog, repoFullName) === 0) {
     fail("soak log has no PR evidence rows");
   }
   process.stdout.write("soak log commit assertion passed\n");
@@ -333,20 +333,27 @@ function findDuplicateSoakEvidencePr(content, expected) {
   return undefined;
 }
 
-function countSoakLogPrEvidenceRows(content) {
-  return content.split(/\r?\n/u).filter((line) => lineHasGitHubPullEvidenceCell(line)).length;
+function countSoakLogPrEvidenceRows(content, repoFullName) {
+  return content.split(/\r?\n/u).filter((line) => lineHasGitHubPullEvidenceCell(line, repoFullName))
+    .length;
 }
 
 function hasCommittedSoakLogMetadata(content, expected) {
   return (
-    content.includes(`Evidence repository: ${expected.repoFullName}`) &&
-    content.includes(`Committed soak log path: ${expected.relativePath}`)
+    readMetadataValue(content, "Evidence repository") === expected.repoFullName &&
+    readMetadataValue(content, "Committed soak log path") === expected.relativePath
   );
 }
 
-function lineHasGitHubPullEvidenceCell(line) {
+function readMetadataValue(content, label) {
+  const prefix = `${label}: `;
+  const line = content.split(/\r?\n/u).find((candidate) => candidate.startsWith(prefix));
+  return line?.slice(prefix.length).trim();
+}
+
+function lineHasGitHubPullEvidenceCell(line, repoFullName) {
   const [prUrlCell] = readMarkdownTableCells(line);
-  return prUrlCell !== undefined && isGitHubPullUrl(prUrlCell);
+  return prUrlCell !== undefined && isGitHubPullUrl(prUrlCell, repoFullName);
 }
 
 function readMarkdownTableCells(line) {
@@ -361,7 +368,7 @@ function readMarkdownTableCells(line) {
     .map((cell) => cell.trim());
 }
 
-function isGitHubPullUrl(value) {
+function isGitHubPullUrl(value, repoFullName) {
   let url;
   try {
     url = new URL(value);
@@ -369,11 +376,15 @@ function isGitHubPullUrl(value) {
     return false;
   }
 
+  const [owner, repo, extraPart] = repoFullName.split("/");
   const pathParts = url.pathname.split("/").filter((part) => part.length > 0);
   return (
+    extraPart === undefined &&
     url.protocol === "https:" &&
     url.hostname === "github.com" &&
     pathParts.length === 4 &&
+    pathParts[0] === owner &&
+    pathParts[1] === repo &&
     pathParts[2] === "pull" &&
     isDecimalInteger(pathParts[3])
   );

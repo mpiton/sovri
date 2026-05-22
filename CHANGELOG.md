@@ -62,6 +62,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `test(e2e)`: require committed soak-log metadata and PR evidence rows to
+  match the expected repository exactly (#1053).
+
 - `test(msw)`: shared Anthropic handler now returns `anthropic-empty.json` for
   non-`json_schema` requests so the structured-output branch is exercised
   distinctly from the default response (#966 review feedback).
