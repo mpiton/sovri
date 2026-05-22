@@ -331,9 +331,33 @@ function findDuplicateSoakEvidencePr(content, expected) {
 }
 
 function countSoakLogPrEvidenceRows(content) {
-  return content
-    .split(/\r?\n/u)
-    .filter((line) => line.includes("https://github.com/") && line.includes("/pull/")).length;
+  return content.split(/\r?\n/u).filter((line) => lineHasGitHubPullUrl(line)).length;
+}
+
+function lineHasGitHubPullUrl(line) {
+  return line.split(/\s+/u).some((token) => isGitHubPullUrl(token.replace(/^\|/u, "")));
+}
+
+function isGitHubPullUrl(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+
+  const pathParts = url.pathname.split("/").filter((part) => part.length > 0);
+  return (
+    url.protocol === "https:" &&
+    url.hostname === "github.com" &&
+    pathParts.length === 4 &&
+    pathParts[2] === "pull" &&
+    isDecimalInteger(pathParts[3])
+  );
+}
+
+function isDecimalInteger(value) {
+  return value.length > 0 && [...value].every((character) => character >= "0" && character <= "9");
 }
 
 function readSoakEvidencePrNumbers(content, repoFullName) {
