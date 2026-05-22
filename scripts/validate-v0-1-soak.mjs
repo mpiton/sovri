@@ -1081,7 +1081,15 @@ function evaluateNoCrashEvidence(content, range) {
   const before = readRestartCountBeforePr(content, range.fromPr);
   const afterCounts = prRange === undefined ? [] : readRestartCountsAfterPr(content, prRange);
 
-  if (prRange === undefined || before === undefined || afterCounts.length === 0) {
+  if (prRange === undefined) {
+    return rejectedNoCrash("restart evidence is incomplete");
+  }
+
+  if (before === undefined && afterCounts.length === 0) {
+    return rejectedNoCrash("restart evidence is incomplete", "missing container restart evidence");
+  }
+
+  if (before === undefined || afterCounts.length === 0) {
     return rejectedNoCrash("restart evidence is incomplete");
   }
 
