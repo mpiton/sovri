@@ -64,14 +64,16 @@ if (command === "image-provenance") {
   const toPr = readOption("--to-pr");
   const soakLogPath = readOption("--soak-log");
   const soakLog = readFileSync(soakLogPath, "utf8");
-  const noCrashFailure = validateContainerDidNotRestartDuringSmokeSet(soakLog, {
+  const noCrashResult = evaluateNoCrashEvidence(soakLog, {
     fromPr,
     toPr,
   });
 
-  if (noCrashFailure !== undefined) {
-    fail(noCrashFailure);
+  if (noCrashResult.outcome === "rejected") {
+    failNoCrash(noCrashResult);
   }
+  process.stdout.write("no-crash outcome: accepted\n");
+  process.stdout.write(`reason: ${noCrashResult.reason}\n`);
 } else {
   fail(
     "usage: validate-v0-1-soak.mjs <image-provenance|anthropic-key|provider-logs|log-secrets|no-crash> [options]",
@@ -129,24 +131,40 @@ function capturedLogsContain(capturedLogLines, needle) {
   return capturedLogLines.some((line) => line.includes(needle));
 }
 
-function validateContainerDidNotRestartDuringSmokeSet(content, range) {
+function evaluateNoCrashEvidence(content, range) {
   const prRange = readPrRange(range);
   const before = readRestartCountBeforePr(content, range.fromPr);
   const afterCounts = prRange === undefined ? [] : readRestartCountsAfterPr(content, prRange);
 
   if (prRange === undefined || before === undefined || afterCounts.length === 0) {
-    return "restart evidence is incomplete";
+    return rejectedNoCrash("restart evidence is incomplete");
   }
 
   if (afterCounts.some((after) => after.restartCount > before)) {
-    return "container restarted during the smoke PR set";
+    return rejectedNoCrash("container restarted", "container restarted during the smoke PR set");
   }
 
   if (!afterCounts.some((after) => after.prNumber >= prRange.toPr)) {
-    return "restart evidence is incomplete";
+    return rejectedNoCrash("restart evidence is incomplete");
   }
 
-  return undefined;
+  const exitCode = readCommunityBotProcessExitCode(content);
+  if (exitCode === undefined) {
+    return rejectedNoCrash("crash evidence is incomplete");
+  }
+  if (exitCode !== 0) {
+    return rejectedNoCrash(`process exited with code ${exitCode}`);
+  }
+
+  const healthStatus = readLatestHealthStatus(content);
+  if (healthStatus === undefined) {
+    return rejectedNoCrash("crash evidence is incomplete");
+  }
+  if (healthStatus !== 200) {
+    return rejectedNoCrash("/health failed");
+  }
+
+  return { outcome: "accepted", reason: "no crash evidence" };
 }
 
 function readRestartCountsAfterPr(content, range) {
@@ -190,6 +208,32 @@ function readRestartCountBeforePr(content, prNumber) {
   return restartCount;
 }
 
+function readCommunityBotProcessExitCode(content) {
+  return readIntegerLine(content, "Community bot process exit code: ");
+}
+
+function readLatestHealthStatus(content) {
+  return readIntegerLine(content, "Latest GET /health response status: ");
+}
+
+function readIntegerLine(content, prefix) {
+  const lines = content.split(/\r?\n/u);
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    if (line.startsWith(prefix)) {
+      const value = Number.parseInt(line.slice(prefix.length), 10);
+      return Number.isNaN(value) ? undefined : value;
+    }
+  }
+
+  return undefined;
+}
+
+function rejectedNoCrash(reason, message = reason) {
+  return { message, outcome: "rejected", reason };
+}
+
 function readOption(name) {
   const index = args.indexOf(name);
   const value = args[index + 1];
@@ -214,5 +258,14 @@ function readOptions(name) {
 
 function fail(message) {
   process.stderr.write(`${message}\n`);
+  process.exit(1);
+}
+
+function failNoCrash(result) {
+  process.stderr.write("no-crash outcome: rejected\n");
+  process.stderr.write(`reason: ${result.reason}\n`);
+  if (result.message !== result.reason) {
+    process.stderr.write(`${result.message}\n`);
+  }
   process.exit(1);
 }
