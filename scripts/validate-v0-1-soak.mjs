@@ -126,7 +126,7 @@ function capturedLogsContain(capturedLogLines, needle) {
 }
 
 function containerRestartedDuringSmokeSet(content, range) {
-  const before = readRestartCount(content, `before PR ${range.fromPr}`);
+  const before = readRestartCountBeforePr(content, range.fromPr);
   const afterMatches = [...content.matchAll(/Container restart count after PR (\d+): (\d+)/gu)];
   return afterMatches.some((match) => {
     const prNumber = Number.parseInt(match[1], 10);
@@ -139,10 +139,10 @@ function containerRestartedDuringSmokeSet(content, range) {
   });
 }
 
-function readRestartCount(content, marker) {
-  const pattern = new RegExp(`Container restart count ${marker}: (\\d+)`, "u");
-  const match = content.match(pattern);
-  return match === null ? 0 : Number.parseInt(match[1], 10);
+function readRestartCountBeforePr(content, prNumber) {
+  const prefix = `Container restart count before PR ${prNumber}: `;
+  const line = content.split(/\r?\n/u).find((candidate) => candidate.startsWith(prefix));
+  return line === undefined ? 0 : Number.parseInt(line.slice(prefix.length), 10);
 }
 
 function readOption(name) {
