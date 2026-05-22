@@ -71,6 +71,28 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("local build must record the source commit");
   });
 
+  it("rejects wrong GHCR image repository provenance", () => {
+    const soakLogPath = writeSoakLog(
+      "Image provenance: pulled ghcr.io/mpiton/sovri/wrong-bot:v0.1.0\n",
+    );
+
+    // Given the running container image is "ghcr.io/mpiton/sovri/wrong-bot:v0.1.0"
+    // And the soak log records "pulled ghcr.io/mpiton/sovri/wrong-bot:v0.1.0"
+    const result = runValidator([
+      "image-provenance",
+      "--provenance-mode",
+      "GHCR pull",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // When image provenance is evaluated
+    // Then the image provenance assertion fails
+    // And the failure mentions "ghcr.io/mpiton/sovri/community-bot:v0.1.0"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("ghcr.io/mpiton/sovri/community-bot:v0.1.0");
+  });
+
   it("fails Anthropic key wiring when Anthropic authentication fails without a crash", () => {
     const soakLogPath = writeSoakLog(
       [

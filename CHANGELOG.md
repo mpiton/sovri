@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add wrong GHCR image repository rejection coverage for
+  v0.1 image provenance validation (#1017).
+
 - `test(e2e)`: add nominal GitHub credential wiring evidence coverage for
   signed webhook acceptance and installation token availability (#1054).
 
