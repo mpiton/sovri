@@ -331,11 +331,24 @@ function findDuplicateSoakEvidencePr(content, expected) {
 }
 
 function countSoakLogPrEvidenceRows(content) {
-  return content.split(/\r?\n/u).filter((line) => lineHasGitHubPullUrl(line)).length;
+  return content.split(/\r?\n/u).filter((line) => lineHasGitHubPullEvidenceCell(line)).length;
 }
 
-function lineHasGitHubPullUrl(line) {
-  return line.split(/\s+/u).some((token) => isGitHubPullUrl(token.replace(/^\|/u, "")));
+function lineHasGitHubPullEvidenceCell(line) {
+  const [prUrlCell] = readMarkdownTableCells(line);
+  return prUrlCell !== undefined && isGitHubPullUrl(prUrlCell);
+}
+
+function readMarkdownTableCells(line) {
+  const trimmedLine = line.trim();
+  if (!trimmedLine.startsWith("|") || !trimmedLine.endsWith("|")) {
+    return [];
+  }
+
+  return trimmedLine
+    .slice(1, -1)
+    .split("|")
+    .map((cell) => cell.trim());
 }
 
 function isGitHubPullUrl(value) {
