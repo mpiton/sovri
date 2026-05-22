@@ -492,10 +492,11 @@ function hasMalformedAppIdStartupFailureEvidence(content) {
   const lines = content.split(/\r?\n/u);
   const appId = readLineValue(lines, "APP_ID value: ");
   const failureReason = readLineValue(lines, "Startup failure reason: ");
+  const normalizedAppId = appId?.trim();
   return (
-    appId !== undefined &&
-    appId.trim().length > 0 &&
-    !isPositiveInteger(appId) &&
+    normalizedAppId !== undefined &&
+    normalizedAppId.length > 0 &&
+    !isPositiveInteger(normalizedAppId) &&
     [
       "WEBHOOK_SECRET configured: true",
       "PRIVATE_KEY decoded PEM key: valid 2048-bit RSA",
