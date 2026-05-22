@@ -548,6 +548,32 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("Sovri Community Bot");
   });
+
+  it("rejects the expected GitHub App when it is installed on a different repository", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "Repository: mpiton/forgent",
+        "Installed GitHub App: Other Review Bot",
+        "Other Review Bot required permissions granted: true",
+        "Other Review Bot required webhook events subscribed: true",
+        "Repository: mpiton/other-repo",
+        "Installed GitHub App: Sovri Community Bot",
+      ].join("\n"),
+    );
+
+    const result = runValidator([
+      "github-app-installation",
+      "--repo",
+      "mpiton/forgent",
+      "--expected-app",
+      "Sovri Community Bot",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Sovri Community Bot");
+  });
 });
 
 function runValidator(args: readonly string[]): ReturnType<typeof spawnSync> {

@@ -142,10 +142,21 @@ function capturedLogsContain(capturedLogLines, needle) {
 
 function hasExpectedGitHubAppInstallation(content, expected) {
   const lines = content.split(/\r?\n/u);
-  return (
-    lines.includes(`Repository: ${expected.repoFullName}`) &&
-    lines.includes(`Installed GitHub App: ${expected.expectedApp}`)
-  );
+  let currentRepo;
+
+  for (const line of lines) {
+    if (line.startsWith("Repository: ")) {
+      currentRepo = line.slice("Repository: ".length);
+    }
+    if (
+      currentRepo === expected.repoFullName &&
+      line === `Installed GitHub App: ${expected.expectedApp}`
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function evaluateNoCrashEvidence(content, range) {
