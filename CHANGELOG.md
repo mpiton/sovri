@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add unrecorded image provenance failure coverage and
+  validator messaging for the v0.1 smoke run (#1016).
+
 - `test(e2e)`: add complete nominal soak-log row coverage for every
   qualifying PR and an explicit content assertion pass message (#1019).
 
