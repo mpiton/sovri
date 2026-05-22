@@ -1840,6 +1840,58 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("p95 latency must be < 90 s");
   });
 
+  it.each([
+    {
+      additions: 0,
+      changedLines: 0,
+      classification: "excluded",
+      deletions: 0,
+      pr: "108",
+    },
+    {
+      additions: 498,
+      changedLines: 499,
+      classification: "included",
+      deletions: 1,
+      pr: "103",
+    },
+    {
+      additions: 499,
+      changedLines: 500,
+      classification: "excluded",
+      deletions: 1,
+      pr: "106",
+    },
+    {
+      additions: 500,
+      changedLines: 500,
+      classification: "excluded",
+      deletions: 0,
+      pr: "107",
+    },
+  ])(
+    "classifies PR $pr as $classification for the latency sample",
+    ({ additions, changedLines, classification, deletions, pr }) => {
+      // Given PR <pr> has <additions> additions and <deletions> deletions
+      const result = runValidator([
+        "latency-pr-filter",
+        "--pr",
+        pr,
+        "--additions",
+        additions.toString(),
+        "--deletions",
+        deletions.toString(),
+      ]);
+
+      // When the qualifying PR filter is evaluated
+      // Then the changed line count is <changed_lines>
+      // And the PR is "<classification>" for the latency sample
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain(`changed line count: ${changedLines}`);
+      expect(result.stdout).toContain(`latency sample classification: ${classification}`);
+    },
+  );
+
   it("fails soak log validation when the finding count is negative", () => {
     const soakLogPath = writeSoakLog(
       [

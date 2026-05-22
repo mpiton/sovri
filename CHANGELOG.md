@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add latency-sample PR qualification coverage using GitHub
+  additions plus deletions for the changed-line boundary (#1046).
+
 - `test(e2e)`: add missing Docker restart-count evidence coverage for the
   no-crash smoke assertion (#1032).
 
