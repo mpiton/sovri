@@ -21,7 +21,7 @@ export class RuntimeEnvironmentError extends Error {
 
 export function readRuntimeEnvironment(env: NodeJS.ProcessEnv = process.env): RuntimeEnvironment {
   return {
-    appId: readRequiredEnv(env, "APP_ID"),
+    appId: readAppId(env),
     port: readPort(env.PORT),
     privateKey: readPrivateKey(env),
     webhookSecret: readRequiredEnv(env, "WEBHOOK_SECRET"),
@@ -45,6 +45,15 @@ function readPrivateKey(env: NodeJS.ProcessEnv): string {
     throw new RuntimeEnvironmentError("PRIVATE_KEY must contain valid PEM private key material");
   }
   return privateKey;
+}
+
+function readAppId(env: NodeJS.ProcessEnv): string {
+  const appId = readRequiredEnv(env, "APP_ID").trim();
+  const parsed = Number.parseInt(appId, 10);
+  if (!DECIMAL_INTEGER.test(appId) || !Number.isSafeInteger(parsed) || parsed < 1) {
+    throw new RuntimeEnvironmentError("APP_ID must be a positive integer");
+  }
+  return appId;
 }
 
 function readRequiredEnv(env: NodeJS.ProcessEnv, name: string): string {

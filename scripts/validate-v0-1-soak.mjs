@@ -127,6 +127,14 @@ if (command === "image-provenance") {
     fail("private key startup failure assertion failed");
   }
   process.stdout.write("private key startup failure assertion passed\n");
+} else if (command === "app-id-startup-failure") {
+  const soakLogPath = readOption("--soak-log");
+  const soakLog = readFileSync(soakLogPath, "utf8");
+
+  if (!hasMalformedAppIdStartupFailureEvidence(soakLog)) {
+    fail("APP_ID startup failure assertion failed");
+  }
+  process.stdout.write("APP_ID startup failure assertion passed\n");
 } else if (command === "latency-p95") {
   const soakLogPath = readOption("--soak-log");
   const soakLog = readFileSync(soakLogPath, "utf8");
@@ -232,7 +240,7 @@ if (command === "image-provenance") {
   process.stdout.write("soak log commit assertion passed\n");
 } else {
   fail(
-    "usage: validate-v0-1-soak.mjs <image-provenance|anthropic-key|provider-logs|log-secrets|no-crash|github-app-installation|private-key-newlines|private-key-startup-failure|latency-p95|latency-pr|smoke-pr-count|soak-log-content|soak-log-commit> [options]",
+    "usage: validate-v0-1-soak.mjs <image-provenance|anthropic-key|provider-logs|log-secrets|no-crash|github-app-installation|private-key-newlines|private-key-startup-failure|app-id-startup-failure|latency-p95|latency-pr|smoke-pr-count|soak-log-content|soak-log-commit> [options]",
   );
 }
 
@@ -480,9 +488,35 @@ function hasInvalidPrivateKeyStartupFailureEvidence(content) {
   );
 }
 
+function hasMalformedAppIdStartupFailureEvidence(content) {
+  const lines = content.split(/\r?\n/u);
+  const appId = readLineValue(lines, "APP_ID value: ");
+  const failureReason = readLineValue(lines, "Startup failure reason: ");
+  const normalizedAppId = appId?.trim();
+  return (
+    normalizedAppId !== undefined &&
+    normalizedAppId.length > 0 &&
+    !isPositiveInteger(normalizedAppId) &&
+    [
+      "WEBHOOK_SECRET configured: true",
+      "PRIVATE_KEY decoded PEM key: valid 2048-bit RSA",
+      "Community bot startup: failed before webhook processing",
+      "Webhook processing: not started",
+    ].every((expectedLine) => lines.includes(expectedLine)) &&
+    failureReason !== undefined &&
+    failureReason.includes("APP_ID") &&
+    failureReason.includes("positive integer")
+  );
+}
+
 function readLineValue(lines, prefix) {
   const line = lines.find((candidate) => candidate.startsWith(prefix));
   return line === undefined ? undefined : line.slice(prefix.length);
+}
+
+function isPositiveInteger(value) {
+  const parsed = Number.parseInt(value, 10);
+  return isDecimalInteger(value) && Number.isSafeInteger(parsed) && parsed > 0;
 }
 
 function calculateLatencyP95(content) {
