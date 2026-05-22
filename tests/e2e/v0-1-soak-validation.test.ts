@@ -763,8 +763,12 @@ describe("v0.1 soak evidence validation", () => {
   it("accepts GitHub App installation evidence with required access to the test repo", () => {
     const soakLogPath = writeSoakLog(
       [
+        "APP_ID value: 123456",
+        "WEBHOOK_SECRET configured: true",
+        "PRIVATE_KEY decoded PEM key: valid 2048-bit RSA",
         "Repository: mpiton/forgent",
         "Installed GitHub App: Sovri Community Bot",
+        "GitHub installation token: available repo=mpiton/forgent",
         "Sovri Community Bot permission: pull_requests=write",
         "Sovri Community Bot permission: contents=read",
         "Sovri Community Bot permission: issues=write",
@@ -777,6 +781,9 @@ describe("v0.1 soak evidence validation", () => {
       ].join("\n"),
     );
 
+    // Given `APP_ID` is "123456"
+    // And `WEBHOOK_SECRET` is configured
+    // And `PRIVATE_KEY` contains valid PEM private key material
     // Given "Sovri Community Bot" is installed on "mpiton/forgent"
     // And the installation grants every required permission
     // And the installation subscribes to every required webhook event
@@ -791,10 +798,14 @@ describe("v0.1 soak evidence validation", () => {
     ]);
 
     // Then GitHub delivers a signed pull_request.opened webhook
+    // And Sovri obtains an installation token for "mpiton/forgent"
     // And Sovri can call the required pull request file and review endpoints
     // And the GitHub App installation assertion passes
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain("GitHub App installation assertion passed");
+    expect(result.stdout).toContain("webhook signature: accepted");
+    expect(result.stdout).toContain("installation token: available repo=mpiton/forgent");
+    expect(result.stdout).toContain("GitHub credential wiring assertion passed");
   });
 
   it("accepts GitHub App API access evidence for any pull request number", () => {
@@ -802,6 +813,7 @@ describe("v0.1 soak evidence validation", () => {
       [
         "Repository: mpiton/forgent",
         "Installed GitHub App: Sovri Community Bot",
+        "GitHub installation token: available repo=mpiton/forgent",
         "Sovri Community Bot permission: pull_requests=write",
         "Sovri Community Bot permission: contents=read",
         "Sovri Community Bot permission: issues=write",

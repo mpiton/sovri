@@ -113,6 +113,9 @@ if (command === "image-provenance") {
     fail(`GitHub App installation assertion failed: ${result.reason}`);
   }
   process.stdout.write("GitHub App installation assertion passed\n");
+  process.stdout.write("webhook signature: accepted\n");
+  process.stdout.write(`installation token: available repo=${repoFullName}\n`);
+  process.stdout.write("GitHub credential wiring assertion passed\n");
 } else if (command === "webhook-secret") {
   const prNumber = readOption("--pr");
   const repoFullName = readOption("--repo");
@@ -466,6 +469,10 @@ function evaluateGitHubAppInstallation(content, expected) {
     return { outcome: "rejected", reason: "signed pull_request.opened webhook" };
   }
 
+  if (!hasAvailableInstallationToken(content, expected.repoFullName)) {
+    return { outcome: "rejected", reason: `installation token for ${expected.repoFullName}` };
+  }
+
   if (!hasRequiredPullRequestApiAccess(content, expected.repoFullName)) {
     return { outcome: "rejected", reason: "pull request files/reviews API access" };
   }
@@ -487,6 +494,12 @@ function hasSignedPullRequestWebhook(content, repoFullName) {
   return content
     .split(/\r?\n/u)
     .includes(`GitHub webhook delivered: pull_request.opened repo=${repoFullName} signed=true`);
+}
+
+function hasAvailableInstallationToken(content, repoFullName) {
+  return content
+    .split(/\r?\n/u)
+    .includes(`GitHub installation token: available repo=${repoFullName}`);
 }
 
 function hasRequiredPullRequestApiAccess(content, repoFullName) {

@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add nominal GitHub credential wiring evidence coverage for
+  signed webhook acceptance and installation token availability (#1054).
+
 - `test(e2e)`: add manual quality rating scale and minimum threshold
   coverage for v0.1 soak-log validation (#1023).
 
