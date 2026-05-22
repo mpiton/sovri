@@ -73,6 +73,39 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stderr).toContain("Anthropic key wiring assertion failed");
   });
 
+  it("treats an empty Anthropic API key as missing", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "ANTHROPIC_API_KEY value:    ",
+        "Repository: mpiton/forgent",
+        "PR: 101",
+        "Changed lines: 128",
+        "Successful review comment posted: false",
+      ].join("\n"),
+    );
+
+    // Given `ANTHROPIC_API_KEY` is "   "
+    // And PR 101 in "mpiton/forgent" has 128 changed lines
+    // When Sovri reviews PR 101
+    const result = runValidator([
+      "anthropic-key",
+      "--repo",
+      "mpiton/forgent",
+      "--pr",
+      "101",
+      "--changed-lines",
+      "128",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // Then no successful review comment is posted on PR 101
+    // And the Anthropic key wiring assertion fails
+    // And the failure mentions "ANTHROPIC_API_KEY"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("ANTHROPIC_API_KEY");
+  });
+
   it("passes Anthropic key wiring when the smoke PR review completes", () => {
     const soakLogPath = writeSoakLog(
       [
