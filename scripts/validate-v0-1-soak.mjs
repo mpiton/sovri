@@ -127,13 +127,15 @@ function readOption(name) {
 
 function readOptions(name) {
   const values = args.flatMap((arg, index) => (arg === name ? [args[index + 1]] : []));
-  const parsedValues = values.filter(
-    (value) => value !== undefined && value.startsWith("--") === false,
-  );
-  if (parsedValues.length === 0) {
+  if (values.length === 0) {
     fail(`${name} is required`);
   }
-  return parsedValues;
+  for (const value of values) {
+    if (value === undefined || value.startsWith("--")) {
+      fail(`${name} is malformed`);
+    }
+  }
+  return values;
 }
 
 function fail(message) {

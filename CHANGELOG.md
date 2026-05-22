@@ -21,7 +21,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
-- `test(e2e)`: add clean captured log metadata success coverage (#1033).
+- `test(e2e)`: add clean captured log metadata success coverage and malformed
+  repeated secret argument rejection (#1033).
 
 - `test(e2e)`: add captured log raw-secret and missing-log failure coverage
   (#1034).

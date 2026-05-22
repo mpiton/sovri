@@ -232,6 +232,24 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain("log secret assertion passed");
   });
+
+  it("rejects a malformed repeated secret value argument", () => {
+    const soakLogPath = writeSoakLog("Captured log: delivery_id=delivery-60-101 pr=101\n");
+
+    const result = runValidator([
+      "log-secrets",
+      "--secret-name",
+      "all smoke secrets",
+      "--secret-value",
+      "WEBHOOK_SECRET_SENTINEL_60",
+      "--secret-value",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("--secret-value is malformed");
+  });
 });
 
 function runValidator(args: readonly string[]): ReturnType<typeof spawnSync> {
