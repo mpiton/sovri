@@ -642,6 +642,44 @@ describe("v0.1 soak evidence validation", () => {
       expect(result.stderr).toContain("--minimum-count is invalid");
     },
   );
+
+  it("fails soak log validation when a qualifying PR has duplicate evidence rows", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "| PR URL | latency | finding count | manual quality rating |",
+        "| --- | --- | --- | --- |",
+        "| https://github.com/mpiton/forgent/pull/101 | 31.200s | 2 | 4 |",
+        "| https://github.com/mpiton/forgent/pull/101 | 32.100s | 1 | 3 |",
+        "| https://github.com/mpiton/forgent/pull/102 | 44.800s | 1 | 3 |",
+        "| https://github.com/mpiton/forgent/pull/103 | 58.400s | 3 | 4 |",
+        "| https://github.com/mpiton/forgent/pull/104 | 76.300s | 0 | 3 |",
+      ].join("\n"),
+    );
+
+    // Given the smoke set contains qualifying PRs 101, 102, 103, and 104
+    // And "evals/v0.1-soak.md" contains two rows for "https://github.com/mpiton/forgent/pull/101"
+    // When the soak log is validated
+    const result = runValidator([
+      "soak-log-content",
+      "--repo",
+      "mpiton/forgent",
+      "--qualifying-pr",
+      "101",
+      "--qualifying-pr",
+      "102",
+      "--qualifying-pr",
+      "103",
+      "--qualifying-pr",
+      "104",
+      "--soak-log",
+      soakLogPath,
+    ]);
+
+    // Then the soak log content assertion fails
+    // And the failure mentions "duplicate evidence row for PR 101"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("duplicate evidence row for PR 101");
+  });
 });
 
 function runValidator(args: readonly string[]): ReturnType<typeof spawnSync> {

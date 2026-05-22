@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add duplicate soak evidence row rejection coverage for
+  qualifying PRs (#1021).
+
 - `test(e2e)`: add smoke PR count exclusion and strict malformed
   minimum-count coverage plus validator support for draft, 500-line, and
   wrong-branch PRs (#1040).
