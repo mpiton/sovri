@@ -367,6 +367,91 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("restart evidence is incomplete");
   });
+
+  it("accepts the healthy crash evidence matrix row", () => {
+    const result = runNoCrashValidator(
+      writeCrashEvidenceLog({ exitCode: 0, healthStatus: 200, restartDelta: 0 }),
+    );
+
+    // Given the smoke set contains qualifying PRs 101, 102, 103, and 104
+    // And the container restart count changes by 0
+    // And the Community bot process exit code is 0
+    // And the latest `GET /health` response status is 200
+    // When the no-crash assertion is evaluated
+    // Then the no-crash outcome is "accepted"
+    // And the reason is "no crash evidence"
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("no-crash outcome: accepted");
+    expect(result.stdout).toContain("reason: no crash evidence");
+  });
+
+  it("rejects the crash evidence matrix row when the container restarted", () => {
+    const result = runNoCrashValidator(
+      writeCrashEvidenceLog({ exitCode: 0, healthStatus: 200, restartDelta: 1 }),
+    );
+
+    // Given the smoke set contains qualifying PRs 101, 102, 103, and 104
+    // And the container restart count changes by 1
+    // And the Community bot process exit code is 0
+    // And the latest `GET /health` response status is 200
+    // When the no-crash assertion is evaluated
+    // Then the no-crash outcome is "rejected"
+    // And the reason is "container restarted"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("no-crash outcome: rejected");
+    expect(result.stderr).toContain("reason: container restarted");
+  });
+
+  it("rejects the crash evidence matrix row when the process exits with code 1", () => {
+    const result = runNoCrashValidator(
+      writeCrashEvidenceLog({ exitCode: 1, healthStatus: 200, restartDelta: 0 }),
+    );
+
+    // Given the smoke set contains qualifying PRs 101, 102, 103, and 104
+    // And the container restart count changes by 0
+    // And the Community bot process exit code is 1
+    // And the latest `GET /health` response status is 200
+    // When the no-crash assertion is evaluated
+    // Then the no-crash outcome is "rejected"
+    // And the reason is "process exited with code 1"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("no-crash outcome: rejected");
+    expect(result.stderr).toContain("reason: process exited with code 1");
+  });
+
+  it("rejects the crash evidence matrix row when the process exits with code 137", () => {
+    const result = runNoCrashValidator(
+      writeCrashEvidenceLog({ exitCode: 137, healthStatus: 200, restartDelta: 0 }),
+    );
+
+    // Given the smoke set contains qualifying PRs 101, 102, 103, and 104
+    // And the container restart count changes by 0
+    // And the Community bot process exit code is 137
+    // And the latest `GET /health` response status is 200
+    // When the no-crash assertion is evaluated
+    // Then the no-crash outcome is "rejected"
+    // And the reason is "process exited with code 137"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("no-crash outcome: rejected");
+    expect(result.stderr).toContain("reason: process exited with code 137");
+  });
+
+  it("rejects the crash evidence matrix row when health fails", () => {
+    const result = runNoCrashValidator(
+      writeCrashEvidenceLog({ exitCode: 0, healthStatus: 503, restartDelta: 0 }),
+    );
+
+    // Given the smoke set contains qualifying PRs 101, 102, 103, and 104
+    // And the container restart count changes by 0
+    // And the Community bot process exit code is 0
+    // And the latest `GET /health` response status is 503
+    // When the no-crash assertion is evaluated
+    // Then the no-crash outcome is "rejected"
+    // And the reason is "/health failed"
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("no-crash outcome: rejected");
+    expect(result.stderr).toContain("reason: /health failed");
+  });
 });
 
 function runValidator(args: readonly string[]): ReturnType<typeof spawnSync> {
@@ -382,4 +467,35 @@ function writeSoakLog(content: string): string {
   const path = join(dir, "v0.1-soak.md");
   writeFileSync(path, content);
   return path;
+}
+
+function runNoCrashValidator(soakLogPath: string): ReturnType<typeof spawnSync> {
+  return runValidator([
+    "no-crash",
+    "--from-pr",
+    "101",
+    "--to-pr",
+    "104",
+    "--soak-log",
+    soakLogPath,
+  ]);
+}
+
+function writeCrashEvidenceLog(input: {
+  readonly exitCode: number;
+  readonly healthStatus: number;
+  readonly restartDelta: number;
+}): string {
+  return writeSoakLog(
+    [
+      "Smoke PR: 101 qualifying=true",
+      "Smoke PR: 102 qualifying=true",
+      "Smoke PR: 103 qualifying=true",
+      "Smoke PR: 104 qualifying=true",
+      "Container restart count before PR 101: 0",
+      `Container restart count after PR 104: ${input.restartDelta}`,
+      `Community bot process exit code: ${input.exitCode}`,
+      `Latest GET /health response status: ${input.healthStatus}`,
+    ].join("\n"),
+  );
 }
