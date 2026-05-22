@@ -88,7 +88,17 @@ describe("v0.1 soak evidence validation", () => {
     // Given `ANTHROPIC_API_KEY` is set to a valid Anthropic API key
     // And PR 101 in "mpiton/forgent" has 128 changed lines
     // When Sovri reviews PR 101
-    const result = runValidator(["anthropic-key", "--pr", "101", "--soak-log", soakLogPath]);
+    const result = runValidator([
+      "anthropic-key",
+      "--repo",
+      "mpiton/forgent",
+      "--pr",
+      "101",
+      "--changed-lines",
+      "128",
+      "--soak-log",
+      soakLogPath,
+    ]);
 
     // Then Sovri receives a structured Anthropic response
     // And Sovri posts a first PR comment on PR 101
