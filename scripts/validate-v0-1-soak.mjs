@@ -45,8 +45,19 @@ if (command === "image-provenance") {
   } else {
     fail("provider log assertion failed");
   }
+} else if (command === "log-secrets") {
+  const secretName = readOption("--secret-name");
+  const secretValue = readOption("--secret-value");
+  const soakLogPath = readOption("--soak-log");
+  const soakLog = readFileSync(soakLogPath, "utf8");
+
+  if (capturedLogsContain(soakLog, secretValue)) {
+    fail(`log secret assertion failed: ${secretName}`);
+  }
 } else {
-  fail("usage: validate-v0-1-soak.mjs <image-provenance|anthropic-key|provider-logs> [options]");
+  fail(
+    "usage: validate-v0-1-soak.mjs <image-provenance|anthropic-key|provider-logs|log-secrets> [options]",
+  );
 }
 
 function hasAcceptedImageProvenance(content, mode) {
@@ -92,6 +103,13 @@ function hasProviderErrorLogWithoutSecret(content, expected) {
     capturedLogLines.every((line) => !line.includes(expected.secret)) &&
     capturedLogLines.some((line) => line.includes(`provider=${expected.provider}`))
   );
+}
+
+function capturedLogsContain(content, needle) {
+  return content
+    .split(/\r?\n/u)
+    .filter((line) => line.startsWith("Captured log:"))
+    .some((line) => line.includes(needle));
 }
 
 function readOption(name) {
