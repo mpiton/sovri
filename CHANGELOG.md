@@ -21,6 +21,20 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: aggregate target repository evidence rows across multiple
+  complete soak-log tables (#1022).
+
+- `test(e2e)`: ensure soak-log validation selects the complete evidence
+  table for the target repository when other repository tables appear first
+  (#1022).
+
+- `test(e2e)`: restrict soak-log field, duplicate, latency, finding-count,
+  and row-count checks to the complete PR evidence table (#1022).
+
+- `test(e2e)`: add missing required soak-log field coverage for PR URL,
+  latency, finding count, manual quality rating, and unrelated leading
+  Markdown tables (#1022).
+
 - `test(e2e)`: add missing target repository GitHub App installation failure
   coverage for the v0.1 smoke run (#1011).
 
