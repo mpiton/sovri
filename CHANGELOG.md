@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add unset Anthropic API key evidence coverage for the v0.1
+  smoke run (#1006).
+
 - `test(e2e)`: add malformed APP_ID startup failure coverage, runtime
   validation, and soak evidence validator support with missing-value,
   whitespace, and oversized-number guards (#1056).
