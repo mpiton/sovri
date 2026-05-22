@@ -114,6 +114,14 @@ if (command === "image-provenance") {
     fail("private key newline assertion failed");
   }
   process.stdout.write("private key newline assertion passed\n");
+} else if (command === "private-key-startup-failure") {
+  const soakLogPath = readOption("--soak-log");
+  const soakLog = readFileSync(soakLogPath, "utf8");
+
+  if (!hasInvalidPrivateKeyStartupFailureEvidence(soakLog)) {
+    fail("private key startup failure assertion failed");
+  }
+  process.stdout.write("private key startup failure assertion passed\n");
 } else if (command === "latency-p95") {
   const soakLogPath = readOption("--soak-log");
   const soakLog = readFileSync(soakLogPath, "utf8");
@@ -209,7 +217,7 @@ if (command === "image-provenance") {
   process.stdout.write("soak log commit assertion passed\n");
 } else {
   fail(
-    "usage: validate-v0-1-soak.mjs <image-provenance|anthropic-key|provider-logs|log-secrets|no-crash|github-app-installation|private-key-newlines|latency-p95|latency-pr|smoke-pr-count|soak-log-content|soak-log-commit> [options]",
+    "usage: validate-v0-1-soak.mjs <image-provenance|anthropic-key|provider-logs|log-secrets|no-crash|github-app-installation|private-key-newlines|private-key-startup-failure|latency-p95|latency-pr|smoke-pr-count|soak-log-content|soak-log-commit> [options]",
   );
 }
 
@@ -431,6 +439,31 @@ function hasEscapedPrivateKeyNewlineStartupEvidence(content) {
     "Private key line break normalization: true",
     "Community bot startup: success",
   ].every((expectedLine) => lines.includes(expectedLine));
+}
+
+function hasInvalidPrivateKeyStartupFailureEvidence(content) {
+  const lines = content.split(/\r?\n/u);
+  const appId = readLineValue(lines, "APP_ID value: ");
+  const privateKey = readLineValue(lines, "PRIVATE_KEY value: ");
+  return (
+    appId !== undefined &&
+    appId.trim().length > 0 &&
+    privateKey !== undefined &&
+    privateKey.trim().length > 0 &&
+    [
+      "WEBHOOK_SECRET configured: true",
+      "Community bot startup: failed before webhook processing",
+      "Webhook processing: not started",
+    ].every((expectedLine) => lines.includes(expectedLine)) &&
+    lines.some(
+      (line) => line.startsWith("Startup failure reason: ") && line.includes("PRIVATE_KEY"),
+    )
+  );
+}
+
+function readLineValue(lines, prefix) {
+  const line = lines.find((candidate) => candidate.startsWith(prefix));
+  return line === undefined ? undefined : line.slice(prefix.length);
 }
 
 function calculateLatencyP95(content) {

@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(e2e)`: add invalid private key startup failure evidence coverage and
+  validator support for fixture and non-fixture credential values (#1059).
+
 - `test(e2e)`: add individual smoke PR qualification matrix coverage and
   validator output for included and excluded reasons (#1041).
 

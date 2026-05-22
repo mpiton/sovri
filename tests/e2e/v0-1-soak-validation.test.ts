@@ -1144,6 +1144,48 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stdout).toContain("private key newline assertion passed");
   });
 
+  it("rejects invalid private key material before webhook processing", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "APP_ID value: 123456",
+        "WEBHOOK_SECRET configured: true",
+        "PRIVATE_KEY value: not-a-private-key",
+        "Community bot startup: failed before webhook processing",
+        "Startup failure reason: PRIVATE_KEY must contain valid PEM private key material",
+        "Webhook processing: not started",
+      ].join("\n"),
+    );
+
+    // Given `APP_ID` is "123456"
+    // And `WEBHOOK_SECRET` is "WEBHOOK_SECRET_SENTINEL_60"
+    // And `PRIVATE_KEY` is "not-a-private-key"
+    // When the Community bot starts
+    const result = runValidator(["private-key-startup-failure", "--soak-log", soakLogPath]);
+
+    // Then startup fails before processing webhooks
+    // And the failure mentions "PRIVATE_KEY"
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("private key startup failure assertion passed");
+  });
+
+  it("accepts invalid private key startup evidence with non-fixture credential values", () => {
+    const soakLogPath = writeSoakLog(
+      [
+        "APP_ID value: 12345",
+        "WEBHOOK_SECRET configured: true",
+        "PRIVATE_KEY value: broken-pem",
+        "Community bot startup: failed before webhook processing",
+        "Startup failure reason: PRIVATE_KEY must contain valid PEM private key material",
+        "Webhook processing: not started",
+      ].join("\n"),
+    );
+
+    const result = runValidator(["private-key-startup-failure", "--soak-log", soakLogPath]);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("private key startup failure assertion passed");
+  });
+
   it("passes latency validation when five qualifying PRs stay below ninety seconds", () => {
     const soakLogPath = writeSoakLog(
       [
