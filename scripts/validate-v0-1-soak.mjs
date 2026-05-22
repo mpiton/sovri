@@ -164,6 +164,7 @@ if (command === "image-provenance") {
   if (result.qualifyingCount < minimumCount) {
     process.stderr.write(`qualifying PR count: ${result.qualifyingCount}\n`);
     process.stderr.write(`smoke run classification: ${classification}\n`);
+    writeSmokePrQualifications(process.stderr, result.qualifications);
     for (const exclusion of result.exclusions) {
       process.stderr.write(`PR ${exclusion.pr} is excluded because ${exclusion.reason}\n`);
     }
@@ -171,6 +172,7 @@ if (command === "image-provenance") {
   }
   process.stdout.write(`qualifying PR count: ${result.qualifyingCount}\n`);
   process.stdout.write(`smoke run classification: ${classification}\n`);
+  writeSmokePrQualifications(process.stdout, result.qualifications);
   process.stdout.write("smoke PR count assertion passed\n");
 } else if (command === "soak-log-content") {
   const repoFullName = readOption("--repo");
@@ -549,18 +551,25 @@ function parseTimestamp(value) {
 function evaluateSmokePrCount(content, expected) {
   const prs = readSmokePrRows(content);
   const exclusions = [];
+  const qualifications = [];
   let qualifyingCount = 0;
 
   for (const pr of prs) {
-    const exclusionReason = smokePrExclusionReason(pr, expected);
-    if (exclusionReason === undefined) {
+    const qualification = qualifySmokePr(pr, expected);
+    qualifications.push({
+      classification: qualification.classification,
+      pr: pr.pr,
+      reason: qualification.reason,
+    });
+
+    if (qualification.classification === "included") {
       qualifyingCount += 1;
     } else {
-      exclusions.push({ pr: pr.pr, reason: exclusionReason });
+      exclusions.push({ pr: pr.pr, reason: qualification.exclusionReason });
     }
   }
 
-  return { exclusions, qualifyingCount };
+  return { exclusions, qualifications, qualifyingCount };
 }
 
 function classifySmokeRun(qualifyingCount, expected) {
@@ -595,20 +604,60 @@ function readSmokePrRows(content) {
   });
 }
 
-function smokePrExclusionReason(pr, expected) {
+function qualifySmokePr(pr, expected) {
+  const exclusion = smokePrExclusion(pr, expected);
+  if (exclusion !== undefined) {
+    return {
+      classification: "excluded",
+      exclusionReason: exclusion.exclusionReason,
+      reason: exclusion.qualificationReason,
+    };
+  }
+
+  return {
+    classification: "included",
+    reason: pr.changedLines === 1 ? "at least one changed line" : "below 500 changed lines",
+  };
+}
+
+function smokePrExclusion(pr, expected) {
   if (pr.targetBranch !== expected.targetBranch) {
-    return `it does not target "${expected.targetBranch}"`;
+    return {
+      exclusionReason: `it does not target "${expected.targetBranch}"`,
+      qualificationReason: "wrong target branch",
+    };
   }
 
   if (pr.draft) {
-    return "it is a draft";
+    return {
+      exclusionReason: "it is a draft",
+      qualificationReason: "draft PR",
+    };
+  }
+
+  if (pr.changedLines < 1) {
+    return {
+      exclusionReason: "no changed lines",
+      qualificationReason: "no changed lines",
+    };
   }
 
   if (pr.changedLines >= 500) {
-    return "changed lines are not < 500";
+    return {
+      exclusionReason: "changed lines are not < 500",
+      qualificationReason: "changed lines are not < 500",
+    };
   }
 
   return undefined;
+}
+
+function writeSmokePrQualifications(stream, qualifications) {
+  for (const qualification of qualifications) {
+    stream.write(
+      `PR ${qualification.pr} qualification: ${qualification.classification} reason=${qualification.reason}\n`,
+    );
+  }
 }
 
 function findDuplicateSoakEvidencePr(content, expected) {

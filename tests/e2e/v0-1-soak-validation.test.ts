@@ -893,6 +893,89 @@ describe("v0.1 soak evidence validation", () => {
     expect(result.stdout).toContain("smoke PR count assertion passed");
   });
 
+  it.each([
+    {
+      changedLines: 0,
+      classification: "excluded",
+      draft: false,
+      expectedStatus: "rejected",
+      pr: "101",
+      reason: "no changed lines",
+      targetBranch: "main",
+    },
+    {
+      changedLines: 1,
+      classification: "included",
+      draft: false,
+      expectedStatus: "accepted",
+      pr: "106",
+      reason: "at least one changed line",
+      targetBranch: "main",
+    },
+    {
+      changedLines: 499,
+      classification: "included",
+      draft: false,
+      expectedStatus: "accepted",
+      pr: "102",
+      reason: "below 500 changed lines",
+      targetBranch: "main",
+    },
+    {
+      changedLines: 500,
+      classification: "excluded",
+      draft: false,
+      expectedStatus: "rejected",
+      pr: "103",
+      reason: "changed lines are not < 500",
+      targetBranch: "main",
+    },
+    {
+      changedLines: 120,
+      classification: "excluded",
+      draft: true,
+      expectedStatus: "rejected",
+      pr: "104",
+      reason: "draft PR",
+      targetBranch: "main",
+    },
+    {
+      changedLines: 120,
+      classification: "excluded",
+      draft: false,
+      expectedStatus: "rejected",
+      pr: "105",
+      reason: "wrong target branch",
+      targetBranch: "develop",
+    },
+  ])(
+    "classifies PR $pr as $classification because $reason",
+    ({ changedLines, classification, draft, expectedStatus, pr, reason, targetBranch }) => {
+      const soakLogPath = writeSoakLog(
+        [
+          `Smoke PR: ${pr} target_branch=${targetBranch} draft=${draft} changed_lines=${changedLines}`,
+        ].join("\n"),
+      );
+
+      const result = runValidator([
+        "smoke-pr-count",
+        "--target-branch",
+        "main",
+        "--minimum-count",
+        "1",
+        "--target-count",
+        "1",
+        "--soak-log",
+        soakLogPath,
+      ]);
+
+      const output = expectedStatus === "accepted" ? result.stdout : result.stderr;
+
+      expect(result.status === 0 ? "accepted" : "rejected").toBe(expectedStatus);
+      expect(output).toContain(`PR ${pr} qualification: ${classification} reason=${reason}`);
+    },
+  );
+
   it.each(["not-a-number", "4oops", "-1"])(
     "rejects malformed minimum smoke PR count argument %s",
     (minimumCount) => {
