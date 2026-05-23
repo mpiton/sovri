@@ -21,6 +21,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(config)`: tag the existing `Provider` type-inference test with
+  the `R-03 nominal —` marker so it is traceable to the ATDD scenario
+  asserting that the inferred `Provider = z.infer<typeof ProviderSchema>`
+  union stays `"anthropic" | "mistral" | "openai" | "openai-compatible"`
+  across v0.2. Assertion body and `expectTypeOf` call are unchanged
+  (R-03 nominal, ATDD scenario sub-issue #1168 under US #1162).
+
 - `test(config)`: regression-guard asserting that `ProviderSchema.options`
   keeps exactly the four declared members
   `["anthropic", "mistral", "openai", "openai-compatible"]`. Pins the

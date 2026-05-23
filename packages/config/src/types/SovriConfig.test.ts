@@ -493,7 +493,13 @@ describe("SovriConfigSchema — type inference", () => {
     expect(SovriConfigSchema.parse(fullConfig)).toEqual(fullConfig);
   });
 
-  it("infers Provider as the schema's literal union", () => {
+  // Issue #1168, R-03 nominal (Provider type alias unchanged across v0.2).
+  // Scenario:
+  //   Given the type alias `Provider = z.infer<typeof ProviderSchema>`
+  //   When the type is compared against the literal union
+  //   Then `Provider` equals
+  //     "anthropic" | "mistral" | "openai" | "openai-compatible"
+  it("R-03 nominal — infers Provider as the schema's literal union (unchanged across v0.2)", () => {
     expectTypeOf<Provider>().toEqualTypeOf<
       "anthropic" | "mistral" | "openai" | "openai-compatible"
     >();
