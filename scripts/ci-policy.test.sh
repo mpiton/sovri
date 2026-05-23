@@ -10704,6 +10704,41 @@ run_release_commit_and_annotated_tag_case() {
     return
   fi
 
+  # And `release-verify-tag` accepts the workspace produced by the procedure
+  local package_files verify_stdout verify_stderr verify_stdout_file verify_stderr_file verify_ec
+  package_files=$(release_metadata_package_files "$root")
+  verify_stdout_file=$(mktemp)
+  verify_stderr_file=$(mktemp)
+  node "$SCRIPT" release-verify-tag \
+    --tag v0.1.0 \
+    --package-files "$package_files" \
+    --changelog "$root/CHANGELOG.md" \
+    >"$verify_stdout_file" 2>"$verify_stderr_file" && verify_ec=0 || verify_ec=$?
+  verify_stdout=$(cat "$verify_stdout_file" 2>/dev/null || true)
+  verify_stderr=$(cat "$verify_stderr_file" 2>/dev/null || true)
+  rm -f "$verify_stdout_file" "$verify_stderr_file"
+
+  if [ "$verify_ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-commit-and-annotated-tag: release-verify-tag rejected the post-state
+      stdout:
+$(printf '%s\n' "$verify_stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$verify_stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$verify_stdout" | grep -Fq "verify_tag=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-commit-and-annotated-tag: missing verify_tag=pass after the release procedure
+$(printf '%s\n' "$verify_stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
   PASS=$((PASS + 1))
   rm -rf "$root"
 }
