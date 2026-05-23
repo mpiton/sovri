@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync, realpathSync, statSync, writeSync } from "node:fs";
+import { readFileSync, realpathSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { argv, exit } from "node:process";
 
@@ -137,6 +137,8 @@ const releaseVerifyTagUsage =
   "Usage: node scripts/ci-policy.mjs release-verify-tag --tag <vX.Y.Z> --package-files <comma-separated-package-json-paths> --changelog <path>";
 const releaseBuildAndPushUsage =
   "Usage: node scripts/ci-policy.mjs release-build-and-push --workflow <path>";
+const promoteChangelogUsage =
+  "Usage: node scripts/ci-policy.mjs promote-changelog --version <X.Y.Z> --date <YYYY-MM-DD> --changelog <path>";
 const cosignDeferralUsage =
   "Usage: node scripts/ci-policy.mjs cosign-deferral --workflow <path> --changelog <path>";
 const actionPinningUsage = "Usage: node scripts/ci-policy.mjs action-pinning --workflow <path>";
@@ -170,7 +172,7 @@ const changelogRemediationMessageUsage =
   "Usage: node scripts/ci-policy.mjs changelog-remediation-message --message <text>";
 const changelogDocumentationOnlyAssertUsage =
   "Usage: node scripts/ci-policy.mjs changelog-documentation-only-assert --changed-files <comma-separated-paths> --gate-result <success|failure>";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dependencyReviewWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${cosignDeferralUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dependencyReviewWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${promoteChangelogUsage}\n${cosignDeferralUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -1808,8 +1810,13 @@ const readTextFile = (path, label) => {
   }
 };
 
+const CHANGELOG_RELEASE_HEADING_DATE_SUFFIX = "(?:\\s*-\\s*\\d{4}-\\d{2}-\\d{2})?";
+
 const hasChangelogReleaseSection = (changelog, version) =>
-  new RegExp(`^## \\[${escapeRegExp(version)}\\]\\s*$`, "m").test(changelog);
+  new RegExp(
+    `^## \\[${escapeRegExp(version)}\\]${CHANGELOG_RELEASE_HEADING_DATE_SUFFIX}\\s*$`,
+    "m",
+  ).test(changelog);
 
 const runReleaseVerifyTag = (args) => {
   const options = parseOptions(args);
@@ -1930,8 +1937,79 @@ const runReleaseBuildAndPush = (args) => {
   );
 };
 
+const PROMOTE_CHANGELOG_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
+const PROMOTE_CHANGELOG_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const isValidCalendarDate = (value) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (match === null) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return (
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() + 1 === month &&
+    parsed.getUTCDate() === day
+  );
+};
+
+const runPromoteChangelog = (args) => {
+  const options = parseOptions(args);
+  const version = readRequiredOption(options, "version", promoteChangelogUsage);
+  const date = readRequiredOption(options, "date", promoteChangelogUsage);
+  const changelogPath = readRequiredOption(options, "changelog", promoteChangelogUsage);
+
+  if (!PROMOTE_CHANGELOG_VERSION_PATTERN.test(version)) {
+    writeStdout("promote_changelog=fail\n");
+    fail(`version must be X.Y.Z, got ${version}`, 1);
+  }
+  if (!PROMOTE_CHANGELOG_DATE_PATTERN.test(date)) {
+    writeStdout("promote_changelog=fail\n");
+    fail(`date must be YYYY-MM-DD, got ${date}`, 1);
+  }
+  if (!isValidCalendarDate(date)) {
+    writeStdout("promote_changelog=fail\n");
+    fail(`date ${date} is not a valid calendar date`, 1);
+  }
+
+  const changelog = readTextFile(changelogPath, "changelog");
+  const unreleasedMatch = /^## \[Unreleased\]\s*$/m.exec(changelog);
+  if (unreleasedMatch === null || unreleasedMatch.index === undefined) {
+    writeStdout("promote_changelog=fail\n");
+    fail("missing ## [Unreleased] heading", 1);
+  }
+
+  const releasedHeading = `## [${version}] - ${date}`;
+  const existingReleasePattern = new RegExp(`^## \\[${escapeRegExp(version)}\\]`, "m");
+  if (existingReleasePattern.test(changelog)) {
+    writeStdout("promote_changelog=fail\n");
+    fail(`version ${version} already has a section in changelog`, 1);
+  }
+
+  const bodyStart = unreleasedMatch.index + unreleasedMatch[0].length;
+  const nextHeadingRelativeMatch = changelog.slice(bodyStart).match(/\n## \[[^\]]+\]/);
+  const bodyEnd =
+    nextHeadingRelativeMatch?.index === undefined
+      ? changelog.length
+      : bodyStart + nextHeadingRelativeMatch.index;
+
+  const before = changelog.slice(0, bodyStart);
+  const body = changelog.slice(bodyStart, bodyEnd);
+  const after = changelog.slice(bodyEnd);
+
+  const promoted = `${before}\n\n${releasedHeading}${body}${after}`;
+
+  writeFileSync(changelogPath, promoted);
+  writeStdout("promote_changelog=pass\n");
+};
+
 const getChangelogReleaseSection = (changelog, version) => {
-  const headingPattern = new RegExp(`^## \\[${escapeRegExp(version)}\\]\\s*$`, "m");
+  const headingPattern = new RegExp(
+    `^## \\[${escapeRegExp(version)}\\]${CHANGELOG_RELEASE_HEADING_DATE_SUFFIX}\\s*$`,
+    "m",
+  );
   const headingMatch = headingPattern.exec(changelog);
   if (headingMatch === null || headingMatch.index === undefined) return "";
 
@@ -3289,6 +3367,8 @@ if (command === "duration-budget") {
   runReleaseVerifyTag(args);
 } else if (command === "release-build-and-push") {
   runReleaseBuildAndPush(args);
+} else if (command === "promote-changelog") {
+  runPromoteChangelog(args);
 } else if (command === "cosign-deferral") {
   runCosignDeferral(args);
 } else if (command === "action-pinning") {

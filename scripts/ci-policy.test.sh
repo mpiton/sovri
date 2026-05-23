@@ -10565,6 +10565,341 @@ run_release_verify_tag_format_case() {
   rm -rf "$root"
 }
 
+run_promote_changelog_nominal_case() {
+  local root changelog_path stdout stderr stdout_file stderr_file ec promoted body_after_release body_after_unreleased
+
+  root=$(mktemp -d)
+  changelog_path="$root/CHANGELOG.md"
+
+  # Given the prior "## [Unreleased]" section contains entries under "### Added"
+  cat >"$changelog_path" <<'MD'
+# Changelog
+
+## [Unreleased]
+
+### Added
+
+- Foo widget shipped.
+- Bar gadget configured.
+
+## [0.0.1] - 2026-01-01
+
+### Added
+
+- Initial release.
+MD
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # When the engineer rewrites "CHANGELOG.md" for the v0.1.0 release
+  node "$SCRIPT" promote-changelog \
+    --version 0.1.0 \
+    --date 2026-05-23 \
+    --changelog "$changelog_path" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog nominal: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "promote_changelog=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog nominal: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  promoted=$(cat "$changelog_path")
+
+  # Then a section heading "## [0.1.0] - 2026-05-23" exists
+  if ! printf '%s\n' "$promoted" | grep -Fxq "## [0.1.0] - 2026-05-23"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog nominal: missing release heading '## [0.1.0] - 2026-05-23'
+$(printf '%s\n' "$promoted" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # And every entry previously under "## [Unreleased]" appears under "## [0.1.0] - 2026-05-23"
+  body_after_release=$(printf '%s\n' "$promoted" | awk '
+    /^## \[0\.1\.0\] - 2026-05-23/ { in_release=1; next }
+    /^## \[/ && in_release { in_release=0 }
+    in_release { print }
+  ')
+  if ! printf '%s\n' "$body_after_release" | grep -Fq -- "- Foo widget shipped."; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog nominal: 'Foo widget' entry not under [0.1.0] section
+$(printf '%s\n' "$body_after_release" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+  if ! printf '%s\n' "$body_after_release" | grep -Fq -- "- Bar gadget configured."; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog nominal: 'Bar gadget' entry not under [0.1.0] section
+$(printf '%s\n' "$body_after_release" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # And the "## [Unreleased]" heading still exists and contains no bullet entries
+  if ! printf '%s\n' "$promoted" | grep -Fxq "## [Unreleased]"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog nominal: '## [Unreleased]' heading missing
+$(printf '%s\n' "$promoted" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+  body_after_unreleased=$(printf '%s\n' "$promoted" | awk '
+    /^## \[Unreleased\]/ { in_unreleased=1; next }
+    /^## \[/ && in_unreleased { in_unreleased=0 }
+    in_unreleased { print }
+  ')
+  if printf '%s\n' "$body_after_unreleased" | grep -Eq "^- "; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog nominal: [Unreleased] body still contains bullet entries
+$(printf '%s\n' "$body_after_unreleased" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
+run_promote_changelog_duplicate_version_case() {
+  local root changelog_path stdout stderr stdout_file stderr_file ec
+
+  root=$(mktemp -d)
+  changelog_path="$root/CHANGELOG.md"
+
+  # Given the changelog already has a "## [0.1.0]" section from a previous run
+  cat >"$changelog_path" <<'MD'
+# Changelog
+
+## [Unreleased]
+
+### Added
+
+- Foo widget shipped.
+
+## [0.1.0] - 2026-05-22
+
+### Added
+
+- Earlier promotion artifact.
+
+## [0.0.1] - 2026-01-01
+
+- Initial release.
+MD
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # When the engineer re-runs promote-changelog for the same version
+  node "$SCRIPT" promote-changelog \
+    --version 0.1.0 \
+    --date 2026-05-23 \
+    --changelog "$changelog_path" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  # Then promote-changelog refuses with a non-zero exit and a duplicate-version message
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog duplicate-version: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "promote_changelog=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog duplicate-version: missing fail assertion
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stderr" | grep -Fq "version 0.1.0 already has a section in changelog"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog duplicate-version: missing duplicate-version error
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
+run_promote_changelog_invalid_calendar_date_case() {
+  local date="$1"
+  local root changelog_path stdout stderr stdout_file stderr_file ec original_changelog
+
+  root=$(mktemp -d)
+  changelog_path="$root/CHANGELOG.md"
+
+  # Given a CHANGELOG with an [Unreleased] entry ready for promotion
+  cat >"$changelog_path" <<'MD'
+# Changelog
+
+## [Unreleased]
+
+### Added
+
+- Sample entry.
+MD
+  original_changelog=$(cat "$changelog_path")
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # When the engineer passes a date that is well-formed but not a real calendar date
+  node "$SCRIPT" promote-changelog \
+    --version 0.1.0 \
+    --date "$date" \
+    --changelog "$changelog_path" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  # Then promote-changelog refuses without rewriting CHANGELOG.md
+  if [ "$ec" -ne 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog invalid-calendar-date ${date}: expected exit 1, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stderr" | grep -Fq "date ${date} is not a valid calendar date"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog invalid-calendar-date ${date}: missing 'not a valid calendar date' error
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if [ "$(cat "$changelog_path")" != "$original_changelog" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog invalid-calendar-date ${date}: CHANGELOG.md was modified despite failed validation"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
+run_promote_changelog_then_verify_tag_case() {
+  local root package_files stdout stderr stdout_file stderr_file ec
+
+  root=$(mktemp -d)
+
+  # Given a workspace with v0.1.0 in every package and a CHANGELOG with Unreleased entries
+  mkdir -p "$root/packages/core" "$root/packages/review-engine" "$root/packages/llm-providers" \
+    "$root/packages/config" "$root/packages/observability" "$root/apps/community-bot"
+  for package_path in packages/core packages/review-engine packages/llm-providers packages/config packages/observability; do
+    printf '{ "version": "0.1.0" }\n' >"$root/${package_path}/package.json"
+  done
+  printf '{ "version": "0.1.0" }\n' >"$root/apps/community-bot/package.json"
+  cat >"$root/CHANGELOG.md" <<'MD'
+# Changelog
+
+## [Unreleased]
+
+### Added
+
+- Feature shipped.
+MD
+  package_files=$(release_metadata_package_files "$root")
+
+  # When the engineer promotes Unreleased to [0.1.0] - 2026-05-23
+  node "$SCRIPT" promote-changelog \
+    --version 0.1.0 \
+    --date 2026-05-23 \
+    --changelog "$root/CHANGELOG.md" >/dev/null 2>&1
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # And then runs release-verify-tag against the promoted CHANGELOG
+  node "$SCRIPT" release-verify-tag \
+    --tag v0.1.0 \
+    --package-files "$package_files" \
+    --changelog "$root/CHANGELOG.md" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  # Then release-verify-tag passes (the dated heading is recognized as ## [0.1.0])
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-then-verify-tag: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')
+      changelog:
+$(cat "$root/CHANGELOG.md" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "verify_tag=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-then-verify-tag: missing verify_tag=pass
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
 write_release_build_workflow() {
   local workflow_file="$1"
   local push_value="$2"
@@ -11009,6 +11344,12 @@ run_release_verify_tag_normalization_case "0.1.0" rejected "tag lacks required v
 run_release_verify_tag_normalization_case "vv0.1.0" rejected "tag has two leading v prefixes"
 run_release_verify_tag_format_case "v0.1"
 run_release_verify_tag_format_case "v0.1.0-rc.1"
+run_promote_changelog_nominal_case
+run_promote_changelog_duplicate_version_case
+run_promote_changelog_invalid_calendar_date_case "2026-13-40"
+run_promote_changelog_invalid_calendar_date_case "2026-02-30"
+run_promote_changelog_invalid_calendar_date_case "2026-04-31"
+run_promote_changelog_then_verify_tag_case
 run_release_build_and_push_case
 run_release_build_dynamic_tags_case
 run_release_build_push_false_case
