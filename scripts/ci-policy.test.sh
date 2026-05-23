@@ -10862,6 +10862,88 @@ $(printf '%s\n' "$stderr" | sed 's/^/        /')"
   rm -rf "$root"
 }
 
+run_release_verify_tag_empty_unreleased_refusal_case() {
+  local root package_files stdout stderr stdout_file stderr_file ec
+
+  root=$(mktemp -d)
+  mkdir -p "$root/packages/core" "$root/packages/review-engine" "$root/packages/llm-providers" \
+    "$root/packages/config" "$root/packages/observability" "$root/apps/community-bot"
+  for package_path in packages/core packages/review-engine packages/llm-providers packages/config packages/observability; do
+    printf '{ "version": "0.1.0" }\n' >"$root/${package_path}/package.json"
+  done
+  printf '{ "version": "0.1.0" }\n' >"$root/apps/community-bot/package.json"
+
+  # Given "CHANGELOG.md" contains "## [Unreleased]" followed by zero bullet entries
+  # And the engineer attempts to tag "v0.1.0" (so no `## [0.1.0]` section exists yet)
+  cat >"$root/CHANGELOG.md" <<'MD'
+# Changelog
+
+## [Unreleased]
+
+## [0.0.1] - 2026-01-01
+
+- Initial release.
+MD
+  package_files=$(release_metadata_package_files "$root")
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # When the engineer runs `node scripts/ci-policy.mjs release-verify-tag --tag v0.1.0 ...`
+  node "$SCRIPT" release-verify-tag \
+    --tag v0.1.0 \
+    --package-files "$package_files" \
+    --changelog "$root/CHANGELOG.md" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  # Then the command exits with a non-zero status
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-verify-tag empty-unreleased-refusal: expected non-zero exit, got 0
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "verify_tag=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-verify-tag empty-unreleased-refusal: missing verify_tag=fail
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # And the error contains the string "Refusing to release with empty Unreleased"
+  if ! printf '%s\n' "$stderr" | grep -Fq "Refusing to release with empty Unreleased"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-verify-tag empty-unreleased-refusal: missing 'Refusing to release with empty Unreleased' error
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # And the remediation hint reads "Add at least one bullet under [Unreleased] before tagging"
+  if ! printf '%s\n' "$stderr" | grep -Fq "Add at least one bullet under [Unreleased] before tagging"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-verify-tag empty-unreleased-refusal: missing remediation hint
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
 run_release_verify_tag_unreleased_still_populated_case() {
   local root package_files stdout stderr stdout_file stderr_file ec
 
@@ -11741,6 +11823,7 @@ run_release_verify_tag_normalization_case "0.1.0" rejected "tag lacks required v
 run_release_verify_tag_normalization_case "vv0.1.0" rejected "tag has two leading v prefixes"
 run_release_verify_tag_format_case "v0.1"
 run_release_verify_tag_format_case "v0.1.0-rc.1"
+run_release_verify_tag_empty_unreleased_refusal_case
 run_release_verify_tag_unreleased_still_populated_case
 run_release_verify_tag_unreleased_populated_marker_case "*" "asterisk"
 run_release_verify_tag_unreleased_populated_marker_case "+" "plus"
