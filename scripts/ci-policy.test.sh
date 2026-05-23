@@ -10762,6 +10762,77 @@ $(printf '%s\n' "$stderr" | sed 's/^/        /')"
   rm -rf "$root"
 }
 
+run_promote_changelog_then_verify_tag_case() {
+  local root package_files stdout stderr stdout_file stderr_file ec
+
+  root=$(mktemp -d)
+
+  # Given a workspace with v0.1.0 in every package and a CHANGELOG with Unreleased entries
+  mkdir -p "$root/packages/core" "$root/packages/review-engine" "$root/packages/llm-providers" \
+    "$root/packages/config" "$root/packages/observability" "$root/apps/community-bot"
+  for package_path in packages/core packages/review-engine packages/llm-providers packages/config packages/observability; do
+    printf '{ "version": "0.1.0" }\n' >"$root/${package_path}/package.json"
+  done
+  printf '{ "version": "0.1.0" }\n' >"$root/apps/community-bot/package.json"
+  cat >"$root/CHANGELOG.md" <<'MD'
+# Changelog
+
+## [Unreleased]
+
+### Added
+
+- Feature shipped.
+MD
+  package_files=$(release_metadata_package_files "$root")
+
+  # When the engineer promotes Unreleased to [0.1.0] - 2026-05-23
+  node "$SCRIPT" promote-changelog \
+    --version 0.1.0 \
+    --date 2026-05-23 \
+    --changelog "$root/CHANGELOG.md" >/dev/null 2>&1
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # And then runs release-verify-tag against the promoted CHANGELOG
+  node "$SCRIPT" release-verify-tag \
+    --tag v0.1.0 \
+    --package-files "$package_files" \
+    --changelog "$root/CHANGELOG.md" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  # Then release-verify-tag passes (the dated heading is recognized as ## [0.1.0])
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-then-verify-tag: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')
+      changelog:
+$(cat "$root/CHANGELOG.md" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "verify_tag=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-then-verify-tag: missing verify_tag=pass
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
 write_release_build_workflow() {
   local workflow_file="$1"
   local push_value="$2"
@@ -11208,6 +11279,7 @@ run_release_verify_tag_format_case "v0.1"
 run_release_verify_tag_format_case "v0.1.0-rc.1"
 run_promote_changelog_nominal_case
 run_promote_changelog_duplicate_version_case
+run_promote_changelog_then_verify_tag_case
 run_release_build_and_push_case
 run_release_build_dynamic_tags_case
 run_release_build_push_false_case

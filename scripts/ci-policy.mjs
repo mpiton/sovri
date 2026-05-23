@@ -1810,8 +1810,13 @@ const readTextFile = (path, label) => {
   }
 };
 
+const CHANGELOG_RELEASE_HEADING_DATE_SUFFIX = "(?:\\s*-\\s*\\d{4}-\\d{2}-\\d{2})?";
+
 const hasChangelogReleaseSection = (changelog, version) =>
-  new RegExp(`^## \\[${escapeRegExp(version)}\\]\\s*$`, "m").test(changelog);
+  new RegExp(
+    `^## \\[${escapeRegExp(version)}\\]${CHANGELOG_RELEASE_HEADING_DATE_SUFFIX}\\s*$`,
+    "m",
+  ).test(changelog);
 
 const runReleaseVerifyTag = (args) => {
   const options = parseOptions(args);
@@ -1982,7 +1987,10 @@ const runPromoteChangelog = (args) => {
 };
 
 const getChangelogReleaseSection = (changelog, version) => {
-  const headingPattern = new RegExp(`^## \\[${escapeRegExp(version)}\\]\\s*$`, "m");
+  const headingPattern = new RegExp(
+    `^## \\[${escapeRegExp(version)}\\]${CHANGELOG_RELEASE_HEADING_DATE_SUFFIX}\\s*$`,
+    "m",
+  );
   const headingMatch = headingPattern.exec(changelog);
   if (headingMatch === null || headingMatch.index === undefined) return "";
 
