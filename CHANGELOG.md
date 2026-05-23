@@ -21,6 +21,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(config)`: regression-guard asserting that the
+  `SovriConfigSchema.safeParse()` rejection message for `llm.provider`
+  is byte-identical between `openai` and `openai-compatible`. Guards
+  against template drift if a future change introduces a per-value
+  interpolation in the refine message (R-02 technical, ATDD scenario
+  sub-issue #1166 under US #1162).
+
 - `test(config)`: regression-guard `it.each` over the v0.2-rejected
   providers (`openai`, `openai-compatible`) asserting that
   `SovriConfigSchema.safeParse()` returns `success=false` with exactly

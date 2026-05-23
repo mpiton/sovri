@@ -221,6 +221,41 @@ describe("SovriConfigSchema — v0.2 refine widening (anthropic + mistral allow-
       }
     },
   );
+
+  // Issue #1166, R-02 technical (byte-identical message across the rejected
+  // set; guards against template drift if a future change introduces a
+  // per-value interpolation in the refine message).
+  // Scenario:
+  //   Given two parse attempts, one with llm.provider "openai" and one with
+  //     llm.provider "openai-compatible"
+  //   When SovriConfigSchema.safeParse() runs on each config
+  //   Then both results are success=false
+  //   And the message of the "llm.provider" issue is byte-identical between
+  //     the two errors
+  it("R-02 technical — rejection message is byte-identical between openai and openai-compatible", () => {
+    const openaiResult = SovriConfigSchema.safeParse({
+      ...minimalConfig,
+      llm: { ...minimalConfig.llm, provider: "openai" },
+    });
+    const openaiCompatibleResult = SovriConfigSchema.safeParse({
+      ...minimalConfig,
+      llm: { ...minimalConfig.llm, provider: "openai-compatible" },
+    });
+
+    expect(openaiResult.success).toBe(false);
+    expect(openaiCompatibleResult.success).toBe(false);
+    if (!openaiResult.success && !openaiCompatibleResult.success) {
+      const openaiMessage = openaiResult.error.issues.find(
+        (issue) => issue.path.join(".") === "llm.provider",
+      )?.message;
+      const openaiCompatibleMessage = openaiCompatibleResult.error.issues.find(
+        (issue) => issue.path.join(".") === "llm.provider",
+      )?.message;
+
+      expect(openaiMessage).toBeDefined();
+      expect(openaiMessage).toBe(openaiCompatibleMessage);
+    }
+  });
 });
 
 describe("SovriConfigSchema — provider refinement (v0.2 widened — rejected set)", () => {
