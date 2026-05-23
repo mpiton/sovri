@@ -1995,6 +1995,10 @@ const runReadmeReferencesRelease = (args) => {
   const pullSnippet = `docker pull ${image}:v${version}`;
   if (!readme.includes(pullSnippet)) {
     writeStdout("readme_references_release=fail\n");
+    const otherRepoPattern = new RegExp(`docker pull \\S+:v${escapeRegExp(version)}\\b`);
+    if (otherRepoPattern.test(readme)) {
+      fail(`README references a different repository path\nRepository path must be ${image}`, 1);
+    }
     fail(
       `README is missing the literal snippet \`${pullSnippet}\`\nAdd a docker pull snippet pinned to v${version} in ${readmePath}`,
       1,

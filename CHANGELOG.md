@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(scripts)`: `readme-references-release` now emits the targeted
+  `Repository path must be <image>` remediation hint when the README
+  contains a `docker pull <other-repo>:v<version>` snippet whose
+  repository path does not match the expected image (#1131).
+
 - `feat(scripts)`: add `readme-references-release` subcommand to
   `scripts/ci-policy.mjs` that checks the root `README.md` contains
   the literal `docker pull <image>:v<version>` snippet and an
