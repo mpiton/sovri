@@ -153,9 +153,9 @@ describe("SovriConfigSchema — happy paths", () => {
 });
 
 // v0.2 widens the refine to accept both `anthropic` and `mistral`. Each
-// scenario sub-issue under US #1162 adds the matching assertions here. The
-// v0.1 narrow block below is kept until its assertions are flipped by the
-// `mistral` acceptance scenario; once flipped, the v0.1 block is retired.
+// scenario sub-issue under US #1162 adds the matching assertions here.
+// The companion describe block further down covers the rejected set
+// (`openai` / `openai-compatible`) and out-of-enum values.
 describe("SovriConfigSchema — v0.2 refine widening (anthropic + mistral allow-list)", () => {
   // Issue #1163, R-01 nominal.
   // Scenario:
@@ -194,8 +194,8 @@ describe("SovriConfigSchema — v0.2 refine widening (anthropic + mistral allow-
   });
 });
 
-describe("SovriConfigSchema — provider refinement (v0.1 narrow)", () => {
-  it.each(["mistral", "openai", "openai-compatible"] satisfies readonly Provider[])(
+describe("SovriConfigSchema — provider refinement (v0.2 widened — rejected set)", () => {
+  it.each(["openai", "openai-compatible"] satisfies readonly Provider[])(
     "rejects provider=%s with a forward-compatible error message",
     (provider) => {
       const result = SovriConfigSchema.safeParse({
