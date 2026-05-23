@@ -10551,6 +10551,144 @@ run_release_verify_tag_normalization_case() {
   rm -rf "$root"
 }
 
+run_release_extract_notes_malformed_heading_case() {
+  local heading="$1"
+  local label="$2"
+  local root changelog_path stdout stderr stdout_file stderr_file ec
+
+  root=$(mktemp -d)
+  changelog_path="$root/CHANGELOG.md"
+
+  # Given the engineer wrote the heading "<heading>"
+  cat >"$changelog_path" <<MD
+# Changelog
+
+## [Unreleased]
+
+${heading}
+
+### Added
+
+- Some release note.
+
+## [0.0.1] - 2026-01-01
+
+- Initial release.
+MD
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # When the release workflow extracts release notes (via release-extract-notes)
+  node "$SCRIPT" release-extract-notes \
+    --changelog "$changelog_path" \
+    --version 0.1.0 \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  # Then the extraction fails with the error "Missing changelog section ## [0.1.0]"
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes malformed-heading '${label}': expected non-zero exit, got 0
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stderr" | grep -Fq "Missing changelog section ## [0.1.0]"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes malformed-heading '${label}': missing 'Missing changelog section ## [0.1.0]' error
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
+run_release_extract_notes_nominal_case() {
+  local root changelog_path stdout stderr stdout_file stderr_file ec
+
+  root=$(mktemp -d)
+  changelog_path="$root/CHANGELOG.md"
+
+  cat >"$changelog_path" <<'MD'
+# Changelog
+
+## [Unreleased]
+
+## [0.1.0] - 2026-05-23
+
+### Added
+
+- Promoted entry one.
+- Promoted entry two.
+
+## [0.0.1] - 2026-01-01
+
+- Initial release.
+MD
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  node "$SCRIPT" release-extract-notes \
+    --changelog "$changelog_path" \
+    --version 0.1.0 \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes nominal: expected exit 0, got ${ec}
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "Promoted entry one."; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes nominal: missing 'Promoted entry one.' in extracted notes
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "Promoted entry two."; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes nominal: missing 'Promoted entry two.' in extracted notes
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if printf '%s\n' "$stdout" | grep -Fq "Initial release."; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes nominal: leaked 'Initial release.' from prior version section
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
 run_release_verify_tag_unreleased_populated_marker_case() {
   local bullet_marker="$1"
   local marker_label="$2"
@@ -11500,6 +11638,11 @@ run_release_verify_tag_unreleased_populated_marker_case "*" "asterisk"
 run_release_verify_tag_unreleased_populated_marker_case "+" "plus"
 run_release_verify_tag_unreleased_populated_marker_case "1." "numbered-dot"
 run_release_verify_tag_unreleased_populated_marker_case "1)" "numbered-paren"
+run_release_extract_notes_nominal_case
+run_release_extract_notes_malformed_heading_case "## [0.1.0] - 23-05-2026" "dd-mm-yyyy"
+run_release_extract_notes_malformed_heading_case "## [0.1.0] - 2026/05/23" "slash-separator"
+run_release_extract_notes_malformed_heading_case "## 0.1.0 - 2026-05-23" "missing-brackets"
+run_release_extract_notes_malformed_heading_case "## [v0.1.0] - 2026-05-23" "prefixed-v"
 run_promote_changelog_nominal_case
 run_promote_changelog_duplicate_version_case
 run_promote_changelog_invalid_calendar_date_case "2026-13-40"
