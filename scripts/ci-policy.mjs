@@ -1871,6 +1871,14 @@ const runReleaseVerifyTag = (args) => {
   const changelogPath = readRequiredOption(options, "changelog", releaseVerifyTagUsage);
   const changelog = readTextFile(changelogPath, "changelog");
   if (!hasChangelogReleaseSection(changelog, expectedVersion)) {
+    const unreleasedBody = getChangelogUnreleasedBody(changelog);
+    if (unreleasedBody !== null && !hasMarkdownBulletEntry(unreleasedBody)) {
+      writeStdout("verify_tag=fail\n");
+      fail(
+        "Refusing to release with empty Unreleased\nAdd at least one bullet under [Unreleased] before tagging",
+        1,
+      );
+    }
     writeStdout("verify_tag=fail\n");
     fail(`changelog section mismatch\nmissing changelog section ## [${expectedVersion}]`, 1);
   }

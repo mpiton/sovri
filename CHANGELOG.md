@@ -21,6 +21,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(scripts)`: `release-verify-tag` now produces an actionable
+  `Refusing to release with empty Unreleased` failure (with the
+  `Add at least one bullet under [Unreleased] before tagging`
+  remediation hint) when the engineer tags a release whose
+  `## [Unreleased]` body is empty and no `## [X.Y.Z]` section exists
+  yet (#1119).
+
 - `feat(scripts)`: add `release-extract-notes` subcommand to
   `scripts/ci-policy.mjs` that prints the body of `## [X.Y.Z]` (with
   optional ` - YYYY-MM-DD` suffix) and fails with
