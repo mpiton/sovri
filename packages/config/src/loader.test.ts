@@ -197,9 +197,9 @@ describe("loadConfig — schema violation", () => {
     }
   });
 
-  it("throws SovriConfigValidationError when llm.provider is mistral (rejected by v0.1 .refine())", async () => {
-    // mistral IS in the ProviderSchema enum but the v0.1 `.refine()` narrows
-    // accepted providers to "anthropic" only, so this exercises the
+  it("throws SovriConfigValidationError when llm.provider is openai (rejected by v0.2 .refine())", async () => {
+    // openai IS in the ProviderSchema enum but the v0.2 `.refine()` narrows
+    // accepted providers to {"anthropic", "mistral"}, so this exercises the
     // refinement path rather than the enum-stage rejection.
     const root = path.join(FIXTURES_ROOT, "schema-violation-bad-provider");
 

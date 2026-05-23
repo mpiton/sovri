@@ -1,4 +1,4 @@
 llm:
-  provider: mistral
-  model: mistral-large-2
-  apiKeySecret: MISTRAL_API_KEY
+  provider: openai
+  model: gpt-4o
+  apiKeySecret: OPENAI_API_KEY
