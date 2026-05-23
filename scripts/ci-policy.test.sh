@@ -10613,6 +10613,63 @@ $(printf '%s\n' "$stderr" | sed 's/^/        /')"
   rm -rf "$root"
 }
 
+run_readme_references_release_fenced_heading_case() {
+  local root readme_path stdout stderr stdout_file stderr_file ec
+
+  root=$(mktemp -d)
+  readme_path="$root/README.md"
+
+  # Given a README whose only "## Install" line lives inside a fenced code block
+  cat >"$readme_path" <<'MD'
+# Some Project
+
+The author shows what the heading should look like but never inserts a real one:
+
+```markdown
+## Install
+
+docker pull ghcr.io/mpiton/sovri/community-bot:v0.1.0
+```
+
+End of file.
+MD
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  node "$SCRIPT" readme-references-release \
+    --readme "$readme_path" \
+    --image ghcr.io/mpiton/sovri/community-bot \
+    --version 0.1.0 \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ readme-references-release fenced-heading: expected non-zero exit, got 0
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stderr" | grep -Fq "## Install"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ readme-references-release fenced-heading: missing install heading hint
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
 run_readme_references_release_inline_mention_case() {
   local root readme_path stdout stderr stdout_file stderr_file ec
 
@@ -11942,6 +11999,7 @@ run_release_extract_notes_nominal_case
 run_release_extract_notes_release_notes_md_case
 run_readme_references_release_nominal_case
 run_readme_references_release_inline_mention_case
+run_readme_references_release_fenced_heading_case
 run_release_extract_notes_malformed_heading_case "## [0.1.0] - 23-05-2026" "dd-mm-yyyy"
 run_release_extract_notes_malformed_heading_case "## [0.1.0] - 2026/05/23" "slash-separator"
 run_release_extract_notes_malformed_heading_case "## 0.1.0 - 2026-05-23" "missing-brackets"

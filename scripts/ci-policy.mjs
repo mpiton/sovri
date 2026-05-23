@@ -1969,6 +1969,22 @@ const runReleaseBuildAndPush = (args) => {
 
 const README_INSTALL_HEADING_MAX_LINES = 200;
 
+const findMarkdownHeadingLine = (markdown, headingPattern) => {
+  const lines = markdown.split("\n");
+  let insideFence = false;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^\s*```/.test(line)) {
+      insideFence = !insideFence;
+      continue;
+    }
+    if (!insideFence && headingPattern.test(line)) {
+      return index + 1;
+    }
+  }
+  return null;
+};
+
 const runReadmeReferencesRelease = (args) => {
   const options = parseOptions(args);
   const readmePath = readRequiredOption(options, "readme", readmeReferencesReleaseUsage);
@@ -1986,18 +2002,16 @@ const runReadmeReferencesRelease = (args) => {
   }
 
   const installHeading = "## Install";
-  const installHeadingPattern = /^## Install\s*$/m;
-  const installHeadingMatch = installHeadingPattern.exec(readme);
-  if (installHeadingMatch === null || installHeadingMatch.index === undefined) {
+  const installHeadingLine = findMarkdownHeadingLine(readme, /^## Install\s*$/);
+  if (installHeadingLine === null) {
     writeStdout("readme_references_release=fail\n");
     fail(`README is missing the \`${installHeading}\` section heading`, 1);
   }
 
-  const linesBeforeHeading = readme.slice(0, installHeadingMatch.index).split("\n").length;
-  if (linesBeforeHeading > README_INSTALL_HEADING_MAX_LINES) {
+  if (installHeadingLine > README_INSTALL_HEADING_MAX_LINES) {
     writeStdout("readme_references_release=fail\n");
     fail(
-      `\`${installHeading}\` heading must appear within the first ${README_INSTALL_HEADING_MAX_LINES} lines (found at line ${linesBeforeHeading})`,
+      `\`${installHeading}\` heading must appear within the first ${README_INSTALL_HEADING_MAX_LINES} lines (found at line ${installHeadingLine})`,
       1,
     );
   }
