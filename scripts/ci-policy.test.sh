@@ -10363,6 +10363,21 @@ run_release_pipeline_failed_job_case() {
     --gh-release "$([ "$job_name" = gh-release ] && printf failure || printf success)"
 }
 
+run_release_pipeline_outline_failure_case() {
+  local label="$1"
+  local verify_tag="$2"
+  local build_push="$3"
+  local sbom="$4"
+  local gh_release="$5"
+
+  run_ci_policy_failure_case "release pipeline outline failed ${label}" "release_pipeline_result=failed" \
+    release-pipeline-result \
+    --verify-tag "$verify_tag" \
+    --build-and-push "$build_push" \
+    --sbom "$sbom" \
+    --gh-release "$gh_release"
+}
+
 run_release_pipeline_idempotent_case() {
   run_ci_policy_success_case "release pipeline idempotent rerun" "release_update=existing-release-updated" \
     release-pipeline-result \
@@ -12714,6 +12729,10 @@ run_release_pipeline_failed_job_case verify-tag
 run_release_pipeline_failed_job_case build-and-push
 run_release_pipeline_failed_job_case sbom
 run_release_pipeline_failed_job_case gh-release
+run_release_pipeline_outline_failure_case verify-tag failure skipped skipped skipped
+run_release_pipeline_outline_failure_case build-and-push success failure success skipped
+run_release_pipeline_outline_failure_case sbom success success failure skipped
+run_release_pipeline_outline_failure_case gh-release success success success failure
 run_release_pipeline_idempotent_case
 run_release_trigger_push_tags_case
 run_release_trigger_missing_tags_case
