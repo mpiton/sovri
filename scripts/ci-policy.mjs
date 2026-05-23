@@ -1986,13 +1986,14 @@ const runReadmeReferencesRelease = (args) => {
   }
 
   const installHeading = "## Install";
-  const headingIndex = readme.indexOf(installHeading);
-  if (headingIndex === -1) {
+  const installHeadingPattern = /^## Install\s*$/m;
+  const installHeadingMatch = installHeadingPattern.exec(readme);
+  if (installHeadingMatch === null || installHeadingMatch.index === undefined) {
     writeStdout("readme_references_release=fail\n");
     fail(`README is missing the \`${installHeading}\` section heading`, 1);
   }
 
-  const linesBeforeHeading = readme.slice(0, headingIndex).split("\n").length;
+  const linesBeforeHeading = readme.slice(0, installHeadingMatch.index).split("\n").length;
   if (linesBeforeHeading > README_INSTALL_HEADING_MAX_LINES) {
     writeStdout("readme_references_release=fail\n");
     fail(
