@@ -21,6 +21,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(config)`: strengthen the existing `gemini` rejection test inside
+  the v0.2 widening describe block to assert (a) exactly one issue at
+  path `llm.provider` and (b) `issue.code === "invalid_value"` — the Zod
+  enum-step failure code, distinct from the refine custom code. Guards
+  against a regression that would route out-of-enum values through the
+  refine path instead of the enum gate (R-03 limit, ATDD scenario
+  sub-issue #1169 under US #1162).
+
 - `test(config)`: tag the existing `Provider` type-inference test with
   the `R-03 nominal —` marker so it is traceable to the ATDD scenario
   asserting that the inferred `Provider = z.infer<typeof ProviderSchema>`

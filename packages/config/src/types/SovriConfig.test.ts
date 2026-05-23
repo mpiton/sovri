@@ -293,13 +293,29 @@ describe("SovriConfigSchema — provider refinement (v0.2 widened — rejected s
     expect(SovriConfigSchema.parse(minimalConfig).llm.provider).toBe("anthropic");
   });
 
-  it("rejects an unknown provider string before the refinement runs", () => {
+  // Issue #1169, R-03 limit (out-of-enum value rejected at the enum step,
+  // before the refine fires).
+  // Scenario:
+  //   Given the .sovri.yml has llm.provider "gemini"
+  //   And a minimal valid llm.model and llm.apiKeySecret are present
+  //   When SovriConfigSchema.safeParse() runs on the config
+  //   Then the result is success=false
+  //   And exactly one issue has path "llm.provider"
+  //   And that issue.code is "invalid_value" (Zod enum failure, not refine)
+  it("R-03 limit — out-of-enum provider is rejected at the enum step (code=invalid_value)", () => {
     const result = SovriConfigSchema.safeParse({
       ...minimalConfig,
       llm: { ...minimalConfig.llm, provider: "gemini" },
     });
 
     expect(result.success).toBe(false);
+    if (!result.success) {
+      const providerIssues = result.error.issues.filter(
+        (issue) => issue.path.join(".") === "llm.provider",
+      );
+      expect(providerIssues).toHaveLength(1);
+      expect(providerIssues[0]?.code).toBe("invalid_value");
+    }
   });
 });
 
