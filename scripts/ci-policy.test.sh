@@ -10613,6 +10613,66 @@ $(printf '%s\n' "$stderr" | sed 's/^/        /')"
   rm -rf "$root"
 }
 
+run_release_retag_delete_recreate_case() {
+  local root wrong_commit head_commit tag_type tag_subject tag_commit
+  root=$(mktemp -d)
+  setup_release_tag_workspace "$root"
+
+  (
+    cd "$root"
+    : >".wrong"
+    git add .wrong
+    # Given the engineer previously ran `git tag -a v0.1.0 -m "Release v0.1.0"` on the wrong commit
+    git commit --quiet -m "chore(release): v0.1.0"
+    git tag -a v0.1.0 -m "Release v0.1.0"
+
+    : >".fix"
+    git add .fix
+    git commit --quiet --amend --no-edit
+    # Note: the tag still points at the original (now stale) commit; HEAD has moved.
+
+    # When the engineer runs `git tag -d v0.1.0`
+    git tag -d v0.1.0 >/dev/null
+    # And the engineer runs `git tag -a v0.1.0 -m "Release v0.1.0"` on the corrected HEAD
+    git tag -a v0.1.0 -m "Release v0.1.0"
+  )
+
+  tag_type=$(cd "$root" && git cat-file -t v0.1.0)
+  tag_subject=$(cd "$root" && git tag -l --format='%(contents:subject)' v0.1.0)
+  tag_commit=$(cd "$root" && git rev-parse 'v0.1.0^{commit}')
+  head_commit=$(cd "$root" && git rev-parse HEAD)
+
+  # Then `git cat-file -t v0.1.0` outputs "tag"
+  if [ "$tag_type" != "tag" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-retag-delete-recreate: cat-file -t outputs '${tag_type}', expected 'tag'"
+    rm -rf "$root"
+    return
+  fi
+
+  # And `git tag -l --format="%(contents:subject)" v0.1.0` outputs "Release v0.1.0"
+  if [ "$tag_subject" != "Release v0.1.0" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-retag-delete-recreate: tag subject is '${tag_subject}', expected 'Release v0.1.0'"
+    rm -rf "$root"
+    return
+  fi
+
+  # And `git rev-parse v0.1.0^{commit}` matches `git rev-parse HEAD`
+  if [ "$tag_commit" != "$head_commit" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-retag-delete-recreate: tag commit ${tag_commit} != HEAD ${head_commit}"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
 run_release_tag_version_mismatch_case() {
   local root package_files tag_type stdout stderr stdout_file stderr_file ec
   root=$(mktemp -d)
@@ -12644,6 +12704,7 @@ run_release_verify_tag_annotation_lightweight_case
 run_release_verify_commit_subject_correct_case
 run_release_verify_commit_subject_wrong_case
 run_release_tag_version_mismatch_case
+run_release_retag_delete_recreate_case
 run_release_extract_notes_malformed_heading_case "## [0.1.0] - 23-05-2026" "dd-mm-yyyy"
 run_release_extract_notes_malformed_heading_case "## [0.1.0] - 2026/05/23" "slash-separator"
 run_release_extract_notes_malformed_heading_case "## 0.1.0 - 2026-05-23" "missing-brackets"
