@@ -10363,6 +10363,42 @@ run_release_pipeline_failed_job_case() {
     --gh-release "$([ "$job_name" = gh-release ] && printf failure || printf success)"
 }
 
+run_release_yml_uses_v_star_filter_case() {
+  local repo_root="${SCRIPT_DIR%/scripts}"
+  local workflow_path="$repo_root/.github/workflows/release.yml"
+  local unprefixed_tag="0.1.0"
+
+  if ! [ -f "$workflow_path" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-yml-uses-v-star-filter: workflow file missing at ${workflow_path}"
+    return
+  fi
+
+  # And no GitHub Release exists for "0.1.0" -- guarded by GitHub: a tag like
+  # "0.1.0" (without leading v) cannot match the `v*` filter declared in the
+  # workflow's `on: push: tags` block. Lock that contract here.
+  if ! grep -Eq '^\s*-\s*"v\*"\s*$' "$workflow_path"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-yml-uses-v-star-filter: workflow does not declare 'v*' in on.push.tags
+$(grep -nE 'tags:' "$workflow_path" | sed 's/^/        /')"
+    return
+  fi
+
+  case "$unprefixed_tag" in
+    v*)
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ release-yml-uses-v-star-filter: tag '${unprefixed_tag}' unexpectedly matches v* glob"
+      return
+      ;;
+  esac
+
+  run_ci_policy_success_case "release trigger on real workflow" "release_trigger=pass" \
+    release-trigger --workflow "$workflow_path"
+}
+
 run_release_pipeline_outline_failure_case() {
   local label="$1"
   local verify_tag="$2"
@@ -12733,6 +12769,7 @@ run_release_pipeline_outline_failure_case verify-tag failure skipped skipped ski
 run_release_pipeline_outline_failure_case build-and-push success failure success skipped
 run_release_pipeline_outline_failure_case sbom success success failure skipped
 run_release_pipeline_outline_failure_case gh-release success success success failure
+run_release_yml_uses_v_star_filter_case
 run_release_pipeline_idempotent_case
 run_release_trigger_push_tags_case
 run_release_trigger_missing_tags_case
