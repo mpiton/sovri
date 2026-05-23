@@ -10613,6 +10613,82 @@ $(printf '%s\n' "$stderr" | sed 's/^/        /')"
   rm -rf "$root"
 }
 
+run_readme_references_release_latest_only_case() {
+  local root readme_path stdout stderr stdout_file stderr_file ec
+
+  root=$(mktemp -d)
+  readme_path="$root/README.md"
+
+  # Given "README.md" instructs users to run `docker pull ghcr.io/mpiton/sovri/community-bot:latest`
+  # And "README.md" does not contain the string "v0.1.0"
+  cat >"$readme_path" <<'MD'
+# Some Project
+
+## Install
+
+```bash
+docker pull ghcr.io/mpiton/sovri/community-bot:latest
+```
+
+End of file.
+MD
+
+  if grep -Fq "v0.1.0" "$readme_path"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ readme-references-release latest-only: fixture unexpectedly contains 'v0.1.0'"
+    rm -rf "$root"
+    return
+  fi
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # When the release engineer verifies the documentation
+  node "$SCRIPT" readme-references-release \
+    --readme "$readme_path" \
+    --image ghcr.io/mpiton/sovri/community-bot \
+    --version 0.1.0 \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  # Then the rule R-02 is reported as violated (signal: readme_references_release=fail)
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ readme-references-release latest-only: expected non-zero exit, got 0
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "readme_references_release=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ readme-references-release latest-only: missing readme_references_release=fail
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # And the remediation hint reads "Add a docker pull snippet pinned to v0.1.0 in README.md"
+  if ! printf '%s\n' "$stderr" | grep -Fq "Add a docker pull snippet pinned to v0.1.0 in"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ readme-references-release latest-only: missing remediation hint
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
 run_readme_references_release_tilde_fenced_heading_case() {
   local root readme_path stdout stderr stdout_file stderr_file ec
 
@@ -12058,6 +12134,7 @@ run_readme_references_release_nominal_case
 run_readme_references_release_inline_mention_case
 run_readme_references_release_fenced_heading_case
 run_readme_references_release_tilde_fenced_heading_case
+run_readme_references_release_latest_only_case
 run_release_extract_notes_malformed_heading_case "## [0.1.0] - 23-05-2026" "dd-mm-yyyy"
 run_release_extract_notes_malformed_heading_case "## [0.1.0] - 2026/05/23" "slash-separator"
 run_release_extract_notes_malformed_heading_case "## 0.1.0 - 2026-05-23" "missing-brackets"
