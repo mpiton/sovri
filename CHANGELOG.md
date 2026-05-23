@@ -64,7 +64,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `feat(scripts)`: add `release-extract-notes` subcommand to
   `scripts/ci-policy.mjs` that prints the body of `## [X.Y.Z]` (with
-  optional ` - YYYY-MM-DD` suffix) and fails with
+  optional `- YYYY-MM-DD` suffix) and fails with
   `Missing changelog section ## [X.Y.Z]` for any malformed heading
   (DD-MM-YYYY, slash separator, missing brackets, prefixed `v`)
   (#1117).

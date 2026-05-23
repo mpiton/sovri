@@ -10378,7 +10378,7 @@ run_release_yml_uses_v_star_filter_case() {
   # And no GitHub Release exists for "0.1.0" -- guarded by GitHub: a tag like
   # "0.1.0" (without leading v) cannot match the `v*` filter declared in the
   # workflow's `on: push: tags` block. Lock that contract here.
-  if ! grep -Eq '^\s*-\s*"v\*"\s*$' "$workflow_path"; then
+  if ! grep -Eq "^[[:space:]]*-[[:space:]]*['\"]?v\\*['\"]?[[:space:]]*$" "$workflow_path"; then
     FAIL=$((FAIL + 1))
     FAILURES="${FAILURES}
   ✗ release-yml-uses-v-star-filter: workflow does not declare 'v*' in on.push.tags
@@ -10858,6 +10858,7 @@ run_release_verify_commit_subject_wrong_case() {
     git add .bump
     # When the engineer runs `git commit -m "release 0.1.0"`
     git commit --quiet -m "release 0.1.0"
+    git tag -a v0.1.0 -m "Release v0.1.0"
   )
 
   subject=$(cd "$root" && git log -1 --pretty=%s)
@@ -10923,6 +10924,7 @@ run_release_verify_commit_subject_correct_case() {
     : >".bump"
     git add .bump
     git commit --quiet -m "chore(release): v0.1.0"
+    git tag -a v0.1.0 -m "Release v0.1.0"
   )
 
   stdout_file=$(mktemp)
@@ -12373,10 +12375,27 @@ MD
   package_files=$(release_metadata_package_files "$root")
 
   # When the engineer promotes Unreleased to [0.1.0] - 2026-05-23
+  local promote_stdout_file promote_stderr_file promote_ec
+  promote_stdout_file=$(mktemp)
+  promote_stderr_file=$(mktemp)
   node "$SCRIPT" promote-changelog \
     --version 0.1.0 \
     --date 2026-05-23 \
-    --changelog "$root/CHANGELOG.md" >/dev/null 2>&1
+    --changelog "$root/CHANGELOG.md" \
+    >"$promote_stdout_file" 2>"$promote_stderr_file" && promote_ec=0 || promote_ec=$?
+  if [ "$promote_ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-then-verify-tag: promote-changelog exited ${promote_ec}
+      stdout:
+$(sed 's/^/        /' "$promote_stdout_file")
+      stderr:
+$(sed 's/^/        /' "$promote_stderr_file")"
+    rm -f "$promote_stdout_file" "$promote_stderr_file"
+    rm -rf "$root"
+    return
+  fi
+  rm -f "$promote_stdout_file" "$promote_stderr_file"
 
   stdout_file=$(mktemp)
   stderr_file=$(mktemp)

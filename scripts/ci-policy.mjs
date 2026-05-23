@@ -2054,32 +2054,42 @@ const runReleaseVerifyTagAnnotation = (args) => {
   writeStdout("verify_tag_annotation=pass\ntag_object_type=tag\n");
 };
 
+const RELEASE_TAG_PATTERN = /^v\d+\.\d+\.\d+$/;
+
 const runReleaseVerifyCommitSubject = (args) => {
   const options = parseOptions(args);
   const tag = readRequiredOption(options, "tag", releaseVerifyCommitSubjectUsage);
   const repo = readRequiredOption(options, "repo", releaseVerifyCommitSubjectUsage);
 
-  const version = tag.replace(/^v/, "");
+  if (!RELEASE_TAG_PATTERN.test(tag)) {
+    writeStdout("verify_commit_subject=fail\n");
+    fail(`tag ${tag} must match vX.Y.Z`, 1);
+  }
+
+  const version = tag.slice(1);
   const expectedSubject = `chore(release): v${version}`;
 
-  const result = spawnSync("git", ["-C", repo, "log", "-1", "--pretty=%s"], {
+  const result = spawnSync("git", ["-C", repo, "log", "-1", "--pretty=%s", `${tag}^{commit}`], {
     encoding: "utf8",
   });
   if (result.status !== 0) {
     writeStdout("verify_commit_subject=fail\n");
-    fail(`git log -1 --pretty=%s failed in ${repo}\n${(result.stderr ?? "").trim()}`, 1);
-  }
-
-  const subject = (result.stdout ?? "").replace(/\n$/, "");
-  if (subject !== expectedSubject) {
-    writeStdout(`verify_commit_subject=fail\nhead_subject=${subject}\n`);
     fail(
-      `HEAD subject is "${subject}", expected "${expectedSubject}"\nCommit subject must equal ${expectedSubject}`,
+      `git log -1 --pretty=%s ${tag}^{commit} failed in ${repo}\n${(result.stderr ?? "").trim()}`,
       1,
     );
   }
 
-  writeStdout(`verify_commit_subject=pass\nhead_subject=${subject}\n`);
+  const subject = (result.stdout ?? "").replace(/\n$/, "");
+  if (subject !== expectedSubject) {
+    writeStdout(`verify_commit_subject=fail\ntag_subject=${subject}\n`);
+    fail(
+      `tagged commit subject is "${subject}", expected "${expectedSubject}"\nCommit subject must equal ${expectedSubject}`,
+      1,
+    );
+  }
+
+  writeStdout(`verify_commit_subject=pass\ntag_subject=${subject}\n`);
 };
 
 const runReleaseExtractNotes = (args) => {
