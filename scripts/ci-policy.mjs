@@ -137,6 +137,8 @@ const releaseVerifyTagUsage =
   "Usage: node scripts/ci-policy.mjs release-verify-tag --tag <vX.Y.Z> --package-files <comma-separated-package-json-paths> --changelog <path>";
 const releaseBuildAndPushUsage =
   "Usage: node scripts/ci-policy.mjs release-build-and-push --workflow <path>";
+const releaseExtractNotesUsage =
+  "Usage: node scripts/ci-policy.mjs release-extract-notes --changelog <path> --version <X.Y.Z>";
 const promoteChangelogUsage =
   "Usage: node scripts/ci-policy.mjs promote-changelog --version <X.Y.Z> --date <YYYY-MM-DD> --changelog <path>";
 const cosignDeferralUsage =
@@ -172,7 +174,7 @@ const changelogRemediationMessageUsage =
   "Usage: node scripts/ci-policy.mjs changelog-remediation-message --message <text>";
 const changelogDocumentationOnlyAssertUsage =
   "Usage: node scripts/ci-policy.mjs changelog-documentation-only-assert --changed-files <comma-separated-paths> --gate-result <success|failure>";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dependencyReviewWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${promoteChangelogUsage}\n${cosignDeferralUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dependencyReviewWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${releaseExtractNotesUsage}\n${promoteChangelogUsage}\n${cosignDeferralUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -1955,6 +1957,20 @@ const runReleaseBuildAndPush = (args) => {
   );
 };
 
+const runReleaseExtractNotes = (args) => {
+  const options = parseOptions(args);
+  const changelogPath = readRequiredOption(options, "changelog", releaseExtractNotesUsage);
+  const version = readRequiredOption(options, "version", releaseExtractNotesUsage);
+
+  const changelog = readTextFile(changelogPath, "changelog");
+  if (!hasChangelogReleaseSection(changelog, version)) {
+    fail(`Missing changelog section ## [${version}]`, 1);
+  }
+
+  const body = getChangelogReleaseSection(changelog, version).trim();
+  writeStdout(`${body}\n`);
+};
+
 const PROMOTE_CHANGELOG_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 const PROMOTE_CHANGELOG_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -3385,6 +3401,8 @@ if (command === "duration-budget") {
   runReleaseVerifyTag(args);
 } else if (command === "release-build-and-push") {
   runReleaseBuildAndPush(args);
+} else if (command === "release-extract-notes") {
+  runReleaseExtractNotes(args);
 } else if (command === "promote-changelog") {
   runPromoteChangelog(args);
 } else if (command === "cosign-deferral") {

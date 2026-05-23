@@ -21,6 +21,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(scripts)`: add `release-extract-notes` subcommand to
+  `scripts/ci-policy.mjs` that prints the body of `## [X.Y.Z]` (with
+  optional ` - YYYY-MM-DD` suffix) and fails with
+  `Missing changelog section ## [X.Y.Z]` for any malformed heading
+  (DD-MM-YYYY, slash separator, missing brackets, prefixed `v`)
+  (#1117).
+
 - `feat(scripts)`: `release-verify-tag` now rejects a CHANGELOG where the
   release section exists but `[Unreleased]` still contains bullet
   entries; the inconsistent state surfaces as
