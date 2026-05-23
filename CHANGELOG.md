@@ -21,6 +21,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(scripts)`: add `release-verify-tag-annotation` subcommand to
+  `scripts/ci-policy.mjs` that runs `git -C <repo> cat-file -t <tag>`
+  and rejects lightweight tags with
+  `verify_tag_annotation=fail` on stdout plus the actionable
+  remediation hint `Recreate the tag with git tag -a <tag> -m
+  "Release v<version>"` on stderr (#1133).
+
 - `feat(scripts)`: `readme-references-release` now emits the targeted
   `Repository path must be <image>` remediation hint when the README
   contains a `docker pull <other-repo>:v<version>` snippet whose
