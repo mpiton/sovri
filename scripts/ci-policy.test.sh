@@ -10551,6 +10551,92 @@ run_release_verify_tag_normalization_case() {
   rm -rf "$root"
 }
 
+run_release_verify_tag_unreleased_still_populated_case() {
+  local root package_files stdout stderr stdout_file stderr_file ec
+
+  root=$(mktemp -d)
+  mkdir -p "$root/packages/core" "$root/packages/review-engine" "$root/packages/llm-providers" \
+    "$root/packages/config" "$root/packages/observability" "$root/apps/community-bot"
+  for package_path in packages/core packages/review-engine packages/llm-providers packages/config packages/observability; do
+    printf '{ "version": "0.1.0" }\n' >"$root/${package_path}/package.json"
+  done
+  printf '{ "version": "0.1.0" }\n' >"$root/apps/community-bot/package.json"
+
+  # Given the engineer added "## [0.1.0] - 2026-05-23" but did not move any entry
+  # And "## [Unreleased]" still contains 12 bullet entries
+  cat >"$root/CHANGELOG.md" <<'MD'
+# Changelog
+
+## [Unreleased]
+
+### Added
+
+- Entry one.
+- Entry two.
+- Entry three.
+- Entry four.
+- Entry five.
+- Entry six.
+- Entry seven.
+- Entry eight.
+- Entry nine.
+- Entry ten.
+- Entry eleven.
+- Entry twelve.
+
+## [0.1.0] - 2026-05-23
+
+MD
+  package_files=$(release_metadata_package_files "$root")
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # When the engineer runs `node scripts/ci-policy.mjs release-verify-tag --tag v0.1.0 ...`
+  node "$SCRIPT" release-verify-tag \
+    --tag v0.1.0 \
+    --package-files "$package_files" \
+    --changelog "$root/CHANGELOG.md" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  # Then the command exits with a non-zero status
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-verify-tag unreleased-still-populated: expected non-zero exit, got 0
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # And the rule R-03 is reported as violated (signal: verify_tag=fail on stdout)
+  if ! printf '%s\n' "$stdout" | grep -Fq "verify_tag=fail"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-verify-tag unreleased-still-populated: missing verify_tag=fail
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stderr" | grep -Fq "[Unreleased] still has entries after release section"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-verify-tag unreleased-still-populated: missing populated-Unreleased error
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
 run_release_verify_tag_format_case() {
   local git_tag="$1"
   local root package_files
@@ -11344,6 +11430,7 @@ run_release_verify_tag_normalization_case "0.1.0" rejected "tag lacks required v
 run_release_verify_tag_normalization_case "vv0.1.0" rejected "tag has two leading v prefixes"
 run_release_verify_tag_format_case "v0.1"
 run_release_verify_tag_format_case "v0.1.0-rc.1"
+run_release_verify_tag_unreleased_still_populated_case
 run_promote_changelog_nominal_case
 run_promote_changelog_duplicate_version_case
 run_promote_changelog_invalid_calendar_date_case "2026-13-40"
