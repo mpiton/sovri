@@ -1828,7 +1828,7 @@ const getChangelogUnreleasedBody = (changelog) => {
   return changelog.slice(bodyStart, bodyEnd);
 };
 
-const hasMarkdownBulletEntry = (body) => /^\s*(?:[-*+]|\d+\.)\s+\S/m.test(body);
+const hasMarkdownBulletEntry = (body) => /^\s*(?:[-*+]|\d+[.)])\s+\S/m.test(body);
 
 const runReleaseVerifyTag = (args) => {
   const options = parseOptions(args);

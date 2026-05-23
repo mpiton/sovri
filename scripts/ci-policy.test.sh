@@ -11498,7 +11498,8 @@ run_release_verify_tag_format_case "v0.1.0-rc.1"
 run_release_verify_tag_unreleased_still_populated_case
 run_release_verify_tag_unreleased_populated_marker_case "*" "asterisk"
 run_release_verify_tag_unreleased_populated_marker_case "+" "plus"
-run_release_verify_tag_unreleased_populated_marker_case "1." "numbered"
+run_release_verify_tag_unreleased_populated_marker_case "1." "numbered-dot"
+run_release_verify_tag_unreleased_populated_marker_case "1)" "numbered-paren"
 run_promote_changelog_nominal_case
 run_promote_changelog_duplicate_version_case
 run_promote_changelog_invalid_calendar_date_case "2026-13-40"
