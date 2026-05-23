@@ -21,6 +21,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(scripts)`: add `readme-references-release` subcommand to
+  `scripts/ci-policy.mjs` that checks the root `README.md` contains
+  the literal `docker pull <image>:v<version>` snippet and an
+  `## Install` section within the first 200 lines; root README now
+  includes the canonical `docker pull
+  ghcr.io/mpiton/sovri/community-bot:v0.1.0` snippet under
+  `## Install` (#1129).
+
 - `feat(scripts)`: `release-verify-tag` now produces an actionable
   `Refusing to release with empty Unreleased` failure (with the
   `Add at least one bullet under [Unreleased] before tagging`

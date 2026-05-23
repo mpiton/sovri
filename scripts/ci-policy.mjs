@@ -139,6 +139,8 @@ const releaseBuildAndPushUsage =
   "Usage: node scripts/ci-policy.mjs release-build-and-push --workflow <path>";
 const releaseExtractNotesUsage =
   "Usage: node scripts/ci-policy.mjs release-extract-notes --changelog <path> --version <X.Y.Z>";
+const readmeReferencesReleaseUsage =
+  "Usage: node scripts/ci-policy.mjs readme-references-release --readme <path> --image <repository> --version <X.Y.Z>";
 const promoteChangelogUsage =
   "Usage: node scripts/ci-policy.mjs promote-changelog --version <X.Y.Z> --date <YYYY-MM-DD> --changelog <path>";
 const cosignDeferralUsage =
@@ -174,7 +176,7 @@ const changelogRemediationMessageUsage =
   "Usage: node scripts/ci-policy.mjs changelog-remediation-message --message <text>";
 const changelogDocumentationOnlyAssertUsage =
   "Usage: node scripts/ci-policy.mjs changelog-documentation-only-assert --changed-files <comma-separated-paths> --gate-result <success|failure>";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dependencyReviewWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${releaseExtractNotesUsage}\n${promoteChangelogUsage}\n${cosignDeferralUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dependencyReviewWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${releaseExtractNotesUsage}\n${readmeReferencesReleaseUsage}\n${promoteChangelogUsage}\n${cosignDeferralUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -1965,6 +1967,58 @@ const runReleaseBuildAndPush = (args) => {
   );
 };
 
+const README_INSTALL_HEADING_MAX_LINES = 200;
+
+const findMarkdownHeadingLine = (markdown, headingPattern) => {
+  const lines = markdown.split("\n");
+  let insideFence = false;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^\s*(?:```|~~~)/.test(line)) {
+      insideFence = !insideFence;
+      continue;
+    }
+    if (!insideFence && headingPattern.test(line)) {
+      return index + 1;
+    }
+  }
+  return null;
+};
+
+const runReadmeReferencesRelease = (args) => {
+  const options = parseOptions(args);
+  const readmePath = readRequiredOption(options, "readme", readmeReferencesReleaseUsage);
+  const image = readRequiredOption(options, "image", readmeReferencesReleaseUsage);
+  const version = readRequiredOption(options, "version", readmeReferencesReleaseUsage);
+
+  const readme = readTextFile(readmePath, "readme");
+  const pullSnippet = `docker pull ${image}:v${version}`;
+  if (!readme.includes(pullSnippet)) {
+    writeStdout("readme_references_release=fail\n");
+    fail(
+      `README is missing the literal snippet \`${pullSnippet}\`\nAdd a docker pull snippet pinned to v${version} in ${readmePath}`,
+      1,
+    );
+  }
+
+  const installHeading = "## Install";
+  const installHeadingLine = findMarkdownHeadingLine(readme, /^## Install\s*$/);
+  if (installHeadingLine === null) {
+    writeStdout("readme_references_release=fail\n");
+    fail(`README is missing the \`${installHeading}\` section heading`, 1);
+  }
+
+  if (installHeadingLine > README_INSTALL_HEADING_MAX_LINES) {
+    writeStdout("readme_references_release=fail\n");
+    fail(
+      `\`${installHeading}\` heading must appear within the first ${README_INSTALL_HEADING_MAX_LINES} lines (found at line ${installHeadingLine})`,
+      1,
+    );
+  }
+
+  writeStdout("readme_references_release=pass\n");
+};
+
 const runReleaseExtractNotes = (args) => {
   const options = parseOptions(args);
   const changelogPath = readRequiredOption(options, "changelog", releaseExtractNotesUsage);
@@ -3411,6 +3465,8 @@ if (command === "duration-budget") {
   runReleaseBuildAndPush(args);
 } else if (command === "release-extract-notes") {
   runReleaseExtractNotes(args);
+} else if (command === "readme-references-release") {
+  runReadmeReferencesRelease(args);
 } else if (command === "promote-changelog") {
   runPromoteChangelog(args);
 } else if (command === "cosign-deferral") {
