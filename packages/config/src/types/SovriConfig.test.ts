@@ -192,6 +192,35 @@ describe("SovriConfigSchema — v0.2 refine widening (anthropic + mistral allow-
       expect(result.data.llm.provider).toBe("mistral");
     }
   });
+
+  // Issue #1165, R-02 violation (Scenario Outline over the rejected set).
+  // Scenario:
+  //   Given the .sovri.yml has llm.provider "<provider>"
+  //   When SovriConfigSchema.safeParse() runs on the config
+  //   Then the result is success=false
+  //   And exactly one issue has path "llm.provider"
+  //   And that issue.message equals
+  //     "Only 'anthropic' and 'mistral' are enabled in this release."
+  it.each(["openai", "openai-compatible"] satisfies readonly Provider[])(
+    "R-02 violation — provider=%s yields exactly one llm.provider issue with the v0.2 message",
+    (provider) => {
+      const result = SovriConfigSchema.safeParse({
+        ...minimalConfig,
+        llm: { ...minimalConfig.llm, provider },
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const providerIssues = result.error.issues.filter(
+          (issue) => issue.path.join(".") === "llm.provider",
+        );
+        expect(providerIssues).toHaveLength(1);
+        expect(providerIssues[0]?.message).toBe(
+          "Only 'anthropic' and 'mistral' are enabled in this release.",
+        );
+      }
+    },
+  );
 });
 
 describe("SovriConfigSchema — provider refinement (v0.2 widened — rejected set)", () => {

@@ -19,6 +19,15 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Added
+
+- `test(config)`: regression-guard `it.each` over the v0.2-rejected
+  providers (`openai`, `openai-compatible`) asserting that
+  `SovriConfigSchema.safeParse()` returns `success=false` with exactly
+  one issue at path `llm.provider` whose message equals the documented
+  v0.2 string `Only 'anthropic' and 'mistral' are enabled in this
+  release.` (R-02 violation, ATDD scenario sub-issue #1165 under US #1162).
+
 ### Changed
 
 - `feat(config)`: widen `LlmSchema.provider` `.refine()` from the v0.1
