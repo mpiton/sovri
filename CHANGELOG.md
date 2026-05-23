@@ -21,6 +21,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(config)`: regression-guard asserting that `ProviderSchema.options`
+  keeps exactly the four declared members
+  `["anthropic", "mistral", "openai", "openai-compatible"]`. Pins the
+  ADR-005 wide-enum / narrow-refine pattern at the runtime layer so any
+  accidental drop or addition trips a test rather than a downstream
+  switch/case (R-03 nominal, ATDD scenario sub-issue #1167 under US #1162).
+
 - `test(config)`: regression-guard asserting that the
   `SovriConfigSchema.safeParse()` rejection message for `llm.provider`
   is byte-identical between `openai` and `openai-compatible`. Guards
