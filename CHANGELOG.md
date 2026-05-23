@@ -19,6 +19,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+
+## [0.1.0] - 2026-05-23
 ### Added
 
 - `feat(scripts)`: `findMarkdownHeadingLine` now splits on both LF
@@ -315,6 +317,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   distinctly from the default response (#966 review feedback).
 
 ### Security
+
+- Cosign signing is deferred to v0.5.
 
 - `test`: add shared MSW handlers and anonymized GitHub/Anthropic fixtures for
   network-free package and bot tests (#58).
@@ -2775,14 +2779,6 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   incident (TanStack, Mistral SDK and OpenSearch compromised). Note that
   Dependabot security-update PRs bypass cooldown by design; merge-time
   review remains enforced by branch protection and human approval.
-
----
-
-## [0.1.0]
-
-### Security
-
-- Cosign signing is deferred to v0.5.
 
 ---
 
