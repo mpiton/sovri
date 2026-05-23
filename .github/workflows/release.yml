@@ -130,28 +130,15 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          node --input-type=module <<'JS'
-          import { readFileSync, writeFileSync } from "node:fs";
-
-          const version = process.env.RELEASE_TAG?.replace(/^v/, "");
-          if (version === undefined || version.length === 0) {
-            throw new Error("RELEASE_TAG is required");
-          }
-
-          const changelog = readFileSync("CHANGELOG.md", "utf8");
-          const heading = `## [${version}]`;
-          const start = changelog.indexOf(heading);
-          if (start === -1) {
-            throw new Error(`Missing changelog section ${heading}`);
-          }
-
-          const bodyStart = start + heading.length;
-          const nextHeading = changelog.slice(bodyStart).match(/\n## \[[^\]]+\]/);
-          const bodyEnd =
-            nextHeading?.index === undefined ? changelog.length : bodyStart + nextHeading.index;
-          const notes = changelog.slice(bodyStart, bodyEnd).trim();
-          writeFileSync("release-notes.md", `${notes}\n`);
-          JS
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          if [ -z "$version" ]; then
+            echo "RELEASE_TAG is required" >&2
+            exit 1
+          fi
+          node scripts/ci-policy.mjs release-extract-notes \
+            --changelog CHANGELOG.md \
+            --version "$version" > release-notes.md
 
       - name: Create or update GitHub Release
         env:

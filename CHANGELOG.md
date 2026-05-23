@@ -21,6 +21,24 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(scripts)`: `findMarkdownHeadingLine` now tracks the opening
+  fence delimiter (backtick or tilde) and only closes the fenced
+  block when a matching delimiter of the same family appears, so a
+  `~~~` line inside a backtick-fenced block (or the reverse) no
+  longer terminates the fence early and lets a fake `## Install`
+  inside the same code block fool `readme-references-release` (per
+  codex P2 review on PR #1159).
+
+- `chore(ci)`: `.github/workflows/release.yml` `Extract release notes`
+  step now shells out to
+  `node scripts/ci-policy.mjs release-extract-notes` instead of
+  carrying an inline `indexOf("## [<version>]")` extractor. The
+  dedicated subcommand uses the strict
+  `## [<version>](optional - YYYY-MM-DD)` regex shared with
+  `release-verify-tag`, so promoted dated headings no longer leak the
+  ` - YYYY-MM-DD` suffix as the first line of `release-notes.md` (per
+  codex P2 review on PR #1159).
+
 - `feat(scripts)`: `promote-changelog` now refuses to write a release
   section when `## [Unreleased]` has no bullet entries; the gate fires
   before any file mutation and surfaces

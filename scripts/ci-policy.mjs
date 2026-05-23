@@ -1976,14 +1976,22 @@ const README_INSTALL_HEADING_MAX_LINES = 200;
 
 const findMarkdownHeadingLine = (markdown, headingPattern) => {
   const lines = markdown.split("\n");
-  let insideFence = false;
+  let openFence = null;
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (/^\s*(?:```|~~~)/.test(line)) {
-      insideFence = !insideFence;
+    const fenceMatch = /^\s*(`{3,}|~{3,})/.exec(line);
+    if (fenceMatch !== null) {
+      const marker = fenceMatch[1][0];
+      if (openFence === null) {
+        openFence = marker;
+        continue;
+      }
+      if (openFence === marker) {
+        openFence = null;
+      }
       continue;
     }
-    if (!insideFence && headingPattern.test(line)) {
+    if (openFence === null && headingPattern.test(line)) {
       return index + 1;
     }
   }
