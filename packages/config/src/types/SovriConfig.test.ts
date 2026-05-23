@@ -55,6 +55,16 @@ describe("ProviderSchema", () => {
     expect(ProviderSchema.parse(value)).toBe(value);
   });
 
+  // Issue #1167, R-03 nominal (enum stays wide; refine narrows).
+  // Scenario:
+  //   Given the exported ProviderSchema is loaded from @sovri/config types
+  //   When the schema is inspected for its accepted enum members
+  //   Then the members are exactly
+  //     ["anthropic", "mistral", "openai", "openai-compatible"]
+  it("R-03 nominal — keeps the four declared options in order", () => {
+    expect(ProviderSchema.options).toEqual(["anthropic", "mistral", "openai", "openai-compatible"]);
+  });
+
   it("rejects an unknown provider", () => {
     expect(ProviderSchema.safeParse("gemini").success).toBe(false);
   });
