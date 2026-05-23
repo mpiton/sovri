@@ -10642,7 +10642,7 @@ $(printf '%s\n' "$promoted" | sed 's/^/        /')"
     /^## \[/ && in_release { in_release=0 }
     in_release { print }
   ')
-  if ! printf '%s\n' "$body_after_release" | grep -Fq "- Foo widget shipped."; then
+  if ! printf '%s\n' "$body_after_release" | grep -Fq -- "- Foo widget shipped."; then
     FAIL=$((FAIL + 1))
     FAILURES="${FAILURES}
   ✗ promote-changelog nominal: 'Foo widget' entry not under [0.1.0] section
@@ -10650,7 +10650,7 @@ $(printf '%s\n' "$body_after_release" | sed 's/^/        /')"
     rm -rf "$root"
     return
   fi
-  if ! printf '%s\n' "$body_after_release" | grep -Fq "- Bar gadget configured."; then
+  if ! printf '%s\n' "$body_after_release" | grep -Fq -- "- Bar gadget configured."; then
     FAIL=$((FAIL + 1))
     FAILURES="${FAILURES}
   ✗ promote-changelog nominal: 'Bar gadget' entry not under [0.1.0] section

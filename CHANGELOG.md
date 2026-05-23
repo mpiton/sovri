@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(scripts)`: add `promote-changelog` subcommand to
+  `scripts/ci-policy.mjs` that rewrites `CHANGELOG.md` for a release by
+  moving every `[Unreleased]` entry under a new `[X.Y.Z] - YYYY-MM-DD`
+  heading while preserving the empty `[Unreleased]` section (#1115).
+
 - `test(e2e)`: add unrecorded image provenance failure coverage and
   validator messaging for the v0.1 smoke run (#1016).
 
