@@ -21,6 +21,15 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(config)`: regression-guard asserting that `loadConfig()`
+  surfaces the v0.2 provider refine failure through
+  `SovriConfigValidationError` with `name === "SovriConfigValidationError"`,
+  the resolved `filePath`, and structured `issues[]` carrying
+  `path === ["llm", "provider"]` plus the documented v0.2 message. New
+  fixture `test-fixtures/schema-violation-openai-compatible/.sovri.yml`
+  exercises the `openai-compatible` rejection path through the loader
+  (R-04 technical, ATDD scenario sub-issue #1171 under US #1162).
+
 - `test(config)`: regression-guard asserting that
   `SovriConfigSchema.safeParse({llm: {provider: "openai", ...}}).error.issues`
   exposes a `llm.provider` issue with structured `path === ["llm",

@@ -1,0 +1,4 @@
+llm:
+  provider: openai-compatible
+  model: any-openai-compatible-model
+  apiKeySecret: OPENAI_COMPATIBLE_API_KEY
