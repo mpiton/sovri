@@ -10565,6 +10565,127 @@ run_release_verify_tag_format_case() {
   rm -rf "$root"
 }
 
+run_promote_changelog_nominal_case() {
+  local root changelog_path stdout stderr stdout_file stderr_file ec promoted body_after_release body_after_unreleased
+
+  root=$(mktemp -d)
+  changelog_path="$root/CHANGELOG.md"
+
+  # Given the prior "## [Unreleased]" section contains entries under "### Added"
+  cat >"$changelog_path" <<'MD'
+# Changelog
+
+## [Unreleased]
+
+### Added
+
+- Foo widget shipped.
+- Bar gadget configured.
+
+## [0.0.1] - 2026-01-01
+
+### Added
+
+- Initial release.
+MD
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # When the engineer rewrites "CHANGELOG.md" for the v0.1.0 release
+  node "$SCRIPT" promote-changelog \
+    --version 0.1.0 \
+    --date 2026-05-23 \
+    --changelog "$changelog_path" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog nominal: expected exit 0, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "promote_changelog=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog nominal: missing pass assertion
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  promoted=$(cat "$changelog_path")
+
+  # Then a section heading "## [0.1.0] - 2026-05-23" exists
+  if ! printf '%s\n' "$promoted" | grep -Fxq "## [0.1.0] - 2026-05-23"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog nominal: missing release heading '## [0.1.0] - 2026-05-23'
+$(printf '%s\n' "$promoted" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # And every entry previously under "## [Unreleased]" appears under "## [0.1.0] - 2026-05-23"
+  body_after_release=$(printf '%s\n' "$promoted" | awk '
+    /^## \[0\.1\.0\] - 2026-05-23/ { in_release=1; next }
+    /^## \[/ && in_release { in_release=0 }
+    in_release { print }
+  ')
+  if ! printf '%s\n' "$body_after_release" | grep -Fq "- Foo widget shipped."; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog nominal: 'Foo widget' entry not under [0.1.0] section
+$(printf '%s\n' "$body_after_release" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+  if ! printf '%s\n' "$body_after_release" | grep -Fq "- Bar gadget configured."; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog nominal: 'Bar gadget' entry not under [0.1.0] section
+$(printf '%s\n' "$body_after_release" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # And the "## [Unreleased]" heading still exists and contains no bullet entries
+  if ! printf '%s\n' "$promoted" | grep -Fxq "## [Unreleased]"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog nominal: '## [Unreleased]' heading missing
+$(printf '%s\n' "$promoted" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+  body_after_unreleased=$(printf '%s\n' "$promoted" | awk '
+    /^## \[Unreleased\]/ { in_unreleased=1; next }
+    /^## \[/ && in_unreleased { in_unreleased=0 }
+    in_unreleased { print }
+  ')
+  if printf '%s\n' "$body_after_unreleased" | grep -Eq "^- "; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ promote-changelog nominal: [Unreleased] body still contains bullet entries
+$(printf '%s\n' "$body_after_unreleased" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
 write_release_build_workflow() {
   local workflow_file="$1"
   local push_value="$2"
@@ -11009,6 +11130,7 @@ run_release_verify_tag_normalization_case "0.1.0" rejected "tag lacks required v
 run_release_verify_tag_normalization_case "vv0.1.0" rejected "tag has two leading v prefixes"
 run_release_verify_tag_format_case "v0.1"
 run_release_verify_tag_format_case "v0.1.0-rc.1"
+run_promote_changelog_nominal_case
 run_release_build_and_push_case
 run_release_build_dynamic_tags_case
 run_release_build_push_false_case
