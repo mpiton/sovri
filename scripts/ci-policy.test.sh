@@ -11356,6 +11356,129 @@ $(printf '%s\n' "$stderr" | sed 's/^/        /')"
   rm -rf "$root"
 }
 
+run_readme_references_release_longer_fence_case() {
+  local root readme_path stdout stderr stdout_file stderr_file ec
+
+  root=$(mktemp -d)
+  readme_path="$root/README.md"
+
+  # Given a README whose fence is opened with FOUR backticks and contains an
+  # inner THREE-backtick line plus a fake `## Install`. CommonMark requires the
+  # closer to have at least as many markers as the opener, so the inner ```
+  # must not close the block.
+  cat >"$readme_path" <<'MD'
+# Some Project
+
+````markdown
+```text
+## Install
+```
+
+docker pull ghcr.io/mpiton/sovri/community-bot:v0.1.0
+````
+
+```bash
+docker pull ghcr.io/mpiton/sovri/community-bot:v0.1.0
+```
+
+End of file.
+MD
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  node "$SCRIPT" readme-references-release \
+    --readme "$readme_path" \
+    --image ghcr.io/mpiton/sovri/community-bot \
+    --version 0.1.0 \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ readme-references-release longer-fence: expected non-zero exit, got 0
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stderr" | grep -Fq "## Install"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ readme-references-release longer-fence: missing install heading hint
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
+run_readme_references_release_closing_fence_info_string_case() {
+  local root readme_path stdout stderr stdout_file stderr_file ec
+
+  root=$(mktemp -d)
+  readme_path="$root/README.md"
+
+  # Given a README whose only `## Install` heading lives inside a fenced block,
+  # and a candidate closing fence carries an info string. CommonMark rejects
+  # closers with trailing info, so the fenced block must stay open and the
+  # inner `## Install` must not be promoted to a real heading.
+  cat >"$readme_path" <<'MD'
+# Some Project
+
+```
+## Install
+```javascript
+
+docker pull ghcr.io/mpiton/sovri/community-bot:v0.1.0
+```
+
+End of file.
+MD
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  node "$SCRIPT" readme-references-release \
+    --readme "$readme_path" \
+    --image ghcr.io/mpiton/sovri/community-bot \
+    --version 0.1.0 \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ readme-references-release closing-fence-info-string: expected non-zero exit, got 0
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stderr" | grep -Fq "## Install"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ readme-references-release closing-fence-info-string: missing install heading hint
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
 run_readme_references_release_mixed_fence_case() {
   local root readme_path stdout stderr stdout_file stderr_file ec
 
@@ -12964,6 +13087,8 @@ run_readme_references_release_inline_mention_case
 run_readme_references_release_fenced_heading_case
 run_readme_references_release_tilde_fenced_heading_case
 run_readme_references_release_mixed_fence_case
+run_readme_references_release_longer_fence_case
+run_readme_references_release_closing_fence_info_string_case
 run_readme_references_release_latest_only_case
 run_readme_references_release_wrong_repo_case
 run_release_commit_and_annotated_tag_case

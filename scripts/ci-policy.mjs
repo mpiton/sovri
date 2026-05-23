@@ -1979,14 +1979,20 @@ const findMarkdownHeadingLine = (markdown, headingPattern) => {
   let openFence = null;
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    const fenceMatch = /^\s*(`{3,}|~{3,})/.exec(line);
+    const fenceMatch = /^\s*(`{3,}|~{3,})(.*)$/.exec(line);
     if (fenceMatch !== null) {
-      const marker = fenceMatch[1][0];
+      const fence = fenceMatch[1];
+      const trailer = fenceMatch[2] ?? "";
+      const marker = fence[0];
       if (openFence === null) {
-        openFence = marker;
+        openFence = { marker, length: fence.length };
         continue;
       }
-      if (openFence === marker) {
+      if (
+        openFence.marker === marker &&
+        fence.length >= openFence.length &&
+        /^[ \t]*$/.test(trailer)
+      ) {
         openFence = null;
       }
       continue;

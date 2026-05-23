@@ -22,12 +22,15 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Added
 
 - `feat(scripts)`: `findMarkdownHeadingLine` now tracks the opening
-  fence delimiter (backtick or tilde) and only closes the fenced
-  block when a matching delimiter of the same family appears, so a
-  `~~~` line inside a backtick-fenced block (or the reverse) no
-  longer terminates the fence early and lets a fake `## Install`
-  inside the same code block fool `readme-references-release` (per
-  codex P2 review on PR #1159).
+  fence delimiter (backtick or tilde) **and its length**, and only
+  closes the fenced block when a matching delimiter of the same
+  family with at least the same length and no trailing info string
+  appears. A `~~~` line inside a backtick-fenced block, a triple
+  ` ``` ` inside a four-backtick block, and a ` ```javascript `
+  candidate closer all leave the block open, so a fake `## Install`
+  inside the same code block cannot fool
+  `readme-references-release` (per chatgpt-codex-connector and
+  coderabbitai reviews on PR #1159).
 
 - `chore(ci)`: `.github/workflows/release.yml` `Extract release notes`
   step now shells out to
