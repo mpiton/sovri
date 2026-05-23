@@ -21,6 +21,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(scripts)`: `release-verify-tag` now rejects a CHANGELOG where the
+  release section exists but `[Unreleased]` still contains bullet
+  entries; the inconsistent state surfaces as
+  `[Unreleased] still has entries after release section` instead of
+  silently passing (#1116).
+
 - `feat(scripts)`: add `promote-changelog` subcommand to
   `scripts/ci-policy.mjs` that rewrites `CHANGELOG.md` for a release by
   moving every `[Unreleased]` entry under a new `[X.Y.Z] - YYYY-MM-DD`

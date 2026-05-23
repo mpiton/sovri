@@ -1818,6 +1818,18 @@ const hasChangelogReleaseSection = (changelog, version) =>
     "m",
   ).test(changelog);
 
+const getChangelogUnreleasedBody = (changelog) => {
+  const match = /^## \[Unreleased\]\s*$/m.exec(changelog);
+  if (match === null || match.index === undefined) return null;
+  const bodyStart = match.index + match[0].length;
+  const nextHeading = changelog.slice(bodyStart).match(/\n## \[[^\]]+\]/);
+  const bodyEnd =
+    nextHeading?.index === undefined ? changelog.length : bodyStart + nextHeading.index;
+  return changelog.slice(bodyStart, bodyEnd);
+};
+
+const hasMarkdownBulletEntry = (body) => /^\s*-\s+\S/m.test(body);
+
 const runReleaseVerifyTag = (args) => {
   const options = parseOptions(args);
   const tag = readRequiredOption(options, "tag", releaseVerifyTagUsage);
@@ -1859,6 +1871,12 @@ const runReleaseVerifyTag = (args) => {
   if (!hasChangelogReleaseSection(changelog, expectedVersion)) {
     writeStdout("verify_tag=fail\n");
     fail(`changelog section mismatch\nmissing changelog section ## [${expectedVersion}]`, 1);
+  }
+
+  const unreleasedBody = getChangelogUnreleasedBody(changelog);
+  if (unreleasedBody !== null && hasMarkdownBulletEntry(unreleasedBody)) {
+    writeStdout("verify_tag=fail\n");
+    fail("changelog inconsistent\n[Unreleased] still has entries after release section", 1);
   }
 
   writeStdout("verify_tag=pass\nboundary_reason=tag has one leading v and exact version\n");
