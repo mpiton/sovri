@@ -2,7 +2,7 @@
 // Copyright 2026 Sovri SAS
 
 import type { Diff } from "@sovri/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 type FilterDiffByIgnores = (diff: Diff, patterns: readonly string[]) => Diff;
 
@@ -194,6 +194,7 @@ describe("filterDiffByIgnores", () => {
     process.env.SOVRI_IGNORE_OVERRIDE = "src/**";
 
     try {
+      vi.resetModules();
       const filterDiffByIgnores = await loadFilterDiffByIgnores();
       const diff = twoFileDiff();
 
@@ -215,6 +216,7 @@ describe("filterDiffByIgnores", () => {
       } else {
         process.env.SOVRI_IGNORE_OVERRIDE = previousOverride;
       }
+      vi.resetModules();
     }
   });
 });
