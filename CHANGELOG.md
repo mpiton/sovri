@@ -19,6 +19,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Added
+
+- `test(review-engine)`: add ATDD coverage for the pre-LLM
+  `filterDiffByIgnores` helper contract, starting with empty ignore
+  patterns preserving every diff file and patch before implementation.
+
 ### Fixed
 
 - `fix(config)`: `review.mode: strict` in `.sovri.yml` now fails config
