@@ -110,4 +110,20 @@ describe("filterDiffByIgnores", () => {
     // And the returned unified_diff still contains "diff --git a/dist/app.js b/dist/app.js"
     expect(filtered.unified_diff).toContain("diff --git a/dist/app.js b/dist/app.js");
   });
+
+  it("keeps generated files and their patch content when ignore patterns are empty", async () => {
+    const filterDiffByIgnores = await loadFilterDiffByIgnores();
+    const diff = twoFileDiff();
+
+    // Given ignore patterns are []
+    const patterns: readonly string[] = [];
+
+    // When filterDiffByIgnores receives the Diff and the patterns
+    const filtered = filterDiffByIgnores(diff, patterns);
+
+    // Then "dist/app.js" is still present in the returned Diff files
+    expect(filtered.files.map((file) => file.path)).toContain("dist/app.js");
+    // And the returned unified_diff still contains "bundled generated code"
+    expect(filtered.unified_diff).toContain("bundled generated code");
+  });
 });
