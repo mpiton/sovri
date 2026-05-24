@@ -145,8 +145,10 @@ index 1111111111111111111111111111111111111111..22222222222222222222222222222222
 
 function largeMixedDiff(): Diff {
   const paths = Array.from({ length: LargeDiffFileCount }, (_unused, index) => {
-    const suffix = index.toString().padStart(3, "0");
-    return index % 2 === 0 ? `src/file-${suffix}.ts` : `dist/file-${suffix}.js`;
+    const suffix = Math.floor(index / 2)
+      .toString()
+      .padStart(3, "0");
+    return index % 2 === 0 ? `src/file-${suffix}.ts` : `dist/generated-${suffix}.js`;
   });
 
   return diffWithPaths(paths);
@@ -499,6 +501,26 @@ describe("filterDiffByIgnores", () => {
 
     // Then the returned unified_diff contains no "diff --git a/dist/"
     expect(filtered.unified_diff).not.toContain("diff --git a/dist/");
+    // And the returned unified_diff still contains "diff --git a/src/file-000.ts b/src/file-000.ts"
+    expect(filtered.unified_diff).toContain("diff --git a/src/file-000.ts b/src/file-000.ts");
+  });
+
+  it("preserves every file and patch in a 500-file diff when no pattern matches", async () => {
+    const filterDiffByIgnores = await loadFilterDiffByIgnores();
+    const diff = largeMixedDiff();
+
+    // Given ignore patterns are ["coverage/**"]
+    const patterns: readonly string[] = ["coverage/**"];
+
+    // When filterDiffByIgnores receives the 500-file Diff and the patterns
+    const filtered = filterDiffByIgnores(diff, patterns);
+
+    // Then the returned Diff has 500 files
+    expect(filtered.files).toHaveLength(500);
+    // And the returned unified_diff still contains "diff --git a/dist/generated-000.js b/dist/generated-000.js"
+    expect(filtered.unified_diff).toContain(
+      "diff --git a/dist/generated-000.js b/dist/generated-000.js",
+    );
     // And the returned unified_diff still contains "diff --git a/src/file-000.ts b/src/file-000.ts"
     expect(filtered.unified_diff).toContain("diff --git a/src/file-000.ts b/src/file-000.ts");
   });

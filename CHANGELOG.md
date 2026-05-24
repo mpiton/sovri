@@ -37,7 +37,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   every file and patch for catch-all `**`, matching renamed files by their
   current path, staying within the 50 ms local soft budget for a 500-file diff
   using median post-warmup samples, dropping ignored patches from large unified
-  diffs, with leading `!` treated literally rather than as gitignore negation.
+  diffs, preserving every file and patch when no large-diff pattern matches, with
+  leading `!` treated literally rather than as gitignore negation.
 
 ### Fixed
 
