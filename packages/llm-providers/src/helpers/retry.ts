@@ -49,30 +49,53 @@ export async function retryWithBackoff<T>(
   fn: (ctx: AttemptContext) => Promise<T>,
   opts: RetryOptions,
 ): Promise<T> {
-  return runAttempt(fn, opts, 1);
+  return runAttempt(fn, opts, 1, Date.now() + opts.timeoutMs, [], opts.timeoutMs);
 }
 
 async function runAttempt<T>(
   fn: (ctx: AttemptContext) => Promise<T>,
   opts: RetryOptions,
   attempt: number,
+  deadlineMs: number,
+  attemptDurationsMs: ReadonlyArray<number>,
+  budgetMs: number,
 ): Promise<T> {
+  if (budgetMs <= 0) {
+    throw new RetryTimeoutError(`Operation timed out after ${String(opts.timeoutMs)} ms`, {
+      cause: undefined,
+      attemptDurationsMs,
+    });
+  }
+
   const controller = new AbortController();
+  const deadlineTimer = setTimeout(() => controller.abort(), budgetMs);
+  const startedAt = Date.now();
 
   try {
     return await fn({
       signal: controller.signal,
-      timeoutMs: opts.timeoutMs,
+      timeoutMs: budgetMs,
       attempt,
     });
   } catch (cause) {
+    const nextDurations: ReadonlyArray<number> = [...attemptDurationsMs, Date.now() - startedAt];
+
+    if (controller.signal.aborted) {
+      throw new RetryTimeoutError(`Operation timed out after ${String(opts.timeoutMs)} ms`, {
+        cause,
+        attemptDurationsMs: nextDurations,
+      });
+    }
+
     if (!opts.isRetryable(cause)) {
       throw cause;
     }
 
     await sleep(nextRetryDelayMs(opts.baseDelayMs, attempt));
 
-    return runAttempt(fn, opts, attempt + 1);
+    return runAttempt(fn, opts, attempt + 1, deadlineMs, nextDurations, deadlineMs - Date.now());
+  } finally {
+    clearTimeout(deadlineTimer);
   }
 }
 

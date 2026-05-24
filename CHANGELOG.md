@@ -21,6 +21,23 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(llm-providers)`: `retryWithBackoff` now enforces an aggregate
+  `timeoutMs` deadline. The helper schedules a per-attempt
+  `setTimeout(() => controller.abort(), budgetMs)` and tracks
+  `attemptDurationsMs` across recursion. When the controller's signal
+  fires (deadline elapsed during `fn`) or when the next attempt's
+  remaining budget is `<= 0` (deadline already past), the helper
+  throws `RetryTimeoutError("Operation timed out after <N> ms", { cause,
+  attemptDurationsMs })`. The function entry pins `budgetMs =
+  opts.timeoutMs` for attempt 1 so AttemptContext.timeoutMs is exactly
+  the configured value (no `Date.now()` drift); attempts 2+ get
+  `deadlineMs - Date.now()` against the original deadline. The matching
+  acceptance test uses `vi.useFakeTimers()` to advance fake time
+  exactly 200 ms after invoking the helper with a 200 ms timeout and
+  asserts the signal aborts, the typed error fires, and exactly one
+  attempt was executed (R-06 violation + R-03 deadline, ATDD scenario
+  sub-issue #1189 under US #1183).
+
 - `test(llm-providers)`: triangulation regression guard asserting that
   `retryWithBackoff` rethrows any caller-classified non-retryable HTTP
   token (`HTTP_400`, `HTTP_401`, `HTTP_403`, `HTTP_404`, `HTTP_422`)

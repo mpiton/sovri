@@ -249,3 +249,62 @@ describe("retryWithBackoff — non-retryable rethrow", () => {
     },
   );
 });
+
+describe("retryWithBackoff — timeout deadline abort", () => {
+  it("aborts the operation and throws RetryTimeoutError when the deadline expires during the first attempt", async () => {
+    // Given the retry helper is configured with max 3 total attempts
+    // And the retry helper is configured with a base delay of 500 ms
+    // And the retry helper is configured with a timeout of 200 ms
+    const opts: RetryOptions = {
+      maxAttempts: 3,
+      baseDelayMs: 500,
+      timeoutMs: 200,
+      isRetryable: () => false,
+    };
+
+    vi.useFakeTimers();
+
+    // And the operation never resolves on its own and instead awaits its AttemptContext AbortSignal
+    const captured: AttemptContext[] = [];
+    const fn = vi.fn(async (ctx: AttemptContext) => {
+      captured.push(ctx);
+      return new Promise<never>((_, reject) => {
+        ctx.signal.addEventListener(
+          "abort",
+          () => reject(new DOMException("aborted", "AbortError")),
+          { once: true },
+        );
+      });
+    });
+
+    // When the caller invokes the retry helper once
+    const promise = retryWithBackoff(fn, opts);
+    const capturedError = promise.catch((error: unknown) => error);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // First attempt has started and its signal is not yet aborted
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(captured[0]?.signal.aborted).toBe(false);
+
+    // And 200 ms elapse
+    await vi.advanceTimersByTimeAsync(200);
+
+    // Then the AttemptContext captured on attempt 1 has an AbortSignal that becomes aborted at 200 ms
+    expect(captured[0]?.signal.aborted).toBe(true);
+
+    // And the retry helper throws RetryTimeoutError
+    const error = await capturedError;
+    expect(error).toBeInstanceOf(RetryTimeoutError);
+
+    // And the RetryTimeoutError message is "Operation timed out after 200 ms"
+    expect((error as RetryTimeoutError).message).toBe("Operation timed out after 200 ms");
+
+    // And the RetryTimeoutError exposes attemptDurationsMs of length 1
+    expect((error as RetryTimeoutError).attemptDurationsMs).toHaveLength(1);
+
+    // And exactly 1 attempt is executed
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+});
