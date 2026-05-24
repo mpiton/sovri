@@ -21,6 +21,17 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(llm-providers)`: triangulation regression guard asserting that
+  `retryWithBackoff` rethrows any caller-classified non-retryable HTTP
+  token (`HTTP_400`, `HTTP_401`, `HTTP_403`, `HTTP_404`, `HTTP_422`)
+  verbatim without wrapping. A `vitest` `it.each` outline mirrors the
+  Scenario Outline `Examples:` table. The `isRetryable`-dispatch branch
+  landed under #1187 already satisfies every example with no
+  production-code diff; the test pins the breadth so any future
+  regression that special-cased one of the documented non-retryable
+  statuses would break (R-06 violation, ATDD scenario sub-issue #1188
+  under US #1183).
+
 - `feat(llm-providers)`: `retryWithBackoff` now consults
   `opts.isRetryable(cause)` before scheduling a retry. When the
   predicate returns `false`, the helper rethrows the original error
