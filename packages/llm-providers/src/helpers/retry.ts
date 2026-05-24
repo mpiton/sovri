@@ -15,8 +15,14 @@ export interface RetryOptions {
 }
 
 export async function retryWithBackoff<T>(
-  _fn: (ctx: AttemptContext) => Promise<T>,
-  _opts: RetryOptions,
+  fn: (ctx: AttemptContext) => Promise<T>,
+  opts: RetryOptions,
 ): Promise<T> {
-  throw new Error("retryWithBackoff: not implemented");
+  const controller = new AbortController();
+
+  return fn({
+    signal: controller.signal,
+    timeoutMs: opts.timeoutMs,
+    attempt: 1,
+  });
 }

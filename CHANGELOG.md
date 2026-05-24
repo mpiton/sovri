@@ -21,19 +21,18 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
-- `test(llm-providers)`: failing RED acceptance test for the new
-  `retryWithBackoff(fn, opts)` helper at
-  `packages/llm-providers/src/helpers/retry.ts`. The test asserts that
-  the helper returns the first attempt result, calls `fn` exactly once,
-  captures an `AttemptContext` with `attempt === 1`,
-  `timeoutMs === 60000`, and a fresh non-aborted `AbortSignal`, and
-  does not schedule any retry sleep (no `setTimeout` with a delay
-  shorter than the per-attempt budget). The helper module ships as a
-  typed stub exporting `AttemptContext`, `RetryOptions`, and the
-  function itself; the function throws "not implemented" so the test
-  file compiles and fails on the implementation gap rather than on
-  module resolution (R-01 nominal, ATDD scenario sub-issue #1184 under
-  US #1183).
+- `feat(llm-providers)`: scaffold the new `retryWithBackoff(fn, opts)`
+  helper at `packages/llm-providers/src/helpers/retry.ts`. The helper
+  module exports the `AttemptContext` and `RetryOptions` interfaces plus
+  the function itself. The initial implementation honours the
+  happy-first-attempt scenario: it constructs a fresh `AbortController`,
+  calls `fn` once with an `AttemptContext` carrying `attempt === 1`,
+  `timeoutMs === opts.timeoutMs`, and the non-aborted `signal`, and
+  returns the resulting promise — no retry loop, no deadline scheduler,
+  no error wrapping yet (subsequent scenarios add each of those
+  behaviours under their own failing tests). A co-located vitest unit
+  test pins the contract (R-01 nominal, ATDD scenario sub-issue #1184
+  under US #1183).
 
 - `test(config)`: regression-guard asserting that `loadConfig()`
   surfaces the v0.2 provider refine failure through
