@@ -31,7 +31,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   patterns; the implementation applies POSIX glob filtering to both
   `Diff.files` and the returned unified diff patches without reading
   environment overrides, including when imported after an override is set,
-  while preserving surviving file objects by value.
+  while preserving surviving file objects by value and honoring directory
+  descendant globs such as `dist/**`.
 
 ### Fixed
 

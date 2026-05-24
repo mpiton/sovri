@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import type { Diff } from "@sovri/core";
+import type { Diff, FileChange } from "@sovri/core";
 import { describe, expect, it, vi } from "vitest";
 
 type FilterDiffByIgnores = (diff: Diff, patterns: readonly string[]) => Diff;
@@ -97,6 +97,47 @@ function emptyDiff(): Diff {
     unified_diff: "",
     files: [],
   };
+}
+
+function directoryGlobDiff(): Diff {
+  const base = twoFileDiff();
+
+  return {
+    unified_diff: renameDirectoryGlobPaths(base.unified_diff),
+    files: base.files.map(renameDirectoryGlobFile),
+  };
+}
+
+function renameDirectoryGlobFile(file: FileChange): FileChange {
+  return {
+    path: renameDirectoryGlobPath(file.path),
+    previous_path:
+      file.previous_path === undefined ? undefined : renameDirectoryGlobPath(file.previous_path),
+    status: file.status,
+    additions: file.additions,
+    deletions: file.deletions,
+    sha: file.sha,
+    patch: file.patch === null ? null : renameDirectoryGlobPaths(file.patch),
+    hunks: file.hunks,
+  };
+}
+
+function renameDirectoryGlobPaths(value: string): string {
+  return value
+    .replaceAll("src/app.ts", "src/domain/review.ts")
+    .replaceAll("dist/app.js", "dist/community-bot.js");
+}
+
+function renameDirectoryGlobPath(path: string): string {
+  if (path === "src/app.ts") {
+    return "src/domain/review.ts";
+  }
+
+  if (path === "dist/app.js") {
+    return "dist/community-bot.js";
+  }
+
+  return path;
 }
 
 function getFile(diff: Diff, path: string) {
@@ -245,5 +286,22 @@ describe("filterDiffByIgnores", () => {
     expect(getFile(filtered, "src/app.ts")).toEqual(originalFile);
     // And the original input Diff files still include "dist/app.js"
     expect(diff.files.map((file) => file.path)).toContain("dist/app.js");
+  });
+
+  it("removes generated descendants with a directory glob", async () => {
+    const filterDiffByIgnores = await loadFilterDiffByIgnores();
+    const diff = directoryGlobDiff();
+
+    // Given ignore patterns are ["dist/**"]
+    const patterns: readonly string[] = ["dist/**"];
+
+    // When filterDiffByIgnores receives the Diff and the patterns
+    const filtered = filterDiffByIgnores(diff, patterns);
+    const returnedPaths = filtered.files.map((file) => file.path);
+
+    // Then "dist/community-bot.js" is removed from the returned Diff
+    expect(returnedPaths).not.toContain("dist/community-bot.js");
+    // And "src/domain/review.ts" remains in the returned Diff
+    expect(returnedPaths).toContain("src/domain/review.ts");
   });
 });
