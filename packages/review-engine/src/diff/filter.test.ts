@@ -170,4 +170,22 @@ describe("filterDiffByIgnores", () => {
     // And the returned unified_diff is ""
     expect(filtered.unified_diff).toBe("");
   });
+
+  it("returns equal filtered output for repeated calls with the same input", async () => {
+    const filterDiffByIgnores = await loadFilterDiffByIgnores();
+    const diff = twoFileDiff();
+
+    // Given ignore patterns are ["dist/**", "coverage/**"]
+    const patterns: readonly string[] = ["dist/**", "coverage/**"];
+
+    // When filterDiffByIgnores receives the same Diff and patterns twice
+    const first = filterDiffByIgnores(diff, patterns);
+    const second = filterDiffByIgnores(diff, patterns);
+
+    // Then both returned Diff values are equal
+    expect(first).toEqual(second);
+    // And both returned Diff values contain only "src/app.ts"
+    expect(first.files.map((file) => file.path)).toEqual(["src/app.ts"]);
+    expect(second.files.map((file) => file.path)).toEqual(["src/app.ts"]);
+  });
 });
