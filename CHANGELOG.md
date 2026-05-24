@@ -21,17 +21,18 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
-- `test(llm-providers)`: failing RED acceptance test asserting that
-  `retryWithBackoff` retries one retryable failure and resolves on the
-  next attempt. The test injects an `isRetryable` predicate that flags
-  the `"E_TRANSIENT"` token, mocks `Math.random` to 0.5 (yielding a
-  0 percent jitter factor on the helper's `(random * 2 - 1) * 0.2`
-  formula), schedules the first attempt to reject with `"E_TRANSIENT"`
-  and the second attempt to resolve with `"ok"`, then asserts the
-  helper waits exactly 500 ms between attempts, executes 2 attempts in
-  total, returns `"ok"`, and propagates `attempt: 2` through the second
-  `AttemptContext` (R-02 nominal, ATDD scenario sub-issue #1185 under
-  US #1183).
+- `feat(llm-providers)`: `retryWithBackoff` now retries on failure.
+  Refactored to a recursive `runAttempt` helper that catches `fn`'s
+  rejection, computes the next backoff via
+  `baseDelayMs * 2^(attempt-1) * (1 ± 0.2 * random())`, sleeps, then
+  re-invokes `fn` with `attempt + 1` and a fresh `AbortController`. The
+  module-scoped `RETRY_JITTER_RATIO = 0.2` constant pins the ±20 %
+  jitter band. No `isRetryable` dispatch yet (deferred to #1187), no
+  `maxAttempts` cap (#1192), no aggregate-timeout deadline (#1189). The
+  matching acceptance test asserts that one retryable failure followed
+  by a successful attempt resolves with `"ok"` after exactly 500 ms of
+  backoff and 2 total invocations of `fn` (R-02 nominal, ATDD scenario
+  sub-issue #1185 under US #1183).
 
 - `feat(llm-providers)`: scaffold the new `retryWithBackoff(fn, opts)`
   helper at `packages/llm-providers/src/helpers/retry.ts`. The helper

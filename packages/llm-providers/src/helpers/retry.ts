@@ -14,15 +14,43 @@ export interface RetryOptions {
   readonly isRetryable: (err: unknown) => boolean;
 }
 
+const RETRY_JITTER_RATIO = 0.2;
+
 export async function retryWithBackoff<T>(
   fn: (ctx: AttemptContext) => Promise<T>,
   opts: RetryOptions,
 ): Promise<T> {
+  return runAttempt(fn, opts, 1);
+}
+
+async function runAttempt<T>(
+  fn: (ctx: AttemptContext) => Promise<T>,
+  opts: RetryOptions,
+  attempt: number,
+): Promise<T> {
   const controller = new AbortController();
 
-  return fn({
-    signal: controller.signal,
-    timeoutMs: opts.timeoutMs,
-    attempt: 1,
+  try {
+    return await fn({
+      signal: controller.signal,
+      timeoutMs: opts.timeoutMs,
+      attempt,
+    });
+  } catch {
+    await sleep(nextRetryDelayMs(opts.baseDelayMs, attempt));
+    return runAttempt(fn, opts, attempt + 1);
+  }
+}
+
+function nextRetryDelayMs(baseDelayMs: number, completedAttempt: number): number {
+  const nominalDelayMs = baseDelayMs * 2 ** (completedAttempt - 1);
+  const jitterFactor = (Math.random() * 2 - 1) * RETRY_JITTER_RATIO;
+
+  return Math.round(nominalDelayMs * (1 + jitterFactor));
+}
+
+async function sleep(delayMs: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, delayMs);
   });
 }
