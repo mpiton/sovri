@@ -87,6 +87,15 @@ describe("ReviewModeSchema", () => {
     expect(ReviewModeSchema.parse(value)).toBe(value);
   });
 
+  // Issue #1356, R-03 nominal (enum stays wide; config refine narrows).
+  // Scenario:
+  //   Given the exported ReviewModeSchema is loaded from @sovri/config types
+  //   When the schema is inspected for its accepted enum members
+  //   Then the members are exactly ["full", "bugs-only", "strict", "minimal"]
+  it("R-03 nominal — keeps the four declared review modes in order", () => {
+    expect(ReviewModeSchema.options).toEqual(["full", "bugs-only", "strict", "minimal"]);
+  });
+
   it("rejects an unknown mode", () => {
     expect(ReviewModeSchema.safeParse("quick").success).toBe(false);
   });
@@ -351,6 +360,172 @@ describe("SovriConfigSchema — provider refinement (v0.2 widened — rejected s
   });
 });
 
+const ReservedStrictReviewModeMessage =
+  "Mode 'strict' is reserved for v0.5+ and is not yet enabled";
+
+describe("SovriConfigSchema — review mode refinement (strict reserved for v0.5)", () => {
+  // Issue #1350, R-01 nominal (Scenario Outline over the enabled set).
+  // Scenario:
+  //   Given the .sovri.yml has review.mode "<mode>"
+  //   When SovriConfigSchema.safeParse() runs on the config
+  //   Then the result is success=true
+  //   And the parsed config has review.mode equal to "<mode>"
+  it.each(["full", "bugs-only", "minimal"] satisfies readonly ReviewMode[])(
+    "R-01 nominal — review.mode=%s passes config validation",
+    (mode) => {
+      const result = SovriConfigSchema.safeParse({
+        ...minimalConfig,
+        review: { mode },
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.review.mode).toBe(mode);
+      }
+    },
+  );
+
+  // Issue #1351, R-01 violation.
+  // Scenario:
+  //   Given the .sovri.yml has review.mode "minimal"
+  //   When SovriConfigSchema.safeParse() runs on the config
+  //   Then the result is success=true
+  //   And no issue has path "review.mode"
+  //   And no issue message equals
+  //     "Mode 'strict' is reserved for v0.5+ and is not yet enabled"
+  it("R-01 violation — enabled review modes do not produce the reserved strict-mode message", () => {
+    const result = SovriConfigSchema.safeParse({
+      ...minimalConfig,
+      review: { mode: "minimal" },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  // Issue #1352, R-01 technical.
+  // Scenario:
+  //   Given three parse attempts with review.mode values "full",
+  //     "bugs-only", and "minimal"
+  //   When SovriConfigSchema.safeParse() runs on each config
+  //   Then all three results are success=true
+  //   And every parsed config keeps llm.provider equal to "anthropic"
+  //   And every parsed config keeps review.severityThreshold equal to "minor"
+  it("R-01 technical — all enabled modes parse with the same surrounding config", () => {
+    for (const mode of ["full", "bugs-only", "minimal"] satisfies readonly ReviewMode[]) {
+      const result = SovriConfigSchema.safeParse({
+        ...minimalConfig,
+        review: { mode },
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.llm.provider).toBe("anthropic");
+        expect(result.data.review.severityThreshold).toBe("minor");
+      }
+    }
+  });
+
+  // Issue #1353, R-02 violation.
+  // Scenario:
+  //   Given the .sovri.yml has review.mode "strict"
+  //   When SovriConfigSchema.safeParse() runs on the config
+  //   Then the result is success=false
+  //   And exactly one issue has path "review.mode"
+  //   And that issue.message equals
+  //     "Mode 'strict' is reserved for v0.5+ and is not yet enabled"
+  it("R-02 violation — review.mode=strict yields exactly one review.mode issue", () => {
+    const result = SovriConfigSchema.safeParse({
+      ...minimalConfig,
+      review: { mode: "strict" },
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const modeIssues = result.error.issues.filter(
+        (issue) => issue.path.join(".") === "review.mode",
+      );
+      expect(modeIssues).toHaveLength(1);
+      expect(modeIssues[0]?.message).toBe(ReservedStrictReviewModeMessage);
+    }
+  });
+
+  // Issue #1354, R-02 violation.
+  // Scenario:
+  //   Given the .sovri.yml has review.mode "strict"
+  //   When SovriConfigSchema.safeParse() runs on the config
+  //   Then the result is success=false
+  //   And the parsed config is unavailable
+  //   And no downstream prompt mode can be derived as "full"
+  it("R-02 violation — strict mode is not silently mapped to full mode", () => {
+    const result = SovriConfigSchema.safeParse({
+      ...minimalConfig,
+      review: { mode: "strict" },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  // Issue #1355, R-02 technical.
+  // Scenario:
+  //   Given the .sovri.yml has review.mode "strict"
+  //   When SovriConfigSchema.safeParse() runs on the config
+  //   Then result.error.issues has at least one entry with path
+  //     ["review", "mode"]
+  //   And that entry.message equals
+  //     "Mode 'strict' is reserved for v0.5+ and is not yet enabled"
+  //   And no issue has path "llm.provider"
+  it("R-02 technical — strict rejection is attached to the review.mode path", () => {
+    const result = SovriConfigSchema.safeParse({
+      ...minimalConfig,
+      review: { mode: "strict" },
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const modeIssue = result.error.issues.find(
+        (issue) =>
+          issue.path.length === 2 && issue.path[0] === "review" && issue.path[1] === "mode",
+      );
+      const providerIssue = result.error.issues.find(
+        (issue) => issue.path.join(".") === "llm.provider",
+      );
+
+      expect(modeIssue).toBeDefined();
+      expect(modeIssue?.message).toBe(ReservedStrictReviewModeMessage);
+      expect(providerIssue).toBeUndefined();
+    }
+  });
+
+  // Issue #1358, R-03 limit (out-of-enum value rejected at the enum step,
+  // before the refine fires).
+  // Scenario:
+  //   Given the .sovri.yml has review.mode "quick"
+  //   And a minimal valid llm.provider, llm.model, and llm.apiKeySecret
+  //     are present
+  //   When SovriConfigSchema.safeParse() runs on the config
+  //   Then the result is success=false
+  //   And exactly one issue has path "review.mode"
+  //   And that issue.code is "invalid_value"
+  //   And that issue.message is not
+  //     "Mode 'strict' is reserved for v0.5+ and is not yet enabled"
+  it("R-03 limit — out-of-enum review mode is rejected before the refine", () => {
+    const result = SovriConfigSchema.safeParse({
+      ...minimalConfig,
+      review: { mode: "quick" },
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const modeIssues = result.error.issues.filter(
+        (issue) => issue.path.join(".") === "review.mode",
+      );
+      expect(modeIssues).toHaveLength(1);
+      expect(modeIssues[0]?.code).toBe("invalid_value");
+      expect(modeIssues[0]?.message).not.toBe(ReservedStrictReviewModeMessage);
+    }
+  });
+});
+
 describe("SovriConfigSchema — strict mode rejects unknown keys", () => {
   it("rejects an unknown top-level key", () => {
     expect(SovriConfigSchema.safeParse({ ...minimalConfig, unknown: true }).success).toBe(false);
@@ -474,6 +649,13 @@ describe("SovriConfigSchema — invalid leaf types", () => {
 });
 
 describe("SovriConfigSchema — defaults application", () => {
+  // Issue #1359, R-04 nominal.
+  // Scenario:
+  //   Given the .sovri.yml omits the review block
+  //   When SovriConfigSchema.parse() runs on the config
+  //   Then the parsed config has review.mode equal to "full"
+  //   And review.autoReviewDrafts equals false
+  //   And review.severityThreshold equals "minor"
   it("applies defaults when review is omitted entirely", () => {
     expect(SovriConfigSchema.parse(minimalConfig).review).toEqual({
       mode: "full",
@@ -493,16 +675,65 @@ describe("SovriConfigSchema — defaults application", () => {
     expect(SovriConfigSchema.parse(minimalConfig).ignores).toEqual([]);
   });
 
-  it("applies per-field defaults when review is provided partially (mode only)", () => {
+  // Issue #1360, R-04 nominal.
+  // Scenario:
+  //   Given the .sovri.yml has review.autoReviewDrafts true
+  //   And the .sovri.yml omits review.mode
+  //   When SovriConfigSchema.parse() runs on the config
+  //   Then the parsed config has review.mode equal to "full"
+  //   And review.autoReviewDrafts equals true
+  //   And review.severityThreshold equals "minor"
+  it("R-04 nominal — defaults review.mode when review is provided partially", () => {
     const parsed = SovriConfigSchema.parse({
       ...minimalConfig,
-      review: { mode: "strict" },
+      review: { autoReviewDrafts: true },
     });
 
     expect(parsed.review).toEqual({
-      mode: "strict",
-      autoReviewDrafts: false,
+      mode: "full",
+      autoReviewDrafts: true,
       severityThreshold: "minor",
+    });
+  });
+
+  // Issue #1361, R-04 violation.
+  // Scenario:
+  //   Given the .sovri.yml omits review.mode
+  //   When SovriConfigSchema.safeParse() runs on the config
+  //   Then the result is success=true
+  //   And no issue has path "review.mode"
+  //   And no issue message equals
+  //     "Mode 'strict' is reserved for v0.5+ and is not yet enabled"
+  it("R-04 violation — defaulting never treats omitted review.mode as strict", () => {
+    const result = SovriConfigSchema.safeParse({
+      ...minimalConfig,
+      review: { autoReviewDrafts: false },
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.review.mode).toBe("full");
+    }
+  });
+
+  // Issue #1362, R-04 technical.
+  // Scenario:
+  //   Given the .sovri.yml has review.severityThreshold "major"
+  //   And the .sovri.yml omits review.mode
+  //   When SovriConfigSchema.parse() runs on the config
+  //   Then the parsed config has review.mode equal to "full"
+  //   And review.autoReviewDrafts equals false
+  //   And review.severityThreshold equals "major"
+  it("R-04 technical — review prefault still applies per-field defaults", () => {
+    const parsed = SovriConfigSchema.parse({
+      ...minimalConfig,
+      review: { severityThreshold: "major" },
+    });
+
+    expect(parsed.review).toEqual({
+      mode: "full",
+      autoReviewDrafts: false,
+      severityThreshold: "major",
     });
   });
 
@@ -553,7 +784,12 @@ describe("SovriConfigSchema — type inference", () => {
     >();
   });
 
-  it("infers ReviewMode as the schema's literal union", () => {
+  // Issue #1357, R-03 nominal.
+  // Scenario:
+  //   Given the type alias `ReviewMode = z.infer<typeof ReviewModeSchema>`
+  //   When the type is compared against the literal union
+  //   Then `ReviewMode` equals "full" | "bugs-only" | "strict" | "minimal"
+  it("R-03 nominal — infers ReviewMode as the schema's literal union", () => {
     expectTypeOf<ReviewMode>().toEqualTypeOf<"full" | "bugs-only" | "strict" | "minimal">();
   });
 

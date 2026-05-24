@@ -21,6 +21,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `fix(config)`: `review.mode: strict` in `.sovri.yml` now fails config
+  validation with `Mode 'strict' is reserved for v0.5+ and is not yet
+  enabled` instead of silently flowing through as an enabled review mode,
+  while the exported `ReviewModeSchema` enum remains wide for the future
+  v0.5 strict-mode rollout.
+
 - `fix(bot)`: missing provider API keys now surface as a single
   configuration error comment on the pull request instead of the generic
   review-failed message, and the handler logs typed missing-key metadata

@@ -103,7 +103,7 @@ describe("loadConfig — valid YAML", () => {
     const cfg = await loadConfig(root);
 
     expect(cfg.llm.baseUrl).toBe("https://api.anthropic.com");
-    expect(cfg.review.mode).toBe("strict");
+    expect(cfg.review.mode).toBe("bugs-only");
     expect(cfg.review.autoReviewDrafts).toBe(true);
     expect(cfg.review.severityThreshold).toBe("major");
     expect(cfg.ignores).toEqual(["**/*.md", "dist/**"]);
