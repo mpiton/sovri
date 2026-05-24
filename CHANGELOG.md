@@ -19,6 +19,26 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Changed
+
+- `feat(llm-providers)`: `AnthropicProvider.retry.ts` now consumes the
+  generic `retryWithBackoff` helper. The provider keeps its own
+  Anthropic-specific `isRetryable` predicate (mirroring the v0.1 SDK
+  policy — retry on `APIConnectionError` + HTTP 408/409/429/5xx,
+  reject `APIConnectionTimeoutError` so it surfaces immediately as a
+  timeout) and maps the helper's typed terminal errors back into the
+  provider error hierarchy (`RetryExhaustedError → AnthropicRetryError`
+  with `cause`-derived `status` / `requestId`,
+  `RetryTimeoutError → AnthropicTimeoutError`, non-retryable rethrows
+  → `AnthropicAuthError` / `AnthropicResponseError` via the existing
+  `normalizeAnthropicError` mapper). The provider tracks per-attempt
+  durations through a closure-scoped array so non-retryable error
+  paths preserve the v0.1 `attemptDurationsMs` contract. The retry
+  loop, backoff calculation, jitter, deadline scheduling, and abort
+  controller lifecycle are now owned by the helper. Zero regression on
+  the existing 122 `AnthropicProvider.*.test.ts` cases (R-05 + R-03
+  satisfied).
+
 ### Added
 
 - `test(llm-providers)`: triangulation regression guard asserting that

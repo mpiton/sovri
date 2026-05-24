@@ -15,13 +15,18 @@ import {
   AnthropicRetryError,
   AnthropicTimeoutError,
 } from "../errors.js";
+import {
+  retryWithBackoff,
+  RetryExhaustedError,
+  RetryTimeoutError,
+  type AttemptContext,
+} from "../helpers/retry.js";
 
 export const DEFAULT_ANTHROPIC_TIMEOUT_MS = 60_000;
 
 const STRUCTURED_OUTPUTS_BETA_HEADER = "structured-outputs-2025-11-13";
 const ANTHROPIC_MAX_TOTAL_ATTEMPTS = 3;
 const ANTHROPIC_RETRY_BASE_DELAY_MS = 500;
-const ANTHROPIC_RETRY_JITTER_RATIO = 0.2;
 
 interface AnthropicCreateOptions {
   readonly headers: Record<string, string>;
@@ -44,102 +49,58 @@ export async function createAnthropicMessageWithRetry(options: {
   readonly request: MessageCreateParamsNonStreaming;
   readonly timeoutMs: number;
 }): Promise<unknown> {
-  return createMessageAttempt({
-    ...options,
-    attempt: 1,
-    attemptDurationsMs: [],
-    deadlineMs: Date.now() + options.timeoutMs,
-  });
-}
-
-async function createMessageAttempt(options: {
-  readonly attempt: number;
-  readonly attemptDurationsMs: ReadonlyArray<number>;
-  readonly client: AnthropicMessagesClient;
-  readonly deadlineMs: number;
-  readonly request: MessageCreateParamsNonStreaming;
-  readonly timeoutMs: number;
-}): Promise<unknown> {
-  const remainingMs = options.deadlineMs - Date.now();
-
-  if (remainingMs <= 0) {
-    throw new AnthropicTimeoutError(
-      `Anthropic request timed out after ${String(options.timeoutMs)} ms`,
-      { attemptDurationsMs: options.attemptDurationsMs },
-    );
-  }
-
-  const controller = new AbortController();
-  const startedAtMs = Date.now();
-  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const attemptDurationsMs: number[] = [];
 
   try {
-    const response = options.client.messages.create(options.request, {
-      headers: { "anthropic-beta": STRUCTURED_OUTPUTS_BETA_HEADER },
-      maxRetries: 0,
-      signal: controller.signal,
-      timeout: remainingMs,
-    });
-    timeout = setTimeout(() => controller.abort(), remainingMs);
-
-    return await response;
+    return await retryWithBackoff(
+      async (ctx: AttemptContext) => {
+        const startedAt = Date.now();
+        try {
+          return await options.client.messages.create(options.request, {
+            headers: { "anthropic-beta": STRUCTURED_OUTPUTS_BETA_HEADER },
+            maxRetries: 0,
+            signal: ctx.signal,
+            timeout: ctx.timeoutMs,
+          });
+        } catch (cause) {
+          attemptDurationsMs.push(Date.now() - startedAt);
+          if (isAnthropicTimeoutError(cause)) {
+            throw new AnthropicTimeoutError(
+              `Anthropic request timed out after ${String(options.timeoutMs)} ms`,
+              { cause, attemptDurationsMs: [...attemptDurationsMs] },
+            );
+          }
+          throw cause;
+        }
+      },
+      {
+        maxAttempts: ANTHROPIC_MAX_TOTAL_ATTEMPTS,
+        baseDelayMs: ANTHROPIC_RETRY_BASE_DELAY_MS,
+        timeoutMs: options.timeoutMs,
+        isRetryable: isRetryableAnthropicError,
+      },
+    );
   } catch (cause) {
-    return handleMessageFailure({
-      ...options,
-      attemptDurationsMs: [...options.attemptDurationsMs, Date.now() - startedAtMs],
-      cause,
-      timedOut: controller.signal.aborted,
-    });
-  } finally {
-    if (timeout !== undefined) {
-      clearTimeout(timeout);
+    if (cause instanceof RetryExhaustedError) {
+      throw new AnthropicRetryError(
+        `Anthropic failed after ${String(ANTHROPIC_MAX_TOTAL_ATTEMPTS)} attempts`,
+        anthropicErrorOptions(cause.cause, cause.attemptDurationsMs),
+      );
     }
+
+    if (cause instanceof RetryTimeoutError) {
+      throw new AnthropicTimeoutError(
+        `Anthropic request timed out after ${String(options.timeoutMs)} ms`,
+        { cause: cause.cause, attemptDurationsMs: cause.attemptDurationsMs },
+      );
+    }
+
+    if (cause instanceof AnthropicTimeoutError) {
+      throw cause;
+    }
+
+    throw normalizeAnthropicError(cause, attemptDurationsMs);
   }
-}
-
-async function handleMessageFailure(options: {
-  readonly attempt: number;
-  readonly attemptDurationsMs: ReadonlyArray<number>;
-  readonly cause: unknown;
-  readonly client: AnthropicMessagesClient;
-  readonly deadlineMs: number;
-  readonly request: MessageCreateParamsNonStreaming;
-  readonly timedOut: boolean;
-  readonly timeoutMs: number;
-}): Promise<unknown> {
-  if (options.timedOut || isAnthropicTimeoutError(options.cause)) {
-    throw new AnthropicTimeoutError(
-      `Anthropic request timed out after ${String(options.timeoutMs)} ms`,
-      { cause: options.cause, attemptDurationsMs: options.attemptDurationsMs },
-    );
-  }
-
-  if (!isRetryableAnthropicError(options.cause)) {
-    throw normalizeAnthropicError(options.cause, options.attemptDurationsMs);
-  }
-
-  if (options.attempt === ANTHROPIC_MAX_TOTAL_ATTEMPTS) {
-    throw new AnthropicRetryError(
-      `Anthropic failed after ${String(ANTHROPIC_MAX_TOTAL_ATTEMPTS)} attempts`,
-      anthropicErrorOptions(options.cause, options.attemptDurationsMs),
-    );
-  }
-
-  const delayMs = retryDelayMs(options.attempt);
-
-  if (options.deadlineMs - Date.now() <= delayMs) {
-    throw new AnthropicTimeoutError(
-      `Anthropic request timed out after ${String(options.timeoutMs)} ms`,
-      { cause: options.cause, attemptDurationsMs: options.attemptDurationsMs },
-    );
-  }
-
-  await sleep(delayMs);
-
-  return createMessageAttempt({
-    ...options,
-    attempt: options.attempt + 1,
-  });
 }
 
 function normalizeAnthropicError(cause: unknown, attemptDurationsMs: ReadonlyArray<number>): Error {
@@ -170,7 +131,9 @@ function anthropicErrorOptions(cause: unknown, attemptDurationsMs: ReadonlyArray
 }
 
 function isRetryableAnthropicError(cause: unknown): boolean {
-  if (cause instanceof APIConnectionError) return true;
+  if (cause instanceof APIConnectionError && !(cause instanceof APIConnectionTimeoutError)) {
+    return true;
+  }
 
   if (!isAnthropicApiError(cause) || cause.status === undefined) return false;
 
@@ -187,17 +150,4 @@ function isAnthropicTimeoutError(cause: unknown): boolean {
 
 function isAnthropicApiError(cause: unknown): cause is APIError {
   return cause instanceof APIError;
-}
-
-function retryDelayMs(completedAttempt: number): number {
-  const nominalDelayMs = ANTHROPIC_RETRY_BASE_DELAY_MS * 2 ** (completedAttempt - 1);
-  const jitterFactor = (Math.random() * 2 - 1) * ANTHROPIC_RETRY_JITTER_RATIO;
-
-  return Math.round(nominalDelayMs * (1 + jitterFactor));
-}
-
-async function sleep(delayMs: number): Promise<void> {
-  await new Promise((resolve) => {
-    setTimeout(resolve, delayMs);
-  });
 }
