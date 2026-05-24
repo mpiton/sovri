@@ -82,6 +82,19 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(llm-providers)`: expand `MistralProvider` coverage with
+  MSW-backed happy-path, token-usage, transient retry, exhausted 503,
+  non-retryable 401, schema-invalid response, and deterministic
+  timeout/jitter assertions. The Mistral tests now use only the dummy
+  `test-key` API key and keep timing-sensitive cases on fake timers so
+  `pnpm exec vitest run packages/llm-providers` remains network-free
+  and deterministic. The fake-timer timeout case in
+  `packages/llm-providers/src/providers/MistralProvider.errors.test.ts`
+  no longer guards a real wall-clock budget (`vi.getRealSystemTime()`
+  delta `< 100 ms`); the typed `MistralProviderTimeoutError` assertion
+  alone proves the abort path without coupling the suite to CI runner
+  scheduling jitter (PR #1285 review feedback from Codex).
+
 - `feat(llm-providers)`: add `MistralProvider` backed by Mistral La
   Plateforme structured chat completions. The adapter exposes the shared
   `LLMProvider` contract, defaults to `mistral-large-latest`, supports

@@ -5,7 +5,12 @@ import { z } from "@sovri/core";
 import { http } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { server } from "../../../../tests/msw/server.js";
+import {
+  failOnUnhandledRequest,
+  getUnhandledRequests,
+  resetUnhandledRequests,
+  server,
+} from "../../../../tests/msw/server.js";
 import {
   DEFAULT_MISTRAL_MAX_TOKENS,
   DEFAULT_MISTRAL_MODEL,
@@ -28,10 +33,11 @@ import {
 const CustomBaseUrl = "https://mistral.internal.example";
 const MistralChatUrl = `${CustomBaseUrl}/v1/chat/completions`;
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 
 afterEach(() => {
   server.resetHandlers();
+  resetUnhandledRequests();
   vi.unstubAllEnvs();
 });
 
@@ -127,14 +133,50 @@ describe("MistralProvider", () => {
     });
   });
 
-  it("returns provider token usage and hides it from generateStructured", async () => {
-    // Given the Mistral SDK usage payload has prompt_tokens 123 and completion_tokens 45
-    const complete = vi.fn<MistralComplete>(async () =>
-      mistralCompletion(validStructuredResponse, { promptTokens: 123, completionTokens: 45 }),
+  it("serves happy-path structured generation through MSW without unhandled requests", async () => {
+    // Given MSW handles one POST request to the Mistral chat completions endpoint
+    // And the MSW response body contains content "{\"summary\":\"Reviewed\"}"
+    let handledRequests = 0;
+    server.use(
+      http.post(MistralChatUrl, () => {
+        handledRequests += 1;
+
+        return mistralHttpResponse({ summary: "Reviewed" });
+      }),
     );
     const provider = new MistralProvider({
       apiKey: TestApiKey,
-      client: clientFromComplete(complete),
+      baseUrl: CustomBaseUrl,
+      model: TestModel,
+    });
+
+    // When MistralProvider.test.ts calls generateStructured
+    const result = await provider.generateStructured({
+      ...generateParams,
+      schema: z.strictObject({ summary: z.string() }),
+    });
+
+    // Then the test receives summary "Reviewed"
+    // And MSW records exactly 1 handled Mistral request
+    // And no unhandled network request is reported
+    expect(result).toEqual({ summary: "Reviewed" });
+    expect(handledRequests).toBe(1);
+    expect(getUnhandledRequests()).toEqual([]);
+  });
+
+  it("returns provider token usage from an MSW response and hides it from generateStructured", async () => {
+    // Given a shared Mistral MSW handler returns status 200
+    // And the response body includes prompt token count 123
+    // And the response body includes completion token count 45
+    server.use(
+      http.post(MistralChatUrl, () => {
+        return mistralHttpResponse(validStructuredResponse);
+      }),
+    );
+    const provider = new MistralProvider({
+      apiKey: TestApiKey,
+      baseUrl: CustomBaseUrl,
+      model: TestModel,
     });
 
     // When generateStructuredWithUsage is called
