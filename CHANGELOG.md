@@ -67,6 +67,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(llm-providers)`: add `MistralProvider` backed by Mistral La
+  Plateforme structured chat completions. The adapter exposes the shared
+  `LLMProvider` contract, defaults to `mistral-large-latest`, supports
+  configurable `model`, `baseUrl`, `timeoutMs`, `maxAttempts`, and
+  `maxTokens`, sends Zod-derived JSON Schema response formats, validates
+  parsed responses with Zod, returns `{ prompt, completion }` token usage,
+  and maps retry exhaustion, timeout, and non-retryable provider failures to
+  typed Mistral errors without leaking API keys. The provider is covered by
+  focused request-shape, retry, timeout, option-validation, and export tests.
+
 - `deps(llm-providers)`: add `@mistralai/mistralai@2.2.1` as an
   exactly pinned runtime dependency for the upcoming Mistral provider.
   The SDK package reports `Apache-2.0`, its newly added transitive
