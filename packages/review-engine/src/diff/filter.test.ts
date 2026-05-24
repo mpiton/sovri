@@ -99,6 +99,15 @@ function emptyDiff(): Diff {
   };
 }
 
+function getFile(diff: Diff, path: string) {
+  const file = diff.files.find((candidate) => candidate.path === path);
+  if (file === undefined) {
+    throw new TypeError(`Missing fixture file: ${path}`);
+  }
+
+  return file;
+}
+
 describe("filterDiffByIgnores", () => {
   it("keeps every file and patch when ignore patterns are empty", async () => {
     const filterDiffByIgnores = await loadFilterDiffByIgnores();
@@ -218,5 +227,23 @@ describe("filterDiffByIgnores", () => {
       }
       vi.resetModules();
     }
+  });
+
+  it("does not mutate surviving file objects while filtering", async () => {
+    const filterDiffByIgnores = await loadFilterDiffByIgnores();
+    const diff = twoFileDiff();
+
+    // Given ignore patterns are ["dist/**"]
+    const patterns: readonly string[] = ["dist/**"];
+    // And the original FileChange object for "src/app.ts" is kept for comparison
+    const originalFile = structuredClone(getFile(diff, "src/app.ts"));
+
+    // When filterDiffByIgnores receives the Diff and the patterns
+    const filtered = filterDiffByIgnores(diff, patterns);
+
+    // Then the returned FileChange for "src/app.ts" equals the original FileChange by value
+    expect(getFile(filtered, "src/app.ts")).toEqual(originalFile);
+    // And the original input Diff files still include "dist/app.js"
+    expect(diff.files.map((file) => file.path)).toContain("dist/app.js");
   });
 });
