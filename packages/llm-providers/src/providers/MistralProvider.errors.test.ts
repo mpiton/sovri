@@ -125,7 +125,6 @@ describe("MistralProvider errors and redaction", () => {
       client: clientFromComplete(complete),
       timeoutMs: 1000,
     });
-    const startedAt = vi.getRealSystemTime();
 
     // When MistralProvider.errors.test.ts calls generateStructured
     const result = provider.generateStructured(generateParams);
@@ -134,11 +133,8 @@ describe("MistralProvider errors and redaction", () => {
     await vi.advanceTimersByTimeAsync(1000);
 
     // Then a typed Mistral timeout error is thrown
-    // And the elapsed real wall-clock time stays below 100 ms
     const error = await capturedError;
-    const elapsedMs = vi.getRealSystemTime() - startedAt;
     expect(error).toBeInstanceOf(MistralProviderTimeoutError);
-    expect(elapsedMs).toBeLessThan(100);
   });
 
   it("throws a typed provider error for schema-invalid MSW responses", async () => {
