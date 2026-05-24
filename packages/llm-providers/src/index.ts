@@ -30,6 +30,19 @@ export {
 } from "./providers/AnthropicProvider.js";
 
 export {
+  DEFAULT_MISTRAL_MAX_TOKENS,
+  DEFAULT_MISTRAL_MODEL,
+  DEFAULT_MISTRAL_TIMEOUT_MS,
+  MAX_MISTRAL_MAX_TOKENS,
+  MistralProvider,
+  MistralProviderError,
+  MistralProviderRetryError,
+  MistralProviderTimeoutError,
+  type MistralProviderErrorOptions,
+  type MistralProviderOptions,
+} from "./providers/MistralProvider.js";
+
+export {
   LLMFindingSchema,
   LLMResponseSchema,
   type LLMFinding,
