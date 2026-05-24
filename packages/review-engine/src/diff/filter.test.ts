@@ -365,6 +365,24 @@ describe("filterDiffByIgnores", () => {
     expect(filter().files.map((file) => file.path)).toEqual(["src/app.ts", "dist/app.js"]);
   });
 
+  it("accepts readonly patterns without mutating them", async () => {
+    const filterDiffByIgnores = await loadFilterDiffByIgnores();
+    const diff = twoFileDiff();
+
+    // Given ignore patterns are the readonly tuple ["dist/**", "*.lock"]
+    const patterns = ["dist/**", "*.lock"] as const;
+    // And a copy of the original patterns is kept
+    const originalPatterns = [...patterns];
+
+    // When filterDiffByIgnores receives the Diff and the patterns
+    const filtered = filterDiffByIgnores(diff, patterns);
+
+    // Then the patterns still equal ["dist/**", "*.lock"]
+    expect(patterns).toEqual(originalPatterns);
+    // And the returned Diff has files ["src/app.ts"]
+    expect(filtered.files.map((file) => file.path)).toEqual(["src/app.ts"]);
+  });
+
   it("does not depend on environment variables when filtering", async () => {
     const previousOverride = process.env.SOVRI_IGNORE_OVERRIDE;
     process.env.SOVRI_IGNORE_OVERRIDE = "src/**";
