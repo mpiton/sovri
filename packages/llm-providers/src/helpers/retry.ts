@@ -14,6 +14,35 @@ export interface RetryOptions {
   readonly isRetryable: (err: unknown) => boolean;
 }
 
+export interface RetryErrorOptions {
+  readonly cause: unknown;
+  readonly attemptDurationsMs: ReadonlyArray<number>;
+}
+
+export class RetryExhaustedError extends Error {
+  override readonly name = "RetryExhaustedError";
+  override readonly cause: unknown;
+  readonly attemptDurationsMs: ReadonlyArray<number>;
+
+  constructor(message: string, options: RetryErrorOptions) {
+    super(message);
+    this.cause = options.cause;
+    this.attemptDurationsMs = options.attemptDurationsMs;
+  }
+}
+
+export class RetryTimeoutError extends Error {
+  override readonly name = "RetryTimeoutError";
+  override readonly cause: unknown;
+  readonly attemptDurationsMs: ReadonlyArray<number>;
+
+  constructor(message: string, options: RetryErrorOptions) {
+    super(message);
+    this.cause = options.cause;
+    this.attemptDurationsMs = options.attemptDurationsMs;
+  }
+}
+
 const RETRY_JITTER_RATIO = 0.2;
 
 export async function retryWithBackoff<T>(

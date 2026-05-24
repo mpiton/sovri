@@ -40,3 +40,12 @@ export {
   zodToProviderJsonSchema,
   type ProviderJsonSchema,
 } from "./helpers/provider-json-schema.js";
+
+export {
+  retryWithBackoff,
+  RetryExhaustedError,
+  RetryTimeoutError,
+  type AttemptContext,
+  type RetryErrorOptions,
+  type RetryOptions,
+} from "./helpers/retry.js";

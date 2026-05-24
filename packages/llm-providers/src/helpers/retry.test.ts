@@ -3,7 +3,13 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { retryWithBackoff, type AttemptContext, type RetryOptions } from "./retry.js";
+import {
+  retryWithBackoff,
+  RetryExhaustedError,
+  RetryTimeoutError,
+  type AttemptContext,
+  type RetryOptions,
+} from "./retry.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -168,4 +174,46 @@ describe("retryWithBackoff — retry then success", () => {
       expect(fn).toHaveBeenCalledTimes(2);
     },
   );
+});
+
+describe("retryWithBackoff — non-retryable rethrow", () => {
+  it("rethrows the original non-retryable error without wrapping", async () => {
+    // Given the retry helper is configured with max 3 total attempts
+    // And the retry helper is configured with a base delay of 500 ms
+    // And the retry helper is configured with a timeout of 60000 ms
+    // And the isRetryable predicate classifies error "E_AUTH" as non-retryable
+    const opts: RetryOptions = {
+      maxAttempts: 3,
+      baseDelayMs: 500,
+      timeoutMs: 60_000,
+      isRetryable: (err) => err instanceof Error && err.message !== "E_AUTH",
+    };
+
+    // And the first attempt rejects with error "E_AUTH"
+    const eAuth = new Error("E_AUTH");
+    const fn = vi.fn(async () => {
+      throw eAuth;
+    });
+
+    // When the caller invokes the retry helper once
+    const capturedError: unknown = await retryWithBackoff(fn, opts).catch(
+      (error: unknown) => error,
+    );
+
+    // Then the retry helper rethrows the original "E_AUTH" error
+    expect(capturedError).toBeInstanceOf(Error);
+    expect((capturedError as Error).message).toBe("E_AUTH");
+
+    // And the rethrown error is the same object reference as the rejected cause
+    expect(capturedError).toBe(eAuth);
+
+    // And exactly 1 attempt is executed
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    // And the rethrown error is not an instance of RetryExhaustedError
+    expect(capturedError).not.toBeInstanceOf(RetryExhaustedError);
+
+    // And the rethrown error is not an instance of RetryTimeoutError
+    expect(capturedError).not.toBeInstanceOf(RetryTimeoutError);
+  });
 });
