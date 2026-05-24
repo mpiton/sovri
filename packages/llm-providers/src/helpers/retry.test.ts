@@ -464,4 +464,53 @@ describe("retryWithBackoff — attempts cap exhausted", () => {
     // And exactly 3 attempts are executed
     expect(fn).toHaveBeenCalledTimes(3);
   });
+
+  it("preserves every per-attempt duration when retries are exhausted", async () => {
+    // Given the retry helper is configured with max 3 total attempts
+    // And the retry helper is configured with a base delay of 500 ms
+    // And the retry helper is configured with a timeout of 60000 ms
+    // And the isRetryable predicate classifies error "E_TRANSIENT" as retryable
+    const opts: RetryOptions = {
+      maxAttempts: 3,
+      baseDelayMs: 500,
+      timeoutMs: 60_000,
+      isRetryable: (err) => err instanceof Error && err.message === "E_TRANSIENT",
+    };
+
+    // And the jitter factor selected for every retry delay is 0 percent
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+
+    // And the first attempt rejects after 40 ms
+    // And the second attempt rejects after 55 ms
+    // And the third attempt rejects after 70 ms
+    const attemptDelays = [40, 55, 70];
+    const fn = vi.fn(async (ctx: AttemptContext) => {
+      const delay = attemptDelays[ctx.attempt - 1] ?? 0;
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, delay);
+      });
+      throw new Error("E_TRANSIENT");
+    });
+
+    // When the caller invokes the retry helper once
+    const promise = retryWithBackoff(fn, opts);
+    const capturedError = promise.catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(40); // attempt 1 duration
+    await vi.advanceTimersByTimeAsync(500); // first retry sleep
+    await vi.advanceTimersByTimeAsync(55); // attempt 2 duration
+    await vi.advanceTimersByTimeAsync(1000); // second retry sleep
+    await vi.advanceTimersByTimeAsync(70); // attempt 3 duration
+
+    // Then the retry helper throws RetryExhaustedError
+    const error = await capturedError;
+    expect(error).toBeInstanceOf(RetryExhaustedError);
+
+    // And the RetryExhaustedError exposes attemptDurationsMs equal to [40, 55, 70]
+    expect((error as RetryExhaustedError).attemptDurationsMs).toEqual([40, 55, 70]);
+
+    // And exactly 3 attempts are executed
+    expect(fn).toHaveBeenCalledTimes(3);
+  });
 });

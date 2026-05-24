@@ -21,6 +21,18 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(llm-providers)`: triangulation regression guard asserting that
+  `RetryExhaustedError.attemptDurationsMs` preserves each per-attempt
+  duration in order across exhausted retries. The test schedules
+  attempt 1 to reject after 40 ms, attempt 2 after 55 ms, attempt 3
+  after 70 ms (with deterministic 0 % jitter for the 500 ms and
+  1000 ms backoffs) and asserts the typed error carries
+  `[40, 55, 70]`. The cap-hit path landed under #1192 already
+  accumulates durations correctly; this test pins the value-by-value
+  contract so any future change to the duration capture would break
+  visibly (R-06 violation, ATDD scenario sub-issue #1193 under US
+  #1183).
+
 - `feat(llm-providers)`: `retryWithBackoff` now caps retries at
   `opts.maxAttempts`. When the catch block has classified the failure
   as retryable but the current attempt index is already at the cap,
