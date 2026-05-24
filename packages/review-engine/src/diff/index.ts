@@ -8,4 +8,5 @@ export {
   parseReviewDiff,
   parseUnifiedDiff,
 } from "./parser.js";
+export { filterDiffByIgnores } from "./filter.js";
 export type { ParsedReviewDiff, ParsedReviewDiffFile } from "./parser.js";

@@ -3,6 +3,7 @@
 
 export {
   DiffParseError,
+  filterDiffByIgnores,
   parseReviewDiff,
   parseUnifiedDiff,
   ParsedReviewDiffSchema,

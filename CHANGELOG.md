@@ -21,9 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
-- `test(review-engine)`: add ATDD coverage for the pre-LLM
-  `filterDiffByIgnores` helper contract, starting with empty ignore
-  patterns preserving every diff file and patch before implementation.
+- `feat(review-engine)`: start the pre-LLM `filterDiffByIgnores`
+  helper contract so empty ignore patterns preserve every diff file and
+  patch while returning a fresh `Diff` object, exported from the
+  review-engine diff module and package index.
 
 ### Fixed
 
