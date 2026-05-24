@@ -97,6 +97,13 @@ async function runAttempt<T>(
       throw cause;
     }
 
+    if (attempt >= opts.maxAttempts) {
+      throw new RetryExhaustedError(`Operation failed after ${String(opts.maxAttempts)} attempts`, {
+        cause,
+        attemptDurationsMs: nextDurations,
+      });
+    }
+
     const sleepMs = nextRetryDelayMs(opts.baseDelayMs, attempt);
 
     if (deadlineMs - Date.now() <= sleepMs) {

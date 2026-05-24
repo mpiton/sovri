@@ -413,3 +413,55 @@ describe("retryWithBackoff — timeout deadline abort", () => {
     },
   );
 });
+
+describe("retryWithBackoff — attempts cap exhausted", () => {
+  it("throws RetryExhaustedError after maxAttempts retryable failures", async () => {
+    // Given the retry helper is configured with max 3 total attempts
+    // And the retry helper is configured with a base delay of 500 ms
+    // And the retry helper is configured with a timeout of 60000 ms
+    // And the isRetryable predicate classifies error "E_TRANSIENT" as retryable
+    const opts: RetryOptions = {
+      maxAttempts: 3,
+      baseDelayMs: 500,
+      timeoutMs: 60_000,
+      isRetryable: (err) => err instanceof Error && err.message === "E_TRANSIENT",
+    };
+
+    // And the jitter factor selected for every retry delay is 0 percent
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+
+    // And every attempt rejects with error "E_TRANSIENT"
+    const transientErrors = [
+      new Error("E_TRANSIENT"),
+      new Error("E_TRANSIENT"),
+      new Error("E_TRANSIENT"),
+    ];
+    const fn = vi.fn(async (ctx: AttemptContext) => {
+      throw transientErrors[ctx.attempt - 1] ?? new Error("E_TRANSIENT");
+    });
+
+    // When the caller invokes the retry helper once
+    const promise = retryWithBackoff(fn, opts);
+    const capturedError = promise.catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(500); // first retry sleep (500 ms * 2^0)
+    await vi.advanceTimersByTimeAsync(1000); // second retry sleep (500 ms * 2^1)
+
+    // Then the retry helper throws RetryExhaustedError
+    const error = await capturedError;
+    expect(error).toBeInstanceOf(RetryExhaustedError);
+
+    // And the RetryExhaustedError message is "Operation failed after 3 attempts"
+    expect((error as RetryExhaustedError).message).toBe("Operation failed after 3 attempts");
+
+    // And the RetryExhaustedError exposes attemptDurationsMs of length 3
+    expect((error as RetryExhaustedError).attemptDurationsMs).toHaveLength(3);
+
+    // And the RetryExhaustedError carries the last "E_TRANSIENT" error as cause
+    expect((error as RetryExhaustedError).cause).toBe(transientErrors[2]);
+
+    // And exactly 3 attempts are executed
+    expect(fn).toHaveBeenCalledTimes(3);
+  });
+});

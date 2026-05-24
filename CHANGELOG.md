@@ -21,6 +21,19 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(llm-providers)`: `retryWithBackoff` now caps retries at
+  `opts.maxAttempts`. When the catch block has classified the failure
+  as retryable but the current attempt index is already at the cap,
+  the helper throws `RetryExhaustedError("Operation failed after <N>
+  attempts", { cause, attemptDurationsMs })` carrying the last
+  attempt's cause and the accumulated per-attempt durations. The
+  matching acceptance test schedules three E_TRANSIENT failures
+  against a 3-attempt cap (with deterministic 0 % jitter so the 500 ms
+  + 1000 ms backoffs are exact) and asserts the typed error fires with
+  the correct message, three durations, the third Error instance as
+  cause, and `fn` invoked exactly three times (R-06 violation +
+  R-02 maxAttempts, ATDD scenario sub-issue #1192 under US #1183).
+
 - `feat(llm-providers)`: `retryWithBackoff` now treats a response that
   arrives at exactly `timeoutMs` as success, matching the v0.1 boundary
   contract pinned by `AnthropicProvider.retry.test.ts`. The `runAttempt`
