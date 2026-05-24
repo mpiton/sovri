@@ -34,8 +34,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   while preserving surviving file objects by value and honoring directory
   descendant globs such as `dist/**` plus Node POSIX brace, extglob, and lockfile
   glob examples, applying multiple ignore patterns with OR semantics, removing
-  every file and patch for catch-all `**`, with leading `!` treated literally
-  rather than as gitignore negation.
+  every file and patch for catch-all `**`, matching renamed files by their
+  current path, with leading `!` treated literally rather than as gitignore
+  negation.
 
 ### Fixed
 

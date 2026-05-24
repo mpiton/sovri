@@ -117,6 +117,30 @@ function diffWithPaths(paths: readonly string[]): Diff {
   };
 }
 
+function renamedFileDiff(): Diff {
+  const patch = `diff --git a/legacy/review.ts b/src/domain/review.ts
+similarity index 88%
+rename from legacy/review.ts
+rename to src/domain/review.ts
+index 1111111111111111111111111111111111111111..2222222222222222222222222222222222222222 100644
+--- a/legacy/review.ts
++++ b/src/domain/review.ts
+@@ -1 +1,2 @@
+ old content
++new content for src/domain/review.ts`;
+
+  return {
+    unified_diff: patch,
+    files: [
+      {
+        ...createFileChange("src/domain/review.ts", patch),
+        previous_path: "legacy/review.ts",
+        status: "renamed",
+      },
+    ],
+  };
+}
+
 function createPatch(path: string): string {
   return `diff --git a/${path} b/${path}
 index 1111111111111111111111111111111111111111..2222222222222222222222222222222222222222 100644
@@ -388,6 +412,23 @@ describe("filterDiffByIgnores", () => {
 
     // Then the returned Diff has no files
     expect(filtered.files).toEqual([]);
+    // And the returned unified_diff is ""
+    expect(filtered.unified_diff).toBe("");
+  });
+
+  it("matches renamed files by their current path", async () => {
+    const filterDiffByIgnores = await loadFilterDiffByIgnores();
+
+    // Given a Diff with one renamed file from "legacy/review.ts" to "src/domain/review.ts"
+    const diff = renamedFileDiff();
+    // And ignore patterns are ["src/**"]
+    const patterns: readonly string[] = ["src/**"];
+
+    // When filterDiffByIgnores receives the Diff and the patterns
+    const filtered = filterDiffByIgnores(diff, patterns);
+
+    // Then "src/domain/review.ts" is removed from the returned Diff
+    expect(filtered.files.map((file) => file.path)).not.toContain("src/domain/review.ts");
     // And the returned unified_diff is ""
     expect(filtered.unified_diff).toBe("");
   });
