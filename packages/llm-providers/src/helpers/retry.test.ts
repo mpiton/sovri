@@ -514,6 +514,55 @@ describe("retryWithBackoff — attempts cap exhausted", () => {
     expect(fn).toHaveBeenCalledTimes(3);
   });
 
+  it.each([
+    { randomValue: 0, jitterPercent: -20, delayMs: 400 },
+    { randomValue: 0.5, jitterPercent: 0, delayMs: 500 },
+    { randomValue: 1, jitterPercent: 20, delayMs: 600 },
+  ])(
+    "first retry delay is $delayMs ms when jitter is $jitterPercent percent",
+    async ({ randomValue, delayMs }) => {
+      // Given the retry helper is configured with max 3 total attempts
+      // And the retry helper is configured with a base delay of 500 ms
+      // And the retry helper is configured with a timeout of 60000 ms
+      // And the isRetryable predicate classifies error "E_TRANSIENT" as retryable
+      const opts: RetryOptions = {
+        maxAttempts: 3,
+        baseDelayMs: 500,
+        timeoutMs: 60_000,
+        isRetryable: (err) => err instanceof Error && err.message === "E_TRANSIENT",
+      };
+
+      // And the jitter factor selected for the first retry delay is <jitter_percent> percent
+      vi.useFakeTimers();
+      vi.spyOn(Math, "random").mockReturnValue(randomValue);
+
+      // And the first attempt rejects with error "E_TRANSIENT"
+      // And the second attempt resolves with value "ok"
+      const fn = vi.fn(async (ctx: AttemptContext) => {
+        if (ctx.attempt === 1) {
+          throw new Error("E_TRANSIENT");
+        }
+        return "ok";
+      });
+
+      // When the caller invokes the retry helper once
+      const promise = retryWithBackoff(fn, opts);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Then the retry helper waits <delay_ms> ms between the first and the second attempt
+      await vi.advanceTimersByTimeAsync(delayMs - 1);
+      expect(fn).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+
+      // And the retry helper returns "ok"
+      await expect(promise).resolves.toBe("ok");
+
+      // And exactly 2 attempts are executed
+      expect(fn).toHaveBeenCalledTimes(2);
+    },
+  );
+
   it.each([1, 2, 3, 5])(
     "respects the maxAttempts cap when configured to %i total attempts",
     async (maxAttempts) => {

@@ -21,6 +21,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(llm-providers)`: triangulation regression guard pinning the
+  first retry delay at the exact endpoints of the ±20 % jitter band.
+  Drives `Math.random` to `0 / 0.5 / 1` (yielding jitter factors of
+  `-20 % / 0 % / +20 %` on the helper's `(random*2-1)*0.2` formula)
+  and asserts the helper waits exactly `400 ms / 500 ms / 600 ms`
+  between attempt 1 and attempt 2 before resolving `"ok"` (R-03
+  violation, ATDD scenario sub-issue #1195 under US #1183).
+
 - `test(llm-providers)`: triangulation regression guard asserting that
   `retryWithBackoff` respects the `opts.maxAttempts` cap for every
   documented value (1, 2, 3, 5). The `vitest` `it.each` outline drives
