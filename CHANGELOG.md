@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `fix(bot)`: missing provider API keys now surface as a single
+  configuration error comment on the pull request instead of the generic
+  review-failed message, and the handler logs typed missing-key metadata
+  with the GitHub delivery correlation ID without exposing secret values.
+
 - `fix(llm-providers)`: `MistralProvider` review hardening (PR #1267
   feedback from CodeRabbit and Codex). `createJsonSchemaDefinition` in
   `packages/llm-providers/src/providers/MistralProvider.response.ts`

@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
 import type { SovriConfig } from "@sovri/config";
+import { MissingApiKeyError } from "@sovri/llm-providers";
 import type { Diff, Review } from "@sovri/review-engine";
 import { registerWebhookHandlers } from "../../src/handlers/index.js";
 import {
@@ -732,6 +733,52 @@ describe("pull request handlers - remaining ATDD scenarios", () => {
     expect(dependencies.postReview).not.toHaveBeenCalled();
   });
 
+  it("handles MissingApiKeyError as one configuration error comment", async () => {
+    const dependencies = {
+      ...buildDependencies({
+        config: {
+          ...buildConfig({ autoReviewDrafts: false }),
+          llm: {
+            apiKeySecret: "MISTRAL_API_KEY",
+            model: "mistral-large-latest",
+            provider: "mistral",
+          },
+        },
+        diff: buildDiff({ path: "packages/llm-providers/src/index.ts" }),
+        review: buildReview({ commitSha: OPENED_HEAD_SHA }),
+      }),
+      buildReviewOptions: vi.fn(() => {
+        throw new MissingApiKeyError("MISTRAL_API_KEY", {
+          cause: new Error("API key environment variable is missing or blank"),
+        });
+      }),
+    };
+
+    // Given GitHub returns a unified diff for "packages/llm-providers/src/index.ts"
+    expect(dependencies.diff.files[0]?.path).toBe("packages/llm-providers/src/index.ts");
+    // When the community bot handles the pull_request.opened webhook
+    await handlePullRequestOpened(
+      buildContext({ event: "pull_request.opened", headSha: OPENED_HEAD_SHA, number: 68 }),
+      dependencies,
+    );
+
+    // Then MissingApiKeyError is handled as a configuration error
+    expect(logOutput(dependencies)).toContain("MissingApiKeyError");
+    expect(logOutput(dependencies)).toContain("MISTRAL_API_KEY");
+    expect(errorLogsIncludeDeliveryId(dependencies)).toBe(true);
+    // And the community bot posts exactly one issue comment on pull request 68
+    expect(dependencies.postErrorComment).toHaveBeenCalledTimes(1);
+    // And the comment body contains "Configuration error: env var MISTRAL_API_KEY is required"
+    expect(dependencies.postErrorComment).toHaveBeenCalledWith(
+      expect.objectContaining({ number: 68, repoFullName: REPO_FULL_NAME }),
+      "Configuration error: env var MISTRAL_API_KEY is required",
+    );
+    // And no GitHub review is posted for pull request 68
+    expect(dependencies.postReview).not.toHaveBeenCalled();
+    // And no LLM request is sent
+    expect(dependencies.reviewPullRequest).not.toHaveBeenCalled();
+  });
+
   it.each([
     {
       event: "pull_request.opened",
@@ -836,6 +883,7 @@ function buildContext(values: {
   readonly omitAuthorLogin?: boolean;
   readonly omitBaseSha?: boolean;
   readonly omitHeadSha?: boolean;
+  readonly number?: number;
   readonly title?: string;
 }): PullRequestWebhookContext {
   return {
@@ -858,7 +906,7 @@ function buildContext(values: {
           ref: "task-41",
           ...(values.omitHeadSha === true ? {} : { sha: values.headSha ?? OPENED_HEAD_SHA }),
         },
-        number: 41,
+        number: values.number ?? 41,
         title: values.title ?? "Implement handlers/pull-request.ts",
         user: values.omitAuthorLogin === true ? {} : { login: "octocat" },
       },
@@ -897,7 +945,12 @@ function buildOctokit(): PullRequestWebhookContext["octokit"] {
   };
 }
 
-function buildDiff(values: { readonly changedFiles?: number } = {}): Diff {
+function buildDiff(
+  values: {
+    readonly changedFiles?: number;
+    readonly path?: string;
+  } = {},
+): Diff {
   if (values.changedFiles === 0) {
     return {
       files: [],
@@ -911,7 +964,7 @@ function buildDiff(values: { readonly changedFiles?: number } = {}): Diff {
         deletions: 3,
         hunks: [],
         patch: '@@ -1,1 +1,2 @@\n import type { Probot } from "probot";\n+export {}',
-        path: "apps/community-bot/src/handlers/pull-request.ts",
+        path: values.path ?? "apps/community-bot/src/handlers/pull-request.ts",
         sha: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         status: "modified",
       },
