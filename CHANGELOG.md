@@ -56,6 +56,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `deps(llm-providers)`: add `@mistralai/mistralai@2.2.1` as an
+  exactly pinned runtime dependency for the upcoming Mistral provider.
+  The SDK package reports `Apache-2.0`, its newly added transitive
+  license buckets stay inside the repository allowlist, and the
+  dependency graph is validated with the existing high/critical audit
+  gate.
+
 - `test(llm-providers)`: triangulation regression guard asserting that
   the AttemptContext `AbortSignal` exposed to `fn` becomes aborted at
   the per-attempt budget boundary. With `timeoutMs: 200` and a fn that
