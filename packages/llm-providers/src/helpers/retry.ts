@@ -69,19 +69,25 @@ async function runAttempt<T>(
 
   const controller = new AbortController();
   const startedAt = Date.now();
-  // Call `fn` BEFORE scheduling the deadline abort timer so the operation's
-  // own internal `setTimeout` (registered synchronously inside its Promise
-  // executor) wins any tie at the exact deadline boundary — a response that
-  // arrives at exactly `timeoutMs` is treated as success, matching the v0.1
-  // contract verified by the boundary outline at `timeout-deadline-abort.feature`.
-  const fnPromise = fn({
-    signal: controller.signal,
-    timeoutMs: budgetMs,
-    attempt,
-  });
-  const deadlineTimer = setTimeout(() => controller.abort(), budgetMs);
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
 
   try {
+    // Call `fn` BEFORE scheduling the deadline abort timer so the operation's
+    // own internal `setTimeout` (registered synchronously inside its Promise
+    // executor) wins any tie at the exact deadline boundary — a response that
+    // arrives at exactly `timeoutMs` is treated as success, matching the v0.1
+    // contract verified by the boundary outline at `timeout-deadline-abort.feature`.
+    // The `fn` invocation lives inside the `try` so a synchronous throw from a
+    // non-async caller (signature allows `() => Promise<T>` shape but cannot
+    // forbid sync escapes) still flows through the catch block's `isRetryable`
+    // dispatch, attempt-cap, deadline, and durations machinery.
+    const fnPromise = fn({
+      signal: controller.signal,
+      timeoutMs: budgetMs,
+      attempt,
+    });
+    deadlineTimer = setTimeout(() => controller.abort(), budgetMs);
+
     return await fnPromise;
   } catch (cause) {
     const nextDurations: ReadonlyArray<number> = [...attemptDurationsMs, Date.now() - startedAt];
@@ -117,7 +123,9 @@ async function runAttempt<T>(
 
     return runAttempt(fn, opts, attempt + 1, deadlineMs, nextDurations, deadlineMs - Date.now());
   } finally {
-    clearTimeout(deadlineTimer);
+    if (deadlineTimer !== undefined) {
+      clearTimeout(deadlineTimer);
+    }
   }
 }
 

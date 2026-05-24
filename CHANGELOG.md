@@ -19,6 +19,21 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Fixed
+
+- `fix(llm-providers)`: `retryWithBackoff` now routes synchronous
+  throws from `fn` through the retry pipeline. The `fn` invocation
+  moved inside the `runAttempt` `try` block so a non-async caller that
+  throws before returning a `Promise` flows through `isRetryable`
+  dispatch, the attempt cap, the budget-vs-sleep guard, durations
+  capture, and the typed-error wrapping. The `deadlineTimer` is now
+  declared as a `let` in the outer scope so the `finally` block can
+  conditionally call `clearTimeout` only when the timer was actually
+  scheduled. The tie-breaking ordering at the exact deadline boundary
+  is preserved — `fn`'s internal `setTimeout` still registers before
+  the helper's deadline `setTimeout` (PR #1217 review feedback from
+  codex and CodeRabbit on `retry.ts:77/83`).
+
 ### Changed
 
 - `feat(llm-providers)`: `AnthropicProvider.retry.ts` now consumes the
