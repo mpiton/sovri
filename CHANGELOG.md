@@ -82,6 +82,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(llm-providers)`: add acceptance coverage for creating Anthropic
+  and Mistral providers from Sovri LLM configuration through the shared
+  provider factory entrypoint.
+
 - `test(llm-providers)`: expand `MistralProvider` coverage with
   MSW-backed happy-path, token-usage, transient retry, exhausted 503,
   non-retryable 401, schema-invalid response, and deterministic
