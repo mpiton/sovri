@@ -19,6 +19,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Added
+
+- `feat(review-engine)`: start the pre-LLM `filterDiffByIgnores`
+  helper contract so empty ignore patterns preserve every diff file and
+  patch while returning a fresh `Diff` object, exported from the
+  review-engine diff module and package index.
+
 ### Fixed
 
 - `fix(config)`: `review.mode: strict` in `.sovri.yml` now fails config
