@@ -21,6 +21,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(llm-providers)`: triangulation regression guard asserting that
+  `retryWithBackoff` retries any caller-classified retryable token
+  (`HTTP_408`, `HTTP_409`, `HTTP_429`, `HTTP_500`, `HTTP_502`, `HTTP_503`,
+  `HTTP_504`, `HTTP_529`, `TRANSPORT`) once and resolves on the next
+  attempt. A `vitest` `it.each` outline mirrors the Scenario Outline
+  `Examples:` table. The current `runAttempt` recursion already satisfies
+  every example with no production-code diff; the test pins the breadth
+  so a future regression that special-cased any token would break (R-02
+  nominal, ATDD scenario sub-issue #1186 under US #1183).
+
 - `feat(llm-providers)`: `retryWithBackoff` now retries on failure.
   Refactored to a recursive `runAttempt` helper that catches `fn`'s
   rejection, computes the next backoff via
