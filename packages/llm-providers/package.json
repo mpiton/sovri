@@ -37,6 +37,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "0.96.0",
     "@mistralai/mistralai": "2.2.1",
+    "@sovri/config": "workspace:*",
     "@sovri/core": "workspace:*",
     "@sovri/observability": "workspace:*",
     "zod": "4.4.3"
