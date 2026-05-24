@@ -62,9 +62,7 @@ describe("createProviderFromConfig", () => {
       apiKeySecret: "OPENAI_API_KEY",
     });
 
-    expect(() => createProviderFromConfig(config, { OPENAI_API_KEY: "test-key" })).toThrow(
-      UnsupportedProviderError,
-    );
+    expect(() => createProviderFromConfig(config, {})).toThrow(UnsupportedProviderError);
   });
 });
 

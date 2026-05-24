@@ -87,7 +87,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   with acceptance coverage for the supported provider creation path. The
   Mistral factory path now also forwards configured custom base URLs to the
   provider adapter, and unsupported providers or missing API keys fail with
-  typed errors.
+  typed errors. Unsupported provider values are rejected before credential
+  lookup so diagnostics point to provider support rather than missing secrets.
 
 - `test(llm-providers)`: expand `MistralProvider` coverage with
   MSW-backed happy-path, token-usage, transient retry, exhausted 503,

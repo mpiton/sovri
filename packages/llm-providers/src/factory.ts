@@ -9,16 +9,14 @@ import { MistralProvider } from "./providers/MistralProvider.js";
 import type { LLMProvider } from "./types/LLMProvider.js";
 
 export function createProviderFromConfig(config: SovriConfig, env: NodeJS.ProcessEnv): LLMProvider {
-  const apiKey = readApiKey(config.llm.apiKeySecret, env);
-
   switch (config.llm.provider) {
     case "anthropic":
       return new AnthropicProvider({
-        env: { ANTHROPIC_API_KEY: apiKey },
+        env: { ANTHROPIC_API_KEY: readApiKey(config.llm.apiKeySecret, env) },
         model: config.llm.model,
       });
     case "mistral":
-      return createMistralProvider(config, apiKey);
+      return createMistralProvider(config, readApiKey(config.llm.apiKeySecret, env));
     default:
       throw new UnsupportedProviderError(config.llm.provider, {
         cause: new Error("Provider is not supported by the provider factory"),
