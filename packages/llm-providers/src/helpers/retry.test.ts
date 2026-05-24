@@ -513,4 +513,48 @@ describe("retryWithBackoff — attempts cap exhausted", () => {
     // And exactly 3 attempts are executed
     expect(fn).toHaveBeenCalledTimes(3);
   });
+
+  it.each([1, 2, 3, 5])(
+    "respects the maxAttempts cap when configured to %i total attempts",
+    async (maxAttempts) => {
+      // Given the retry helper is configured with max <max_attempts> total attempts
+      // And the retry helper is configured with a base delay of 1 ms
+      // And the retry helper is configured with a timeout of 60000 ms
+      // And the isRetryable predicate classifies error "E_TRANSIENT" as retryable
+      const opts: RetryOptions = {
+        maxAttempts,
+        baseDelayMs: 1,
+        timeoutMs: 60_000,
+        isRetryable: (err) => err instanceof Error && err.message === "E_TRANSIENT",
+      };
+
+      // And the jitter factor selected for every retry delay is 0 percent
+      vi.useFakeTimers();
+      vi.spyOn(Math, "random").mockReturnValue(0.5);
+
+      // And every attempt rejects with error "E_TRANSIENT"
+      const fn = vi.fn(async () => {
+        throw new Error("E_TRANSIENT");
+      });
+
+      // When the caller invokes the retry helper once
+      const promise = retryWithBackoff(fn, opts);
+      const capturedError = promise.catch((error: unknown) => error);
+
+      // Advance through every retry sleep (1, 2, 4, 8 ... ms for maxAttempts up to 5)
+      for (let attempt = 1; attempt < maxAttempts; attempt++) {
+        await vi.advanceTimersByTimeAsync(2 ** (attempt - 1));
+      }
+
+      // Then the retry helper throws RetryExhaustedError
+      const error = await capturedError;
+      expect(error).toBeInstanceOf(RetryExhaustedError);
+
+      // And exactly <max_attempts> attempts are executed
+      expect(fn).toHaveBeenCalledTimes(maxAttempts);
+
+      // And the RetryExhaustedError exposes attemptDurationsMs of length <max_attempts>
+      expect((error as RetryExhaustedError).attemptDurationsMs).toHaveLength(maxAttempts);
+    },
+  );
 });

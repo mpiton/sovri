@@ -22,6 +22,18 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Added
 
 - `test(llm-providers)`: triangulation regression guard asserting that
+  `retryWithBackoff` respects the `opts.maxAttempts` cap for every
+  documented value (1, 2, 3, 5). The `vitest` `it.each` outline drives
+  `fn` to reject `"E_TRANSIENT"` on every call against the parametric
+  cap, advances fake time through `2^(attempt-1)` ms backoffs, then
+  asserts the typed error fires after exactly `maxAttempts` invocations
+  with a matching-length durations array. Current impl satisfies every
+  example with no production-code diff; the test pins the breadth so a
+  future change that hardcoded a specific cap (e.g. always 3) would
+  break visibly (R-02 violation, ATDD scenario sub-issue #1194 under
+  US #1183).
+
+- `test(llm-providers)`: triangulation regression guard asserting that
   `RetryExhaustedError.attemptDurationsMs` preserves each per-attempt
   duration in order across exhausted retries. The test schedules
   attempt 1 to reject after 40 ms, attempt 2 after 55 ms, attempt 3
