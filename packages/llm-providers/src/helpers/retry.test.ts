@@ -216,4 +216,36 @@ describe("retryWithBackoff — non-retryable rethrow", () => {
     // And the rethrown error is not an instance of RetryTimeoutError
     expect(capturedError).not.toBeInstanceOf(RetryTimeoutError);
   });
+
+  it.each(["HTTP_400", "HTTP_401", "HTTP_403", "HTTP_404", "HTTP_422"])(
+    "rethrows non-retryable HTTP token %s verbatim without wrapping",
+    async (errorToken) => {
+      // Given the retry helper is configured with max 3 total attempts
+      // And the retry helper is configured with a base delay of 500 ms
+      // And the retry helper is configured with a timeout of 60000 ms
+      // And the isRetryable predicate classifies error "<error_token>" as non-retryable
+      const opts: RetryOptions = {
+        maxAttempts: 3,
+        baseDelayMs: 500,
+        timeoutMs: 60_000,
+        isRetryable: (err) => err instanceof Error && err.message !== errorToken,
+      };
+
+      // And the first attempt rejects with error "<error_token>"
+      const cause = new Error(errorToken);
+      const fn = vi.fn(async () => {
+        throw cause;
+      });
+
+      // When the caller invokes the retry helper once
+      const capturedError: unknown = await retryWithBackoff(fn, opts).catch(
+        (error: unknown) => error,
+      );
+
+      // Then the retry helper rethrows the original "<error_token>" error
+      expect(capturedError).toBe(cause);
+      // And exactly 1 attempt is executed
+      expect(fn).toHaveBeenCalledTimes(1);
+    },
+  );
 });
