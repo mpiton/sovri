@@ -68,15 +68,21 @@ async function runAttempt<T>(
   }
 
   const controller = new AbortController();
-  const deadlineTimer = setTimeout(() => controller.abort(), budgetMs);
   const startedAt = Date.now();
+  // Call `fn` BEFORE scheduling the deadline abort timer so the operation's
+  // own internal `setTimeout` (registered synchronously inside its Promise
+  // executor) wins any tie at the exact deadline boundary — a response that
+  // arrives at exactly `timeoutMs` is treated as success, matching the v0.1
+  // contract verified by the boundary outline at `timeout-deadline-abort.feature`.
+  const fnPromise = fn({
+    signal: controller.signal,
+    timeoutMs: budgetMs,
+    attempt,
+  });
+  const deadlineTimer = setTimeout(() => controller.abort(), budgetMs);
 
   try {
-    return await fn({
-      signal: controller.signal,
-      timeoutMs: budgetMs,
-      attempt,
-    });
+    return await fnPromise;
   } catch (cause) {
     const nextDurations: ReadonlyArray<number> = [...attemptDurationsMs, Date.now() - startedAt];
 

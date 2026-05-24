@@ -21,6 +21,17 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(llm-providers)`: `retryWithBackoff` now treats a response that
+  arrives at exactly `timeoutMs` as success, matching the v0.1 boundary
+  contract pinned by `AnthropicProvider.retry.test.ts`. The `runAttempt`
+  body calls `fn` BEFORE scheduling the deadline `setTimeout`, so the
+  operation's internal timer (registered synchronously inside its
+  Promise executor) wins any tie at the exact boundary. A parametric
+  vitest outline verifies 999 ms / 1000 ms / 1001 ms responses against
+  a 1000 ms timeout: the first two resolve `"ok"`, the third throws
+  `RetryTimeoutError` (R-02 timeoutMs + R-03 deadline limit, ATDD
+  scenario sub-issue #1191 under US #1183).
+
 - `feat(llm-providers)`: `retryWithBackoff` now surfaces the timeout
   before scheduling a retry that cannot fit. When the catch block has
   classified the failure as retryable, the helper compares the next

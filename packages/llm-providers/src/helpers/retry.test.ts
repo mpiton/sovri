@@ -359,4 +359,57 @@ describe("retryWithBackoff — timeout deadline abort", () => {
     // And the RetryTimeoutError carries the rejected "E_TRANSIENT" error as cause
     expect((error as RetryTimeoutError).cause).toBe(eTransient);
   });
+
+  it.each([
+    { responseMs: 999, outcome: "success" as const },
+    { responseMs: 1000, outcome: "success" as const },
+    { responseMs: 1001, outcome: "RetryTimeoutError" as const },
+  ])(
+    "handles boundary response at $responseMs ms as $outcome (timeout 1000 ms)",
+    async ({ responseMs, outcome }) => {
+      // Given the retry helper is configured with max 3 total attempts
+      // And the retry helper is configured with a base delay of 500 ms
+      // And the retry helper is configured with a timeout of 1000 ms
+      const opts: RetryOptions = {
+        maxAttempts: 3,
+        baseDelayMs: 500,
+        timeoutMs: 1000,
+        isRetryable: () => false,
+      };
+
+      vi.useFakeTimers();
+
+      // And the operation resolves with value "ok" after <response_ms> ms
+      //   (or rejects via the AbortSignal if the abort fires first)
+      const fn = vi.fn(
+        (ctx: AttemptContext) =>
+          new Promise<string>((resolve, reject) => {
+            if (ctx.signal.aborted) {
+              reject(new DOMException("aborted", "AbortError"));
+              return;
+            }
+            ctx.signal.addEventListener(
+              "abort",
+              () => reject(new DOMException("aborted", "AbortError")),
+              { once: true },
+            );
+            setTimeout(() => resolve("ok"), responseMs);
+          }),
+      );
+
+      // When the caller invokes the retry helper once
+      // And <response_ms> ms elapse
+      const promise = retryWithBackoff(fn, opts);
+      const capturedError =
+        outcome === "RetryTimeoutError" ? promise.catch((error: unknown) => error) : undefined;
+      await vi.advanceTimersByTimeAsync(responseMs);
+
+      // Then the retry helper outcome is "<outcome>"
+      if (outcome === "success") {
+        await expect(promise).resolves.toBe("ok");
+      } else {
+        expect(await capturedError).toBeInstanceOf(RetryTimeoutError);
+      }
+    },
+  );
 });
