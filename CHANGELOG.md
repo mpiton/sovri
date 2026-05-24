@@ -21,6 +21,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(llm-providers)`: triangulation regression guard asserting that
+  `retryWithBackoff` forwards the full configured `opts.timeoutMs` to
+  `AttemptContext.timeoutMs` on the first attempt. The test uses
+  `timeoutMs: 5000` and a captures-on-every-attempt `fn` that resolves
+  `"ok"` immediately, then asserts the captured context shows
+  `timeoutMs === 5000`, `attempt === 1`, and a fresh non-aborted
+  `AbortSignal`. Complements #1184 (which used 60000 ms) and guards
+  the drift-free budget propagation through the public entry (R-01
+  nominal, ATDD scenario sub-issue #1197 under US #1183).
+
 - `test(llm-providers)`: triangulation regression guard pinning the
   second retry delay at the endpoints of the ±20 % jitter band around
   the 1000 ms exponential step. Two outline rows drive

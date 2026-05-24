@@ -661,3 +661,41 @@ describe("retryWithBackoff — attempts cap exhausted", () => {
     },
   );
 });
+
+describe("retryWithBackoff — per-attempt budget", () => {
+  it("forwards the full configured timeout to AttemptContext on the first attempt", async () => {
+    // Given the retry helper is configured with max 3 total attempts
+    // And the retry helper is configured with a base delay of 500 ms
+    // And the retry helper is configured with a timeout of 5000 ms
+    const opts: RetryOptions = {
+      maxAttempts: 3,
+      baseDelayMs: 500,
+      timeoutMs: 5000,
+      isRetryable: () => false,
+    };
+
+    // And the operation captures its AttemptContext on every attempt
+    // And the operation resolves with value "ok" on the first attempt
+    const captured: AttemptContext[] = [];
+    const fn = vi.fn(async (ctx: AttemptContext) => {
+      captured.push(ctx);
+      return "ok";
+    });
+
+    // When the caller invokes the retry helper once
+    const result = await retryWithBackoff(fn, opts);
+
+    // Then the retry helper returns "ok"
+    expect(result).toBe("ok");
+
+    // And the AttemptContext captured on attempt 1 reports a remaining budget of 5000 ms
+    expect(captured[0]?.timeoutMs).toBe(5000);
+
+    // And the AttemptContext captured on attempt 1 reports attempt number 1
+    expect(captured[0]?.attempt).toBe(1);
+
+    // And the AttemptContext captured on attempt 1 has a fresh, non-aborted AbortSignal
+    expect(captured[0]?.signal).toBeInstanceOf(AbortSignal);
+    expect(captured[0]?.signal.aborted).toBe(false);
+  });
+});
