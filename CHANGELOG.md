@@ -21,6 +21,21 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `fix(llm-providers)`: `MistralProvider` review hardening (PR #1267
+  feedback from CodeRabbit and Codex). `createJsonSchemaDefinition` in
+  `packages/llm-providers/src/providers/MistralProvider.response.ts`
+  now rejects schemas whose JSON Schema root is not `type: "object"`
+  (e.g. `z.string()`), failing fast at request construction instead of
+  shipping an invalid `json_schema` payload to the Mistral API.
+  `resolveModel` in `packages/llm-providers/src/providers/MistralProvider.ts`
+  now returns the trimmed value so whitespace-padded models like
+  `" mistral-large-latest "` no longer reach the SDK with surrounding
+  whitespace. `waitForResponseOrAbort` in
+  `packages/llm-providers/src/providers/MistralProvider.test-helpers.ts`
+  now checks `signal.aborted` synchronously and clears its timer on
+  abort, matching the existing `waitForAbort` helper so tests that
+  exercise pre-aborted signals stop racing the response timer.
+
 - `test(supply-chain)`: `scripts/mistral-sdk-policy.test.sh`
   `has_install_lifecycle_script` now uses `Object.prototype.hasOwnProperty`
   for `preinstall` / `install` / `postinstall` key presence instead of
@@ -66,6 +81,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   satisfied).
 
 ### Added
+
+- `feat(llm-providers)`: add `MistralProvider` backed by Mistral La
+  Plateforme structured chat completions. The adapter exposes the shared
+  `LLMProvider` contract, defaults to `mistral-large-latest`, supports
+  configurable `model`, `baseUrl`, `timeoutMs`, `maxAttempts`, and
+  `maxTokens`, sends Zod-derived JSON Schema response formats, validates
+  parsed responses with Zod, returns `{ prompt, completion }` token usage,
+  and maps retry exhaustion, timeout, and non-retryable provider failures to
+  typed Mistral errors without leaking API keys. The provider is covered by
+  focused request-shape, retry, timeout, option-validation, and export tests.
 
 - `deps(llm-providers)`: add `@mistralai/mistralai@2.2.1` as an
   exactly pinned runtime dependency for the upcoming Mistral provider.
