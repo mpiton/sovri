@@ -188,4 +188,33 @@ describe("filterDiffByIgnores", () => {
     expect(first.files.map((file) => file.path)).toEqual(["src/app.ts"]);
     expect(second.files.map((file) => file.path)).toEqual(["src/app.ts"]);
   });
+
+  it("does not depend on environment variables when filtering", async () => {
+    const previousOverride = process.env.SOVRI_IGNORE_OVERRIDE;
+    process.env.SOVRI_IGNORE_OVERRIDE = "src/**";
+
+    try {
+      const filterDiffByIgnores = await loadFilterDiffByIgnores();
+      const diff = twoFileDiff();
+
+      // Given process.env.SOVRI_IGNORE_OVERRIDE is set to "src/**" for the test process
+      // And ignore patterns are ["dist/**"]
+      const patterns: readonly string[] = ["dist/**"];
+
+      // When filterDiffByIgnores receives the Diff and the patterns
+      const filtered = filterDiffByIgnores(diff, patterns);
+      const returnedPaths = filtered.files.map((file) => file.path);
+
+      // Then "src/app.ts" remains in the returned Diff
+      expect(returnedPaths).toContain("src/app.ts");
+      // And "dist/app.js" is removed from the returned Diff
+      expect(returnedPaths).not.toContain("dist/app.js");
+    } finally {
+      if (previousOverride === undefined) {
+        delete process.env.SOVRI_IGNORE_OVERRIDE;
+      } else {
+        process.env.SOVRI_IGNORE_OVERRIDE = previousOverride;
+      }
+    }
+  });
 });

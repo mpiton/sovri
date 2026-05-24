@@ -29,7 +29,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   remain empty when ignore patterns are present, and acceptance coverage
   now defines deterministic repeated-call filtering for non-empty ignore
   patterns; the implementation applies POSIX glob filtering to both
-  `Diff.files` and the returned unified diff patches.
+  `Diff.files` and the returned unified diff patches without reading
+  environment overrides.
 
 ### Fixed
 
