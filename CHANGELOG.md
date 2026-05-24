@@ -33,7 +33,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   environment overrides, including when imported after an override is set,
   while preserving surviving file objects by value and honoring directory
   descendant globs such as `dist/**` plus Node POSIX brace, extglob, and lockfile
-  glob examples.
+  glob examples, with leading `!` treated literally rather than as gitignore
+  negation.
 
 ### Fixed
 

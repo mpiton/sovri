@@ -367,4 +367,21 @@ describe("filterDiffByIgnores", () => {
     // And "<kept_path>" remains in the returned Diff
     expect(returnedPaths).toContain(keptPath);
   });
+
+  it("does not treat a leading bang as gitignore negation", async () => {
+    const filterDiffByIgnores = await loadFilterDiffByIgnores();
+    const diff = directoryGlobDiff();
+
+    // Given ignore patterns are ["!dist/**"]
+    const patterns: readonly string[] = ["!dist/**"];
+
+    // When filterDiffByIgnores receives the Diff and the patterns
+    const filtered = filterDiffByIgnores(diff, patterns);
+    const returnedPaths = filtered.files.map((file) => file.path);
+
+    // Then "dist/community-bot.js" remains in the returned Diff
+    expect(returnedPaths).toContain("dist/community-bot.js");
+    // And no file is removed because node:path.posix.matchesGlob does not treat a leading "!" as pattern negation
+    expect(returnedPaths).toEqual(diff.files.map((file) => file.path));
+  });
 });
