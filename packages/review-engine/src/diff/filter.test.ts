@@ -12,6 +12,7 @@ const FilterModulePath = "./filter.js";
 const FilterSourceUrl = new URL("./filter.ts", import.meta.url);
 const LargeDiffFileCount = 500;
 const Sha = "2222222222222222222222222222222222222222";
+const ThirdPartyGlobLibraries = ["minimatch", "picomatch", "fast-glob", "micromatch"] as const;
 
 async function loadFilterDiffByIgnores(): Promise<FilterDiffByIgnores> {
   const module: unknown = await import(FilterModulePath);
@@ -32,6 +33,12 @@ function isFilterModule(value: unknown): value is { filterDiffByIgnores: FilterD
   }
 
   return typeof Reflect.get(value, "filterDiffByIgnores") === "function";
+}
+
+function packageImportPattern(packageName: string): RegExp {
+  return new RegExp(
+    `(?:from\\s+["']${packageName}["']|import\\(\\s*["']${packageName}["']\\s*\\))`,
+  );
 }
 
 function twoFileDiff(): Diff {
@@ -630,5 +637,16 @@ describe("filterDiffByIgnores", () => {
     expect(source).toContain('import { posix } from "node:path";');
     // And it calls "posix.matchesGlob"
     expect(source).toContain("posix.matchesGlob");
+  });
+
+  it("does not import a third-party glob library", async () => {
+    // Given filter.ts exists
+    // When the implementation imports modules
+    const source = await readFilterSource();
+
+    for (const packageName of ThirdPartyGlobLibraries) {
+      // Then it does not import the third-party glob library
+      expect(source).not.toMatch(packageImportPattern(packageName));
+    }
   });
 });

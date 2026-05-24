@@ -42,7 +42,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   metadata, invalid-looking unmatched patterns kept as a no-op without surfacing
   config validation errors, readonly pattern tuples accepted without mutation, and
   leading `!` treated literally rather than as gitignore negation, plus static
-  coverage for the `node:path` POSIX matcher import and call.
+  coverage for the `node:path` POSIX matcher import and call while rejecting
+  third-party glob imports.
 
 ### Fixed
 
