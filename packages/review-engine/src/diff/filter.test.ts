@@ -126,4 +126,24 @@ describe("filterDiffByIgnores", () => {
     // And the returned unified_diff still contains "bundled generated code"
     expect(filtered.unified_diff).toContain("bundled generated code");
   });
+
+  it("returns an equal fresh Diff object without mutating the input when ignore patterns are empty", async () => {
+    const filterDiffByIgnores = await loadFilterDiffByIgnores();
+    const diff = twoFileDiff();
+
+    // Given ignore patterns are []
+    const patterns: readonly string[] = [];
+    // And the original Diff object is kept for comparison
+    const original = structuredClone(diff);
+
+    // When filterDiffByIgnores receives the Diff and the patterns
+    const filtered = filterDiffByIgnores(diff, patterns);
+
+    // Then the returned Diff equals the original Diff by value
+    expect(filtered).toEqual(original);
+    // And the returned Diff is not the same object reference as the input Diff
+    expect(filtered).not.toBe(diff);
+    // And the input Diff files remain ["src/app.ts", "dist/app.js"]
+    expect(diff.files.map((file) => file.path)).toEqual(["src/app.ts", "dist/app.js"]);
+  });
 });

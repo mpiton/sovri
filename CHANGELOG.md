@@ -24,8 +24,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `feat(review-engine)`: start the pre-LLM `filterDiffByIgnores`
   helper contract so empty ignore patterns preserve every diff file and
   patch, including generated-file patches, while returning a fresh
-  `Diff` object, exported from the review-engine diff module and
-  package index.
+  `Diff` object without mutating the input, exported from the
+  review-engine diff module and package index.
 
 ### Fixed
 
