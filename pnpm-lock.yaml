@@ -131,6 +131,9 @@ importers:
       '@mistralai/mistralai':
         specifier: 2.2.1
         version: 2.2.1
+      '@sovri/config':
+        specifier: workspace:*
+        version: link:../config
       '@sovri/core':
         specifier: workspace:*
         version: link:../core

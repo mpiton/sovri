@@ -48,6 +48,7 @@ export interface AnthropicProviderOptions {
   readonly model?: Model;
   readonly maxTokens?: number;
   readonly timeoutMs?: number;
+  readonly baseUrl?: string;
   readonly env?: NodeJS.ProcessEnv;
   readonly client?: AnthropicMessagesClient;
 }
@@ -68,6 +69,7 @@ export class AnthropicProvider implements LLMProvider {
       options.client ??
       new Anthropic({
         apiKey: readAnthropicApiKey(options.env ?? process.env),
+        baseURL: resolveBaseUrl(options.baseUrl),
         maxRetries: 0,
         timeout: this.timeoutMs,
       });
@@ -174,6 +176,17 @@ function resolveModel(model: Model | undefined): Model {
   }
 
   return resolvedModel;
+}
+
+function resolveBaseUrl(baseUrl: string | undefined): string | undefined {
+  if (baseUrl === undefined) return undefined;
+
+  const trimmed = baseUrl.trim();
+  if (trimmed.length === 0) {
+    throw new AnthropicResponseError("Anthropic baseUrl must be a non-empty value");
+  }
+
+  return trimmed;
 }
 
 function resolveMaxTokens(maxTokens: number | undefined): number {

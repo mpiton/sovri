@@ -16,9 +16,14 @@ export {
   AnthropicResponseError,
   AnthropicRetryError,
   AnthropicTimeoutError,
+  MissingApiKeyError,
+  UnsupportedProviderError,
   type AnthropicProviderErrorOptions,
   type AnthropicResponseErrorOptions,
+  type FactoryProviderErrorOptions,
 } from "./errors.js";
+
+export { createProviderFromConfig } from "./factory.js";
 
 export {
   AnthropicProvider,

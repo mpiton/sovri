@@ -2,7 +2,7 @@
 // Copyright 2026 Sovri SAS
 
 import { DEFAULT_CONFIG, parseConfigContent, type SovriConfig } from "@sovri/config";
-import { AnthropicProvider } from "@sovri/llm-providers";
+import { createProviderFromConfig } from "@sovri/llm-providers";
 import { createLogger } from "@sovri/observability";
 import {
   buildInlineComments,
@@ -108,29 +108,7 @@ async function postErrorComment(
 function buildReviewOptions(config: SovriConfig, env: NodeJS.ProcessEnv): ReviewPullRequestOptions {
   return {
     logger,
-    provider: createProvider(config, env),
-  };
-}
-
-function createProvider(config: SovriConfig, env: NodeJS.ProcessEnv): AnthropicProvider {
-  if (config.llm.provider !== "anthropic") {
-    throw new PullRequestReviewAdapterError("Unsupported LLM provider");
-  }
-
-  return new AnthropicProvider({
-    env: buildAnthropicEnv(config, env),
-    model: config.llm.model,
-  });
-}
-
-function buildAnthropicEnv(config: SovriConfig, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const apiKey = env[config.llm.apiKeySecret]?.trim();
-  if (apiKey === undefined || apiKey.length === 0) {
-    throw new PullRequestReviewAdapterError(`${config.llm.apiKeySecret} must be set`);
-  }
-
-  return {
-    ANTHROPIC_API_KEY: apiKey,
+    provider: createProviderFromConfig(config, env),
   };
 }
 

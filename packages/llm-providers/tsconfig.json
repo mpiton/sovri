@@ -8,7 +8,7 @@
     "emitDeclarationOnly": true,
     "types": ["node"]
   },
-  "references": [{ "path": "../core" }, { "path": "../observability" }],
+  "references": [{ "path": "../config" }, { "path": "../core" }, { "path": "../observability" }],
   "include": ["src/**/*"],
   "exclude": ["dist", ".tsbuild", "node_modules", "**/*.test.ts", "**/*.spec.ts"]
 }
