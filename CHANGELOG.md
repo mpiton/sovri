@@ -22,6 +22,15 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Added
 
 - `test(llm-providers)`: triangulation regression guard asserting that
+  `retryWithBackoff` shrinks the per-attempt budget across recursion.
+  With `timeoutMs: 5000`, an attempt-1 rejection after 800 ms, and a
+  500 ms backoff sleep (0 % jitter), the AttemptContext captured on
+  attempt 2 must show `timeoutMs === 3700` (exact: `5000 - 800 - 500`).
+  Any future change that froze the budget at the configured value (no
+  recompute on recurse) would break (R-01 nominal, ATDD scenario
+  sub-issue #1198 under US #1183).
+
+- `test(llm-providers)`: triangulation regression guard asserting that
   `retryWithBackoff` forwards the full configured `opts.timeoutMs` to
   `AttemptContext.timeoutMs` on the first attempt. The test uses
   `timeoutMs: 5000` and a captures-on-every-attempt `fn` that resolves

@@ -698,4 +698,57 @@ describe("retryWithBackoff — per-attempt budget", () => {
     expect(captured[0]?.signal).toBeInstanceOf(AbortSignal);
     expect(captured[0]?.signal.aborted).toBe(false);
   });
+
+  it("forwards the shrunken remaining budget to AttemptContext on the second attempt", async () => {
+    // Given the retry helper is configured with max 3 total attempts
+    // And the retry helper is configured with a base delay of 500 ms
+    // And the retry helper is configured with a timeout of 5000 ms
+    // And the isRetryable predicate classifies error "E_TRANSIENT" as retryable
+    const opts: RetryOptions = {
+      maxAttempts: 3,
+      baseDelayMs: 500,
+      timeoutMs: 5000,
+      isRetryable: (err) => err instanceof Error && err.message === "E_TRANSIENT",
+    };
+
+    // And the jitter factor selected for the first retry delay is 0 percent
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+
+    // And the operation captures its AttemptContext on every attempt
+    // And the first attempt rejects with error "E_TRANSIENT" after 800 ms
+    // And the second attempt resolves with value "ok"
+    const captured: AttemptContext[] = [];
+    const fn = vi.fn(async (ctx: AttemptContext) => {
+      captured.push(ctx);
+      if (ctx.attempt === 1) {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 800);
+        });
+        throw new Error("E_TRANSIENT");
+      }
+      return "ok";
+    });
+
+    // When the caller invokes the retry helper once
+    const promise = retryWithBackoff(fn, opts);
+
+    await vi.advanceTimersByTimeAsync(800); // attempt 1 duration
+    await vi.advanceTimersByTimeAsync(500); // first retry sleep
+
+    // Then the retry helper returns "ok"
+    await expect(promise).resolves.toBe("ok");
+
+    // And the AttemptContext captured on attempt 1 reports a remaining budget of 5000 ms
+    expect(captured[0]?.timeoutMs).toBe(5000);
+
+    // And the AttemptContext captured on attempt 2 reports a remaining budget of 3700 ms
+    expect(captured[1]?.timeoutMs).toBe(3700);
+
+    // And the AttemptContext captured on attempt 2 reports attempt number 2
+    expect(captured[1]?.attempt).toBe(2);
+
+    // And exactly 2 attempts are executed
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
 });
