@@ -376,6 +376,22 @@ describe("filterDiffByIgnores", () => {
     expect(filtered.unified_diff).not.toContain("diff --git a/app.lock b/app.lock");
   });
 
+  it("removes every file patch with a catch-all pattern", async () => {
+    const filterDiffByIgnores = await loadFilterDiffByIgnores();
+    const diff = directoryGlobDiff();
+
+    // Given ignore patterns are ["**"]
+    const patterns: readonly string[] = ["**"];
+
+    // When filterDiffByIgnores receives the Diff and the patterns
+    const filtered = filterDiffByIgnores(diff, patterns);
+
+    // Then the returned Diff has no files
+    expect(filtered.files).toEqual([]);
+    // And the returned unified_diff is ""
+    expect(filtered.unified_diff).toBe("");
+  });
+
   it.each([
     ["*.lock", "app.lock", "pnpm-lock.yaml"],
     ["**/*.lock", "app.lock", "pnpm-lock.yaml"],
