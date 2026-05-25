@@ -261,6 +261,21 @@ describe("re-review command handler", () => {
       runtime.reviewOptions,
     );
   });
+
+  it("does not install a re-review-specific timeout budget", async () => {
+    const runtime = buildRuntime("valid-response");
+
+    await handleReReviewCommand(
+      buildCommand({ correlationId: "delivery-re-review-020" }),
+      runtime.dependencies,
+    );
+
+    const reviewOptions = firstReviewOptions(runtime);
+    const timeoutMs = providerTimeoutMs(reviewOptions);
+    expect(timeoutMs).toBe(ReviewTimeoutMs);
+    expect(timeoutMs).not.toBe(60_000);
+    expect(timeoutMs).not.toBe(900_000);
+  });
 });
 
 type RuntimeMode = "invalid-response" | "rejects" | "valid-response";
@@ -361,6 +376,24 @@ function buildReviewOptions(): ReviewPullRequestOptions {
   };
 
   return { provider };
+}
+
+function firstReviewOptions(runtime: ReReviewRuntime): ReviewPullRequestOptions {
+  const call = runtime.reviewPullRequest.mock.calls[0];
+  if (call === undefined) {
+    throw new Error("Expected reviewPullRequest to have been called");
+  }
+
+  return call[1];
+}
+
+function providerTimeoutMs(options: ReviewPullRequestOptions): number {
+  const timeoutMs = Reflect.get(options.provider, "timeoutMs");
+  if (typeof timeoutMs !== "number") {
+    throw new Error("Expected review provider to expose timeoutMs");
+  }
+
+  return timeoutMs;
 }
 
 function buildOctokit(mode: RuntimeMode, values: { readonly draft?: boolean }): ReReviewOctokit {

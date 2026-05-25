@@ -93,6 +93,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   300000 ms LLM timeout budget, so `@sovri-bot re-review` and webhook reviews
   use the same provider deadline.
 
+- `test(bot)`: add ATDD violation coverage proving `@sovri-bot re-review`
+  does not install a separate 60000 ms or 900000 ms timeout budget.
+
 - `feat(bot)`: register the `issue_comment.created` Probot webhook through
   `registerWebhookHandlers`, wire a real Octokit `reactions.createForIssueComment`
   reactor for unknown commands, and route re-review and dismiss commands through
