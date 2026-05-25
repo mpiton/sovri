@@ -58,6 +58,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `fix(review-engine)`: walkthrough cost lookup now rejects prototype-key
+  model names (`__proto__`, `constructor`, `toString`,
+  `hasOwnProperty`) via an `Object.hasOwn` own-property check before
+  returning pricing, so unknown models keep the documented `unavailable`
+  fallback instead of feeding inherited prototype values into
+  `estimateCostUsd` and rendering `$NaN`.
+
 - `fix(config)`: `review.mode: strict` in `.sovri.yml` now fails config
   validation with `Mode 'strict' is reserved for v0.5+ and is not yet
   enabled` instead of silently flowing through as an enabled review mode,

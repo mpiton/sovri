@@ -69,6 +69,18 @@ describe("renderCostFooter fallbacks", () => {
       "_Tokens: 1234 in / 567 out · Estimated cost: unavailable (openai-compatible local-qwen-72b)_",
     );
   });
+
+  it.each(["__proto__", "constructor", "toString", "hasOwnProperty"])(
+    "treats prototype key %s as an unknown model and falls back to unavailable",
+    (model) => {
+      const markdown = renderCostFooter(usage(1234, 567), "anthropic", model);
+
+      expect(markdown).toBe(
+        `_Tokens: 1234 in / 567 out · Estimated cost: unavailable (anthropic ${model})_`,
+      );
+      expect(markdown).not.toContain("$NaN");
+    },
+  );
 });
 
 describe("renderCostFooter rounding", () => {

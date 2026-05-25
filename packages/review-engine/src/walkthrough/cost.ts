@@ -76,7 +76,12 @@ function getModelPricing(provider: string, model: string): ModelPricing | undefi
     return undefined;
   }
 
-  return PROVIDER_PRICING[provider][model];
+  const providerPricing = PROVIDER_PRICING[provider];
+  if (!Object.hasOwn(providerPricing, model)) {
+    return undefined;
+  }
+
+  return providerPricing[model];
 }
 
 function isProvider(provider: string): provider is PricingProvider {
