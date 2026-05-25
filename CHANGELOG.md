@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(bot)`: add ATDD acceptance coverage for `@sovri-bot re-review`
+  reaching the shared pull request review flow, requiring the issue-comment
+  command path to load repository config, fetch the pull request diff, call the
+  review engine, and post a walkthrough against the current PR head.
+
 - `feat(bot)`: register the `issue_comment.created` Probot webhook through
   `registerWebhookHandlers`, wire a real Octokit `reactions.createForIssueComment`
   reactor for unknown commands, and route re-review and dismiss commands through

@@ -21,12 +21,15 @@ const Owner = "octo-org";
 const Repo = "sovri-target";
 const RepoFullName = `${Owner}/${Repo}`;
 const PullNumber = 42;
+const CommentId = 98_765;
 const BaseSha = "dddddddddddddddddddddddddddddddddddddddd";
 const OpenedHeadSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const SynchronizedHeadSha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const SecondSynchronizedHeadSha = "cccccccccccccccccccccccccccccccccccccccc";
+const ReReviewHeadSha = "dddddddddddddddddddddddddddddddddddddddd";
 const OpenedDeliveryId = "8f1b9c2d-3e4f-45a6-91b2-123456789abc";
 const SynchronizeDeliveryId = "9f1b9c2d-3e4f-45a6-91b2-123456789abc";
+const ReReviewDeliveryId = "delivery-re-review-001";
 const SecretWebhookValue = "secret-webhook-value-45";
 const SecretLlmValue = "secret-llm-value-45";
 const SecretMistralValue = "test-key";
@@ -65,6 +68,7 @@ type ObservedRuntime = {
   readonly listFilesQueries: string[];
   readonly mistralApiKeys: string[];
   readonly mistralRequests: unknown[];
+  readonly repositoryConfigRequests: string[];
   readonly reviewRequests: ReviewRequest[];
 };
 
@@ -584,6 +588,29 @@ describe("community bot pull request review E2E ATDD", () => {
     // And the unhandled-request listener records 0 unhandled network requests
     expect(unhandledRequests).toEqual([]);
   }, 20_000);
+
+  it("re-review reaches the same review collaborators as synchronize", async () => {
+    // Given issue comment delivery "delivery-re-review-001" targets repository "octo-org/sovri-target"
+    // And issue 42 is pull request 42
+    // And comment 98765 was authored by "alice"
+    // And the command body is "@sovri-bot re-review"
+    // And GitHub pull request 42 currently has head SHA "dddddddddddddddddddddddddddddddddddddddd"
+    // And repository config sets `review.autoReviewDrafts` to false
+    // And pull request 42 is not a draft
+    const runtime = await runReReviewFlow({ headSha: ReReviewHeadSha });
+
+    // When Sovri accepts the re-review command
+    // Then the shared pull request review flow loads config for "octo-org/sovri-target"
+    expect(runtime.repositoryConfigRequests).toEqual([RepoFullName]);
+    // And the shared pull request review flow fetches the diff for pull request 42
+    expect(runtime.listFilesQueries).toHaveLength(1);
+    expect(runtime.listFilesQueries[0]).toContain(String(PullNumber));
+    // And the shared pull request review flow calls the review engine for pull request 42
+    expect(runtime.anthropicRequests).toHaveLength(1);
+    // And the shared pull request review flow posts the walkthrough for pull request 42
+    expect(runtime.reviewRequests).toHaveLength(1);
+    expect(runtime.reviewRequests[0]?.commit_id).toBe(ReReviewHeadSha);
+  }, 15_000);
 });
 
 function runOpenedReviewFlow(): Promise<ObservedRuntime> {
@@ -633,13 +660,14 @@ async function runReviewFlow(values: {
     listFilesQueries: [],
     mistralApiKeys: [],
     mistralRequests: [],
+    repositoryConfigRequests: [],
     reviewRequests: [],
   };
   vi.stubEnv("ANTHROPIC_API_KEY", SecretLlmValue);
   if (Object.hasOwn(values, "mistralApiKey")) {
     vi.stubEnv("MISTRAL_API_KEY", values.mistralApiKey);
   }
-  installReviewFlowHandlers(runtime, values.reviewStatus ?? 200);
+  installReviewFlowHandlers(runtime, values.reviewStatus ?? 200, values.headSha);
   if (values.configContent !== undefined) {
     installRepositoryConfigHandler(values.configContent);
   }
@@ -656,6 +684,32 @@ async function runReviewFlow(values: {
   return runtime;
 }
 
+async function runReReviewFlow(values: { readonly headSha: string }): Promise<ObservedRuntime> {
+  const runtime: ObservedRuntime = {
+    anthropicApiKeys: [],
+    anthropicRequests: [],
+    issueCommentBodies: [],
+    listFilesQueries: [],
+    mistralApiKeys: [],
+    mistralRequests: [],
+    repositoryConfigRequests: [],
+    reviewRequests: [],
+  };
+  vi.stubEnv("ANTHROPIC_API_KEY", SecretLlmValue);
+  installReviewFlowHandlers(runtime, 200, values.headSha);
+  const probot = new Probot({
+    githubToken: SecretInstallationToken,
+    log: createLogger("community-bot.e2e-test"),
+  });
+  await probot.load(app, { addHandler() {} });
+  await probot.receive({
+    id: ReReviewDeliveryId,
+    name: "issue_comment",
+    payload: buildIssueCommentPayload(),
+  });
+  return runtime;
+}
+
 function installRepositoryConfigHandler(configContent: string): void {
   server.use(
     http.get(`${GitHubBaseUrl}/repos/:owner/:repo/contents/.sovri.yml`, () =>
@@ -664,18 +718,34 @@ function installRepositoryConfigHandler(configContent: string): void {
   );
 }
 
-function installReviewFlowHandlers(runtime: ObservedRuntime, reviewStatus: number): void {
+function installReviewFlowHandlers(
+  runtime: ObservedRuntime,
+  reviewStatus: number,
+  currentHeadSha: string,
+): void {
   server.use(
-    http.get(`${GitHubBaseUrl}/repos/:owner/:repo/contents/.sovri.yml`, () =>
-      HttpResponse.json({ message: "Not Found" }, { status: 404 }),
-    ),
-    http.get(`${GitHubBaseUrl}/repos/:owner/:repo/pulls/:pull_number`, () =>
-      HttpResponse.text("not a unified diff"),
-    ),
-    http.get(`${GitHubBaseUrl}/repos/:owner/:repo/pulls/:pull_number/files`, ({ request }) => {
-      runtime.listFilesQueries.push(new URL(request.url).searchParams.toString());
-      return HttpResponse.json(defaultGitHubFiles());
+    http.get(`${GitHubBaseUrl}/repos/:owner/:repo/contents/.sovri.yml`, ({ params }) => {
+      runtime.repositoryConfigRequests.push(`${String(params.owner)}/${String(params.repo)}`);
+      return HttpResponse.json({ message: "Not Found" }, { status: 404 });
     }),
+    http.get(`${GitHubBaseUrl}/repos/:owner/:repo/pulls/:pull_number`, ({ request }) => {
+      const accept = request.headers.get("accept") ?? "";
+      if (accept.includes("diff")) {
+        return HttpResponse.text("not a unified diff");
+      }
+      return HttpResponse.json(
+        buildPullRequestPayload({ action: "synchronize", headSha: currentHeadSha }).pull_request,
+      );
+    }),
+    http.get(
+      `${GitHubBaseUrl}/repos/:owner/:repo/pulls/:pull_number/files`,
+      ({ params, request }) => {
+        runtime.listFilesQueries.push(
+          `${String(params.pull_number)}?${new URL(request.url).searchParams.toString()}`,
+        );
+        return HttpResponse.json(defaultGitHubFiles());
+      },
+    ),
     http.get(`${GitHubBaseUrl}/repos/:owner/:repo/pulls/:pull_number/reviews`, () =>
       HttpResponse.json([]),
     ),
@@ -724,6 +794,29 @@ function installReviewFlowHandlers(runtime: ObservedRuntime, reviewStatus: numbe
       return mistralChatCompletionWithText(JSON.stringify(buildProviderResponse(3)));
     }),
   );
+}
+
+function buildIssueCommentPayload() {
+  return {
+    action: "created",
+    comment: {
+      body: "@sovri-bot re-review",
+      id: CommentId,
+      user: {
+        login: "alice",
+      },
+    },
+    installation: {
+      id: 123456,
+    },
+    issue: {
+      number: PullNumber,
+      pull_request: {},
+    },
+    repository: {
+      full_name: RepoFullName,
+    },
+  };
 }
 
 function buildPullRequestPayload(values: { readonly action: string; readonly headSha: string }) {
