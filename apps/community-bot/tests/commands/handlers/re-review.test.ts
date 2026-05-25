@@ -187,12 +187,40 @@ describe("re-review command handler", () => {
       "Pull request review failed",
     );
   });
+
+  it("logs draft skip without running review collaborators when draft reviews are disabled", async () => {
+    const runtime = buildRuntime("valid-response", { draft: true });
+
+    await handleReReviewCommand(
+      buildCommand({ correlationId: "delivery-re-review-015" }),
+      runtime.dependencies,
+    );
+
+    expect(runtime.loadConfig).toHaveBeenCalledTimes(1);
+    expect(runtime.logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        delivery_id: "delivery-re-review-015",
+        draft: true,
+        event: "pull_request.synchronize",
+        pr_number: PullRequestNumber,
+        repo: RepoFullName,
+      }),
+      "Pull request review skipped",
+    );
+    expect(runtime.fetchDiff).not.toHaveBeenCalled();
+    expect(runtime.reviewPullRequest).not.toHaveBeenCalled();
+    expect(runtime.postReview).not.toHaveBeenCalled();
+    expect(runtime.postErrorComment).not.toHaveBeenCalled();
+  });
 });
 
 type RuntimeMode = "invalid-response" | "rejects" | "valid-response";
 type ReReviewRuntime = ReturnType<typeof buildRuntime>;
 
-function buildRuntime(mode: RuntimeMode): {
+function buildRuntime(
+  mode: RuntimeMode,
+  values: { readonly draft?: boolean } = {},
+): {
   readonly createPullRequestDependencies: ReturnType<
     typeof vi.fn<ReReviewCommandDependencies["createPullRequestDependencies"]>
   >;
@@ -212,7 +240,7 @@ function buildRuntime(mode: RuntimeMode): {
     typeof vi.fn<PullRequestHandlerDependencies["reviewPullRequest"]>
   >;
 } {
-  const octokit = buildOctokit(mode);
+  const octokit = buildOctokit(mode, values);
   const fetchDiff = vi.fn<PullRequestHandlerDependencies["fetchDiff"]>(async () => buildDiff());
   const loadConfig = vi.fn<PullRequestHandlerDependencies["loadConfig"]>(
     async () => DEFAULT_CONFIG,
@@ -261,14 +289,17 @@ function buildRuntime(mode: RuntimeMode): {
   };
 }
 
-function buildOctokit(mode: RuntimeMode): ReReviewOctokit {
+function buildOctokit(mode: RuntimeMode, values: { readonly draft?: boolean }): ReReviewOctokit {
   const getPullRequest = vi.fn<ReReviewOctokit["rest"]["pulls"]["get"]>(async () => {
     if (mode === "rejects") {
       throw new Error("GitHub pull lookup failed");
     }
 
     return {
-      data: mode === "invalid-response" ? { number: PullRequestNumber } : buildPullRequest(),
+      data:
+        mode === "invalid-response"
+          ? { number: PullRequestNumber }
+          : buildPullRequest({ draft: values.draft ?? false }),
     };
   });
 
@@ -348,7 +379,7 @@ function buildCommand(
   };
 }
 
-function buildPullRequest() {
+function buildPullRequest(values: { readonly draft: boolean }) {
   return {
     additions: 12,
     base: {
@@ -358,7 +389,7 @@ function buildPullRequest() {
     body: "Implement re-review.",
     changed_files: 1,
     deletions: 3,
-    draft: false,
+    draft: values.draft,
     head: {
       ref: "task-77",
       sha: HeadSha,

@@ -75,6 +75,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   re-review` posts a walkthrough review and does not post an error issue
   comment.
 
+- `test(bot)`: add ATDD violation coverage proving `@sovri-bot re-review`
+  skips draft pull requests when `review.autoReviewDrafts` is disabled,
+  logging the skip without fetching diffs, running the review engine, or
+  posting a walkthrough.
+
 - `feat(bot)`: register the `issue_comment.created` Probot webhook through
   `registerWebhookHandlers`, wire a real Octokit `reactions.createForIssueComment`
   reactor for unknown commands, and route re-review and dismiss commands through
