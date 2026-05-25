@@ -136,6 +136,17 @@ describe("parseCommand", () => {
     expect(command).toEqual({ kind: "no-mention" });
   });
 
+  it("returns no-mention for an empty comment body", async () => {
+    const { parseCommand } = await import("./parser.js");
+
+    // Given an empty GitHub issue comment body:
+    const body = "";
+    // When the command body is parsed
+    const command = parseCommand(body);
+    // Then the parsed command is `no-mention`
+    expect(command).toEqual({ kind: "no-mention" });
+  });
+
   it("ignores a mention after leading whitespace", async () => {
     const { parseCommand } = await import("./parser.js");
 

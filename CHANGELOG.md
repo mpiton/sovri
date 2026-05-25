@@ -30,7 +30,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   coverage, `unknown` results for non-exact command verbs and supported
   commands with extra tokens, repeated whitespace after the bot mention before
   supported commands, ordinary comments without a bot mention, inline prose
-  mentions ignored as `no-mention`,
+  mentions ignored as `no-mention`, empty comment bodies returning `no-mention`,
   while indented and quoted mentions remain ignored, and repeated parsing
   of the same input remains deterministic without GitHub event context,
   environment reads, or Node filesystem imports.
