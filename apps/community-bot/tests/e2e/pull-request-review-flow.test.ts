@@ -38,6 +38,8 @@ const ReReviewLookupFailureDeliveryId = "delivery-re-review-006";
 const ReReviewAcceptedReactionDeliveryId = "delivery-re-review-007";
 const ReReviewSingleReactionDeliveryId = "delivery-re-review-008";
 const ReReviewCannotAcceptDeliveryId = "delivery-re-review-009";
+const ReReviewDiffFailureDeliveryId = "delivery-re-review-010";
+const ReReviewPosterFailureDeliveryId = "delivery-re-review-012";
 const SecretWebhookValue = "secret-webhook-value-45";
 const SecretLlmValue = "secret-llm-value-45";
 const SecretMistralValue = "test-key";
@@ -69,6 +71,8 @@ const PullRequestReviewRouteSchema = z.object({
 
 type ReviewRequest = ReturnType<typeof validatePullRequestReviewRequest>;
 
+type ReviewFlowFailureStep = "diff fetcher" | "review poster";
+
 type ReactionRequest = {
   readonly comment_id: number;
   readonly content: "+1";
@@ -89,6 +93,7 @@ type ObservedRuntime = {
   readonly reactionRequests: ReactionRequest[];
   readonly repositoryConfigRequests: string[];
   readonly reviewRequests: ReviewRequest[];
+  readonly successfulReviewRequests: ReviewRequest[];
 };
 
 type UnhandledRequest = {
@@ -794,6 +799,51 @@ describe("community bot pull request review E2E ATDD", () => {
     expect(runtime.reviewRequests).toEqual([]);
   }, 15_000);
 
+  it.each([
+    {
+      deliveryId: ReReviewDiffFailureDeliveryId,
+      expectedCommentText: "review failed",
+      failingStep: "diff fetcher",
+    },
+    {
+      deliveryId: ReReviewPosterFailureDeliveryId,
+      expectedCommentText: "could not be posted as a pull request review",
+      failingStep: "review poster",
+    },
+  ] satisfies readonly {
+    readonly deliveryId: string;
+    readonly expectedCommentText: string;
+    readonly failingStep: ReviewFlowFailureStep;
+  }[])(
+    "review flow failure posts one error comment and no walkthrough for $failingStep failure",
+    async ({ deliveryId, expectedCommentText, failingStep }) => {
+      // Given issue comment delivery "<delivery_id>" targets repository "octo-org/sovri-target"
+      // And issue 42 is pull request 42
+      // And comment 98765 was authored by "alice"
+      // And the command body is "@sovri-bot re-review"
+      // And GitHub `pulls.get` returns head SHA "dddddddddddddddddddddddddddddddddddddddd"
+      // And repository config sets `review.autoReviewDrafts` to false
+      // And pull request 42 is not a draft
+      // And the "<failing_step>" fails with message "provider timeout"
+      const runtime = await runReReviewFlow({
+        deliveryId,
+        failingStep,
+        headSha: ReReviewHeadSha,
+      });
+
+      // When Sovri handles the re-review command
+      // Then exactly 1 issue comment is posted on pull request 42
+      expect(runtime.issueCommentBodies).toHaveLength(1);
+      // And the issue comment explains that re-review failed
+      expect(runtime.issueCommentBodies[0]).toContain(expectedCommentText);
+      // And no walkthrough review is posted
+      expect(runtime.successfulReviewRequests).toEqual([]);
+      // And no inline comments are posted
+      expect(runtime.successfulReviewRequests.flatMap((request) => request.comments)).toEqual([]);
+    },
+    35_000,
+  );
+
   it("re-review preserves synchronize collaborator order", async () => {
     // Given issue comment delivery "delivery-re-review-002" targets repository "octo-org/sovri-target"
     // And issue 42 is pull request 42
@@ -873,6 +923,7 @@ async function runReviewFlow(values: {
     reactionRequests: [],
     repositoryConfigRequests: [],
     reviewRequests: [],
+    successfulReviewRequests: [],
   };
   vi.stubEnv("ANTHROPIC_API_KEY", SecretLlmValue);
   if (Object.hasOwn(values, "mistralApiKey")) {
@@ -897,6 +948,7 @@ async function runReviewFlow(values: {
 
 async function runReReviewFlow(values: {
   readonly deliveryId?: string;
+  readonly failingStep?: ReviewFlowFailureStep;
   readonly headSha: string;
   readonly pullLookupStatus?: number;
 }): Promise<ObservedRuntime> {
@@ -913,9 +965,16 @@ async function runReReviewFlow(values: {
     reactionRequests: [],
     repositoryConfigRequests: [],
     reviewRequests: [],
+    successfulReviewRequests: [],
   };
   vi.stubEnv("ANTHROPIC_API_KEY", SecretLlmValue);
-  installReviewFlowHandlers(runtime, 200, values.headSha, values.pullLookupStatus ?? 200);
+  installReviewFlowHandlers(
+    runtime,
+    200,
+    values.headSha,
+    values.pullLookupStatus ?? 200,
+    values.failingStep,
+  );
   const probot = new Probot({
     githubToken: SecretInstallationToken,
     log: createLogger("community-bot.e2e-test"),
@@ -942,6 +1001,7 @@ function installReviewFlowHandlers(
   reviewStatus: number,
   currentHeadSha: string,
   pullLookupStatus = 200,
+  failingStep?: ReviewFlowFailureStep,
 ): void {
   server.use(
     http.get(`${GitHubBaseUrl}/repos/:owner/:repo/contents/.sovri.yml`, ({ params }) => {
@@ -953,6 +1013,9 @@ function installReviewFlowHandlers(
       const accept = request.headers.get("accept") ?? "";
       if (accept.includes("diff")) {
         runtime.collaboratorCalls.push("fetch diff");
+        if (failingStep === "diff fetcher") {
+          return HttpResponse.json({ message: "provider timeout" }, { status: 404 });
+        }
         return HttpResponse.text("not a unified diff");
       }
       runtime.pullGetRequests.push(
@@ -994,12 +1057,13 @@ function installReviewFlowHandlers(
         });
         runtime.reviewRequests.push(reviewRequest);
         runtime.eventLog.push("post review");
-        if (reviewStatus === 403) {
+        if (failingStep === "review poster" || reviewStatus === 403) {
           return HttpResponse.json(
             { message: "Resource not accessible by integration" },
             { status: 403 },
           );
         }
+        runtime.successfulReviewRequests.push(reviewRequest);
         return HttpResponse.json({ body: reviewRequest.body, id: 98765 });
       },
     ),

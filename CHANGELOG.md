@@ -62,6 +62,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   does not create the accepted `+1` reaction when the current pull request
   lookup fails before command acceptance.
 
+- `test(bot)`: add ATDD violation coverage for `@sovri-bot re-review`
+  shared-flow failures, requiring one explanatory issue comment and no
+  successful walkthrough review when diff fetching, review execution, or
+  review posting fails.
+
 - `feat(bot)`: register the `issue_comment.created` Probot webhook through
   `registerWebhookHandlers`, wire a real Octokit `reactions.createForIssueComment`
   reactor for unknown commands, and route re-review and dismiss commands through
@@ -158,6 +163,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   third-party glob imports including side-effect import forms.
 
 ### Fixed
+
+- `fix(bot)`: make PR review fallback issue comments explicitly explain that
+  the walkthrough could not be posted as a pull request review while keeping
+  the walkthrough marker for future updates and cleanup.
 
 - `fix(bot)`: keep `@sovri-bot re-review` running when the accepted-command
   `+1` reaction cannot be created, logging the reaction failure without

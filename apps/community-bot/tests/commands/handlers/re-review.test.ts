@@ -110,9 +110,57 @@ describe("re-review command handler", () => {
     expect(runtime.reviewPullRequest).toHaveBeenCalledTimes(1);
     expect(runtime.postReview).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    {
+      failingStep: "diff fetcher",
+      postReviewCalls: 0,
+      reject(runtime: ReReviewRuntime): void {
+        runtime.fetchDiff.mockRejectedValue(new Error("provider timeout"));
+      },
+    },
+    {
+      failingStep: "review engine",
+      postReviewCalls: 0,
+      reject(runtime: ReReviewRuntime): void {
+        runtime.reviewPullRequest.mockRejectedValue(new Error("provider timeout"));
+      },
+    },
+    {
+      failingStep: "review poster",
+      postReviewCalls: 1,
+      reject(runtime: ReReviewRuntime): void {
+        runtime.postReview.mockRejectedValue(new Error("provider timeout"));
+      },
+    },
+  ])("posts one review failure comment for shared $failingStep failure", async (testCase) => {
+    const runtime = buildRuntime("valid-response");
+    testCase.reject(runtime);
+
+    await handleReReviewCommand(buildCommand(), runtime.dependencies);
+
+    expect(runtime.reactToAccepted).toHaveBeenCalledTimes(1);
+    expect(runtime.postErrorComment).toHaveBeenCalledTimes(1);
+    expect(runtime.postErrorComment).toHaveBeenCalledWith(
+      expect.objectContaining({ number: PullRequestNumber, repoFullName: RepoFullName }),
+      "review failed",
+    );
+    expect(runtime.postReview).toHaveBeenCalledTimes(testCase.postReviewCalls);
+    expect(runtime.logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        delivery_id: DeliveryId,
+        error_message: "provider timeout",
+        event: "pull_request.synchronize",
+        pr_number: PullRequestNumber,
+        repo: RepoFullName,
+      }),
+      "Pull request review failed",
+    );
+  });
 });
 
 type RuntimeMode = "invalid-response" | "rejects" | "valid-response";
+type ReReviewRuntime = ReturnType<typeof buildRuntime>;
 
 function buildRuntime(mode: RuntimeMode): {
   readonly createPullRequestDependencies: ReturnType<

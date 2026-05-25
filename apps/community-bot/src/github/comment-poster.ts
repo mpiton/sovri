@@ -7,6 +7,8 @@ import type { InlineCommentDraft } from "@sovri/review-engine";
 export const WALKTHROUGH_MARKER = "<!-- sovri:walkthrough -->";
 
 const logger = createLogger("community-bot.comment-poster");
+const FallbackIssueCommentNotice =
+  "Sovri review could not be posted as a pull request review, so the walkthrough is posted as an issue comment.";
 
 export type RepositoryRef = {
   readonly owner: string;
@@ -515,6 +517,7 @@ async function postFallbackComment(values: {
   readonly repo: RepositoryRef;
 }): Promise<void> {
   const status = statusFrom(values.error);
+  const fallbackBody = buildFallbackIssueCommentBody(values.body);
   try {
     const existing = await findMarkedIssueComment(
       values.octokit,
@@ -524,7 +527,7 @@ async function postFallbackComment(values: {
     );
     if (existing !== undefined) {
       const updated = await values.octokit.rest.issues.updateComment({
-        body: values.body,
+        body: fallbackBody,
         comment_id: existing.id,
         owner: values.repo.owner,
         repo: values.repo.repo,
@@ -534,7 +537,7 @@ async function postFallbackComment(values: {
     }
 
     const response = await values.octokit.rest.issues.createComment({
-      body: values.body,
+      body: fallbackBody,
       issue_number: values.prNumber,
       owner: values.repo.owner,
       repo: values.repo.repo,
@@ -547,6 +550,17 @@ async function postFallbackComment(values: {
       status,
     });
   }
+}
+
+function buildFallbackIssueCommentBody(body: string): string {
+  if (body.startsWith(`${WALKTHROUGH_MARKER}\n`)) {
+    return body.replace(
+      `${WALKTHROUGH_MARKER}\n`,
+      `${WALKTHROUGH_MARKER}\n${FallbackIssueCommentNotice}\n\n`,
+    );
+  }
+
+  return `${FallbackIssueCommentNotice}\n\n${body}`;
 }
 
 function logReviewPosted(
