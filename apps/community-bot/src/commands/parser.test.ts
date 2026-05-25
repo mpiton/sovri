@@ -123,6 +123,19 @@ describe("parseCommand", () => {
     expect(command).toEqual({ kind: "unknown", raw: "help, please!" });
   });
 
+  it("excludes trailing whitespace from an unknown raw command remainder", async () => {
+    const { parseCommand } = await import("./parser.js");
+
+    // Given a GitHub issue comment body:
+    const body = "@sovri-bot explain    ";
+    // And the command line has four trailing spaces after "explain"
+    // When the command body is parsed
+    const command = parseCommand(body);
+    // Then the parsed command is `unknown`
+    // And the raw command remainder is "explain"
+    expect(command).toEqual({ kind: "unknown", raw: "explain" });
+  });
+
   it.each(["Re-Review", "DISMISS abc-123-def", "resolve abc-123-def"])(
     "returns unknown for non-exact command verb %s",
     async (commandLine) => {
