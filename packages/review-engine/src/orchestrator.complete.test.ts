@@ -114,6 +114,7 @@ describe("reviewPullRequest complete Review contract", () => {
     expect(review.findings.some((finding) => finding.title === "review_failed")).toBe(false);
 
     expect(review.tokens_used).toEqual({ prompt: 812, completion: 144 });
+    expect(Reflect.get(review, "token_usage_reported")).toBe(true);
     expect(review.completed_at.getTime()).toBeGreaterThanOrEqual(review.started_at.getTime());
     expect(review.findings).toEqual([
       expect.objectContaining({
@@ -222,6 +223,7 @@ describe("reviewPullRequest complete Review contract", () => {
 
     expect(review.summary).toBe("No actionable findings.");
     expect(review.tokens_used).toEqual({ prompt: 700, completion: 32 });
+    expect(Reflect.get(review, "token_usage_reported")).toBe(true);
   });
 });
 

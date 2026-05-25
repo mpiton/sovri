@@ -21,6 +21,7 @@ const FixtureReviewSchema = z.object({
     prompt: z.number(),
     completion: z.number(),
   }),
+  token_usage_reported: z.boolean().optional(),
   summary: z.string(),
   findings: z.array(FindingSchema),
   walkthrough_markdown: z.string(),

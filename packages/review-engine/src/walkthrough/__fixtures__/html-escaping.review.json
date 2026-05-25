@@ -11,6 +11,7 @@
     "prompt": 900,
     "completion": 150
   },
+  "token_usage_reported": true,
   "summary": "Found <script>alert(1)</script> & comments",
   "findings": [
     {

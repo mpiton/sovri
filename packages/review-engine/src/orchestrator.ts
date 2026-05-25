@@ -78,11 +78,16 @@ interface StructuredGeneration<T> {
   readonly tokenUsage: TokenUsage;
 }
 
+interface ReportedStructuredGeneration<T> extends StructuredGeneration<T> {
+  readonly tokenUsageReported: boolean;
+}
+
 type ParsedReviewGeneration = SuccessfulReviewGeneration | FailedReviewGeneration;
 
 interface SuccessfulReviewGeneration {
   readonly parsed: ProviderReviewResponse;
   readonly tokenUsage: TokenUsage;
+  readonly tokenUsageReported: boolean;
   readonly status: "success" | "partial";
 }
 
@@ -90,6 +95,7 @@ interface FailedReviewGeneration {
   readonly error: string;
   readonly failureKind: "parse" | "provider";
   readonly tokenUsage: TokenUsage;
+  readonly tokenUsageReported: boolean;
   readonly status: "failed";
 }
 
@@ -98,11 +104,13 @@ type ProviderReviewAttempt =
       readonly success: true;
       readonly parsed: ProviderReviewResponse;
       readonly tokenUsage: TokenUsage;
+      readonly tokenUsageReported: boolean;
     }
   | {
       readonly success: false;
       readonly error: unknown;
       readonly tokenUsage: TokenUsage;
+      readonly tokenUsageReported: boolean;
     };
 
 interface UsageAwareProvider extends LLMProvider {
@@ -257,6 +265,7 @@ export async function reviewPullRequest(
     return buildFailedReview(reviewInput.pullRequest, provider, startedAt, generation.error, {
       findings,
       tokenUsage: generation.tokenUsage,
+      tokenUsageReported: generation.tokenUsageReported,
     });
   }
 
@@ -276,6 +285,7 @@ export async function reviewPullRequest(
     llm_provider: provider.name,
     llm_model: provider.model,
     tokens_used: generation.tokenUsage,
+    token_usage_reported: generation.tokenUsageReported,
     summary: generation.parsed.summary,
     findings,
     walkthrough_markdown: generation.parsed.walkthrough_markdown,
@@ -298,6 +308,7 @@ function buildNoFilesReview(
     llm_provider: provider.name,
     llm_model: provider.model,
     tokens_used: ZeroTokenUsage,
+    token_usage_reported: false,
     summary: NoFilesAfterIgnoreFiltersMessage,
     findings: [],
     walkthrough_markdown: `## Sovri review\n\n${NoFilesAfterIgnoreFiltersMessage}`,
@@ -344,6 +355,7 @@ async function generateParsedProviderReview(
     return {
       parsed: firstAttempt.parsed,
       tokenUsage: firstAttempt.tokenUsage,
+      tokenUsageReported: firstAttempt.tokenUsageReported,
       status: "success",
     };
   }
@@ -357,6 +369,7 @@ async function generateParsedProviderReview(
       error: providerFailureMessage(firstAttempt.error),
       failureKind: "provider",
       tokenUsage: firstAttempt.tokenUsage,
+      tokenUsageReported: firstAttempt.tokenUsageReported,
       status: "failed",
     };
   }
@@ -376,6 +389,7 @@ async function generateParsedProviderReview(
         error: providerFailureMessage(retryAttempt.error),
         failureKind: "provider",
         tokenUsage: addTokenUsage(firstAttempt.tokenUsage, retryAttempt.tokenUsage),
+        tokenUsageReported: hasReportedTokenUsage(firstAttempt, retryAttempt),
         status: "failed",
       };
     }
@@ -384,6 +398,7 @@ async function generateParsedProviderReview(
       error: schemaFailureMessage(retryAttempt.error),
       failureKind: "parse",
       tokenUsage: addTokenUsage(firstAttempt.tokenUsage, retryAttempt.tokenUsage),
+      tokenUsageReported: hasReportedTokenUsage(firstAttempt, retryAttempt),
       status: "failed",
     };
   }
@@ -391,6 +406,7 @@ async function generateParsedProviderReview(
   return {
     parsed: retryAttempt.parsed,
     tokenUsage: addTokenUsage(firstAttempt.tokenUsage, retryAttempt.tokenUsage),
+    tokenUsageReported: hasReportedTokenUsage(firstAttempt, retryAttempt),
     status: "partial",
   };
 }
@@ -407,19 +423,24 @@ async function generateProviderReviewAttempt(
         success: true,
         parsed: parseLLMReviewResponse(generation.data, ProviderReviewResponseSchema),
         tokenUsage: generation.tokenUsage,
+        tokenUsageReported: generation.tokenUsageReported,
       };
     } catch (error) {
       return {
         success: false,
         error: new ProviderReviewSchemaError(error),
         tokenUsage: generation.tokenUsage,
+        tokenUsageReported: generation.tokenUsageReported,
       };
     }
   } catch (error) {
+    const tokenUsage = tokenUsageFromError(error);
+
     return {
       success: false,
       error,
-      tokenUsage: tokenUsageFromError(error),
+      tokenUsage: tokenUsage.usage,
+      tokenUsageReported: tokenUsage.reported,
     };
   }
 }
@@ -427,19 +448,21 @@ async function generateProviderReviewAttempt(
 async function generateProviderReviewResponse(
   provider: LLMProvider,
   params: GenerateStructuredParams<ProviderReviewResponse>,
-): Promise<StructuredGeneration<ProviderReviewResponse>> {
+): Promise<ReportedStructuredGeneration<ProviderReviewResponse>> {
   if (isUsageAwareProvider(provider)) {
     const generation = await provider.generateStructuredWithUsage(params);
 
     return {
       data: generation.data,
       tokenUsage: parseTokenUsage(generation.tokenUsage),
+      tokenUsageReported: true,
     };
   }
 
   return {
     data: await provider.generateStructured(params),
     tokenUsage: ZeroTokenUsage,
+    tokenUsageReported: false,
   };
 }
 
@@ -461,17 +484,20 @@ function isRetryableSchemaFailure(error: unknown): boolean {
   return Reflect.get(error, "retryableWithCorrectivePrompt") === true;
 }
 
-function tokenUsageFromError(error: unknown): TokenUsage {
+function tokenUsageFromError(error: unknown): {
+  readonly usage: TokenUsage;
+  readonly reported: boolean;
+} {
   if (!isJsonObject(error)) {
-    return ZeroTokenUsage;
+    return { usage: ZeroTokenUsage, reported: false };
   }
 
   const tokenUsage: unknown = Reflect.get(error, "tokenUsage");
   if (tokenUsage === undefined) {
-    return ZeroTokenUsage;
+    return { usage: ZeroTokenUsage, reported: false };
   }
 
-  return parseTokenUsage(tokenUsage);
+  return { usage: parseTokenUsage(tokenUsage), reported: true };
 }
 
 function parseTokenUsage(tokenUsage: unknown): TokenUsage {
@@ -497,6 +523,13 @@ function addTokenUsage(left: TokenUsage, right: TokenUsage): TokenUsage {
     prompt: left.prompt + right.prompt,
     completion: left.completion + right.completion,
   };
+}
+
+function hasReportedTokenUsage(
+  firstAttempt: ProviderReviewAttempt,
+  retryAttempt: ProviderReviewAttempt,
+): boolean {
+  return firstAttempt.tokenUsageReported || retryAttempt.tokenUsageReported;
 }
 
 function buildCorrectiveSystemPrompt(systemPrompt: string, failure: unknown): string {
@@ -552,6 +585,7 @@ function buildFailedReview(
   options: {
     readonly findings?: readonly Finding[];
     readonly tokenUsage?: TokenUsage;
+    readonly tokenUsageReported?: boolean;
   } = {},
 ): Review {
   return ReviewSchema.parse({
@@ -564,6 +598,7 @@ function buildFailedReview(
     llm_provider: provider.name,
     llm_model: provider.model,
     tokens_used: options.tokenUsage ?? ZeroTokenUsage,
+    token_usage_reported: options.tokenUsageReported ?? false,
     summary: error,
     findings: options.findings ?? [],
     walkthrough_markdown: `## Sovri review\n\n${error}`,

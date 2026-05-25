@@ -326,6 +326,8 @@ describe("reviewPullRequest config filters", () => {
     expect(review.findings).toHaveLength(0);
     // And the returned token usage is 0 prompt tokens and 0 completion tokens
     expect(review.tokens_used).toEqual({ prompt: 0, completion: 0 });
+    // And the returned Review has no reported provider token usage
+    expect(Reflect.get(review, "token_usage_reported")).toBe(false);
     // And the returned Review error is absent
     expect(review.error).toBeUndefined();
   });
@@ -732,6 +734,8 @@ describe("reviewPullRequest config filters", () => {
     expect(review.status).toBe("failed");
     // And the returned Review `tokens_used` is 0 prompt tokens and 0 completion tokens
     expect(review.tokens_used).toEqual({ prompt: 0, completion: 0 });
+    // And the returned Review has no reported provider token usage
+    expect(Reflect.get(review, "token_usage_reported")).toBe(false);
     // And the returned Review summary contains "exceeds review limits"
     expect(review.summary).toContain("exceeds review limits");
     // And the returned Review error contains "exceeds review limits"

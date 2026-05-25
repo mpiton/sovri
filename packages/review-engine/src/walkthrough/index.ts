@@ -18,6 +18,14 @@ const WalkthroughInputWithoutUsageSchema = z.unknown().transform((input, context
     return z.NEVER;
   }
 
+  if (Reflect.get(input, "token_usage_reported") === true) {
+    context.addIssue({
+      code: "custom",
+      message: "walkthrough input cannot report token usage without token counts",
+    });
+    return z.NEVER;
+  }
+
   const parsed = ReviewSchema.safeParse({ ...input, tokens_used: ZeroTokenUsage });
   if (!parsed.success) {
     context.addIssue({ code: "custom", message: parsed.error.message });
@@ -49,7 +57,10 @@ export function composeWalkthrough(input: unknown): string {
   const review = WalkthroughInputSchema.parse(input);
   const findings = sortFindings(review.findings);
   const summary = review.summary.trim();
-  const tokenUsage = "tokens_used" in review ? review.tokens_used : undefined;
+  const tokenUsage =
+    "tokens_used" in review && Reflect.get(review, "token_usage_reported") === true
+      ? review.tokens_used
+      : undefined;
   const costFooter = renderCostFooter(tokenUsage, review.llm_provider, review.llm_model);
 
   const sections = [

@@ -11,6 +11,7 @@
     "prompt": 800,
     "completion": 120
   },
+  "token_usage_reported": true,
   "summary": "No actionable findings were found.",
   "findings": [],
   "walkthrough_markdown": "Previous provider walkthrough.",

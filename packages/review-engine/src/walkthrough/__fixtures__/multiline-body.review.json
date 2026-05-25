@@ -11,6 +11,7 @@
     "prompt": 1100,
     "completion": 260
   },
+  "token_usage_reported": true,
   "summary": "The PR has actionable review findings.",
   "findings": [
     {

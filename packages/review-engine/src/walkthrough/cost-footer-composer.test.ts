@@ -88,7 +88,7 @@ describe("composeWalkthrough cost footer", () => {
       // And the review uses provider "<provider>" with model "<model>"
       // And the review token usage is <prompt_tokens> prompt tokens and <completion_tokens> completion tokens
       // And the review contains <finding_count> finding
-      const review: Review = {
+      const review = {
         ...baseReview,
         llm_provider: provider,
         llm_model: model,
@@ -96,6 +96,7 @@ describe("composeWalkthrough cost footer", () => {
           prompt: promptTokens,
           completion: completionTokens,
         },
+        token_usage_reported: true,
         findings,
       };
 
@@ -120,6 +121,27 @@ describe("composeWalkthrough cost footer", () => {
       expect(sectionIndex(markdown, "### File-by-file")).toBeLessThan(markdown.indexOf(footer));
     },
   );
+
+  it("omits the footer when zero token usage is a synthetic default", () => {
+    // Given a review for PR 36 in "mpiton/sovri"
+    // And the review token usage is 0 prompt tokens and 0 completion tokens
+    // And no provider usage signal is present
+    const review: Review = {
+      ...baseReview,
+      tokens_used: {
+        prompt: 0,
+        completion: 0,
+      },
+    };
+
+    // When the walkthrough Markdown is composed
+    const markdown = composeWalkthrough(review);
+
+    // Then the Markdown does not contain "Tokens:"
+    expect(markdown).not.toContain("Tokens:");
+    // And the Markdown does not contain "Estimated cost:"
+    expect(markdown).not.toContain("Estimated cost:");
+  });
 });
 
 function lastNonEmptyLine(markdown: string): string {

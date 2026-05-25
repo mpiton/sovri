@@ -25,6 +25,7 @@ export const ReviewSchema = z
     llm_provider: z.string(),
     llm_model: z.string(),
     tokens_used: TokensUsedSchema,
+    token_usage_reported: z.boolean().optional(),
     summary: z.string(),
     findings: z.array(FindingSchema),
     walkthrough_markdown: z.string(),

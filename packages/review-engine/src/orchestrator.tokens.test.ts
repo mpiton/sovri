@@ -256,6 +256,8 @@ describe("reviewPullRequest token usage", () => {
         expect(review.tokens_used.prompt).toBe(tokenUsage.prompt);
         // And the returned Review `tokens_used.completion` is <completionTokens>
         expect(review.tokens_used.completion).toBe(tokenUsage.completion);
+        // And the returned Review marks token usage as provider-reported
+        expect(Reflect.get(review, "token_usage_reported")).toBe(true);
       }),
     );
   });
@@ -288,6 +290,8 @@ describe("reviewPullRequest token usage", () => {
     expect(review.tokens_used.prompt).toBe(900);
     // And the returned Review `tokens_used.completion` is 200
     expect(review.tokens_used.completion).toBe(200);
+    // And the returned Review marks token usage as provider-reported
+    expect(Reflect.get(review, "token_usage_reported")).toBe(true);
   });
 
   it("rejects invalid token usage from schema-invalid retry attempts", async () => {

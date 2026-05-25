@@ -60,6 +60,15 @@ describe("ReviewSchema — happy paths", () => {
 
     expect(parsed.tokens_used).toEqual({ prompt: 0, completion: 0 });
   });
+
+  it("accepts an explicit provider token usage signal", () => {
+    const parsed = ReviewSchema.parse({
+      ...baseReview,
+      token_usage_reported: true,
+    });
+
+    expect(parsed.token_usage_reported).toBe(true);
+  });
 });
 
 describe("ReviewSchema — commit_sha", () => {
