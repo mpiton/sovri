@@ -64,4 +64,83 @@ describe("composeWalkthrough cost footer", () => {
     // And the Markdown does not contain "Estimated cost:"
     expect(markdown).not.toContain("Estimated cost:");
   });
+
+  it.each([
+    {
+      provider: "anthropic",
+      model: "claude-sonnet-4-6",
+      promptTokens: 1234,
+      completionTokens: 567,
+      findings: [baseFinding],
+    },
+    {
+      provider: "mistral",
+      model: "mistral-large-latest",
+      promptTokens: 2048,
+      completionTokens: 256,
+      findings: [],
+    },
+  ])(
+    "renders the $provider $model cost footer after all walkthrough sections",
+    ({ provider, model, promptTokens, completionTokens, findings }) => {
+      // Given a review for PR 36 in "mpiton/sovri"
+      // And the review summary is "Review completed."
+      // And the review uses provider "<provider>" with model "<model>"
+      // And the review token usage is <prompt_tokens> prompt tokens and <completion_tokens> completion tokens
+      // And the review contains <finding_count> finding
+      const review: Review = {
+        ...baseReview,
+        llm_provider: provider,
+        llm_model: model,
+        tokens_used: {
+          prompt: promptTokens,
+          completion: completionTokens,
+        },
+        findings,
+      };
+
+      // When the walkthrough Markdown is composed
+      const markdown = composeWalkthrough(review);
+      const footer = lastNonEmptyLine(markdown);
+
+      // Then the Markdown contains "### Findings"
+      expect(markdown).toContain("### Findings");
+      // And the Markdown contains "### File-by-file"
+      expect(markdown).toContain("### File-by-file");
+      // And the Markdown ends with "_Tokens: <prompt_tokens> in / <completion_tokens> out"
+      expect(footer).toContain(
+        `_Tokens: ${String(promptTokens)} in / ${String(completionTokens)} out`,
+      );
+      expect(markdown.endsWith(footer)).toBe(true);
+      // And "### Findings" appears before "### File-by-file"
+      expect(sectionIndex(markdown, "### Findings")).toBeLessThan(
+        sectionIndex(markdown, "### File-by-file"),
+      );
+      // And "### File-by-file" appears before the cost footer
+      expect(sectionIndex(markdown, "### File-by-file")).toBeLessThan(markdown.indexOf(footer));
+    },
+  );
 });
+
+function lastNonEmptyLine(markdown: string): string {
+  const line = markdown
+    .split("\n")
+    .toReversed()
+    .find((candidate) => candidate.length > 0);
+
+  if (line === undefined) {
+    throw new Error("Expected walkthrough Markdown to contain at least one line");
+  }
+
+  return line;
+}
+
+function sectionIndex(markdown: string, heading: string): number {
+  const index = markdown.indexOf(heading);
+
+  if (index < 0) {
+    throw new Error(`Missing walkthrough section: ${heading}`);
+  }
+
+  return index;
+}
