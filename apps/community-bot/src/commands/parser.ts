@@ -15,10 +15,10 @@ export function parseCommand(body: string): ParsedCommand {
 
   for (const line of body.split(/\r?\n/u)) {
     const mentionMatch = MentionPattern.exec(line);
-    const rawCommand = mentionMatch?.[1]?.trimEnd();
-    if (rawCommand === undefined) {
+    if (mentionMatch === null) {
       continue;
     }
+    const rawCommand = mentionMatch[1]?.trimEnd() ?? "";
 
     if (rawCommand === "re-review") {
       return { kind: "re-review" };
