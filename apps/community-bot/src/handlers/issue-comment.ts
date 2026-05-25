@@ -40,6 +40,10 @@ export async function handleIssueCommentCreated(
   context: IssueCommentWebhookContext,
   dependencies: IssueCommentHandlerDependencies,
 ): Promise<void> {
+  if (context.payload.issue.pull_request === undefined) {
+    return;
+  }
+
   const command = parseCommand(requireString(context.payload.comment.body, "comment.body"));
   if (command.kind !== "re-review") {
     throw new UnsupportedIssueCommentCommandError(command.kind);
