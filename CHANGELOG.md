@@ -21,9 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
-- `feat(review-engine)`: start wiring walkthrough cost-footer behavior so
-  reviews without token usage still compose complete Markdown without
-  broken footer placeholders.
+- `feat(review-engine)`: start wiring walkthrough cost-footer behavior by
+  allowing the composer to accept reviews without token usage while still
+  rendering complete Markdown without broken footer placeholders.
 
 - `feat(review-engine)`: add a pure walkthrough cost helper with static
   Anthropic and Mistral provider pricing, four-decimal USD estimates,
