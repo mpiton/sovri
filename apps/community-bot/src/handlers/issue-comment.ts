@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { parseCommand } from "../commands/parser.js";
+import type { ParsedCommand } from "../commands/parser.js";
 
 export type IssueCommentWebhookContext = {
   readonly id: string;
@@ -33,7 +33,9 @@ export type IssueCommentCommandContext = {
 };
 
 export type IssueCommentHandlerDependencies = {
+  readonly botLogin: string;
   readonly handleReReview: (context: IssueCommentCommandContext) => Promise<void>;
+  readonly parseCommand: (body: string) => ParsedCommand;
 };
 
 export async function handleIssueCommentCreated(
@@ -44,7 +46,13 @@ export async function handleIssueCommentCreated(
     return;
   }
 
-  const command = parseCommand(requireString(context.payload.comment.body, "comment.body"));
+  if (context.payload.comment.user?.login === dependencies.botLogin) {
+    return;
+  }
+
+  const command = dependencies.parseCommand(
+    requireString(context.payload.comment.body, "comment.body"),
+  );
   if (command.kind !== "re-review") {
     throw new UnsupportedIssueCommentCommandError(command.kind);
   }

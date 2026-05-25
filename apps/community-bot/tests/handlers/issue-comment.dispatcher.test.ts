@@ -10,6 +10,7 @@ import {
 } from "../../src/handlers/issue-comment.js";
 
 const DeliveryId = "delivery-issue-comment-001";
+const SelfCommentDeliveryId = "delivery-issue-comment-002";
 const RepoFullName = "octo-org/sovri-target";
 const PullRequestNumber = 42;
 const CommentId = 98_765;
@@ -58,11 +59,56 @@ describe("issue comment dispatcher - ATDD #1532", () => {
       "x-hub-signature-256",
     );
   });
+
+  it("skips bot self-comments before command parsing", async () => {
+    const dependencies = buildDependencies();
+    const context = buildIssueCommentContext({
+      author: "sovri-bot[bot]",
+      body: "@sovri-bot re-review",
+      deliveryId: SelfCommentDeliveryId,
+      pullRequestNumber: PullRequestNumber,
+      repoFullName: RepoFullName,
+    });
+
+    // Given Probot has accepted delivery "delivery-issue-comment-002" for event "issue_comment.created"
+    expect(context.id).toBe(SelfCommentDeliveryId);
+    expect(context.name).toBe("issue_comment.created");
+    // And the authenticated bot login is "sovri-bot[bot]"
+    expect(dependencies.botLogin).toBe("sovri-bot[bot]");
+    // And the repository is "octo-org/sovri-target"
+    expect(context.payload.repository.full_name).toBe(RepoFullName);
+    // And issue 42 is pull request 42
+    expect(context.payload.issue.number).toBe(PullRequestNumber);
+    expect(context.payload.issue.pull_request).toEqual({});
+    // And comment 98765 was authored by "sovri-bot[bot]"
+    expect(context.payload.comment.id).toBe(CommentId);
+    expect(context.payload.comment.user.login).toBe("sovri-bot[bot]");
+    // And the comment body is "@sovri-bot re-review"
+    expect(context.payload.comment.body).toBe("@sovri-bot re-review");
+
+    // When Sovri dispatches the issue comment webhook context
+    await handleIssueCommentCreated(context, dependencies);
+
+    // Then the command parser is not called
+    expect(dependencies.parseCommand).not.toHaveBeenCalled();
+    // And no command handler is called
+    expect(dependencies.handleReReview).not.toHaveBeenCalled();
+    // And no reaction is created on comment 98765
+    expect(dependencies.reactToUnknown).not.toHaveBeenCalled();
+    // And no issue comment is created
+    expect(dependencies.createIssueComment).not.toHaveBeenCalled();
+  });
 });
 
-function buildDependencies(): IssueCommentHandlerDependencies {
+type CommandParser = (body: string) => { readonly kind: "re-review" };
+
+function buildDependencies() {
   return {
+    botLogin: "sovri-bot[bot]",
+    createIssueComment: vi.fn<(body: string) => Promise<void>>(async () => undefined),
     handleReReview: vi.fn<IssueCommentHandlerDependencies["handleReReview"]>(async () => undefined),
+    parseCommand: vi.fn<CommandParser>(() => ({ kind: "re-review" })),
+    reactToUnknown: vi.fn<() => Promise<void>>(async () => undefined),
   };
 }
 
