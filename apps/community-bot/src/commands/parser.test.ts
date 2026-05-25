@@ -101,6 +101,18 @@ describe("parseCommand", () => {
     expect(command).toEqual({ kind: "unknown", raw: `dismiss ${findingId}` });
   });
 
+  it("returns unknown for dismiss without a finding id", async () => {
+    const { parseCommand } = await import("./parser.js");
+
+    // Given a GitHub issue comment body:
+    const body = "@sovri-bot dismiss";
+    // When the command body is parsed
+    const command = parseCommand(body);
+    // Then the parsed command is `unknown`
+    // And the raw command remainder is "dismiss"
+    expect(command).toEqual({ kind: "unknown", raw: "dismiss" });
+  });
+
   it("recognizes supported commands after repeated mention whitespace", async () => {
     const { parseCommand } = await import("./parser.js");
 
