@@ -12,4 +12,6 @@ No findings.
 
 No changed files with findings.
 
+---
+
 _Tokens: 800 in / 120 out · Estimated cost: unavailable (test-provider test-model)_

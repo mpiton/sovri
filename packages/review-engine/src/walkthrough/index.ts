@@ -80,7 +80,7 @@ export function composeWalkthrough(input: unknown): string {
   ];
 
   if (costFooter.length > 0) {
-    sections.push("", costFooter);
+    sections.push("", "---", "", costFooter);
   }
 
   return sections.join("\n");

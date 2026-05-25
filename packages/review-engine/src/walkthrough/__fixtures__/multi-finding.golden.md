@@ -39,4 +39,6 @@ Three review findings need attention.
 
 - src/auth/session.ts:42-45 Unvalidated session token
 
+---
+
 _Tokens: 1200 in / 300 out · Estimated cost: unavailable (test-provider test-model)_

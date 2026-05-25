@@ -20,4 +20,6 @@ The PR has actionable review findings.
 
 - src/api/review.ts:18 Missing payload null guard
 
+---
+
 _Tokens: 1100 in / 260 out · Estimated cost: unavailable (test-provider test-model)_

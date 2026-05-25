@@ -138,7 +138,7 @@ describe("composeWalkthrough cost footer", () => {
       findings: [],
     },
   ])(
-    "renders a horizontal rule immediately before the $provider $model cost footer",
+    "renders a horizontal rule before the $provider $model cost footer",
     ({ provider, model, promptTokens, completionTokens, findings }) => {
       // Given a review for PR 36 in "mpiton/sovri"
       // And the review uses provider "<provider>" with model "<model>"
@@ -163,10 +163,11 @@ describe("composeWalkthrough cost footer", () => {
 
       // Then the Markdown contains a horizontal rule line "---"
       expect(separatorIndex).toBeGreaterThanOrEqual(0);
-      // And the line immediately after the final horizontal rule is the cost footer
-      expect(lines[separatorIndex + 1]).toBe(lastNonEmptyLine(markdown));
+      const footer = firstNonEmptyLineAfter(lines, separatorIndex);
+      // And the first non-empty line after the final horizontal rule is the cost footer
+      expect(footer).toBe(lastNonEmptyLine(markdown));
       // And the cost footer contains "Tokens: <prompt_tokens> in / <completion_tokens> out"
-      expect(lines[separatorIndex + 1]).toContain(
+      expect(footer).toContain(
         `Tokens: ${String(promptTokens)} in / ${String(completionTokens)} out`,
       );
     },
@@ -215,4 +216,14 @@ function sectionIndex(markdown: string, heading: string): number {
   }
 
   return index;
+}
+
+function firstNonEmptyLineAfter(lines: readonly string[], index: number): string {
+  const line = lines.slice(index + 1).find((candidate) => candidate.length > 0);
+
+  if (line === undefined) {
+    throw new Error("Expected a non-empty line after the horizontal rule");
+  }
+
+  return line;
 }

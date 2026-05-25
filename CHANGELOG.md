@@ -28,7 +28,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   carry an explicit provider usage signal so synthetic zero-token defaults do
   not render billing text, while usage-backed Anthropic and Mistral walkthroughs
   append the cost footer after all existing walkthrough sections. Acceptance
-  coverage now defines the horizontal-rule separator expected before
+  coverage now defines and renders the horizontal-rule separator before
   usage-backed footers.
 
 - `feat(review-engine)`: add a pure walkthrough cost helper with static
