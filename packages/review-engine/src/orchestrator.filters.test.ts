@@ -34,6 +34,9 @@ interface ReviewPullRequestInput {
 
 interface ReviewPullRequestOptions {
   readonly provider: LLMProvider;
+  readonly logger?: {
+    info(fields: Record<string, unknown>, message: string): void;
+  };
 }
 
 type ReviewPullRequest = (
@@ -146,7 +149,227 @@ const config: ReviewFilterConfig = {
   },
 };
 
+const preLlmDiff: Diff = {
+  unified_diff: `diff --git a/src/app.ts b/src/app.ts
+index 1111111111111111111111111111111111111111..2222222222222222222222222222222222222222 100644
+--- a/src/app.ts
++++ b/src/app.ts
+@@ -1 +1,2 @@
+ old content
++enable review path
+diff --git a/dist/app.js b/dist/app.js
+index 3333333333333333333333333333333333333333..4444444444444444444444444444444444444444 100644
+--- a/dist/app.js
++++ b/dist/app.js
+@@ -1 +1,2 @@
+ old content
++generated bundle
+diff --git a/coverage/summary.json b/coverage/summary.json
+index 5555555555555555555555555555555555555555..6666666666666666666666666666666666666666 100644
+--- a/coverage/summary.json
++++ b/coverage/summary.json
+@@ -1 +1,2 @@
+ {}
++generated coverage`,
+  files: [
+    {
+      path: "src/app.ts",
+      status: "modified",
+      additions: 1,
+      deletions: 0,
+      sha: "2222222222222222222222222222222222222222",
+      patch: "@@ -1 +1,2 @@\n old content\n+enable review path",
+      hunks: [],
+    },
+    {
+      path: "dist/app.js",
+      status: "modified",
+      additions: 1,
+      deletions: 0,
+      sha: "4444444444444444444444444444444444444444",
+      patch: "@@ -1 +1,2 @@\n old content\n+generated bundle",
+      hunks: [],
+    },
+    {
+      path: "coverage/summary.json",
+      status: "added",
+      additions: 1,
+      deletions: 0,
+      sha: "6666666666666666666666666666666666666666",
+      patch: "@@ -1 +1,2 @@\n {}\n+generated coverage",
+      hunks: [],
+    },
+  ],
+};
+
+const preLlmPullRequest: PullRequest = {
+  ...pullRequest,
+  additions: 3,
+  deletions: 0,
+  changed_files: 3,
+};
+
+const preLlmConfig: ReviewFilterConfig = {
+  review: {
+    severityThreshold: "minor",
+  },
+  ignores: ["dist/**", "coverage/**"],
+  limits: {
+    maxFilesPerReview: 10,
+    maxLinesPerReview: 500,
+  },
+};
+
 describe("reviewPullRequest config filters", () => {
+  it("removes ignored files from the prompt before the provider call", async () => {
+    let providerCallCount = 0;
+    let recordedUserPrompt = "";
+    const provider = createProvider([]);
+    const recordingProvider: LLMProvider = {
+      ...provider,
+      async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
+        providerCallCount += 1;
+        recordedUserPrompt = params.userPrompt;
+        return provider.generateStructured(params);
+      },
+    };
+    const reviewPullRequest = getReviewPullRequest();
+
+    // Given the ReviewConfig ignores are ["dist/**", "coverage/**"]
+    // And the provider records the user prompt it receives
+    // When reviewPullRequest runs
+    await reviewPullRequest(
+      { pullRequest: preLlmPullRequest, diff: preLlmDiff, config: preLlmConfig },
+      { provider: recordingProvider },
+    );
+
+    // Then the provider is called exactly 1 time
+    expect(providerCallCount).toBe(1);
+    // And the recorded user prompt contains "src/app.ts"
+    expect(recordedUserPrompt).toContain("src/app.ts");
+    // And the recorded user prompt does not contain "dist/app.js"
+    expect(recordedUserPrompt).not.toContain("dist/app.js");
+    // And the recorded user prompt does not contain "coverage/summary.json"
+    expect(recordedUserPrompt).not.toContain("coverage/summary.json");
+  });
+
+  it("keeps every path in the provider prompt when ignores are empty", async () => {
+    let providerCallCount = 0;
+    let recordedUserPrompt = "";
+    const provider = createProvider([]);
+    const recordingProvider: LLMProvider = {
+      ...provider,
+      async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
+        providerCallCount += 1;
+        recordedUserPrompt = params.userPrompt;
+        return provider.generateStructured(params);
+      },
+    };
+    const reviewPullRequest = getReviewPullRequest();
+
+    // Given the ReviewConfig ignores are []
+    // And the provider records the user prompt it receives
+    // When reviewPullRequest runs
+    await reviewPullRequest(
+      {
+        pullRequest: preLlmPullRequest,
+        diff: preLlmDiff,
+        config: { ...preLlmConfig, ignores: [] },
+      },
+      { provider: recordingProvider },
+    );
+
+    // Then the provider is called exactly 1 time
+    expect(providerCallCount).toBe(1);
+    // And the recorded user prompt contains "src/app.ts"
+    expect(recordedUserPrompt).toContain("src/app.ts");
+    // And the recorded user prompt contains "dist/app.js"
+    expect(recordedUserPrompt).toContain("dist/app.js");
+    // And the recorded user prompt contains "generated bundle"
+    expect(recordedUserPrompt).toContain("generated bundle");
+  });
+
+  it("returns a clean no-review result when ignore filters remove every file", async () => {
+    let providerCallCount = 0;
+    const provider = createProvider([]);
+    const countingProvider: LLMProvider = {
+      ...provider,
+      async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
+        providerCallCount += 1;
+        return provider.generateStructured(params);
+      },
+    };
+    const reviewPullRequest = getReviewPullRequest();
+
+    // Given the ReviewConfig ignores are ["**"]
+    // When reviewPullRequest runs
+    const review = await reviewPullRequest(
+      {
+        pullRequest: preLlmPullRequest,
+        diff: preLlmDiff,
+        config: { ...preLlmConfig, ignores: ["**"] },
+      },
+      { provider: countingProvider },
+    );
+
+    // Then the provider is not called
+    expect(providerCallCount).toBe(0);
+    // And the returned Review status is "success"
+    expect(review.status).toBe("success");
+    // And the returned Review summary is "No files to review after ignore filters applied"
+    expect(review.summary).toBe("No files to review after ignore filters applied");
+    // And the returned walkthrough markdown contains "No files to review after ignore filters applied"
+    expect(review.walkthrough_markdown).toContain(
+      "No files to review after ignore filters applied",
+    );
+    // And the returned Review contains no findings
+    expect(review.findings).toHaveLength(0);
+    // And the returned token usage is 0 prompt tokens and 0 completion tokens
+    expect(review.tokens_used).toEqual({ prompt: 0, completion: 0 });
+    // And the returned Review error is absent
+    expect(review.error).toBeUndefined();
+  });
+
+  it("logs changed, reviewable, and ignored file counts without raw patch content", async () => {
+    const infoLogs: Array<{
+      readonly fields: Record<string, unknown>;
+      readonly message: string;
+    }> = [];
+    const logger = {
+      info(fields: Record<string, unknown>, message: string): void {
+        infoLogs.push({ fields, message });
+      },
+    };
+    const provider = createProvider([]);
+    const reviewPullRequest = getReviewPullRequest();
+
+    // Given a logger stub records structured info events
+    // And the ReviewConfig ignores are ["dist/**", "coverage/**"]
+    // When reviewPullRequest runs
+    await reviewPullRequest(
+      { pullRequest: preLlmPullRequest, diff: preLlmDiff, config: preLlmConfig },
+      { provider, logger },
+    );
+
+    const filterLog = infoLogs.find(
+      (entry) => entry.message === "Review engine ignore filters applied",
+    );
+    const serializedLogs = JSON.stringify(infoLogs);
+
+    // Then an info log message is emitted for "Review engine ignore filters applied"
+    expect(filterLog).toBeDefined();
+    // And the log fields include "changed_files" as 3
+    expect(filterLog?.fields.changed_files).toBe(3);
+    // And the log fields include "reviewable_files" as 1
+    expect(filterLog?.fields.reviewable_files).toBe(1);
+    // And the log fields include "ignored_files" as 2
+    expect(filterLog?.fields.ignored_files).toBe(2);
+    // And no logger event contains "generated bundle"
+    expect(serializedLogs).not.toContain("generated bundle");
+    // And no logger event contains "generated coverage"
+    expect(serializedLogs).not.toContain("generated coverage");
+  });
+
   it("filters parsed findings by severity threshold and ignored paths", async () => {
     let providerCallCount = 0;
     const provider = createProvider([
