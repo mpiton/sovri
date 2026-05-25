@@ -58,6 +58,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   re-review` commands create exactly one `+1` reaction and do not emit a
   second acknowledgement after the walkthrough is posted.
 
+- `test(bot)`: add ATDD violation coverage proving `@sovri-bot re-review`
+  does not create the accepted `+1` reaction when the current pull request
+  lookup fails before command acceptance.
+
 - `feat(bot)`: register the `issue_comment.created` Probot webhook through
   `registerWebhookHandlers`, wire a real Octokit `reactions.createForIssueComment`
   reactor for unknown commands, and route re-review and dismiss commands through

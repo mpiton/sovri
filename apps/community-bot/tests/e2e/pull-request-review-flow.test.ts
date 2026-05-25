@@ -37,6 +37,7 @@ const ReReviewStaleHeadDeliveryId = "delivery-re-review-005";
 const ReReviewLookupFailureDeliveryId = "delivery-re-review-006";
 const ReReviewAcceptedReactionDeliveryId = "delivery-re-review-007";
 const ReReviewSingleReactionDeliveryId = "delivery-re-review-008";
+const ReReviewCannotAcceptDeliveryId = "delivery-re-review-009";
 const SecretWebhookValue = "secret-webhook-value-45";
 const SecretLlmValue = "secret-llm-value-45";
 const SecretMistralValue = "test-key";
@@ -768,6 +769,29 @@ describe("community bot pull request review E2E ATDD", () => {
     // And no second thumbs-up reaction is created after the walkthrough is posted
     const reviewPostIndex = eventOrder(runtime, "post review");
     expect(runtime.eventLog.slice(reviewPostIndex + 1)).not.toContain("accepted reaction");
+  }, 15_000);
+
+  it("a command that cannot be accepted does not create the accepted reaction", async () => {
+    // Given issue comment delivery "delivery-re-review-009" targets repository "octo-org/sovri-target"
+    // And issue 42 is pull request 42
+    // And comment 98765 was authored by "alice"
+    // And the command body is "@sovri-bot re-review"
+    // And GitHub `pulls.get` fails with status 500
+    const runtime = await runReReviewFlow({
+      deliveryId: ReReviewCannotAcceptDeliveryId,
+      headSha: ReReviewHeadSha,
+      pullLookupStatus: 500,
+    });
+
+    // When Sovri handles the re-review command
+    expect(runtime.pullGetRequests).toContain(`${RepoFullName}#${String(PullNumber)}`);
+    // Then GitHub receives no reaction request for comment 98765 with content "+1"
+    expect(runtime.reactionRequests).toEqual([]);
+    // And exactly 1 issue comment is posted on pull request 42
+    expect(runtime.issueCommentBodies).toHaveLength(1);
+    expect(runtime.issueCommentBodies[0]).toContain("review failed");
+    // And no walkthrough review is posted
+    expect(runtime.reviewRequests).toEqual([]);
   }, 15_000);
 
   it("re-review preserves synchronize collaborator order", async () => {
