@@ -36,6 +36,7 @@ const ReReviewCurrentHeadDeliveryId = "delivery-re-review-004";
 const ReReviewStaleHeadDeliveryId = "delivery-re-review-005";
 const ReReviewLookupFailureDeliveryId = "delivery-re-review-006";
 const ReReviewAcceptedReactionDeliveryId = "delivery-re-review-007";
+const ReReviewSingleReactionDeliveryId = "delivery-re-review-008";
 const SecretWebhookValue = "secret-webhook-value-45";
 const SecretLlmValue = "secret-llm-value-45";
 const SecretMistralValue = "test-key";
@@ -739,6 +740,34 @@ describe("community bot pull request review E2E ATDD", () => {
     expect(eventOrder(runtime, "accepted reaction")).toBeLessThan(
       eventOrder(runtime, "post review"),
     );
+  }, 15_000);
+
+  it("accepted re-review creates only one thumbs-up reaction", async () => {
+    // Given issue comment delivery "delivery-re-review-008" targets repository "octo-org/sovri-target"
+    // And issue 42 is pull request 42
+    // And comment 98765 was authored by "alice"
+    // And the command body is "@sovri-bot re-review"
+    // And GitHub `pulls.get` returns head SHA "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    // And the review engine completes successfully
+    const runtime = await runReReviewFlow({
+      deliveryId: ReReviewSingleReactionDeliveryId,
+      headSha: ReReviewOrderHeadSha,
+    });
+
+    // When Sovri accepts the re-review command
+    // Then GitHub receives exactly 1 reaction request for comment 98765 with content "+1"
+    expect(runtime.reactionRequests).toEqual([
+      {
+        comment_id: CommentId,
+        content: "+1",
+        owner: Owner,
+        repo: Repo,
+      },
+    ]);
+    expect(runtime.eventLog.filter((event) => event === "accepted reaction")).toHaveLength(1);
+    // And no second thumbs-up reaction is created after the walkthrough is posted
+    const reviewPostIndex = eventOrder(runtime, "post review");
+    expect(runtime.eventLog.slice(reviewPostIndex + 1)).not.toContain("accepted reaction");
   }, 15_000);
 
   it("re-review preserves synchronize collaborator order", async () => {
