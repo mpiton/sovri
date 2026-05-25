@@ -21,6 +21,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(review-engine)`: add a pure walkthrough cost helper with static
+  Anthropic and Mistral provider pricing, four-decimal USD estimates,
+  non-breaking unavailable-cost fallback for unknown provider/model
+  pricing, and public walkthrough exports for `PROVIDER_PRICING`,
+  `estimateCostUsd`, and `renderCostFooter`.
+
 - `feat(review-engine)`: wire `reviewPullRequest` to apply configured path
   ignore filters to the parsed `Diff` before prompt construction, skip
   provider calls cleanly when every changed file is ignored, and log
@@ -51,6 +57,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   third-party glob imports including side-effect import forms.
 
 ### Fixed
+
+- `fix(review-engine)`: walkthrough cost lookup now rejects prototype-key
+  model names (`__proto__`, `constructor`, `toString`,
+  `hasOwnProperty`) via an `Object.hasOwn` own-property check before
+  returning pricing, so unknown models keep the documented `unavailable`
+  fallback instead of feeding inherited prototype values into
+  `estimateCostUsd` and rendering `$NaN`.
 
 - `fix(config)`: `review.mode: strict` in `.sovri.yml` now fails config
   validation with `Mode 'strict' is reserved for v0.5+ and is not yet
