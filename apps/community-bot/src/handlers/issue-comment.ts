@@ -58,6 +58,11 @@ export async function handleIssueCommentCreated(
   const command = dependencies.parseCommand(
     requireString(context.payload.comment.body, "comment.body"),
   );
+
+  if (command.kind === "no-mention") {
+    return;
+  }
+
   const commandContext = buildCommandContext(context);
 
   if (command.kind === "re-review") {

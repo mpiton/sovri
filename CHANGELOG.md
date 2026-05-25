@@ -36,7 +36,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   propagation contract with the handler routing parsed dismiss commands to a
   dedicated dismiss dependency. Re-review routing coverage now also verifies the
   dispatcher does not fetch pull request diffs or post review results itself,
-  and dismiss routing coverage pins the same boundary.
+  and dismiss routing coverage pins the same boundary. No-mention dispatcher
+  coverage now starts pinning silent skips for ordinary PR issue comments, with
+  the handler returning before command side effects.
 
 - `feat(bot)`: start the `@sovri-bot` command parser contract with
   acceptance coverage and a pure parser implementation for

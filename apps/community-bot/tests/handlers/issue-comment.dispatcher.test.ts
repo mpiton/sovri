@@ -305,6 +305,44 @@ describe("issue comment dispatcher - ATDD task 76", () => {
     // And the dispatcher does not post a review result
     expect(dependencies.postReviewResult).not.toHaveBeenCalled();
   });
+
+  it("silently skips no-mention comments", async () => {
+    const dependencies = buildDependencies({ kind: "no-mention" });
+    const context = buildIssueCommentContext({
+      author: "alice",
+      body: "Looks good to me",
+      deliveryId: CommandRoutingDeliveryId,
+      pullRequestNumber: PullRequestNumber,
+      repoFullName: RepoFullName,
+    });
+
+    // Given Probot has accepted delivery "delivery-issue-comment-005" for event "issue_comment.created"
+    expect(context.id).toBe(CommandRoutingDeliveryId);
+    expect(context.name).toBe("issue_comment.created");
+    // And the repository is "octo-org/sovri-target"
+    expect(context.payload.repository.full_name).toBe(RepoFullName);
+    // And issue 42 is pull request 42
+    expect(context.payload.issue.number).toBe(PullRequestNumber);
+    expect(context.payload.issue.pull_request).toEqual({});
+    // And comment 98765 was authored by "alice"
+    expect(context.payload.comment.id).toBe(CommentId);
+    expect(context.payload.comment.user.login).toBe("alice");
+    // And the comment body is "Looks good to me"
+    expect(context.payload.comment.body).toBe("Looks good to me");
+
+    // When Sovri dispatches the issue comment webhook context
+    await handleIssueCommentCreated(context, dependencies);
+
+    // Then no command handler is called
+    expect(dependencies.handleReReview).not.toHaveBeenCalled();
+    expect(dependencies.handleDismiss).not.toHaveBeenCalled();
+    // And no reaction is created on comment 98765
+    expect(dependencies.reactToUnknown).not.toHaveBeenCalled();
+    // And no issue comment is created
+    expect(dependencies.createIssueComment).not.toHaveBeenCalled();
+    // And the dispatcher does not fetch a pull request diff
+    expect(dependencies.fetchPullRequestDiff).not.toHaveBeenCalled();
+  });
 });
 
 type CommandParser = (body: string) => ParsedCommand;
