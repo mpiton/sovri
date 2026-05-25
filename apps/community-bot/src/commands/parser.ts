@@ -4,22 +4,37 @@
 export type ParsedCommand =
   | { readonly kind: "re-review" }
   | { readonly kind: "dismiss"; readonly findingId: string }
+  | { readonly kind: "unknown"; readonly raw: string }
   | { readonly kind: "no-mention" };
 
-const DismissMentionPattern = /^@sovri-bot\s+dismiss\s+([A-Za-z0-9-]+)$/iu;
-const ReReviewMentionPattern = /^@sovri-bot\s+re-review$/iu;
+const MentionPattern = /^@sovri-bot(?:\s+(.*))?$/iu;
+const FindingIdPattern = /^[A-Za-z0-9-]+$/u;
 
 export function parseCommand(body: string): ParsedCommand {
   for (const line of body.split(/\r?\n/u)) {
-    const dismissMatch = DismissMentionPattern.exec(line);
-    const findingId = dismissMatch?.[1];
-    if (findingId !== undefined) {
+    const mentionMatch = MentionPattern.exec(line);
+    const rawCommand = mentionMatch?.[1]?.trimEnd();
+    if (rawCommand === undefined) {
+      continue;
+    }
+
+    if (rawCommand === "re-review") {
+      return { kind: "re-review" };
+    }
+
+    const tokens = rawCommand.split(/\s+/u);
+    const command = tokens[0];
+    const findingId = tokens[1];
+    if (
+      tokens.length === 2 &&
+      command === "dismiss" &&
+      findingId !== undefined &&
+      FindingIdPattern.test(findingId)
+    ) {
       return { kind: "dismiss", findingId };
     }
 
-    if (ReReviewMentionPattern.test(line)) {
-      return { kind: "re-review" };
-    }
+    return { kind: "unknown", raw: rawCommand };
   }
 
   return { kind: "no-mention" };
