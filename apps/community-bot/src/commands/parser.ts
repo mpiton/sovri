@@ -8,7 +8,7 @@ export type ParsedCommand =
   | { readonly kind: "no-mention" };
 
 const MentionPattern = /^@sovri-bot(?:\s+(.*))?$/iu;
-const FindingIdPattern = /^[A-Za-z0-9-]+$/u;
+const FindingIdPattern = /^[A-Za-z0-9-]{1,64}$/u;
 
 export function parseCommand(body: string): ParsedCommand {
   let firstUnknown: { readonly kind: "unknown"; readonly raw: string } | undefined;
