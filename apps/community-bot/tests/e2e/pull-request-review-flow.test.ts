@@ -32,6 +32,7 @@ const OpenedDeliveryId = "8f1b9c2d-3e4f-45a6-91b2-123456789abc";
 const SynchronizeDeliveryId = "9f1b9c2d-3e4f-45a6-91b2-123456789abc";
 const ReReviewDeliveryId = "delivery-re-review-001";
 const ReReviewOrderDeliveryId = "delivery-re-review-002";
+const ReReviewCurrentHeadDeliveryId = "delivery-re-review-004";
 const SecretWebhookValue = "secret-webhook-value-45";
 const SecretLlmValue = "secret-llm-value-45";
 const SecretMistralValue = "test-key";
@@ -71,6 +72,7 @@ type ObservedRuntime = {
   readonly listFilesQueries: string[];
   readonly mistralApiKeys: string[];
   readonly mistralRequests: unknown[];
+  readonly pullGetRequests: string[];
   readonly repositoryConfigRequests: string[];
   readonly reviewRequests: ReviewRequest[];
 };
@@ -615,6 +617,35 @@ describe("community bot pull request review E2E ATDD", () => {
     expect(runtime.reviewRequests[0]?.commit_id).toBe(ReReviewHeadSha);
   }, 15_000);
 
+  it("current head SHA from pulls.get drives review and posting", async () => {
+    const issueCommentPayload = buildIssueCommentPayload();
+
+    // Given issue comment delivery "delivery-re-review-004" targets repository "octo-org/sovri-target"
+    // And issue 42 is pull request 42
+    // And comment 98765 was authored by "alice"
+    // And the command body is "@sovri-bot re-review"
+    expect(issueCommentPayload.repository.full_name).toBe(RepoFullName);
+    expect(issueCommentPayload.issue.number).toBe(PullNumber);
+    expect(issueCommentPayload.comment.id).toBe(CommentId);
+    expect(issueCommentPayload.comment.user.login).toBe("alice");
+    expect(issueCommentPayload.comment.body).toBe("@sovri-bot re-review");
+    // And the issue comment payload contains no pull request head SHA
+    expect(JSON.stringify(issueCommentPayload)).not.toContain("head");
+    // And GitHub `pulls.get` returns head SHA "dddddddddddddddddddddddddddddddddddddddd"
+    const runtime = await runReReviewFlow({
+      deliveryId: ReReviewCurrentHeadDeliveryId,
+      headSha: ReReviewHeadSha,
+    });
+
+    // When Sovri accepts the re-review command
+    // Then GitHub receives one `pulls.get` request for repository "octo-org/sovri-target" and pull request 42
+    expect(runtime.pullGetRequests).toEqual([`${RepoFullName}#${String(PullNumber)}`]);
+    // And the review engine receives head SHA "dddddddddddddddddddddddddddddddddddddddd"
+    expect(runtime.anthropicRequests).toHaveLength(1);
+    // And the walkthrough is posted against commit "dddddddddddddddddddddddddddddddddddddddd"
+    expect(runtime.reviewRequests[0]?.commit_id).toBe(ReReviewHeadSha);
+  }, 15_000);
+
   it("re-review preserves synchronize collaborator order", async () => {
     // Given issue comment delivery "delivery-re-review-002" targets repository "octo-org/sovri-target"
     // And issue 42 is pull request 42
@@ -689,6 +720,7 @@ async function runReviewFlow(values: {
     listFilesQueries: [],
     mistralApiKeys: [],
     mistralRequests: [],
+    pullGetRequests: [],
     repositoryConfigRequests: [],
     reviewRequests: [],
   };
@@ -725,6 +757,7 @@ async function runReReviewFlow(values: {
     listFilesQueries: [],
     mistralApiKeys: [],
     mistralRequests: [],
+    pullGetRequests: [],
     repositoryConfigRequests: [],
     reviewRequests: [],
   };
@@ -762,12 +795,15 @@ function installReviewFlowHandlers(
       runtime.repositoryConfigRequests.push(`${String(params.owner)}/${String(params.repo)}`);
       return HttpResponse.json({ message: "Not Found" }, { status: 404 });
     }),
-    http.get(`${GitHubBaseUrl}/repos/:owner/:repo/pulls/:pull_number`, ({ request }) => {
+    http.get(`${GitHubBaseUrl}/repos/:owner/:repo/pulls/:pull_number`, ({ params, request }) => {
       const accept = request.headers.get("accept") ?? "";
       if (accept.includes("diff")) {
         runtime.collaboratorCalls.push("fetch diff");
         return HttpResponse.text("not a unified diff");
       }
+      runtime.pullGetRequests.push(
+        `${String(params.owner)}/${String(params.repo)}#${String(params.pull_number)}`,
+      );
       return HttpResponse.json(
         buildPullRequestPayload({ action: "synchronize", headSha: currentHeadSha }).pull_request,
       );
