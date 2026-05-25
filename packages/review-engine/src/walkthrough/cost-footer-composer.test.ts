@@ -122,6 +122,56 @@ describe("composeWalkthrough cost footer", () => {
     },
   );
 
+  it.each([
+    {
+      provider: "anthropic",
+      model: "claude-sonnet-4-6",
+      promptTokens: 1234,
+      completionTokens: 567,
+      findings: [baseFinding],
+    },
+    {
+      provider: "mistral",
+      model: "mistral-large-latest",
+      promptTokens: 2048,
+      completionTokens: 256,
+      findings: [],
+    },
+  ])(
+    "renders a horizontal rule immediately before the $provider $model cost footer",
+    ({ provider, model, promptTokens, completionTokens, findings }) => {
+      // Given a review for PR 36 in "mpiton/sovri"
+      // And the review uses provider "<provider>" with model "<model>"
+      // And the review token usage is <prompt_tokens> prompt tokens and <completion_tokens> completion tokens
+      // And the review contains <finding_count> finding
+      const review = {
+        ...baseReview,
+        llm_provider: provider,
+        llm_model: model,
+        tokens_used: {
+          prompt: promptTokens,
+          completion: completionTokens,
+        },
+        token_usage_reported: true,
+        findings,
+      };
+
+      // When the walkthrough Markdown is composed
+      const markdown = composeWalkthrough(review);
+      const lines = markdown.split("\n");
+      const separatorIndex = lines.lastIndexOf("---");
+
+      // Then the Markdown contains a horizontal rule line "---"
+      expect(separatorIndex).toBeGreaterThanOrEqual(0);
+      // And the line immediately after the final horizontal rule is the cost footer
+      expect(lines[separatorIndex + 1]).toBe(lastNonEmptyLine(markdown));
+      // And the cost footer contains "Tokens: <prompt_tokens> in / <completion_tokens> out"
+      expect(lines[separatorIndex + 1]).toContain(
+        `Tokens: ${String(promptTokens)} in / ${String(completionTokens)} out`,
+      );
+    },
+  );
+
   it("omits the footer when zero token usage is a synthetic default", () => {
     // Given a review for PR 36 in "mpiton/sovri"
     // And the review token usage is 0 prompt tokens and 0 completion tokens

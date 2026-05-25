@@ -27,7 +27,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   preserving the exported walkthrough input type as Review-shaped. Reviews now
   carry an explicit provider usage signal so synthetic zero-token defaults do
   not render billing text, while usage-backed Anthropic and Mistral walkthroughs
-  append the cost footer after all existing walkthrough sections.
+  append the cost footer after all existing walkthrough sections. Acceptance
+  coverage now defines the horizontal-rule separator expected before
+  usage-backed footers.
 
 - `feat(review-engine)`: add a pure walkthrough cost helper with static
   Anthropic and Mistral provider pricing, four-decimal USD estimates,
