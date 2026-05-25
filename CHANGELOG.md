@@ -27,8 +27,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `re-review` and first-valid-mention precedence coverage with implementation
   for lowercase `dismiss <finding-id>`, including fallback to the first
   unknown command when no later valid command exists, valid alphanumeric dash
-  finding ids through the 64-character boundary, with exact command-verb
-  coverage, `unknown` results for unsupported command words, non-exact command
+  finding ids through the 64-character boundary, malformed finding ids returning
+  `unknown`, with exact command-verb coverage, `unknown` results for unsupported
+  command words, non-exact command
   verbs, mentions without commands returning an empty raw remainder,
   punctuation-preserving unknown raw remainders, trailing-whitespace trimming for
   unknown raw remainders, and supported commands with extra tokens, repeated
