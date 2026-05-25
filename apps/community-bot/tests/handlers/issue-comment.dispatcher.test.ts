@@ -3,6 +3,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
+import type { ParsedCommand } from "../../src/commands/parser.js";
 import {
   handleIssueCommentCreated,
   type IssueCommentHandlerDependencies,
@@ -17,6 +18,7 @@ const RepoFullName = "octo-org/sovri-target";
 const PullRequestNumber = 42;
 const PlainIssueNumber = 41;
 const CommentId = 98_765;
+const FindingId = "finding-abc-123";
 
 describe("issue comment dispatcher - ATDD task 76", () => {
   it("routes a Probot-validated re-review comment without raw signature plumbing", async () => {
@@ -178,16 +180,68 @@ describe("issue comment dispatcher - ATDD task 76", () => {
     // And the re-review handler receives comment ID 98765
     expect(dependencies.handleReReview.mock.calls[0]?.[0]?.commentId).toBe(CommentId);
   });
+
+  it("propagates delivery and comment IDs to the dismiss handler", async () => {
+    const dependencies = buildDependencies({ kind: "dismiss", findingId: FindingId });
+    const context = buildIssueCommentContext({
+      author: "alice",
+      body: "@sovri-bot dismiss finding-abc-123",
+      deliveryId: CommandCorrelationDeliveryId,
+      pullRequestNumber: PullRequestNumber,
+      repoFullName: RepoFullName,
+    });
+
+    // Given Probot has accepted delivery "delivery-issue-comment-004" for event "issue_comment.created"
+    expect(context.id).toBe(CommandCorrelationDeliveryId);
+    expect(context.name).toBe("issue_comment.created");
+    // And the repository is "octo-org/sovri-target"
+    expect(context.payload.repository.full_name).toBe(RepoFullName);
+    // And issue 42 is pull request 42
+    expect(context.payload.issue.number).toBe(PullRequestNumber);
+    expect(context.payload.issue.pull_request).toEqual({});
+    // And comment 98765 was authored by "alice"
+    expect(context.payload.comment.id).toBe(CommentId);
+    expect(context.payload.comment.user.login).toBe("alice");
+    // And the comment body is "@sovri-bot dismiss finding-abc-123"
+    expect(context.payload.comment.body).toBe("@sovri-bot dismiss finding-abc-123");
+
+    // When Sovri dispatches the issue comment webhook context
+    await handleIssueCommentCreated(context, dependencies);
+
+    // Then the dismiss handler is called once for pull request 42
+    expect(dependencies.handleDismiss).toHaveBeenCalledTimes(1);
+    expect(dependencies.handleDismiss.mock.calls[0]?.[0]?.pullRequestNumber).toBe(
+      PullRequestNumber,
+    );
+    // And the dismiss handler receives finding ID "finding-abc-123"
+    expect(dependencies.handleDismiss.mock.calls[0]?.[0]?.findingId).toBe(FindingId);
+    // And the dismiss handler receives correlation ID "delivery-issue-comment-004"
+    expect(dependencies.handleDismiss.mock.calls[0]?.[0]?.correlationId).toBe(
+      CommandCorrelationDeliveryId,
+    );
+    // And the dismiss handler receives comment ID 98765
+    expect(dependencies.handleDismiss.mock.calls[0]?.[0]?.commentId).toBe(CommentId);
+  });
 });
 
-type CommandParser = (body: string) => { readonly kind: "re-review" };
+type CommandParser = (body: string) => ParsedCommand;
 
-function buildDependencies() {
+type DismissCommandContext = {
+  readonly commentId: number;
+  readonly correlationId: string;
+  readonly findingId: string;
+  readonly issueNumber: number;
+  readonly pullRequestNumber: number;
+  readonly repoFullName: string;
+};
+
+function buildDependencies(command: ParsedCommand = { kind: "re-review" }) {
   return {
     botLogin: "sovri-bot[bot]",
     createIssueComment: vi.fn<(body: string) => Promise<void>>(async () => undefined),
+    handleDismiss: vi.fn<(context: DismissCommandContext) => Promise<void>>(async () => undefined),
     handleReReview: vi.fn<IssueCommentHandlerDependencies["handleReReview"]>(async () => undefined),
-    parseCommand: vi.fn<CommandParser>(() => ({ kind: "re-review" })),
+    parseCommand: vi.fn<CommandParser>(() => command),
     reactToUnknown: vi.fn<() => Promise<void>>(async () => undefined),
   };
 }
