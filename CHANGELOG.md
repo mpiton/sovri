@@ -21,6 +21,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(bot)`: register the `issue_comment.created` Probot webhook through
+  `registerWebhookHandlers`, wire a real Octokit `reactions.createForIssueComment`
+  reactor for unknown commands, and route re-review and dismiss commands through
+  pending-handler log stubs until the dedicated command handlers land. The
+  dispatcher factory reads the bot login from `SOVRI_BOT_LOGIN` and falls back
+  to `sovri-bot[bot]`, keeping the dispatcher reachable in production with
+  delivery correlation propagated end-to-end.
+
 - `test(bot)`: add the first issue-comment dispatcher ATDD acceptance
   scenario for Probot-validated `@sovri-bot re-review` comments, requiring
   the dispatcher to call the re-review handler with the GitHub delivery
