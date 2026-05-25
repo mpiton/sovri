@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(bot)`: route `@sovri-bot re-review` issue comments through the
+  shared pull request synchronize review flow after resolving and validating
+  the current pull request from GitHub.
+
 - `test(bot)`: add ATDD acceptance coverage for `@sovri-bot re-review`
   reaching the shared pull request review flow, requiring the issue-comment
   command path to load repository config, fetch the pull request diff, call the

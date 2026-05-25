@@ -3,9 +3,13 @@
 
 import { createLogger } from "@sovri/observability";
 
+import {
+  createReReviewCommandDependencies,
+  handleReReviewCommand,
+  type ReReviewOctokit,
+} from "../commands/handlers/re-review.js";
 import { parseCommand } from "../commands/parser.js";
 import type {
-  IssueCommentCommandContext,
   IssueCommentDismissCommandContext,
   IssueCommentHandlerDependencies,
   IssueCommentUnknownReaction,
@@ -15,8 +19,8 @@ const DEFAULT_BOT_LOGIN = "sovri-bot[bot]";
 
 const logger = createLogger("community-bot.issue-comment");
 
-export type IssueCommentDispatchOctokit = {
-  readonly rest: {
+export type IssueCommentDispatchOctokit = ReReviewOctokit & {
+  readonly rest: ReReviewOctokit["rest"] & {
     readonly reactions: {
       readonly createForIssueComment: (
         parameters: ReactionParameters,
@@ -49,7 +53,8 @@ export function createIssueCommentHandlerDependencies(
   return {
     botLogin: readBotLogin(env),
     handleDismiss: (command) => logPendingDismiss(context.id, command),
-    handleReReview: (command) => logPendingReReview(context.id, command),
+    handleReReview: (command) =>
+      handleReReviewCommand(command, createReReviewCommandDependencies(context.octokit, env)),
     parseCommand,
     reactToUnknown: (reaction) => reactConfused(context, reaction),
   };
@@ -75,21 +80,6 @@ async function reactConfused(
     owner: repo.owner,
     repo: repo.repo,
   });
-}
-
-async function logPendingReReview(
-  correlationId: string,
-  command: IssueCommentCommandContext,
-): Promise<void> {
-  logger.warn(
-    {
-      commentId: command.commentId,
-      correlationId,
-      pullRequestNumber: command.pullRequestNumber,
-      repoFullName: command.repoFullName,
-    },
-    "re-review command received before handler implementation is wired",
-  );
 }
 
 async function logPendingDismiss(
