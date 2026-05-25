@@ -24,8 +24,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `feat(bot)`: start the `@sovri-bot` command parser contract with
   acceptance coverage and a pure parser implementation for
   case-insensitive line-start `re-review` mentions, plus lowercase
-  `re-review` and first-command precedence coverage with implementation
-  for lowercase `dismiss <finding-id>`,
+  `re-review` and first-valid-mention precedence coverage with implementation
+  for lowercase `dismiss <finding-id>`, including fallback to the first
+  unknown command when no later valid command exists, with exact command-verb coverage,
+  `unknown` results for non-exact command verbs, repeated whitespace after
+  the bot mention before supported commands,
   while indented and quoted mentions remain ignored, and repeated parsing
   of the same input remains deterministic without GitHub event context,
   environment reads, or Node filesystem imports.
