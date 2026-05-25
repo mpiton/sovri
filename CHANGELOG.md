@@ -38,6 +38,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   dispatcher routes `@sovri-bot re-review` without fetching pull request diffs
   or posting review results itself.
 
+- `test(bot)`: add ATDD acceptance coverage proving `@sovri-bot re-review`
+  resolves the current pull request through `pulls.get` and posts the
+  walkthrough against that returned head commit.
+
 - `feat(bot)`: register the `issue_comment.created` Probot webhook through
   `registerWebhookHandlers`, wire a real Octokit `reactions.createForIssueComment`
   reactor for unknown commands, and route re-review and dismiss commands through
