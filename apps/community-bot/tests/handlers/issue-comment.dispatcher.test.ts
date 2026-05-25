@@ -263,6 +263,48 @@ describe("issue comment dispatcher - ATDD task 76", () => {
     // And the dispatcher does not post a review result
     expect(dependencies.postReviewResult).not.toHaveBeenCalled();
   });
+
+  it("routes dismiss commands without running review business logic", async () => {
+    const dependencies = buildDependencies({ kind: "dismiss", findingId: FindingId });
+    const context = buildIssueCommentContext({
+      author: "alice",
+      body: "@sovri-bot dismiss finding-abc-123",
+      deliveryId: CommandRoutingDeliveryId,
+      pullRequestNumber: PullRequestNumber,
+      repoFullName: RepoFullName,
+    });
+
+    // Given Probot has accepted delivery "delivery-issue-comment-005" for event "issue_comment.created"
+    expect(context.id).toBe(CommandRoutingDeliveryId);
+    expect(context.name).toBe("issue_comment.created");
+    // And the repository is "octo-org/sovri-target"
+    expect(context.payload.repository.full_name).toBe(RepoFullName);
+    // And issue 42 is pull request 42
+    expect(context.payload.issue.number).toBe(PullRequestNumber);
+    expect(context.payload.issue.pull_request).toEqual({});
+    // And comment 98765 was authored by "alice"
+    expect(context.payload.comment.id).toBe(CommentId);
+    expect(context.payload.comment.user.login).toBe("alice");
+    // And the comment body is "@sovri-bot dismiss finding-abc-123"
+    expect(context.payload.comment.body).toBe("@sovri-bot dismiss finding-abc-123");
+
+    // When Sovri dispatches the issue comment webhook context
+    await handleIssueCommentCreated(context, dependencies);
+
+    // Then the dismiss handler is called once for pull request 42
+    expect(dependencies.handleDismiss).toHaveBeenCalledTimes(1);
+    expect(dependencies.handleDismiss.mock.calls[0]?.[0]?.pullRequestNumber).toBe(
+      PullRequestNumber,
+    );
+    // And the dismiss handler receives finding ID "finding-abc-123"
+    expect(dependencies.handleDismiss.mock.calls[0]?.[0]?.findingId).toBe(FindingId);
+    // And the re-review handler is not called
+    expect(dependencies.handleReReview).not.toHaveBeenCalled();
+    // And the dispatcher does not fetch a pull request diff
+    expect(dependencies.fetchPullRequestDiff).not.toHaveBeenCalled();
+    // And the dispatcher does not post a review result
+    expect(dependencies.postReviewResult).not.toHaveBeenCalled();
+  });
 });
 
 type CommandParser = (body: string) => ParsedCommand;
