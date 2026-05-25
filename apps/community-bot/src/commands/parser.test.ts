@@ -67,6 +67,23 @@ describe("parseCommand", () => {
     expect(command).toEqual({ kind: "dismiss", findingId: "finding-abc-123" });
   });
 
+  it.each([
+    "abc-123-def",
+    "550e8400-e29b-41d4-a716-446655440000",
+    "ABC-123-def",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  ])("accepts alphanumeric dash finding id %s", async (findingId) => {
+    const { parseCommand } = await import("./parser.js");
+
+    // Given a GitHub issue comment body:
+    const body = `@sovri-bot dismiss ${findingId}`;
+    // When the command body is parsed
+    const command = parseCommand(body);
+    // Then the parsed command is `dismiss`
+    // And the parsed finding id is "<finding_id>"
+    expect(command).toEqual({ kind: "dismiss", findingId });
+  });
+
   it("recognizes supported commands after repeated mention whitespace", async () => {
     const { parseCommand } = await import("./parser.js");
 
