@@ -28,8 +28,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   for lowercase `dismiss <finding-id>`, including fallback to the first
   unknown command when no later valid command exists, with exact command-verb
   coverage, `unknown` results for unsupported command words, non-exact command
-  verbs, mentions without commands returning an empty raw remainder, and
-  supported commands with extra tokens, repeated whitespace after
+  verbs, mentions without commands returning an empty raw remainder,
+  punctuation-preserving unknown raw remainders, and supported commands with
+  extra tokens, repeated whitespace after
   the bot mention before
   supported commands, ordinary comments without a bot mention, inline prose
   mentions ignored as `no-mention`, empty comment bodies returning `no-mention`,

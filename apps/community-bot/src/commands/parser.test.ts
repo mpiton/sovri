@@ -111,6 +111,18 @@ describe("parseCommand", () => {
     expect(command).toEqual({ kind: "unknown", raw: "" });
   });
 
+  it("keeps punctuation in an unknown raw command remainder", async () => {
+    const { parseCommand } = await import("./parser.js");
+
+    // Given a GitHub issue comment body:
+    const body = "@sovri-bot help, please!";
+    // When the command body is parsed
+    const command = parseCommand(body);
+    // Then the parsed command is `unknown`
+    // And the raw command remainder is "help, please!"
+    expect(command).toEqual({ kind: "unknown", raw: "help, please!" });
+  });
+
   it.each(["Re-Review", "DISMISS abc-123-def", "resolve abc-123-def"])(
     "returns unknown for non-exact command verb %s",
     async (commandLine) => {
