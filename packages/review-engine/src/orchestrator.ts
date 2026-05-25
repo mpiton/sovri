@@ -21,7 +21,7 @@ import type { GenerateStructuredParams, LLMProvider } from "@sovri/llm-providers
 import type { Logger } from "@sovri/observability";
 import { v4 as uuidv4, v7 as uuidv7 } from "uuid";
 
-import { parseUnifiedDiff } from "./diff/index.js";
+import { filterDiffByIgnores, parseUnifiedDiff } from "./diff/index.js";
 import {
   buildReviewPrompt,
   ReviewPromptInputSchema,
@@ -43,6 +43,7 @@ const TokenUsageSchema = z.object({
 
 const ZeroTokenUsage = TokenUsageSchema.parse({ prompt: 0, completion: 0 });
 const FindingBodyMaxLength = 2_000;
+const NoFilesAfterIgnoreFiltersMessage = "No files to review after ignore filters applied";
 
 // Mirrors the v0.1 config-layer review mode enum so `.sovri.yml` files
 // that still ship `mode: strict` keep parsing. The transform maps
@@ -210,8 +211,23 @@ export async function reviewPullRequest(
     return buildFailedReview(reviewInput.pullRequest, provider, startedAt, limitError);
   }
 
+  const filteredDiff = filterDiffByIgnores(reviewInput.diff, reviewInput.config.ignores);
+  options.logger?.info(
+    {
+      provider: provider.name,
+      changed_files: reviewInput.diff.files.length,
+      reviewable_files: filteredDiff.files.length,
+      ignored_files: reviewInput.diff.files.length - filteredDiff.files.length,
+    },
+    "Review engine ignore filters applied",
+  );
+
+  if (filteredDiff.files.length === 0) {
+    return buildNoFilesReview(reviewInput.pullRequest, provider, startedAt);
+  }
+
   const prompt = buildReviewPrompt({
-    unifiedDiff: reviewInput.diff.unified_diff,
+    unifiedDiff: filteredDiff.unified_diff,
     mode: reviewInput.config.review.mode,
     pullRequest: {
       number: reviewInput.pullRequest.number,
@@ -222,7 +238,7 @@ export async function reviewPullRequest(
   });
 
   options.logger?.info(
-    { provider: provider.name, changed_files: reviewInput.diff.files.length },
+    { provider: provider.name, changed_files: filteredDiff.files.length },
     "Review engine request started",
   );
 
@@ -235,7 +251,7 @@ export async function reviewPullRequest(
   if (generation.status === "failed") {
     const findings =
       generation.failureKind === "parse"
-        ? [buildReviewFailedFinding(reviewInput.diff, generation.error)]
+        ? [buildReviewFailedFinding(filteredDiff, generation.error)]
         : [];
 
     return buildFailedReview(reviewInput.pullRequest, provider, startedAt, generation.error, {
@@ -264,6 +280,28 @@ export async function reviewPullRequest(
     findings,
     walkthrough_markdown: generation.parsed.walkthrough_markdown,
     status: generation.status,
+  });
+}
+
+function buildNoFilesReview(
+  pullRequest: PullRequest,
+  provider: LLMProvider,
+  startedAt: Date,
+): Review {
+  return ReviewSchema.parse({
+    id: uuidv7(),
+    pr_number: pullRequest.number,
+    repo_full_name: pullRequest.repo_full_name,
+    commit_sha: pullRequest.head_sha,
+    started_at: startedAt,
+    completed_at: new Date(),
+    llm_provider: provider.name,
+    llm_model: provider.model,
+    tokens_used: ZeroTokenUsage,
+    summary: NoFilesAfterIgnoreFiltersMessage,
+    findings: [],
+    walkthrough_markdown: `## Sovri review\n\n${NoFilesAfterIgnoreFiltersMessage}`,
+    status: "success",
   });
 }
 

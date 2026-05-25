@@ -21,10 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
-- `feat(review-engine)`: wire `reviewPullRequest` to apply path ignore
-  filters to the parsed `Diff` before prompt construction, skip provider
-  calls cleanly when every changed file is ignored, and log changed,
-  reviewable, and ignored file counts without raw patch content.
+- `feat(review-engine)`: wire `reviewPullRequest` to apply configured path
+  ignore filters to the parsed `Diff` before prompt construction, skip
+  provider calls cleanly when every changed file is ignored, and log
+  changed, reviewable, and ignored file counts without raw patch content.
 
 - `feat(review-engine)`: start the pre-LLM `filterDiffByIgnores`
   helper contract so empty ignore patterns preserve every diff file and
