@@ -21,6 +21,26 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(bot)`: start the `@sovri-bot` command parser contract with
+  acceptance coverage and a pure parser implementation for
+  case-insensitive line-start `re-review` mentions, plus lowercase
+  `re-review` and first-valid-mention precedence coverage with implementation
+  for lowercase `dismiss <finding-id>`, including fallback to the first
+  unknown command when no later valid command exists, valid alphanumeric dash
+  finding ids through the 64-character boundary, malformed finding ids returning
+  `unknown` with raw remainders, `dismiss` without an id returning `unknown`,
+  with exact command-verb coverage, `unknown` results for unsupported command
+  words, non-exact command
+  verbs, mentions without commands returning an empty raw remainder,
+  punctuation-preserving unknown raw remainders, trailing-whitespace trimming for
+  unknown raw remainders, and supported commands with extra tokens, repeated
+  whitespace after the bot mention before
+  supported commands, ordinary comments without a bot mention, inline prose
+  mentions ignored as `no-mention`, empty comment bodies returning `no-mention`,
+  while indented and quoted mentions remain ignored, and repeated parsing
+  of the same input remains deterministic without GitHub event context,
+  environment reads, or Node filesystem imports.
+
 - `feat(review-engine)`: start wiring walkthrough cost-footer behavior by
   allowing the composer to accept reviews without token usage while still
   rendering complete Markdown without broken footer placeholders and
