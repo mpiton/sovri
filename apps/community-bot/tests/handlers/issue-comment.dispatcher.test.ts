@@ -12,6 +12,7 @@ import {
 const DeliveryId = "delivery-issue-comment-001";
 const SelfCommentDeliveryId = "delivery-issue-comment-002";
 const PlainIssueDeliveryId = "delivery-issue-comment-003";
+const CommandCorrelationDeliveryId = "delivery-issue-comment-004";
 const RepoFullName = "octo-org/sovri-target";
 const PullRequestNumber = 42;
 const PlainIssueNumber = 41;
@@ -136,6 +137,46 @@ describe("issue comment dispatcher - ATDD task 76", () => {
     expect(dependencies.reactToUnknown).not.toHaveBeenCalled();
     // And no issue comment is created
     expect(dependencies.createIssueComment).not.toHaveBeenCalled();
+  });
+
+  it("propagates delivery and comment IDs to the re-review handler", async () => {
+    const dependencies = buildDependencies();
+    const context = buildIssueCommentContext({
+      author: "alice",
+      body: "@sovri-bot re-review",
+      deliveryId: CommandCorrelationDeliveryId,
+      pullRequestNumber: PullRequestNumber,
+      repoFullName: RepoFullName,
+    });
+
+    // Given Probot has accepted delivery "delivery-issue-comment-004" for event "issue_comment.created"
+    expect(context.id).toBe(CommandCorrelationDeliveryId);
+    expect(context.name).toBe("issue_comment.created");
+    // And the repository is "octo-org/sovri-target"
+    expect(context.payload.repository.full_name).toBe(RepoFullName);
+    // And issue 42 is pull request 42
+    expect(context.payload.issue.number).toBe(PullRequestNumber);
+    expect(context.payload.issue.pull_request).toEqual({});
+    // And comment 98765 was authored by "alice"
+    expect(context.payload.comment.id).toBe(CommentId);
+    expect(context.payload.comment.user.login).toBe("alice");
+    // And the comment body is "@sovri-bot re-review"
+    expect(context.payload.comment.body).toBe("@sovri-bot re-review");
+
+    // When Sovri dispatches the issue comment webhook context
+    await handleIssueCommentCreated(context, dependencies);
+
+    // Then the re-review handler is called once for pull request 42
+    expect(dependencies.handleReReview).toHaveBeenCalledTimes(1);
+    expect(dependencies.handleReReview.mock.calls[0]?.[0]?.pullRequestNumber).toBe(
+      PullRequestNumber,
+    );
+    // And the re-review handler receives correlation ID "delivery-issue-comment-004"
+    expect(dependencies.handleReReview.mock.calls[0]?.[0]?.correlationId).toBe(
+      CommandCorrelationDeliveryId,
+    );
+    // And the re-review handler receives comment ID 98765
+    expect(dependencies.handleReReview.mock.calls[0]?.[0]?.commentId).toBe(CommentId);
   });
 });
 

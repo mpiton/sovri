@@ -30,7 +30,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   bot self-comments being skipped before command parsing or command side
   effects, with the handler comparing the comment author against the configured
   bot login before parsing, and plain issue comments being ignored before
-  command parsing or command side effects.
+  command parsing or command side effects. Re-review dispatcher coverage now
+  also pins delivery correlation and GitHub comment ID propagation.
 
 - `feat(bot)`: start the `@sovri-bot` command parser contract with
   acceptance coverage and a pure parser implementation for
