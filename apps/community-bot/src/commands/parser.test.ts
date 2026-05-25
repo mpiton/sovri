@@ -55,6 +55,23 @@ describe("parseCommand", () => {
     expect(command).toEqual({ kind: "dismiss", findingId: "finding-abc-123" });
   });
 
+  it("recognizes supported commands after repeated mention whitespace", async () => {
+    const { parseCommand } = await import("./parser.js");
+
+    // Given GitHub issue comment bodies with repeated mention whitespace:
+    const reReviewBody = "@sovri-bot   re-review";
+    const dismissBody = "@sovri-bot\tdismiss finding-abc-123";
+    // When the command bodies are parsed
+    const reReviewCommand = parseCommand(reReviewBody);
+    const dismissCommand = parseCommand(dismissBody);
+    // Then the supported commands are still recognized
+    expect(reReviewCommand).toEqual({ kind: "re-review" });
+    expect(dismissCommand).toEqual({
+      kind: "dismiss",
+      findingId: "finding-abc-123",
+    });
+  });
+
   it.each(["Re-Review", "DISMISS abc-123-def", "resolve abc-123-def"])(
     "returns unknown for non-exact command verb %s",
     async (commandLine) => {
