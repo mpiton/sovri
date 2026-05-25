@@ -38,7 +38,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   dispatcher does not fetch pull request diffs or post review results itself,
   and dismiss routing coverage pins the same boundary. No-mention dispatcher
   coverage now starts pinning silent skips for ordinary PR issue comments, with
-  the handler returning before command side effects.
+  the handler returning before command side effects. Unknown command coverage
+  now starts pinning a single confused reaction without command or review
+  side effects, with the handler routing unknown commands to the reaction
+  dependency.
 
 - `feat(bot)`: start the `@sovri-bot` command parser contract with
   acceptance coverage and a pure parser implementation for

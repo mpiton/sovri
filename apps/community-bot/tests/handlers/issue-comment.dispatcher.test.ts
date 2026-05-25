@@ -15,6 +15,7 @@ const SelfCommentDeliveryId = "delivery-issue-comment-002";
 const PlainIssueDeliveryId = "delivery-issue-comment-003";
 const CommandCorrelationDeliveryId = "delivery-issue-comment-004";
 const CommandRoutingDeliveryId = "delivery-issue-comment-005";
+const UnknownCommandDeliveryId = "delivery-issue-comment-006";
 const RepoFullName = "octo-org/sovri-target";
 const PullRequestNumber = 42;
 const PlainIssueNumber = 41;
@@ -343,6 +344,48 @@ describe("issue comment dispatcher - ATDD task 76", () => {
     // And the dispatcher does not fetch a pull request diff
     expect(dependencies.fetchPullRequestDiff).not.toHaveBeenCalled();
   });
+
+  it("reacts confused to unknown mentions without command side effects", async () => {
+    const dependencies = buildDependencies({ kind: "unknown", raw: "explain this finding" });
+    const context = buildIssueCommentContext({
+      author: "alice",
+      body: "@sovri-bot explain this finding",
+      deliveryId: UnknownCommandDeliveryId,
+      pullRequestNumber: PullRequestNumber,
+      repoFullName: RepoFullName,
+    });
+
+    // Given Probot has accepted delivery "delivery-issue-comment-006" for event "issue_comment.created"
+    expect(context.id).toBe(UnknownCommandDeliveryId);
+    expect(context.name).toBe("issue_comment.created");
+    // And the repository is "octo-org/sovri-target"
+    expect(context.payload.repository.full_name).toBe(RepoFullName);
+    // And issue 42 is pull request 42
+    expect(context.payload.issue.number).toBe(PullRequestNumber);
+    expect(context.payload.issue.pull_request).toEqual({});
+    // And comment 98765 was authored by "alice"
+    expect(context.payload.comment.id).toBe(CommentId);
+    expect(context.payload.comment.user.login).toBe("alice");
+    // And the comment body is "@sovri-bot explain this finding"
+    expect(context.payload.comment.body).toBe("@sovri-bot explain this finding");
+
+    // When Sovri dispatches the issue comment webhook context
+    await handleIssueCommentCreated(context, dependencies);
+
+    // Then GitHub receives one reaction request for comment 98765 with content "confused"
+    expect(dependencies.reactToUnknown).toHaveBeenCalledTimes(1);
+    expect(dependencies.reactToUnknown).toHaveBeenCalledWith({
+      commentId: CommentId,
+      content: "confused",
+    });
+    // And no command handler is called
+    expect(dependencies.handleReReview).not.toHaveBeenCalled();
+    expect(dependencies.handleDismiss).not.toHaveBeenCalled();
+    // And no issue comment is created
+    expect(dependencies.createIssueComment).not.toHaveBeenCalled();
+    // And the dispatcher does not fetch a pull request diff
+    expect(dependencies.fetchPullRequestDiff).not.toHaveBeenCalled();
+  });
 });
 
 type CommandParser = (body: string) => ParsedCommand;
@@ -356,6 +399,11 @@ type DismissCommandContext = {
   readonly repoFullName: string;
 };
 
+type UnknownCommandReaction = {
+  readonly commentId: number;
+  readonly content: "confused";
+};
+
 function buildDependencies(command: ParsedCommand = { kind: "re-review" }) {
   return {
     botLogin: "sovri-bot[bot]",
@@ -365,7 +413,9 @@ function buildDependencies(command: ParsedCommand = { kind: "re-review" }) {
     handleReReview: vi.fn<IssueCommentHandlerDependencies["handleReReview"]>(async () => undefined),
     parseCommand: vi.fn<CommandParser>(() => command),
     postReviewResult: vi.fn<() => Promise<void>>(async () => undefined),
-    reactToUnknown: vi.fn<() => Promise<void>>(async () => undefined),
+    reactToUnknown: vi.fn<(reaction: UnknownCommandReaction) => Promise<void>>(
+      async () => undefined,
+    ),
   };
 }
 

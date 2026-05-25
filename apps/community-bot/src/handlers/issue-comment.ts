@@ -36,11 +36,17 @@ export type IssueCommentDismissCommandContext = IssueCommentCommandContext & {
   readonly findingId: string;
 };
 
+export type IssueCommentUnknownReaction = {
+  readonly commentId: number;
+  readonly content: "confused";
+};
+
 export type IssueCommentHandlerDependencies = {
   readonly botLogin: string;
   readonly handleDismiss: (context: IssueCommentDismissCommandContext) => Promise<void>;
   readonly handleReReview: (context: IssueCommentCommandContext) => Promise<void>;
   readonly parseCommand: (body: string) => ParsedCommand;
+  readonly reactToUnknown: (reaction: IssueCommentUnknownReaction) => Promise<void>;
 };
 
 export async function handleIssueCommentCreated(
@@ -63,6 +69,14 @@ export async function handleIssueCommentCreated(
     return;
   }
 
+  if (command.kind === "unknown") {
+    await dependencies.reactToUnknown({
+      commentId: requireNumber(context.payload.comment.id, "comment.id"),
+      content: "confused",
+    });
+    return;
+  }
+
   const commandContext = buildCommandContext(context);
 
   if (command.kind === "re-review") {
@@ -75,10 +89,7 @@ export async function handleIssueCommentCreated(
       ...commandContext,
       findingId: command.findingId,
     });
-    return;
   }
-
-  throw new UnsupportedIssueCommentCommandError(command.kind);
 }
 
 function buildCommandContext(context: IssueCommentWebhookContext): IssueCommentCommandContext {
@@ -113,13 +124,5 @@ class IssueCommentPayloadError extends Error {
 
   public constructor(path: string) {
     super(`Missing issue comment payload field: ${path}`);
-  }
-}
-
-class UnsupportedIssueCommentCommandError extends Error {
-  public override readonly name = "UnsupportedIssueCommentCommandError";
-
-  public constructor(kind: string) {
-    super(`Unsupported issue comment command: ${kind}`);
   }
 }
