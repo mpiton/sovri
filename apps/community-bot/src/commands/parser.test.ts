@@ -99,6 +99,18 @@ describe("parseCommand", () => {
     });
   });
 
+  it("returns unknown for a mention without a command", async () => {
+    const { parseCommand } = await import("./parser.js");
+
+    // Given a GitHub issue comment body:
+    const body = "@sovri-bot";
+    // When the command body is parsed
+    const command = parseCommand(body);
+    // Then the parsed command is `unknown`
+    // And the raw command remainder is empty
+    expect(command).toEqual({ kind: "unknown", raw: "" });
+  });
+
   it.each(["Re-Review", "DISMISS abc-123-def", "resolve abc-123-def"])(
     "returns unknown for non-exact command verb %s",
     async (commandLine) => {
