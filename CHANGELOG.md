@@ -21,6 +21,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(review-engine)`: add a pure walkthrough cost helper with static
+  Anthropic and Mistral provider pricing, four-decimal USD estimates,
+  non-breaking unavailable-cost fallback for unknown provider/model
+  pricing, and public walkthrough exports for `PROVIDER_PRICING`,
+  `estimateCostUsd`, and `renderCostFooter`.
+
 - `feat(review-engine)`: wire `reviewPullRequest` to apply configured path
   ignore filters to the parsed `Diff` before prompt construction, skip
   provider calls cleanly when every changed file is ignored, and log

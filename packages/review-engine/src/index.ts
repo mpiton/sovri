@@ -41,10 +41,18 @@ export type {
 export {
   buildInlineComments,
   composeWalkthrough,
+  estimateCostUsd,
   InlineCommentDraftSchema,
+  PROVIDER_PRICING,
+  renderCostFooter,
   WalkthroughInputSchema,
 } from "./walkthrough/index.js";
-export type { InlineCommentDraft, WalkthroughInput } from "./walkthrough/index.js";
+export type {
+  InlineCommentDraft,
+  ModelPricing,
+  PricingProvider,
+  WalkthroughInput,
+} from "./walkthrough/index.js";
 
 export { reviewPullRequest, runReview } from "./orchestrator.js";
 export type {

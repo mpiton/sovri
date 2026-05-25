@@ -13,6 +13,8 @@ export type WalkthroughInput = z.input<typeof WalkthroughInputSchema>;
 
 export { buildInlineComments, InlineCommentDraftSchema } from "./inline.js";
 export type { InlineCommentDraft } from "./inline.js";
+export { estimateCostUsd, PROVIDER_PRICING, renderCostFooter } from "./cost.js";
+export type { ModelPricing, PricingProvider } from "./cost.js";
 
 export function composeWalkthrough(input: unknown): string {
   const review = WalkthroughInputSchema.parse(input);
