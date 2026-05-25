@@ -43,6 +43,18 @@ describe("parseCommand", () => {
     expect(command).toEqual({ kind: "dismiss", findingId: "finding-123" });
   });
 
+  it("uses a later valid mention after an unsupported mention command", async () => {
+    const { parseCommand } = await import("./parser.js");
+
+    // Given a GitHub issue comment body:
+    const body = `@sovri-bot Re-Review
+@sovri-bot re-review`;
+    // When the command body is parsed
+    const command = parseCommand(body);
+    // Then the later valid command is used
+    expect(command).toEqual({ kind: "re-review" });
+  });
+
   it("recognizes the lowercase dismiss command with one finding id", async () => {
     const { parseCommand } = await import("./parser.js");
 

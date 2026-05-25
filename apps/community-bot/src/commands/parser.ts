@@ -11,6 +11,8 @@ const MentionPattern = /^@sovri-bot(?:\s+(.*))?$/iu;
 const FindingIdPattern = /^[A-Za-z0-9-]+$/u;
 
 export function parseCommand(body: string): ParsedCommand {
+  let firstUnknown: { readonly kind: "unknown"; readonly raw: string } | undefined;
+
   for (const line of body.split(/\r?\n/u)) {
     const mentionMatch = MentionPattern.exec(line);
     const rawCommand = mentionMatch?.[1]?.trimEnd();
@@ -34,8 +36,8 @@ export function parseCommand(body: string): ParsedCommand {
       return { kind: "dismiss", findingId };
     }
 
-    return { kind: "unknown", raw: rawCommand };
+    firstUnknown ??= { kind: "unknown", raw: rawCommand };
   }
 
-  return { kind: "no-mention" };
+  return firstUnknown ?? { kind: "no-mention" };
 }
