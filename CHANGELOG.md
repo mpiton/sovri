@@ -23,7 +23,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `feat(bot)`: start the `@sovri-bot` command parser contract with
   acceptance coverage and a pure parser implementation for
-  case-insensitive line-start `re-review` mentions.
+  case-insensitive line-start `re-review` mentions, plus first-command
+  precedence coverage for `dismiss <finding-id>`.
 
 - `feat(review-engine)`: start wiring walkthrough cost-footer behavior by
   allowing the composer to accept reviews without token usage while still
