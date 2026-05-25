@@ -27,9 +27,11 @@ const OpenedHeadSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const SynchronizedHeadSha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const SecondSynchronizedHeadSha = "cccccccccccccccccccccccccccccccccccccccc";
 const ReReviewHeadSha = "dddddddddddddddddddddddddddddddddddddddd";
+const ReReviewOrderHeadSha = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const OpenedDeliveryId = "8f1b9c2d-3e4f-45a6-91b2-123456789abc";
 const SynchronizeDeliveryId = "9f1b9c2d-3e4f-45a6-91b2-123456789abc";
 const ReReviewDeliveryId = "delivery-re-review-001";
+const ReReviewOrderDeliveryId = "delivery-re-review-002";
 const SecretWebhookValue = "secret-webhook-value-45";
 const SecretLlmValue = "secret-llm-value-45";
 const SecretMistralValue = "test-key";
@@ -64,6 +66,7 @@ type ReviewRequest = ReturnType<typeof validatePullRequestReviewRequest>;
 type ObservedRuntime = {
   readonly anthropicApiKeys: string[];
   readonly anthropicRequests: unknown[];
+  readonly collaboratorCalls: string[];
   readonly issueCommentBodies: string[];
   readonly listFilesQueries: string[];
   readonly mistralApiKeys: string[];
@@ -611,6 +614,31 @@ describe("community bot pull request review E2E ATDD", () => {
     expect(runtime.reviewRequests).toHaveLength(1);
     expect(runtime.reviewRequests[0]?.commit_id).toBe(ReReviewHeadSha);
   }, 15_000);
+
+  it("re-review preserves synchronize collaborator order", async () => {
+    // Given issue comment delivery "delivery-re-review-002" targets repository "octo-org/sovri-target"
+    // And issue 42 is pull request 42
+    // And comment 98765 was authored by "alice"
+    // And the command body is "@sovri-bot re-review"
+    // And GitHub pull request 42 currently has head SHA "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    // And every review collaborator succeeds
+    const runtime = await runReReviewFlow({
+      deliveryId: ReReviewOrderDeliveryId,
+      headSha: ReReviewOrderHeadSha,
+    });
+
+    // When Sovri accepts the re-review command
+    // Then collaborator call 1 is "load config"
+    // And collaborator call 2 is "fetch diff"
+    // And collaborator call 3 is "review pull request"
+    // And collaborator call 4 is "post review"
+    expect(runtime.collaboratorCalls).toEqual([
+      "load config",
+      "fetch diff",
+      "review pull request",
+      "post review",
+    ]);
+  }, 15_000);
 });
 
 function runOpenedReviewFlow(): Promise<ObservedRuntime> {
@@ -656,6 +684,7 @@ async function runReviewFlow(values: {
   const runtime: ObservedRuntime = {
     anthropicApiKeys: [],
     anthropicRequests: [],
+    collaboratorCalls: [],
     issueCommentBodies: [],
     listFilesQueries: [],
     mistralApiKeys: [],
@@ -684,10 +713,14 @@ async function runReviewFlow(values: {
   return runtime;
 }
 
-async function runReReviewFlow(values: { readonly headSha: string }): Promise<ObservedRuntime> {
+async function runReReviewFlow(values: {
+  readonly deliveryId?: string;
+  readonly headSha: string;
+}): Promise<ObservedRuntime> {
   const runtime: ObservedRuntime = {
     anthropicApiKeys: [],
     anthropicRequests: [],
+    collaboratorCalls: [],
     issueCommentBodies: [],
     listFilesQueries: [],
     mistralApiKeys: [],
@@ -703,7 +736,7 @@ async function runReReviewFlow(values: { readonly headSha: string }): Promise<Ob
   });
   await probot.load(app, { addHandler() {} });
   await probot.receive({
-    id: ReReviewDeliveryId,
+    id: values.deliveryId ?? ReReviewDeliveryId,
     name: "issue_comment",
     payload: buildIssueCommentPayload(),
   });
@@ -725,12 +758,14 @@ function installReviewFlowHandlers(
 ): void {
   server.use(
     http.get(`${GitHubBaseUrl}/repos/:owner/:repo/contents/.sovri.yml`, ({ params }) => {
+      runtime.collaboratorCalls.push("load config");
       runtime.repositoryConfigRequests.push(`${String(params.owner)}/${String(params.repo)}`);
       return HttpResponse.json({ message: "Not Found" }, { status: 404 });
     }),
     http.get(`${GitHubBaseUrl}/repos/:owner/:repo/pulls/:pull_number`, ({ request }) => {
       const accept = request.headers.get("accept") ?? "";
       if (accept.includes("diff")) {
+        runtime.collaboratorCalls.push("fetch diff");
         return HttpResponse.text("not a unified diff");
       }
       return HttpResponse.json(
@@ -755,6 +790,7 @@ function installReviewFlowHandlers(
     http.post(
       `${GitHubBaseUrl}/repos/:owner/:repo/pulls/:pull_number/reviews`,
       async ({ params, request }) => {
+        runtime.collaboratorCalls.push("post review");
         const route = PullRequestReviewRouteSchema.parse(params);
         const body = PullRequestReviewBodySchema.parse(await request.json());
         const reviewRequest = validatePullRequestReviewRequest({
@@ -782,6 +818,7 @@ function installReviewFlowHandlers(
       },
     ),
     http.post(AnthropicMessagesUrl, async ({ request }) => {
+      runtime.collaboratorCalls.push("review pull request");
       runtime.anthropicApiKeys.push(request.headers.get("x-api-key") ?? "");
       runtime.anthropicRequests.push(await request.json());
       return anthropicMessageWithText(JSON.stringify(buildProviderResponse(3)));
