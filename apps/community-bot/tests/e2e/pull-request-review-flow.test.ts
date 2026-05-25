@@ -33,6 +33,7 @@ const SynchronizeDeliveryId = "9f1b9c2d-3e4f-45a6-91b2-123456789abc";
 const ReReviewDeliveryId = "delivery-re-review-001";
 const ReReviewOrderDeliveryId = "delivery-re-review-002";
 const ReReviewCurrentHeadDeliveryId = "delivery-re-review-004";
+const ReReviewStaleHeadDeliveryId = "delivery-re-review-005";
 const SecretWebhookValue = "secret-webhook-value-45";
 const SecretLlmValue = "secret-llm-value-45";
 const SecretMistralValue = "test-key";
@@ -645,6 +646,35 @@ describe("community bot pull request review E2E ATDD", () => {
     // And the walkthrough is posted against commit "dddddddddddddddddddddddddddddddddddddddd"
     expect(runtime.reviewRequests[0]?.commit_id).toBe(ReReviewHeadSha);
   }, 15_000);
+
+  it("re-review does not reuse a stale synchronize head SHA", async () => {
+    // Given issue comment delivery "delivery-re-review-005" targets repository "octo-org/sovri-target"
+    // And issue 42 is pull request 42
+    // And comment 98765 was authored by "alice"
+    // And the command body is "@sovri-bot re-review"
+    // And the previous synchronize webhook used head SHA "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    const previous = await runReviewFlow({
+      action: "synchronize",
+      deliveryId: `${ReReviewStaleHeadDeliveryId}-synchronize`,
+      headSha: SynchronizedHeadSha,
+    });
+    expect(previous.reviewRequests[0]?.commit_id).toBe(SynchronizedHeadSha);
+
+    // And GitHub `pulls.get` returns head SHA "cccccccccccccccccccccccccccccccccccccccc"
+    const runtime = await runReReviewFlow({
+      deliveryId: ReReviewStaleHeadDeliveryId,
+      headSha: SecondSynchronizedHeadSha,
+    });
+
+    // When Sovri accepts the re-review command
+    // Then the review engine receives head SHA "cccccccccccccccccccccccccccccccccccccccc"
+    expect(runtime.anthropicRequests).toHaveLength(1);
+    expect(runtime.reviewRequests[0]?.commit_id).toBe(SecondSynchronizedHeadSha);
+    // And no review call receives head SHA "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    expect(runtime.reviewRequests.map((request) => request.commit_id)).not.toContain(
+      SynchronizedHeadSha,
+    );
+  }, 20_000);
 
   it("re-review preserves synchronize collaborator order", async () => {
     // Given issue comment delivery "delivery-re-review-002" targets repository "octo-org/sovri-target"
