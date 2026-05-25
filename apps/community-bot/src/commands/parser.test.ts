@@ -82,11 +82,12 @@ describe("parseCommand", () => {
     // Given the command parser source:
     const parserPath = fileURLToPath(new URL("./parser.ts", import.meta.url));
     const parserSource = readFileSync(parserPath, "utf8");
+    const filesystemImportPattern =
+      /(?:from\s+|import\s*\(\s*|import\s+|require\s*\(\s*)["'](?:node:)?fs(?:\/promises)?["']/u;
     // When parser dependencies are inspected
     // Then the parser does not read process environment
     expect(parserSource).not.toContain("process.env");
     // And the parser does not import filesystem modules
-    expect(parserSource).not.toContain("node:fs");
-    expect(parserSource).not.toContain("node:fs/promises");
+    expect(parserSource).not.toMatch(filesystemImportPattern);
   });
 });
