@@ -39,4 +39,15 @@ describe("parseCommand", () => {
     // Then the parsed command is `no-mention`
     expect(command).toEqual({ kind: "no-mention" });
   });
+
+  it("ignores a mention in a quoted reply line", async () => {
+    const { parseCommand } = await import("./parser.js");
+
+    // Given a GitHub issue comment body:
+    const body = "> @sovri-bot re-review";
+    // When the command body is parsed
+    const command = parseCommand(body);
+    // Then the parsed command is `no-mention`
+    expect(command).toEqual({ kind: "no-mention" });
+  });
 });
