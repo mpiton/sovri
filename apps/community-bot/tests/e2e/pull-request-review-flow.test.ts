@@ -28,6 +28,7 @@ const SynchronizedHeadSha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const SecondSynchronizedHeadSha = "cccccccccccccccccccccccccccccccccccccccc";
 const ReReviewHeadSha = "dddddddddddddddddddddddddddddddddddddddd";
 const ReReviewOrderHeadSha = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+const ReReviewSuccessfulHeadSha = "ffffffffffffffffffffffffffffffffffffffff";
 const OpenedDeliveryId = "8f1b9c2d-3e4f-45a6-91b2-123456789abc";
 const SynchronizeDeliveryId = "9f1b9c2d-3e4f-45a6-91b2-123456789abc";
 const ReReviewDeliveryId = "delivery-re-review-001";
@@ -40,6 +41,7 @@ const ReReviewSingleReactionDeliveryId = "delivery-re-review-008";
 const ReReviewCannotAcceptDeliveryId = "delivery-re-review-009";
 const ReReviewDiffFailureDeliveryId = "delivery-re-review-010";
 const ReReviewPosterFailureDeliveryId = "delivery-re-review-012";
+const ReReviewSuccessfulDeliveryId = "delivery-re-review-014";
 const SecretWebhookValue = "secret-webhook-value-45";
 const SecretLlmValue = "secret-llm-value-45";
 const SecretMistralValue = "test-key";
@@ -844,6 +846,29 @@ describe("community bot pull request review E2E ATDD", () => {
     35_000,
   );
 
+  it("successful re-review posts a walkthrough and no error comment", async () => {
+    // Given issue comment delivery "delivery-re-review-014" targets repository "octo-org/sovri-target"
+    // And issue 42 is pull request 42
+    // And comment 98765 was authored by "alice"
+    // And the command body is "@sovri-bot re-review"
+    // And GitHub `pulls.get` returns head SHA "ffffffffffffffffffffffffffffffffffffffff"
+    // And the review engine returns walkthrough "Review complete"
+    const runtime = await runReReviewFlow({
+      deliveryId: ReReviewSuccessfulDeliveryId,
+      headSha: ReReviewSuccessfulHeadSha,
+      providerResponse: buildProviderResponseWithWalkthrough("Review complete"),
+    });
+
+    // When Sovri handles the re-review command
+    // Then the walkthrough review is posted on pull request 42
+    expect(runtime.successfulReviewRequests).toHaveLength(1);
+    expect(runtime.successfulReviewRequests[0]?.pull_number).toBe(PullNumber);
+    expect(runtime.successfulReviewRequests[0]?.commit_id).toBe(ReReviewSuccessfulHeadSha);
+    expect(runtime.successfulReviewRequests[0]?.body).toContain("Review complete");
+    // And no issue comment explaining an error is posted
+    expect(runtime.issueCommentBodies).toEqual([]);
+  }, 15_000);
+
   it("re-review preserves synchronize collaborator order", async () => {
     // Given issue comment delivery "delivery-re-review-002" targets repository "octo-org/sovri-target"
     // And issue 42 is pull request 42
@@ -951,6 +976,7 @@ async function runReReviewFlow(values: {
   readonly failingStep?: ReviewFlowFailureStep;
   readonly headSha: string;
   readonly pullLookupStatus?: number;
+  readonly providerResponse?: ProviderReviewResponse;
 }): Promise<ObservedRuntime> {
   const runtime: ObservedRuntime = {
     anthropicApiKeys: [],
@@ -974,6 +1000,7 @@ async function runReReviewFlow(values: {
     values.headSha,
     values.pullLookupStatus ?? 200,
     values.failingStep,
+    values.providerResponse,
   );
   const probot = new Probot({
     githubToken: SecretInstallationToken,
@@ -1002,6 +1029,7 @@ function installReviewFlowHandlers(
   currentHeadSha: string,
   pullLookupStatus = 200,
   failingStep?: ReviewFlowFailureStep,
+  providerResponse: ProviderReviewResponse = buildProviderResponse(3),
 ): void {
   server.use(
     http.get(`${GitHubBaseUrl}/repos/:owner/:repo/contents/.sovri.yml`, ({ params }) => {
@@ -1100,14 +1128,14 @@ function installReviewFlowHandlers(
       runtime.collaboratorCalls.push("review pull request");
       runtime.anthropicApiKeys.push(request.headers.get("x-api-key") ?? "");
       runtime.anthropicRequests.push(await request.json());
-      return anthropicMessageWithText(JSON.stringify(buildProviderResponse(3)));
+      return anthropicMessageWithText(JSON.stringify(providerResponse));
     }),
     http.post(MistralChatUrl, async ({ request }) => {
       runtime.mistralApiKeys.push(
         request.headers.get("authorization") ?? request.headers.get("x-api-key") ?? "",
       );
       runtime.mistralRequests.push(await request.json());
-      return mistralChatCompletionWithText(JSON.stringify(buildProviderResponse(3)));
+      return mistralChatCompletionWithText(JSON.stringify(providerResponse));
     }),
   );
 }
@@ -1172,6 +1200,14 @@ function buildProviderResponse(findingCount: number): ProviderReviewResponse {
     summary: "Review completed.",
     findings: defaultProviderFindings().slice(0, findingCount),
     walkthrough_markdown: buildWalkthroughMarkdown(findingCount),
+  });
+}
+
+function buildProviderResponseWithWalkthrough(walkthroughMarkdown: string): ProviderReviewResponse {
+  return ProviderReviewResponseSchema.parse({
+    summary: walkthroughMarkdown,
+    findings: defaultProviderFindings().slice(0, 3),
+    walkthrough_markdown: walkthroughMarkdown,
   });
 }
 
