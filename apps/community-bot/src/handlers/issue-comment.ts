@@ -32,8 +32,13 @@ export type IssueCommentCommandContext = {
   readonly repoFullName: string;
 };
 
+export type IssueCommentDismissCommandContext = IssueCommentCommandContext & {
+  readonly findingId: string;
+};
+
 export type IssueCommentHandlerDependencies = {
   readonly botLogin: string;
+  readonly handleDismiss: (context: IssueCommentDismissCommandContext) => Promise<void>;
   readonly handleReReview: (context: IssueCommentCommandContext) => Promise<void>;
   readonly parseCommand: (body: string) => ParsedCommand;
 };
@@ -53,11 +58,22 @@ export async function handleIssueCommentCreated(
   const command = dependencies.parseCommand(
     requireString(context.payload.comment.body, "comment.body"),
   );
-  if (command.kind !== "re-review") {
-    throw new UnsupportedIssueCommentCommandError(command.kind);
+  const commandContext = buildCommandContext(context);
+
+  if (command.kind === "re-review") {
+    await dependencies.handleReReview(commandContext);
+    return;
   }
 
-  await dependencies.handleReReview(buildCommandContext(context));
+  if (command.kind === "dismiss") {
+    await dependencies.handleDismiss({
+      ...commandContext,
+      findingId: command.findingId,
+    });
+    return;
+  }
+
+  throw new UnsupportedIssueCommentCommandError(command.kind);
 }
 
 function buildCommandContext(context: IssueCommentWebhookContext): IssueCommentCommandContext {

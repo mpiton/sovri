@@ -31,7 +31,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   effects, with the handler comparing the comment author against the configured
   bot login before parsing, and plain issue comments being ignored before
   command parsing or command side effects. Re-review dispatcher coverage now
-  also pins delivery correlation and GitHub comment ID propagation.
+  also pins delivery correlation and GitHub comment ID propagation, and dismiss
+  dispatcher coverage starts pinning the same delivery, comment, and finding ID
+  propagation contract with the handler routing parsed dismiss commands to a
+  dedicated dismiss dependency.
 
 - `feat(bot)`: start the `@sovri-bot` command parser contract with
   acceptance coverage and a pure parser implementation for
