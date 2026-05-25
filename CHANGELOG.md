@@ -29,7 +29,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   guard before command parsing. The dispatcher acceptance suite now also covers
   bot self-comments being skipped before command parsing or command side
   effects, with the handler comparing the comment author against the configured
-  bot login before parsing.
+  bot login before parsing, and plain issue comments being ignored before
+  command parsing or command side effects.
 
 - `feat(bot)`: start the `@sovri-bot` command parser contract with
   acceptance coverage and a pure parser implementation for

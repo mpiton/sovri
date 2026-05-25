@@ -11,11 +11,13 @@ import {
 
 const DeliveryId = "delivery-issue-comment-001";
 const SelfCommentDeliveryId = "delivery-issue-comment-002";
+const PlainIssueDeliveryId = "delivery-issue-comment-003";
 const RepoFullName = "octo-org/sovri-target";
 const PullRequestNumber = 42;
+const PlainIssueNumber = 41;
 const CommentId = 98_765;
 
-describe("issue comment dispatcher - ATDD #1532", () => {
+describe("issue comment dispatcher - ATDD task 76", () => {
   it("routes a Probot-validated re-review comment without raw signature plumbing", async () => {
     const dependencies = buildDependencies();
     const context = buildIssueCommentContext({
@@ -98,6 +100,43 @@ describe("issue comment dispatcher - ATDD #1532", () => {
     // And no issue comment is created
     expect(dependencies.createIssueComment).not.toHaveBeenCalled();
   });
+
+  it("skips plain issue comments before command parsing", async () => {
+    const dependencies = buildDependencies();
+    const context = buildIssueCommentContext({
+      author: "alice",
+      body: "@sovri-bot dismiss finding-abc-123",
+      deliveryId: PlainIssueDeliveryId,
+      issueNumber: PlainIssueNumber,
+      repoFullName: RepoFullName,
+    });
+
+    // Given Probot has accepted delivery "delivery-issue-comment-003" for event "issue_comment.created"
+    expect(context.id).toBe(PlainIssueDeliveryId);
+    expect(context.name).toBe("issue_comment.created");
+    // And the repository is "octo-org/sovri-target"
+    expect(context.payload.repository.full_name).toBe(RepoFullName);
+    // And issue 41 has no pull request link
+    expect(context.payload.issue.number).toBe(PlainIssueNumber);
+    expect(context.payload.issue.pull_request).toBeUndefined();
+    // And comment 98765 was authored by "alice"
+    expect(context.payload.comment.id).toBe(CommentId);
+    expect(context.payload.comment.user.login).toBe("alice");
+    // And the comment body is "@sovri-bot dismiss finding-abc-123"
+    expect(context.payload.comment.body).toBe("@sovri-bot dismiss finding-abc-123");
+
+    // When Sovri dispatches the issue comment webhook context
+    await handleIssueCommentCreated(context, dependencies);
+
+    // Then the command parser is not called
+    expect(dependencies.parseCommand).not.toHaveBeenCalled();
+    // And no command handler is called
+    expect(dependencies.handleReReview).not.toHaveBeenCalled();
+    // And no reaction is created on comment 98765
+    expect(dependencies.reactToUnknown).not.toHaveBeenCalled();
+    // And no issue comment is created
+    expect(dependencies.createIssueComment).not.toHaveBeenCalled();
+  });
 });
 
 type CommandParser = (body: string) => { readonly kind: "re-review" };
@@ -112,13 +151,31 @@ function buildDependencies() {
   };
 }
 
-function buildIssueCommentContext(values: {
+type IssueCommentContextValues = {
   readonly author: string;
   readonly body: string;
   readonly deliveryId: string;
-  readonly pullRequestNumber: number;
   readonly repoFullName: string;
-}): IssueCommentWebhookContext {
+} & (
+  | {
+      readonly issueNumber: number;
+      readonly pullRequestNumber?: undefined;
+    }
+  | {
+      readonly issueNumber?: undefined;
+      readonly pullRequestNumber: number;
+    }
+);
+
+function buildIssueCommentContext(values: IssueCommentContextValues): IssueCommentWebhookContext {
+  const issueNumber = values.issueNumber ?? values.pullRequestNumber;
+  const issue: IssueCommentWebhookContext["payload"]["issue"] = {
+    number: issueNumber,
+  };
+  if (values.pullRequestNumber !== undefined) {
+    issue.pull_request = {};
+  }
+
   return {
     id: values.deliveryId,
     name: "issue_comment.created",
@@ -130,10 +187,7 @@ function buildIssueCommentContext(values: {
           login: values.author,
         },
       },
-      issue: {
-        number: values.pullRequestNumber,
-        pull_request: {},
-      },
+      issue,
       repository: {
         full_name: values.repoFullName,
       },
