@@ -499,6 +499,50 @@ describe("dismiss command handler", () => {
     });
   });
 
+  it("treats a duplicate dismiss reaction response as accepted state", async () => {
+    const runtime = buildRuntime({
+      createReviewCommentReactionError: Object.assign(new Error("Reaction already exists"), {
+        status: 422,
+      }),
+      reviewComments: [
+        {
+          body: "<!-- sovri-finding-id: finding-race-001 -->",
+          id: InlineCommentId,
+          user: {
+            login: "sovri-bot",
+          },
+        },
+      ],
+      walkthroughReviewBody: [
+        "<!-- sovri:walkthrough -->",
+        "## Sovri review",
+        "",
+        "- <!-- sovri-finding-id: finding-race-001 --> finding-race-001",
+        "- <!-- sovri-finding-id: finding-alpha --> finding-alpha",
+      ].join("\n"),
+    });
+    const context = buildIssueCommentContext(runtime.octokit, {
+      findingId: "finding-race-001",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(runtime.octokit.rest.issues.createComment).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.pulls.updateReview).toHaveBeenCalledTimes(1);
+    const updateRequest = runtime.octokit.rest.pulls.updateReview.mock.calls[0]?.[0];
+    expect(updateRequest?.body).not.toContain("finding-race-001");
+    expect(updateRequest?.body).toContain("finding-alpha");
+    expect(runtime.octokit.rest.reactions.createForIssueComment).toHaveBeenCalledWith({
+      comment_id: CommentId,
+      content: "+1",
+      owner: "octo-org",
+      repo: "sovri-target",
+    });
+  });
+
   it("does not treat visible finding text without a hidden marker as a match", async () => {
     const runtime = buildRuntime({
       inlineCommentBody: VisibleOnlyInlineCommentBody,
@@ -544,6 +588,7 @@ type ReactionFixture = {
 
 function buildRuntime(
   options: {
+    readonly createReviewCommentReactionError?: unknown;
     readonly inlineCommentBody?: string;
     readonly reviewCommentReactions?: Readonly<Record<number, readonly ReactionFixture[]>>;
     readonly reviewComments?: readonly ReviewCommentFixture[];
@@ -610,7 +655,13 @@ function buildRuntime(
       },
       reactions: {
         createForIssueComment: vi.fn(async () => ({ data: {} })),
-        createForPullRequestReviewComment: vi.fn(async () => ({ data: {} })),
+        createForPullRequestReviewComment: vi.fn(async () => {
+          if (options.createReviewCommentReactionError !== undefined) {
+            throw options.createReviewCommentReactionError;
+          }
+
+          return { data: {} };
+        }),
         listForPullRequestReviewComment: vi.fn(async (parameters: { comment_id: number }) => ({
           data: options.reviewCommentReactions?.[parameters.comment_id] ?? [],
         })),

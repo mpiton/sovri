@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `fix(bot)`: treat duplicate GitHub dismiss reaction responses as accepted
+  dismissed state during concurrent retries.
+
+- `test(bot)`: add dismiss coverage for concurrent duplicate reaction responses.
+
 - `test(bot)`: add dismiss coverage proving already-dismissed findings are not
   reported as errors or unknown ids.
 

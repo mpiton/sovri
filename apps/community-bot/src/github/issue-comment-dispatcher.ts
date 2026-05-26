@@ -121,6 +121,7 @@ const WALKTHROUGH_PAGE_SIZE = 100;
 const DISMISSED_FINDING_LABEL = "sovri:dismissed-finding";
 const UNAUTHORIZED_DISMISS_BODY = "Only the pull request author can dismiss findings.";
 const FindingMarkerPattern = /<!--\s*sovri-finding-id:\s*([A-Za-z0-9-]{1,64})\s*-->/u;
+const AlreadyExistsMessagePattern = /already(?:_| )exists/iu;
 
 const PullRequestAuthorSchema = z
   .object({
@@ -210,12 +211,7 @@ async function handleDismissCommand(
       botLogin,
     );
     if (!dismissedFindingIds.has(command.findingId)) {
-      await context.octokit.rest.reactions.createForPullRequestReviewComment({
-        comment_id: findingComment.id,
-        content: "-1",
-        owner: repo.owner,
-        repo: repo.repo,
-      });
+      await createDismissReaction(context, repo, findingComment.id);
       dismissedFindingIds.add(command.findingId);
     }
     await context.octokit.rest.issues.addLabels({
@@ -240,6 +236,42 @@ async function handleDismissCommand(
     owner: repo.owner,
     repo: repo.repo,
   });
+}
+
+async function createDismissReaction(
+  context: IssueCommentDispatchContext,
+  repo: RepoRef,
+  commentId: number,
+): Promise<void> {
+  try {
+    await context.octokit.rest.reactions.createForPullRequestReviewComment({
+      comment_id: commentId,
+      content: "-1",
+      owner: repo.owner,
+      repo: repo.repo,
+    });
+  } catch (error) {
+    if (isGithubAlreadyExistsError(error)) {
+      return;
+    }
+
+    throw error;
+  }
+}
+
+function isGithubAlreadyExistsError(error: unknown): boolean {
+  if (!isRecord(error)) {
+    return false;
+  }
+
+  const status = readNumberProperty(error, "status");
+  if (status !== 409 && status !== 422) {
+    return false;
+  }
+
+  const message =
+    error instanceof Error ? error.message : (readStringProperty(error, "message") ?? "");
+  return AlreadyExistsMessagePattern.test(message);
 }
 
 async function resolvePullRequestAuthorLogin(
@@ -470,6 +502,26 @@ function extractFindingId(value: string | null | undefined): string | undefined 
 
 function isDefined<T>(value: T | undefined): value is T {
   return value !== undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readNumberProperty(
+  record: Readonly<Record<string, unknown>>,
+  property: string,
+): number | undefined {
+  const value = record[property];
+  return typeof value === "number" ? value : undefined;
+}
+
+function readStringProperty(
+  record: Readonly<Record<string, unknown>>,
+  property: string,
+): string | undefined {
+  const value = record[property];
+  return typeof value === "string" ? value : undefined;
 }
 
 function splitRepoFullName(repoFullName: string | undefined): {
