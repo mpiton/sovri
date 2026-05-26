@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(bot)`: add ATDD RED coverage requiring `@sovri-bot dismiss` to post
+  one unknown-finding error comment without mutating GitHub review state.
+
 - `feat(bot)`: route `@sovri-bot re-review` issue comments through the
   shared pull request synchronize review flow after resolving and validating
   the current pull request from GitHub.
