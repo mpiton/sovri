@@ -101,6 +101,9 @@ type PullRequestReviewCommentListParameters = {
 type PullRequestReviewComment = {
   readonly body?: string | null;
   readonly id: number;
+  readonly user?: {
+    readonly login?: string;
+  } | null;
 };
 
 type PullRequestReview = {
@@ -214,7 +217,8 @@ async function handleDismissCommand(
     }
 
     const reviewComments = await listReviewCommentsOnAllPages(context, command, repo);
-    const findingComment = reviewComments.find((comment) =>
+    const botReviewComments = reviewComments.filter((comment) => comment.user?.login === botLogin);
+    const findingComment = botReviewComments.find((comment) =>
       hasFindingMarker(comment, command.findingId),
     );
 
@@ -222,7 +226,7 @@ async function handleDismissCommand(
       const dismissedFindingIds = await collectBotDismissedFindingIds(
         context,
         repo,
-        reviewComments,
+        botReviewComments,
         botLogin,
       );
       if (!dismissedFindingIds.has(command.findingId)) {

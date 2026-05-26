@@ -19,6 +19,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Security
+
+- `fix(bot)`: restrict dismiss finding marker matching to bot-authored review
+  comments so collaborator-planted `sovri-finding-id` markers cannot poison the
+  dismissed state set.
+
 ### Added
 
 - `fix(bot)`: log dismiss GitHub update failures with delivery id and status

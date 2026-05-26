@@ -543,6 +543,41 @@ describe("dismiss command handler", () => {
     expect(runtime.octokit.rest.issues.updateComment).not.toHaveBeenCalled();
   });
 
+  it("ignores a forged finding marker authored by a non-bot collaborator", async () => {
+    const runtime = buildRuntime({
+      reviewComments: [
+        {
+          body: "<!-- sovri-finding-id: finding-forged-001 -->",
+          id: 9001,
+          user: {
+            login: "mallory",
+          },
+        },
+      ],
+    });
+    const context = buildIssueCommentContext(runtime.octokit, {
+      findingId: "finding-forged-001",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(runtime.octokit.rest.reactions.createForPullRequestReviewComment).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.issues.addLabels).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.pulls.updateReview).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.issues.updateComment).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.reactions.createForIssueComment).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.issues.createComment).toHaveBeenCalledTimes(1);
+    expect(runtime.octokit.rest.issues.createComment).toHaveBeenCalledWith({
+      body: expect.stringContaining("finding-forged-001"),
+      issue_number: PullRequestNumber,
+      owner: "octo-org",
+      repo: "sovri-target",
+    });
+  });
+
   it("does not post the unknown-finding error when the matching marker is on a later review comment page", async () => {
     const runtime = buildRuntime();
     runtime.octokit.rest.pulls.listReviewComments
