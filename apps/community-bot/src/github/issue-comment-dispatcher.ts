@@ -18,6 +18,9 @@ const DEFAULT_BOT_LOGIN = "sovri-bot[bot]";
 export type IssueCommentDispatchOctokit = ReReviewOctokit & {
   readonly rest: ReReviewOctokit["rest"] & {
     readonly issues: {
+      readonly addLabels: (
+        parameters: IssueAddLabelsParameters,
+      ) => Promise<{ readonly data: unknown }>;
       readonly createComment: (
         parameters: IssueCommentCreateParameters,
       ) => Promise<{ readonly data: unknown }>;
@@ -52,6 +55,13 @@ type PullRequestReviewCommentReactionParameters = {
   readonly repo: string;
 };
 
+type IssueAddLabelsParameters = {
+  readonly issue_number: number;
+  readonly labels: string[];
+  readonly owner: string;
+  readonly repo: string;
+};
+
 type IssueCommentCreateParameters = {
   readonly body: string;
   readonly issue_number: number;
@@ -73,6 +83,7 @@ type PullRequestReviewComment = {
 };
 
 const REVIEW_COMMENT_PAGE_SIZE = 100;
+const DISMISSED_FINDING_LABEL = "sovri:dismissed-finding";
 
 export type IssueCommentDispatchContext = {
   readonly id: string;
@@ -131,6 +142,18 @@ async function handleDismissCommand(
     await context.octokit.rest.reactions.createForPullRequestReviewComment({
       comment_id: findingComment.id,
       content: "-1",
+      owner: repo.owner,
+      repo: repo.repo,
+    });
+    await context.octokit.rest.issues.addLabels({
+      issue_number: command.pullRequestNumber,
+      labels: [DISMISSED_FINDING_LABEL],
+      owner: repo.owner,
+      repo: repo.repo,
+    });
+    await context.octokit.rest.reactions.createForIssueComment({
+      comment_id: command.commentId,
+      content: "+1",
       owner: repo.owner,
       repo: repo.repo,
     });
