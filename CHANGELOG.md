@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(bot)`: add dismiss coverage proving inline finding markers are parsed
+  when surrounded by normal review Markdown.
+
 - `feat(bot)`: restrict `@sovri-bot dismiss` to the pull request author before
   mutating dismissed finding state.
 

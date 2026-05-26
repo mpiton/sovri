@@ -17,6 +17,21 @@ const KnownInlineCommentBody = [
   "Add a guard before reading payload.user.",
   "<!-- sovri-finding-id: finding-known-001 -->",
 ].join("\n");
+const MarkdownWrappedInlineCommentBody = [
+  "> **Dismissable finding**",
+  "> The marker is surrounded by normal review Markdown.",
+  "",
+  "<details>",
+  "<summary>Context</summary>",
+  "",
+  "<!-- sovri-finding-id: finding-markdown-001 -->",
+  "",
+  "```ts",
+  "payload.user.login",
+  "```",
+  "",
+  "</details>",
+].join("\n");
 const VisibleOnlyInlineCommentBody = [
   "**finding-visible-only**",
   "",
@@ -129,6 +144,40 @@ describe("dismiss command handler", () => {
       repo: "sovri-target",
     });
     expect(runtime.octokit.rest.reactions.createForIssueComment).toHaveBeenCalledTimes(1);
+    expect(runtime.octokit.rest.reactions.createForIssueComment).toHaveBeenCalledWith({
+      comment_id: CommentId,
+      content: "+1",
+      owner: "octo-org",
+      repo: "sovri-target",
+    });
+  });
+
+  it("parses an inline marker surrounded by normal markdown", async () => {
+    const runtime = buildRuntime({
+      inlineCommentBody: MarkdownWrappedInlineCommentBody,
+    });
+    const context = buildIssueCommentContext(runtime.octokit, {
+      findingId: "finding-markdown-001",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(runtime.octokit.rest.issues.createComment).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.reactions.createForPullRequestReviewComment).toHaveBeenCalledWith({
+      comment_id: InlineCommentId,
+      content: "-1",
+      owner: "octo-org",
+      repo: "sovri-target",
+    });
+    expect(runtime.octokit.rest.issues.addLabels).toHaveBeenCalledWith({
+      issue_number: PullRequestNumber,
+      labels: ["sovri:dismissed-finding"],
+      owner: "octo-org",
+      repo: "sovri-target",
+    });
     expect(runtime.octokit.rest.reactions.createForIssueComment).toHaveBeenCalledWith({
       comment_id: CommentId,
       content: "+1",
