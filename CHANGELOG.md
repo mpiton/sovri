@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(bot)`: log successful dismiss command handling with GitHub delivery
+  correlation fields and without raw issue comment payloads.
+
 - `test(bot)`: add issue-comment acceptance coverage for extra dismiss tokens
   becoming unknown commands before review comment search.
 

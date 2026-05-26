@@ -8,6 +8,7 @@ import { handleIssueCommentCreated } from "../../../src/handlers/issue-comment.j
 
 const DeliveryId = "delivery-dismiss-unknown-001";
 const ExtraDismissTokensDeliveryId = "delivery-dismiss-format-003";
+const DismissLogDeliveryId = "delivery-dismiss-log-001";
 const RepoFullName = "octo-org/sovri-target";
 const PullRequestNumber = 42;
 const CommentId = 98_765;
@@ -17,6 +18,12 @@ const KnownInlineCommentBody = [
   "",
   "Add a guard before reading payload.user.",
   "<!-- sovri-finding-id: finding-known-001 -->",
+].join("\n");
+const DismissLogInlineCommentBody = [
+  "**Dismissable finding**",
+  "",
+  "The marker matches the command finding id.",
+  "<!-- sovri-finding-id: finding-abc-123 -->",
 ].join("\n");
 const MarkdownWrappedInlineCommentBody = [
   "> **Dismissable finding**",
@@ -255,6 +262,68 @@ describe("dismiss command handler", () => {
       owner: "octo-org",
       repo: "sovri-target",
     });
+  });
+
+  it("logs successful dismiss entries with the GitHub delivery id", async () => {
+    const runtime = buildRuntime({
+      inlineCommentBody: DismissLogInlineCommentBody,
+    });
+    const logger = buildLogger();
+    const context = buildIssueCommentContext(runtime.octokit, {
+      deliveryId: DismissLogDeliveryId,
+      findingId: "finding-abc-123",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(
+      context,
+      {
+        SOVRI_BOT_LOGIN: "sovri-bot",
+      },
+      logger,
+    );
+
+    // Given Probot has accepted delivery "delivery-dismiss-log-001" for event "issue_comment.created"
+    expect(context.id).toBe(DismissLogDeliveryId);
+    expect(context.name).toBe("issue_comment.created");
+    // And the repository is "octo-org/sovri-target"
+    expect(context.payload.repository.full_name).toBe(RepoFullName);
+    // And issue 42 is pull request 42
+    expect(context.payload.issue.number).toBe(PullRequestNumber);
+    // And pull request 42 was opened by "alice"
+    expect(context.payload.issue.pull_request).toEqual({
+      user: {
+        login: "alice",
+      },
+    });
+    // And comment 98765 was authored by "alice"
+    expect(context.payload.comment.id).toBe(CommentId);
+    expect(context.payload.comment.user?.login).toBe("alice");
+    // And the comment body is "@sovri-bot dismiss finding-abc-123"
+    expect(context.payload.comment.body).toBe("@sovri-bot dismiss finding-abc-123");
+    // And pull request review comment 501 contains hidden marker "<!-- sovri-finding-id: finding-abc-123 -->"
+    expect(runtime.inlineComment.body).toContain("<!-- sovri-finding-id: finding-abc-123 -->");
+
+    // When Sovri handles the dismiss command
+    await handleIssueCommentCreated(context, dependencies);
+
+    // Then every dismiss log entry for pull request 42 contains delivery id "delivery-dismiss-log-001"
+    const dismissLogCalls = logger.info.mock.calls.filter((call) =>
+      String(call[1]).startsWith("Dismiss command"),
+    );
+    expect(dismissLogCalls.length).toBeGreaterThan(0);
+    for (const [bindings] of dismissLogCalls) {
+      expect(bindings).toMatchObject({
+        delivery_id: DismissLogDeliveryId,
+        pr_number: PullRequestNumber,
+      });
+    }
+    // And every dismiss log entry identifies repository "octo-org/sovri-target"
+    for (const [bindings] of dismissLogCalls) {
+      expect(bindings).toMatchObject({ repo: RepoFullName });
+    }
+    // And no dismiss log entry contains the raw issue comment payload
+    expect(loggerOutput(logger)).not.toContain("@sovri-bot dismiss finding-abc-123");
+    expect(loggerOutput(logger)).not.toContain('"payload"');
+    expect(logger.error).not.toHaveBeenCalled();
   });
 
   it("parses an inline marker surrounded by normal markdown", async () => {
@@ -892,6 +961,24 @@ function lastNonEmptyLine(value: string): string | undefined {
   }
 
   return undefined;
+}
+
+function buildLogger() {
+  return {
+    error: vi.fn<(bindings: Readonly<Record<string, unknown>>, message: string) => void>(
+      () => undefined,
+    ),
+    info: vi.fn<(bindings: Readonly<Record<string, unknown>>, message: string) => void>(
+      () => undefined,
+    ),
+  };
+}
+
+function loggerOutput(logger: ReturnType<typeof buildLogger>): string {
+  return JSON.stringify({
+    error: logger.error.mock.calls,
+    info: logger.info.mock.calls,
+  });
 }
 
 function buildIssueCommentContext(
