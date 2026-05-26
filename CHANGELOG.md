@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(bot)`: add dismiss coverage proving walkthrough re-rendering keeps the
+  existing cost footer as the final non-empty line.
+
 - `fix(bot)`: treat duplicate GitHub dismiss reaction responses as accepted
   dismissed state during concurrent retries.
 

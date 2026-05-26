@@ -37,6 +37,7 @@ const VisibleOnlyInlineCommentBody = [
   "",
   "This comment mentions finding-visible-only in visible Markdown only.",
 ].join("\n");
+const CostFooter = "_Tokens: 1234 in / 567 out. Estimated cost: $0.0123._";
 const MarkedWalkthroughBody = [
   "<!-- sovri:walkthrough -->",
   "## Sovri review",
@@ -52,6 +53,19 @@ const MarkedWalkthroughBody = [
   "- <!-- sovri-finding-id: finding-alpha --> src/alpha.ts finding-alpha",
   "- <!-- sovri-finding-id: finding-beta --> src/beta.ts finding-beta",
   "- <!-- sovri-finding-id: finding-gamma --> src/gamma.ts finding-gamma",
+].join("\n");
+const MarkedWalkthroughWithCostFooter = [
+  "<!-- sovri:walkthrough -->",
+  "## Sovri review",
+  "",
+  "### Findings",
+  "",
+  "- <!-- sovri-finding-id: finding-alpha --> finding-alpha",
+  "- <!-- sovri-finding-id: finding-beta --> finding-beta",
+  "",
+  "---",
+  "",
+  CostFooter,
 ].join("\n");
 
 describe("dismiss command handler", () => {
@@ -421,6 +435,45 @@ describe("dismiss command handler", () => {
     expect(updateRequest?.body).not.toContain("finding-beta");
   });
 
+  it("keeps the existing cost footer last after dismissing one finding", async () => {
+    const runtime = buildRuntime({
+      reviewComments: [
+        {
+          body: "<!-- sovri-finding-id: finding-alpha -->",
+          id: 501,
+          user: {
+            login: "sovri-bot",
+          },
+        },
+        {
+          body: "<!-- sovri-finding-id: finding-beta -->",
+          id: 502,
+          user: {
+            login: "sovri-bot",
+          },
+        },
+      ],
+      reviewCommentReactions: {
+        502: [{ content: "-1", user: { login: "sovri-bot" } }],
+      },
+      walkthroughReviewBody: MarkedWalkthroughWithCostFooter,
+    });
+    const context = buildIssueCommentContext(runtime.octokit, {
+      findingId: "finding-beta",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    const updateRequest = runtime.octokit.rest.pulls.updateReview.mock.calls[0]?.[0];
+    expect(updateRequest?.body).toContain("finding-alpha");
+    expect(updateRequest?.body).not.toContain("finding-beta");
+    expect(updateRequest?.body).toContain(CostFooter);
+    expect(lastNonEmptyLine(updateRequest?.body ?? "")).toBe(CostFooter);
+  });
+
   it("accepts repeated dismiss without creating a duplicate finding reaction", async () => {
     const runtime = buildRuntime({
       reviewComments: [
@@ -679,6 +732,18 @@ function buildRuntime(
     },
     octokit,
   };
+}
+
+function lastNonEmptyLine(value: string): string | undefined {
+  const lines = value.split("\n");
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index]?.trim();
+    if (line !== undefined && line.length > 0) {
+      return line;
+    }
+  }
+
+  return undefined;
 }
 
 function buildIssueCommentContext(
