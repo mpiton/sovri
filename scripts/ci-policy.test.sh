@@ -9,6 +9,230 @@ PASS=0
 FAIL=0
 FAILURES=""
 
+run_coverage_gate_branch_case() {
+  local label="$1"
+  local covered="$2"
+  local total="$3"
+  local expected_exit="$4"
+  local expected_status_line="$5"
+  local tmp stdout stderr stdout_file stderr_file ec
+
+  tmp=$(mktemp -d 2>/dev/null || mktemp -d -t 'ci-policy-coverage')
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  mkdir -p "$tmp/coverage"
+  cat >"$tmp/coverage/coverage-summary.json" <<EOF
+{
+  "total": {
+    "branches": { "total": 1000, "covered": 920, "skipped": 0, "pct": 92 }
+  },
+  "/repo/packages/llm-providers/src/providers/MistralProvider.ts": {
+    "branches": { "total": ${total}, "covered": ${covered}, "skipped": 0, "pct": 0 }
+  }
+}
+EOF
+
+  # Given "coverage/coverage-summary.json" reports <covered>/<total> branch units
+  # for "packages/llm-providers"
+  node "$SCRIPT" coverage-gate \
+    --input "$tmp/coverage/coverage-summary.json" \
+    --package packages/llm-providers \
+    --branches 85 \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -rf "$tmp"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the release engineer evaluates the llm-providers coverage gate
+  # Then the gate exits with code <expected_exit>
+  if [ "$ec" -ne "$expected_exit" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ coverage gate ${label}: expected exit ${expected_exit}, got ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  # And stdout includes "<expected_status_line>"
+  if ! printf '%s\n' "$stdout" | grep -Fq "$expected_status_line"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ coverage gate ${label}: missing status line ${expected_status_line}
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_coverage_gate_workspace_total_case() {
+  local tmp stdout stderr stdout_file stderr_file ec
+
+  tmp=$(mktemp -d 2>/dev/null || mktemp -d -t 'ci-policy-coverage')
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  mkdir -p "$tmp/coverage"
+  cat >"$tmp/coverage/coverage-summary.json" <<EOF
+{
+  "total": {
+    "branches": { "total": 100, "covered": 92, "skipped": 0, "pct": 92 }
+  },
+  "/repo/packages/llm-providers/src/providers/MistralProvider.ts": {
+    "branches": { "total": 100, "covered": 84, "skipped": 0, "pct": 84 }
+  },
+  "/repo/packages/core/src/index.ts": {
+    "branches": { "total": 100, "covered": 100, "skipped": 0, "pct": 100 }
+  }
+}
+EOF
+
+  # Given the workspace total branch coverage is 92 percent
+  # And "packages/llm-providers" branch coverage is 84 percent
+  node "$SCRIPT" coverage-gate \
+    --input "$tmp/coverage/coverage-summary.json" \
+    --package packages/llm-providers \
+    --branches 85 \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -rf "$tmp"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the release engineer evaluates the llm-providers coverage gate
+  # Then the gate fails using package coverage rather than workspace totals
+  if [ "$ec" -ne 1 ] ||
+    ! printf '%s\n' "$stdout" | grep -Fq "coverage_gate=fail" ||
+    ! printf '%s\n' "$stdout" | grep -Fq "packages/llm-providers branches 84.00 < 85.00"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ coverage gate workspace total isolation failed
+      exit: ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+write_coverage_workflow_fixture() {
+  local path="$1"
+  local threshold="$2"
+  local retention_days="$3"
+  local upload_condition="$4"
+
+  cat >"$path" <<EOF
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  backend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run coverage
+        run: pnpm exec vitest run --coverage --reporter=verbose
+      - name: Coverage gate — packages/llm-providers ≥ 85 %
+        run: node scripts/check-coverage.mjs coverage/coverage-summary.json packages/llm-providers ${threshold}
+      - name: Upload TypeScript coverage
+        if: ${upload_condition}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ts-coverage
+          path: coverage/
+          retention-days: ${retention_days}
+EOF
+}
+
+run_llm_providers_workflow_threshold_case() {
+  local threshold="$1"
+  local expected_exit="$2"
+  local expected_status="$3"
+  local tmp stdout stderr stdout_file stderr_file ec
+
+  tmp=$(mktemp -d 2>/dev/null || mktemp -d -t 'ci-policy-workflow')
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+  write_coverage_workflow_fixture "$tmp/ci.yml" "$threshold" 90 "always()"
+
+  # Given the candidate workflow sets the llm-providers branch threshold to <threshold>
+  node "$SCRIPT" llm-providers-coverage-workflow --workflow "$tmp/ci.yml" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -rf "$tmp"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the release engineer evaluates the candidate workflow
+  # Then lowering the threshold below 85 percent is rejected
+  if [ "$ec" -ne "$expected_exit" ] ||
+    ! printf '%s\n' "$stdout" | grep -Fq "$expected_status"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ llm-providers threshold ${threshold}: expected exit ${expected_exit} with ${expected_status}
+      exit: ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_coverage_artifact_policy_case() {
+  local retention_days="$1"
+  local upload_condition="$2"
+  local expected_exit="$3"
+  local expected_status="$4"
+  local tmp stdout stderr stdout_file stderr_file ec
+
+  tmp=$(mktemp -d 2>/dev/null || mktemp -d -t 'ci-policy-artifact')
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+  write_coverage_workflow_fixture "$tmp/ci.yml" 85 "$retention_days" "$upload_condition"
+
+  # Given the coverage upload step uses retention-days <retention_days>
+  # And the upload condition is "<upload_condition>"
+  node "$SCRIPT" coverage-artifact-policy --workflow "$tmp/ci.yml" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -rf "$tmp"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the release engineer evaluates the CI coverage artifact policy
+  # Then the policy exits with code <expected_exit>
+  if [ "$ec" -ne "$expected_exit" ] ||
+    ! printf '%s\n' "$stdout" | grep -Fq "$expected_status"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ coverage artifact retention ${retention_days}, condition ${upload_condition}: expected ${expected_status}
+      exit: ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_duration_pass_case() {
   local elapsed_ms="$1"
   local reported_duration="$2"
@@ -13250,6 +13474,15 @@ run_release_build_missing_tag_case "v0"
 run_release_build_missing_tag_case "latest"
 run_release_build_missing_job_case
 run_release_build_wrong_repo_case
+run_coverage_gate_branch_case "above threshold" 875 1000 0 "packages/llm-providers branches 87.50 >= 85.00"
+run_coverage_gate_branch_case "exact threshold" 8500 10000 0 "coverage_gate=pass"
+run_coverage_gate_branch_case "below threshold" 8499 10000 1 "packages/llm-providers branches 84.99 < 85.00"
+run_coverage_gate_workspace_total_case
+run_llm_providers_workflow_threshold_case 85 0 "llm_providers_threshold=pass"
+run_llm_providers_workflow_threshold_case 84 1 "llm_providers_threshold=fail"
+run_coverage_artifact_policy_case 90 "always()" 0 "coverage_artifact_retention=pass"
+run_coverage_artifact_policy_case 89 "always()" 1 "coverage artifact retention < 90"
+run_coverage_artifact_policy_case 90 "success()" 1 "coverage artifact upload must use always()"
 run_cosign_deferral_pass_case
 run_cosign_missing_note_case
 run_cosign_outside_section_case

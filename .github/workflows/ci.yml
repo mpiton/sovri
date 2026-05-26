@@ -10,6 +10,54 @@ permissions:
   contents: read
 
 jobs:
+  backend-checks:
+    name: TS — oxlint + oxfmt + tsc + vitest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Lint
+        run: pnpm exec oxlint . --max-warnings=0 --no-error-on-unmatched-pattern
+
+      - name: Format check
+        run: pnpm exec oxfmt --check .
+
+      - name: Typecheck
+        run: pnpm exec tsc -b
+
+      - name: Build
+        run: pnpm turbo build
+
+      - name: Test with coverage
+        run: pnpm exec vitest run --coverage --reporter=verbose
+
+      - name: Coverage gate — packages/llm-providers ≥ 85 %
+        run: node scripts/check-coverage.mjs coverage/coverage-summary.json packages/llm-providers 85
+
+      - name: Upload TypeScript coverage
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ts-coverage
+          path: coverage/
+          retention-days: 90
+
   forbidden-tools:
     name: Forbidden tools
     runs-on: ubuntu-latest
