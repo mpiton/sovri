@@ -21,6 +21,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `fix(bot)`: treat repeated dismiss commands as accepted when the bot already
+  reacted with `-1` on the matching review comment.
+
+- `test(bot)`: add dismiss coverage proving repeated commands do not create
+  duplicate finding reactions.
+
 - `feat(bot)`: update fallback issue-comment walkthroughs in place when
   dismissing findings and no marked pull request review body exists.
 

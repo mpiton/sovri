@@ -203,25 +203,27 @@ async function handleDismissCommand(
   );
 
   if (findingComment !== undefined) {
-    await context.octokit.rest.reactions.createForPullRequestReviewComment({
-      comment_id: findingComment.id,
-      content: "-1",
-      owner: repo.owner,
-      repo: repo.repo,
-    });
-    await context.octokit.rest.issues.addLabels({
-      issue_number: command.pullRequestNumber,
-      labels: [DISMISSED_FINDING_LABEL],
-      owner: repo.owner,
-      repo: repo.repo,
-    });
     const dismissedFindingIds = await collectBotDismissedFindingIds(
       context,
       repo,
       reviewComments,
       botLogin,
     );
-    dismissedFindingIds.add(command.findingId);
+    if (!dismissedFindingIds.has(command.findingId)) {
+      await context.octokit.rest.reactions.createForPullRequestReviewComment({
+        comment_id: findingComment.id,
+        content: "-1",
+        owner: repo.owner,
+        repo: repo.repo,
+      });
+      dismissedFindingIds.add(command.findingId);
+    }
+    await context.octokit.rest.issues.addLabels({
+      issue_number: command.pullRequestNumber,
+      labels: [DISMISSED_FINDING_LABEL],
+      owner: repo.owner,
+      repo: repo.repo,
+    });
     await updateWalkthroughReview(context, command, repo, dismissedFindingIds, botLogin);
     await context.octokit.rest.reactions.createForIssueComment({
       comment_id: command.commentId,
