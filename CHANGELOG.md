@@ -25,6 +25,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   comments so collaborator-planted `sovri-finding-id` markers cannot poison the
   dismissed state set.
 
+### Fixed
+
+- `fix(bot)`: paginate the dismiss reaction lookup with `per_page=100` so a
+  bot `-1` reaction past the first reaction page is still recognised as a
+  dismissed finding.
+- `fix(bot)`: fetch dismiss reactions sequentially to avoid bursting GitHub
+  concurrent-request limits on PRs with many findings.
+
 ### Added
 
 - `fix(bot)`: log dismiss GitHub update failures with delivery id and status

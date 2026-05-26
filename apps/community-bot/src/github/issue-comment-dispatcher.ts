@@ -66,6 +66,8 @@ type PullRequestReviewCommentReactionParameters = {
 type PullRequestReviewCommentReactionListParameters = {
   readonly comment_id: number;
   readonly owner: string;
+  readonly page?: number;
+  readonly per_page?: number;
   readonly repo: string;
 };
 
@@ -128,6 +130,7 @@ type IssueCommentDispatchLogger = {
 
 const REVIEW_COMMENT_PAGE_SIZE = 100;
 const WALKTHROUGH_PAGE_SIZE = 100;
+const REACTION_PAGE_SIZE = 100;
 const DISMISSED_FINDING_LABEL = "sovri:dismissed-finding";
 const DISMISS_FAILURE_BODY = "Dismiss command could not be completed. Please retry later.";
 const NO_FINDINGS_LINE = "No findings.";
@@ -391,27 +394,87 @@ async function collectBotDismissedFindingIds(
   comments: readonly PullRequestReviewComment[],
   botLogin: string,
 ): Promise<Set<string>> {
-  const dismissedIds = await Promise.all(
-    comments.map(async (comment) => {
-      const findingId = extractFindingId(comment.body);
-      if (findingId === undefined) {
-        return undefined;
-      }
+  return collectBotDismissedFindingIdsFromIndex(context, repo, comments, botLogin, 0, new Set());
+}
 
-      const reactions = await context.octokit.rest.reactions.listForPullRequestReviewComment({
-        comment_id: comment.id,
-        owner: repo.owner,
-        repo: repo.repo,
-      });
+async function collectBotDismissedFindingIdsFromIndex(
+  context: IssueCommentDispatchContext,
+  repo: RepoRef,
+  comments: readonly PullRequestReviewComment[],
+  botLogin: string,
+  index: number,
+  accumulator: Set<string>,
+): Promise<Set<string>> {
+  if (index >= comments.length) {
+    return accumulator;
+  }
 
-      const botDismissed = reactions.data.some(
-        (reaction) => reaction.content === "-1" && reaction.user?.login === botLogin,
-      );
-      return botDismissed ? findingId : undefined;
-    }),
+  const comment = comments[index];
+  if (comment === undefined) {
+    return collectBotDismissedFindingIdsFromIndex(
+      context,
+      repo,
+      comments,
+      botLogin,
+      index + 1,
+      accumulator,
+    );
+  }
+
+  const findingId = extractFindingId(comment.body);
+  if (findingId !== undefined) {
+    const botDismissed = await hasBotDismissReaction(context, repo, comment.id, botLogin);
+    if (botDismissed) {
+      accumulator.add(findingId);
+    }
+  }
+
+  return collectBotDismissedFindingIdsFromIndex(
+    context,
+    repo,
+    comments,
+    botLogin,
+    index + 1,
+    accumulator,
   );
+}
 
-  return new Set(dismissedIds.filter(isDefined));
+async function hasBotDismissReaction(
+  context: IssueCommentDispatchContext,
+  repo: RepoRef,
+  commentId: number,
+  botLogin: string,
+): Promise<boolean> {
+  return hasBotDismissReactionPage(context, repo, commentId, botLogin, 1);
+}
+
+async function hasBotDismissReactionPage(
+  context: IssueCommentDispatchContext,
+  repo: RepoRef,
+  commentId: number,
+  botLogin: string,
+  page: number,
+): Promise<boolean> {
+  const reactions = await context.octokit.rest.reactions.listForPullRequestReviewComment({
+    comment_id: commentId,
+    owner: repo.owner,
+    page,
+    per_page: REACTION_PAGE_SIZE,
+    repo: repo.repo,
+  });
+
+  const botDismissed = reactions.data.some(
+    (reaction) => reaction.content === "-1" && reaction.user?.login === botLogin,
+  );
+  if (botDismissed) {
+    return true;
+  }
+
+  if (reactions.data.length < REACTION_PAGE_SIZE) {
+    return false;
+  }
+
+  return hasBotDismissReactionPage(context, repo, commentId, botLogin, page + 1);
 }
 
 async function updateWalkthroughReview(
@@ -578,10 +641,6 @@ function insertNoFindingsLine(lines: readonly string[]): string[] {
   }
 
   return [...lines.slice(0, insertionIndex), NO_FINDINGS_LINE, "", ...lines.slice(insertionIndex)];
-}
-
-function isDefined<T>(value: T | undefined): value is T {
-  return value !== undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

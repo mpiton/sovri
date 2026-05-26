@@ -723,6 +723,95 @@ describe("dismiss command handler", () => {
     expect(updateRequest?.body).not.toContain("finding-beta");
   });
 
+  it("detects bot dismiss reactions across multiple reaction pages", async () => {
+    const page1HumanReactions: ReactionFixture[] = Array.from({ length: 100 }, () => ({
+      content: "+1",
+      user: { login: "bob" },
+    }));
+    const runtime = buildRuntime({
+      reviewCommentReactionsByPage: {
+        501: {
+          1: page1HumanReactions,
+          2: [{ content: "-1", user: { login: "sovri-bot" } }],
+        },
+        502: {
+          1: [],
+        },
+      },
+      reviewComments: [
+        {
+          body: "<!-- sovri-finding-id: finding-alpha -->",
+          id: 501,
+          user: { login: "sovri-bot" },
+        },
+        {
+          body: "<!-- sovri-finding-id: finding-beta -->",
+          id: 502,
+          user: { login: "sovri-bot" },
+        },
+      ],
+      walkthroughReviewBody: MarkedWalkthroughBody,
+    });
+    const context = buildIssueCommentContext(runtime.octokit, {
+      findingId: "finding-beta",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(runtime.octokit.rest.reactions.listForPullRequestReviewComment).toHaveBeenCalledWith(
+      expect.objectContaining({ comment_id: 501, page: 2, per_page: 100 }),
+    );
+    const updateRequest = runtime.octokit.rest.pulls.updateReview.mock.calls[0]?.[0];
+    expect(updateRequest?.body).not.toContain("finding-alpha");
+    expect(updateRequest?.body).not.toContain("finding-beta");
+    expect(updateRequest?.body).toContain("finding-gamma");
+  });
+
+  it("queries review comment reactions sequentially rather than concurrently", async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const runtime = buildRuntime({
+      reviewComments: [
+        {
+          body: "<!-- sovri-finding-id: finding-alpha -->",
+          id: 501,
+          user: { login: "sovri-bot" },
+        },
+        {
+          body: "<!-- sovri-finding-id: finding-beta -->",
+          id: 502,
+          user: { login: "sovri-bot" },
+        },
+        {
+          body: "<!-- sovri-finding-id: finding-gamma -->",
+          id: 503,
+          user: { login: "sovri-bot" },
+        },
+      ],
+      walkthroughReviewBody: MarkedWalkthroughBody,
+    });
+    runtime.octokit.rest.reactions.listForPullRequestReviewComment.mockImplementation(async () => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await Promise.resolve();
+      inFlight -= 1;
+      return { data: [] };
+    });
+    const context = buildIssueCommentContext(runtime.octokit, {
+      findingId: "finding-beta",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(maxInFlight).toBe(1);
+  });
+
   it("updates a fallback issue-comment walkthrough on its original surface", async () => {
     const runtime = buildRuntime({
       reviewComments: [
@@ -1046,6 +1135,9 @@ function buildRuntime(
     readonly createReviewCommentReactionError?: unknown;
     readonly inlineCommentBody?: string;
     readonly reviewCommentReactions?: Readonly<Record<number, readonly ReactionFixture[]>>;
+    readonly reviewCommentReactionsByPage?: Readonly<
+      Record<number, Readonly<Record<number, readonly ReactionFixture[]>>>
+    >;
     readonly reviewComments?: readonly ReviewCommentFixture[];
     readonly updateReviewError?: unknown;
     readonly walkthroughIssueCommentBody?: string;
@@ -1124,9 +1216,20 @@ function buildRuntime(
 
           return { data: {} };
         }),
-        listForPullRequestReviewComment: vi.fn(async (parameters: { comment_id: number }) => ({
-          data: options.reviewCommentReactions?.[parameters.comment_id] ?? [],
-        })),
+        listForPullRequestReviewComment: vi.fn(
+          async (parameters: { comment_id: number; page?: number }) => {
+            const pageMap = options.reviewCommentReactionsByPage?.[parameters.comment_id];
+            if (pageMap !== undefined) {
+              const page = parameters.page ?? 1;
+              return { data: pageMap[page] ?? [] };
+            }
+            const page = parameters.page ?? 1;
+            return {
+              data:
+                page === 1 ? (options.reviewCommentReactions?.[parameters.comment_id] ?? []) : [],
+            };
+          },
+        ),
       },
     },
   };
