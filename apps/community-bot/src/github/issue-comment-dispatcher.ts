@@ -2,6 +2,7 @@
 // Copyright 2026 Sovri SAS
 
 import { z } from "@sovri/core";
+import { createLogger } from "@sovri/observability";
 
 import {
   createReReviewCommandDependencies,
@@ -17,6 +18,7 @@ import type {
 import { WALKTHROUGH_MARKER } from "./comment-poster.js";
 
 const DEFAULT_BOT_LOGIN = "sovri-bot[bot]";
+const logger = createLogger("community-bot.issue-comment");
 
 export type IssueCommentDispatchOctokit = ReReviewOctokit & {
   readonly rest: ReReviewOctokit["rest"] & {
@@ -116,6 +118,11 @@ type RepoRef = {
   readonly repo: string;
 };
 
+type IssueCommentDispatchLogger = {
+  error(bindings: Readonly<Record<string, unknown>>, message: string): void;
+  info(bindings: Readonly<Record<string, unknown>>, message: string): void;
+};
+
 const REVIEW_COMMENT_PAGE_SIZE = 100;
 const WALKTHROUGH_PAGE_SIZE = 100;
 const DISMISSED_FINDING_LABEL = "sovri:dismissed-finding";
@@ -147,11 +154,12 @@ export type IssueCommentDispatchContext = {
 export function createIssueCommentHandlerDependencies(
   context: IssueCommentDispatchContext,
   env: NodeJS.ProcessEnv = process.env,
+  dispatchLogger: IssueCommentDispatchLogger = logger,
 ): IssueCommentHandlerDependencies {
   const botLogin = readBotLogin(env);
   return {
     botLogin,
-    handleDismiss: (command) => handleDismissCommand(context, command, botLogin),
+    handleDismiss: (command) => handleDismissCommand(context, command, botLogin, dispatchLogger),
     handleReReview: (command) =>
       handleReReviewCommand(command, createReReviewCommandDependencies(context.octokit, env)),
     parseCommand,
@@ -185,7 +193,10 @@ async function handleDismissCommand(
   context: IssueCommentDispatchContext,
   command: IssueCommentDismissCommandContext,
   botLogin: string,
+  dispatchLogger: IssueCommentDispatchLogger,
 ): Promise<void> {
+  const logContext = buildDismissLogContext(command);
+  dispatchLogger.info(logContext, "Dismiss command started");
   const repo = splitRepoFullName(command.repoFullName);
   const pullRequestAuthorLogin = await resolvePullRequestAuthorLogin(context, command, repo);
 
@@ -228,6 +239,7 @@ async function handleDismissCommand(
       owner: repo.owner,
       repo: repo.repo,
     });
+    dispatchLogger.info({ ...logContext, result: "success" }, "Dismiss command completed");
     return;
   }
 
@@ -237,6 +249,16 @@ async function handleDismissCommand(
     owner: repo.owner,
     repo: repo.repo,
   });
+}
+
+function buildDismissLogContext(
+  command: IssueCommentDismissCommandContext,
+): Readonly<Record<string, unknown>> {
+  return {
+    delivery_id: command.correlationId,
+    pr_number: command.pullRequestNumber,
+    repo: command.repoFullName,
+  };
 }
 
 async function createDismissReaction(
