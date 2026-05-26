@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { createLogger } from "@sovri/observability";
-
 import {
   createReReviewCommandDependencies,
   handleReReviewCommand,
@@ -17,10 +15,18 @@ import type {
 
 const DEFAULT_BOT_LOGIN = "sovri-bot[bot]";
 
-const logger = createLogger("community-bot.issue-comment");
-
 export type IssueCommentDispatchOctokit = ReReviewOctokit & {
   readonly rest: ReReviewOctokit["rest"] & {
+    readonly issues: {
+      readonly createComment: (
+        parameters: IssueCommentCreateParameters,
+      ) => Promise<{ readonly data: unknown }>;
+    };
+    readonly pulls: ReReviewOctokit["rest"]["pulls"] & {
+      readonly listReviewComments: (
+        parameters: PullRequestReviewCommentListParameters,
+      ) => Promise<{ readonly data: readonly PullRequestReviewComment[] }>;
+    };
     readonly reactions: {
       readonly createForIssueComment: (
         parameters: ReactionParameters,
@@ -35,6 +41,27 @@ type ReactionParameters = {
   readonly owner: string;
   readonly repo: string;
 };
+
+type IssueCommentCreateParameters = {
+  readonly body: string;
+  readonly issue_number: number;
+  readonly owner: string;
+  readonly repo: string;
+};
+
+type PullRequestReviewCommentListParameters = {
+  readonly owner: string;
+  readonly page?: number;
+  readonly per_page?: number;
+  readonly pull_number: number;
+  readonly repo: string;
+};
+
+type PullRequestReviewComment = {
+  readonly body?: string | null;
+};
+
+const REVIEW_COMMENT_PAGE_SIZE = 100;
 
 export type IssueCommentDispatchContext = {
   readonly id: string;
@@ -52,7 +79,7 @@ export function createIssueCommentHandlerDependencies(
 ): IssueCommentHandlerDependencies {
   return {
     botLogin: readBotLogin(env),
-    handleDismiss: (command) => logPendingDismiss(context.id, command),
+    handleDismiss: (command) => reportUnknownFinding(context, command),
     handleReReview: (command) =>
       handleReReviewCommand(command, createReReviewCommandDependencies(context.octokit, env)),
     parseCommand,
@@ -82,20 +109,59 @@ async function reactConfused(
   });
 }
 
-async function logPendingDismiss(
-  correlationId: string,
+async function reportUnknownFinding(
+  context: IssueCommentDispatchContext,
   command: IssueCommentDismissCommandContext,
 ): Promise<void> {
-  logger.warn(
-    {
-      commentId: command.commentId,
-      correlationId,
-      findingId: command.findingId,
-      pullRequestNumber: command.pullRequestNumber,
-      repoFullName: command.repoFullName,
-    },
-    "dismiss command received before handler implementation is wired",
-  );
+  const repo = splitRepoFullName(command.repoFullName);
+
+  if (await hasFindingMarkerOnAnyReviewCommentPage(context, command, repo)) {
+    return;
+  }
+
+  await context.octokit.rest.issues.createComment({
+    body: `Finding \`${command.findingId}\` was not found on this pull request. No review state was changed.`,
+    issue_number: command.pullRequestNumber,
+    owner: repo.owner,
+    repo: repo.repo,
+  });
+}
+
+async function hasFindingMarkerOnAnyReviewCommentPage(
+  context: IssueCommentDispatchContext,
+  command: IssueCommentDismissCommandContext,
+  repo: { readonly owner: string; readonly repo: string },
+): Promise<boolean> {
+  return hasFindingMarkerOnReviewCommentPage(context, command, repo, 1);
+}
+
+async function hasFindingMarkerOnReviewCommentPage(
+  context: IssueCommentDispatchContext,
+  command: IssueCommentDismissCommandContext,
+  repo: { readonly owner: string; readonly repo: string },
+  page: number,
+): Promise<boolean> {
+  const comments = await context.octokit.rest.pulls.listReviewComments({
+    owner: repo.owner,
+    page,
+    per_page: REVIEW_COMMENT_PAGE_SIZE,
+    pull_number: command.pullRequestNumber,
+    repo: repo.repo,
+  });
+
+  if (comments.data.some((comment) => hasFindingMarker(comment, command.findingId))) {
+    return true;
+  }
+
+  if (comments.data.length < REVIEW_COMMENT_PAGE_SIZE) {
+    return false;
+  }
+
+  return hasFindingMarkerOnReviewCommentPage(context, command, repo, page + 1);
+}
+
+function hasFindingMarker(comment: PullRequestReviewComment, findingId: string): boolean {
+  return comment.body?.includes(`<!-- sovri-finding-id: ${findingId} -->`) ?? false;
 }
 
 function splitRepoFullName(repoFullName: string | undefined): {

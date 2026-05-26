@@ -21,6 +21,24 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `fix(bot)`: paginate `@sovri-bot dismiss` review-comment marker lookup
+  before reporting a finding id as unknown.
+
+- `test(bot)`: add regression coverage for a matching dismiss finding marker
+  beyond the first review-comment page.
+
+- `fix(bot)`: gate unknown `@sovri-bot dismiss` errors on actual inline
+  finding markers so known findings are not rejected as missing.
+
+- `test(bot)`: add regression coverage proving known dismiss finding markers
+  do not trigger the unknown-finding error path.
+
+- `feat(bot)`: report an unknown `@sovri-bot dismiss` finding id with one
+  issue comment and no GitHub review-state mutation.
+
+- `test(bot)`: add ATDD RED coverage requiring `@sovri-bot dismiss` to post
+  one unknown-finding error comment without mutating GitHub review state.
+
 - `feat(bot)`: route `@sovri-bot re-review` issue comments through the
   shared pull request synchronize review flow after resolving and validating
   the current pull request from GitHub.
