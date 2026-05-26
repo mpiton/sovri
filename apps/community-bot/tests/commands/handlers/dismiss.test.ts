@@ -93,7 +93,7 @@ describe("dismiss command handler", () => {
     });
   });
 
-  it("does not post the unknown-finding error when an inline marker matches", async () => {
+  it("stores dismissed state when an inline marker matches", async () => {
     const runtime = buildRuntime();
     const context = buildIssueCommentContext(runtime.octokit, {
       findingId: "finding-known-001",
@@ -118,6 +118,20 @@ describe("dismiss command handler", () => {
     expect(runtime.octokit.rest.reactions.createForPullRequestReviewComment).toHaveBeenCalledWith({
       comment_id: InlineCommentId,
       content: "-1",
+      owner: "octo-org",
+      repo: "sovri-target",
+    });
+    expect(runtime.octokit.rest.issues.addLabels).toHaveBeenCalledTimes(1);
+    expect(runtime.octokit.rest.issues.addLabels).toHaveBeenCalledWith({
+      issue_number: PullRequestNumber,
+      labels: ["sovri:dismissed-finding"],
+      owner: "octo-org",
+      repo: "sovri-target",
+    });
+    expect(runtime.octokit.rest.reactions.createForIssueComment).toHaveBeenCalledTimes(1);
+    expect(runtime.octokit.rest.reactions.createForIssueComment).toHaveBeenCalledWith({
+      comment_id: CommentId,
+      content: "+1",
       owner: "octo-org",
       repo: "sovri-target",
     });

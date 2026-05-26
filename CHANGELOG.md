@@ -21,6 +21,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(bot)`: add the dismiss success state mutations: PR label
+  `sovri:dismissed-finding` and `+1` reaction on the accepted command comment.
+
+- `test(bot)`: extend dismiss success coverage to require the PR label and
+  accepted command reaction for matched inline markers.
+
 - `test(bot)`: add dismiss coverage proving visible finding text without the
   hidden marker is still treated as an unknown finding id.
 
