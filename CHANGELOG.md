@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(bot)`: add dismiss coverage proving already-dismissed findings are not
+  reported as errors or unknown ids.
+
 - `fix(bot)`: treat repeated dismiss commands as accepted when the bot already
   reacted with `-1` on the matching review comment.
 

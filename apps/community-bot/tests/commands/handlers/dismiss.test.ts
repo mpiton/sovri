@@ -457,6 +457,48 @@ describe("dismiss command handler", () => {
     });
   });
 
+  it("does not report an already dismissed finding as an error", async () => {
+    const runtime = buildRuntime({
+      reviewComments: [
+        {
+          body: "<!-- sovri-finding-id: finding-abc-123 -->",
+          id: InlineCommentId,
+          user: {
+            login: "sovri-bot",
+          },
+        },
+      ],
+      reviewCommentReactions: {
+        [InlineCommentId]: [{ content: "-1", user: { login: "sovri-bot" } }],
+      },
+    });
+    const context = buildIssueCommentContext(runtime.octokit, {
+      findingId: "finding-abc-123",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(runtime.octokit.rest.issues.createComment).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining("already dismissed"),
+      }),
+    );
+    expect(runtime.octokit.rest.issues.createComment).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining("not found"),
+      }),
+    );
+    expect(runtime.octokit.rest.reactions.createForIssueComment).toHaveBeenCalledWith({
+      comment_id: CommentId,
+      content: "+1",
+      owner: "octo-org",
+      repo: "sovri-target",
+    });
+  });
+
   it("does not treat visible finding text without a hidden marker as a match", async () => {
     const runtime = buildRuntime({
       inlineCommentBody: VisibleOnlyInlineCommentBody,
