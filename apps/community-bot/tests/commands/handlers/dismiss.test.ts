@@ -10,11 +10,13 @@ const DeliveryId = "delivery-dismiss-unknown-001";
 const ExtraDismissTokensDeliveryId = "delivery-dismiss-format-003";
 const DismissLogDeliveryId = "delivery-dismiss-log-001";
 const SecretLogDeliveryId = "delivery-dismiss-log-002";
+const DismissFailureLogDeliveryId = "delivery-dismiss-log-003";
 const RepoFullName = "octo-org/sovri-target";
 const PullRequestNumber = 42;
 const CommentId = 98_765;
 const WebhookCredential = "redacted-test-credential";
 const InstallationToken = "ghs_installation-token";
+const GitHubUpdateRawBody = "raw GitHub 502 response body with private diagnostics";
 const InlineCommentId = 501;
 const KnownInlineCommentBody = [
   "**Missing null guard**",
@@ -104,6 +106,14 @@ const EndToEndWalkthroughWithCostFooter = [
   "---",
   "",
   EndToEndCostFooter,
+].join("\n");
+const DismissFailureWalkthroughBody = [
+  "<!-- sovri:walkthrough -->",
+  "## Sovri review",
+  "",
+  "### Findings",
+  "",
+  "- <!-- sovri-finding-id: finding-abc-123 --> finding-abc-123",
 ].join("\n");
 
 describe("dismiss command handler", () => {
@@ -391,6 +401,79 @@ describe("dismiss command handler", () => {
     // And no dismiss log entry contains an installation token
     expect(output).not.toContain(InstallationToken);
     expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it("logs GitHub walkthrough update failures without raw response bodies", async () => {
+    const runtime = buildRuntime({
+      inlineCommentBody: DismissLogInlineCommentBody,
+      updateReviewError: buildGitHubUpdateError(),
+      walkthroughReviewBody: DismissFailureWalkthroughBody,
+    });
+    const logger = buildLogger();
+    const context = buildIssueCommentContext(runtime.octokit, {
+      deliveryId: DismissFailureLogDeliveryId,
+      findingId: "finding-abc-123",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(
+      context,
+      {
+        SOVRI_BOT_LOGIN: "sovri-bot",
+      },
+      logger,
+    );
+
+    // Given Probot has accepted delivery "delivery-dismiss-log-003" for event "issue_comment.created"
+    expect(context.id).toBe(DismissFailureLogDeliveryId);
+    expect(context.name).toBe("issue_comment.created");
+    // And the repository is "octo-org/sovri-target"
+    expect(context.payload.repository.full_name).toBe(RepoFullName);
+    // And issue 42 is pull request 42
+    expect(context.payload.issue.number).toBe(PullRequestNumber);
+    // And pull request 42 was opened by "alice"
+    expect(context.payload.issue.pull_request).toEqual({
+      user: {
+        login: "alice",
+      },
+    });
+    // And comment 98765 was authored by "alice"
+    expect(context.payload.comment.id).toBe(CommentId);
+    expect(context.payload.comment.user?.login).toBe("alice");
+    // And the command body is "@sovri-bot dismiss finding-abc-123"
+    expect(context.payload.comment.body).toBe("@sovri-bot dismiss finding-abc-123");
+    // And pull request review comment 501 contains hidden marker "<!-- sovri-finding-id: finding-abc-123 -->"
+    expect(runtime.inlineComment.body).toContain("<!-- sovri-finding-id: finding-abc-123 -->");
+
+    // When Sovri handles the dismiss command
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(runtime.octokit.rest.pulls.updateReview).toHaveBeenCalledTimes(1);
+    // Then a dismiss error log entry contains delivery id "delivery-dismiss-log-003"
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        delivery_id: DismissFailureLogDeliveryId,
+        pr_number: PullRequestNumber,
+        repo: RepoFullName,
+      }),
+      "Dismiss command failed",
+    );
+    // And the dismiss error log entry contains GitHub status 502
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        github_status: 502,
+      }),
+      "Dismiss command failed",
+    );
+    // And the dismiss error log entry does not contain a raw GitHub response body
+    expect(loggerOutput(logger)).not.toContain(GitHubUpdateRawBody);
+    expect(loggerOutput(logger)).not.toContain('"response"');
+    // And the PR author receives one generic error issue comment
+    expect(runtime.octokit.rest.issues.createComment).toHaveBeenCalledTimes(1);
+    expect(runtime.octokit.rest.issues.createComment).toHaveBeenCalledWith({
+      body: "Dismiss command could not be completed. Please retry later.",
+      issue_number: PullRequestNumber,
+      owner: "octo-org",
+      repo: "sovri-target",
+    });
   });
 
   it("parses an inline marker surrounded by normal markdown", async () => {
@@ -929,6 +1012,7 @@ function buildRuntime(
     readonly inlineCommentBody?: string;
     readonly reviewCommentReactions?: Readonly<Record<number, readonly ReactionFixture[]>>;
     readonly reviewComments?: readonly ReviewCommentFixture[];
+    readonly updateReviewError?: unknown;
     readonly walkthroughIssueCommentBody?: string;
     readonly walkthroughReviewBody?: string | null;
   } = {},
@@ -988,7 +1072,13 @@ function buildRuntime(
                   },
                 ],
         })),
-        updateReview: vi.fn(async () => ({ data: { id: 6000 } })),
+        updateReview: vi.fn(async () => {
+          if (options.updateReviewError !== undefined) {
+            throw options.updateReviewError;
+          }
+
+          return { data: { id: 6000 } };
+        }),
       },
       reactions: {
         createForIssueComment: vi.fn(async () => ({ data: {} })),
@@ -1045,6 +1135,18 @@ function loggerOutput(logger: ReturnType<typeof buildLogger>): string {
   return JSON.stringify({
     error: logger.error.mock.calls,
     info: logger.info.mock.calls,
+  });
+}
+
+function buildGitHubUpdateError(): Error & {
+  readonly response: { readonly data: string };
+  readonly status: number;
+} {
+  return Object.assign(new Error("GitHub walkthrough update failed"), {
+    response: {
+      data: GitHubUpdateRawBody,
+    },
+    status: 502,
   });
 }
 
