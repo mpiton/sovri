@@ -27,6 +27,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `test(llm-providers)`: advance retry fake timers without an awaited loop so
+  the full oxlint gate passes cleanly.
+
 - `fix(bot)`: paginate the dismiss reaction lookup with `per_page=100` so a
   bot `-1` reaction past the first reaction page is still recognised as a
   dismissed finding.

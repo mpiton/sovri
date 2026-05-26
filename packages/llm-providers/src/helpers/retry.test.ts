@@ -645,9 +645,11 @@ describe("retryWithBackoff — attempts cap exhausted", () => {
       const capturedError = promise.catch((error: unknown) => error);
 
       // Advance through every retry sleep (1, 2, 4, 8 ... ms for maxAttempts up to 5)
-      for (let attempt = 1; attempt < maxAttempts; attempt++) {
-        await vi.advanceTimersByTimeAsync(2 ** (attempt - 1));
-      }
+      const totalRetryDelayMs = Array.from(
+        { length: Math.max(0, maxAttempts - 1) },
+        (_, attemptIndex) => 2 ** attemptIndex,
+      ).reduce((total, delay) => total + delay, 0);
+      await vi.advanceTimersByTimeAsync(totalRetryDelayMs);
 
       // Then the retry helper throws RetryExhaustedError
       const error = await capturedError;

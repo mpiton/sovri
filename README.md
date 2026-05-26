@@ -112,6 +112,27 @@ Not yet available. The first runnable release is targeted for the v0.1 milestone
 
 Configuration will be provided through a `.sovri.yml` file in each repository and environment variables for the GitHub App credentials and the LLM API key. The bot is **stateless** in v0.1: its only persistent state is the configuration file and the GitHub API itself.
 
+### Configuration
+
+The active self-host providers are Anthropic and Mistral. Configure at least
+one provider API key in the bot runtime, then point `.sovri.yml` at the matching
+environment variable name:
+
+```bash
+export ANTHROPIC_API_KEY="<anthropic-api-key>"
+export MISTRAL_API_KEY="<mistral-api-key>"
+```
+
+```yaml
+llm:
+  provider: mistral
+  model: mistral-large-latest
+  apiKeySecret: MISTRAL_API_KEY
+```
+
+See the full [`.sovri.yml` reference](docs/sovri-yml-reference.md) for every
+supported field, default, and example.
+
 ### Image tags
 
 Each release publishes the same image digest under four tags on `ghcr.io/mpiton/sovri/community-bot`:
@@ -127,12 +148,13 @@ Production deployments should pin to `vX.Y.Z`. The moving aliases (`vX.Y`, `vX`,
 
 ## Documentation
 
-| Resource                                     | What you will find                                                     |
-| -------------------------------------------- | ---------------------------------------------------------------------- |
-| [`CHANGELOG.md`](CHANGELOG.md)               | Keep-a-Changelog 1.1 history, Unreleased section updated on every PR.  |
-| [`docs/adr/`](docs/adr/)                     | Architecture Decision Records (toolchain, licensing, security policy). |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md)         | How to file issues, propose features, send pull requests.              |
-| [`.github/SECURITY.md`](.github/SECURITY.md) | Vulnerability reporting policy, scope, response SLA.                   |
+| Resource                                                     | What you will find                                                     |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| [`CHANGELOG.md`](CHANGELOG.md)                               | Keep-a-Changelog 1.1 history, Unreleased section updated on every PR.  |
+| [`docs/sovri-yml-reference.md`](docs/sovri-yml-reference.md) | `.sovri.yml` fields, defaults, providers, and examples.                |
+| [`docs/adr/`](docs/adr/)                                     | Architecture Decision Records (toolchain, licensing, security policy). |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md)                         | How to file issues, propose features, send pull requests.              |
+| [`.github/SECURITY.md`](.github/SECURITY.md)                 | Vulnerability reporting policy, scope, response SLA.                   |
 
 ---
 

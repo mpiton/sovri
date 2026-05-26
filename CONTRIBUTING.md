@@ -72,6 +72,9 @@ Linting and formatting are handled by `oxlint` and `oxfmt`; do not introduce
 ESLint, Prettier, Biome, or project-local alternatives. See
 [ADR-011](docs/adr/011-oxlint-oxfmt.md).
 
+Configuration changes that affect `.sovri.yml` must update the public
+[`.sovri.yml` reference](docs/sovri-yml-reference.md) in the same pull request.
+
 ## Dependencies
 
 Do not edit `package.json` dependency blocks by hand.
