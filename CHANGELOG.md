@@ -19,6 +19,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Changed
+
+- `docs(ci)`: add verification evidence that the Mistral SDK dependency keeps
+  audit, dedupe, coverage, forbidden import/tool, and CycloneDX SBOM checks
+  green.
+
 ### Security
 
 - `fix(bot)`: restrict dismiss finding marker matching to bot-authored review
