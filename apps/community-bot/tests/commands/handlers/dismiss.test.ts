@@ -812,6 +812,52 @@ describe("dismiss command handler", () => {
     expect(maxInFlight).toBe(1);
   });
 
+  it("updates the newest marked walkthrough review when duplicates exist", async () => {
+    const StaleWalkthroughBody = [
+      "<!-- sovri:walkthrough -->",
+      "## Sovri review (stale)",
+      "",
+      "### Findings",
+      "",
+      "- <!-- sovri-finding-id: finding-beta --> stale finding-beta",
+    ].join("\n");
+    const runtime = buildRuntime({
+      reviewComments: [
+        {
+          body: "<!-- sovri-finding-id: finding-beta -->",
+          id: 502,
+          user: { login: "sovri-bot" },
+        },
+      ],
+      walkthroughReviews: [
+        {
+          body: StaleWalkthroughBody,
+          id: 5000,
+          user: { login: "sovri-bot" },
+        },
+        {
+          body: MarkedWalkthroughBody,
+          id: 6000,
+          user: { login: "sovri-bot" },
+        },
+      ],
+    });
+    const context = buildIssueCommentContext(runtime.octokit, {
+      findingId: "finding-beta",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(runtime.octokit.rest.pulls.updateReview).toHaveBeenCalledTimes(1);
+    const updateRequest = runtime.octokit.rest.pulls.updateReview.mock.calls[0]?.[0];
+    expect(updateRequest?.review_id).toBe(6000);
+    expect(updateRequest?.body).not.toContain("finding-beta");
+    expect(updateRequest?.body).toContain("finding-alpha");
+  });
+
   it("updates a fallback issue-comment walkthrough on its original surface", async () => {
     const runtime = buildRuntime({
       reviewComments: [
@@ -1130,6 +1176,14 @@ type ReactionFixture = {
   } | null;
 };
 
+type WalkthroughReviewFixture = {
+  readonly body?: string | null;
+  readonly id: number;
+  readonly user?: {
+    readonly login?: string;
+  };
+};
+
 function buildRuntime(
   options: {
     readonly createReviewCommentReactionError?: unknown;
@@ -1142,6 +1196,7 @@ function buildRuntime(
     readonly updateReviewError?: unknown;
     readonly walkthroughIssueCommentBody?: string;
     readonly walkthroughReviewBody?: string | null;
+    readonly walkthroughReviews?: readonly WalkthroughReviewFixture[];
   } = {},
 ) {
   const inlineCommentBody = options.inlineCommentBody ?? KnownInlineCommentBody;
@@ -1185,20 +1240,26 @@ function buildRuntime(
         listReviewComments: vi.fn(async () => ({
           data: reviewComments,
         })),
-        listReviews: vi.fn(async () => ({
-          data:
-            walkthroughReviewBody === null
-              ? []
-              : [
-                  {
-                    body: walkthroughReviewBody,
-                    id: 6000,
-                    user: {
-                      login: "sovri-bot",
+        listReviews: vi.fn(async (parameters: { page?: number }) => {
+          const page = parameters.page ?? 1;
+          if (options.walkthroughReviews !== undefined) {
+            return { data: page === 1 ? options.walkthroughReviews : [] };
+          }
+          return {
+            data:
+              page === 1 && walkthroughReviewBody !== null
+                ? [
+                    {
+                      body: walkthroughReviewBody,
+                      id: 6000,
+                      user: {
+                        login: "sovri-bot",
+                      },
                     },
-                  },
-                ],
-        })),
+                  ]
+                : [],
+          };
+        }),
         updateReview: vi.fn(async () => {
           if (options.updateReviewError !== undefined) {
             throw options.updateReviewError;

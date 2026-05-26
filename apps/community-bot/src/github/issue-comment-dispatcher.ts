@@ -525,7 +525,7 @@ async function findMarkedWalkthroughReview(
   repo: RepoRef,
   botLogin: string,
 ): Promise<PullRequestReview | undefined> {
-  return findMarkedWalkthroughReviewPage(context, command, repo, botLogin, 1);
+  return findMarkedWalkthroughReviewPage(context, command, repo, botLogin, 1, undefined);
 }
 
 async function findMarkedWalkthroughReviewPage(
@@ -534,6 +534,7 @@ async function findMarkedWalkthroughReviewPage(
   repo: RepoRef,
   botLogin: string,
   page: number,
+  latest: PullRequestReview | undefined,
 ): Promise<PullRequestReview | undefined> {
   const reviews = await context.octokit.rest.pulls.listReviews({
     owner: repo.owner,
@@ -542,22 +543,21 @@ async function findMarkedWalkthroughReviewPage(
     pull_number: command.pullRequestNumber,
     repo: repo.repo,
   });
-  const match = reviews.data.find(
-    (review) =>
+  const newLatest = reviews.data.reduce<PullRequestReview | undefined>(
+    (acc, review) =>
       typeof review.body === "string" &&
       review.body.includes(WALKTHROUGH_MARKER) &&
-      review.user?.login === botLogin,
+      review.user?.login === botLogin
+        ? review
+        : acc,
+    latest,
   );
 
-  if (match !== undefined) {
-    return match;
-  }
-
   if (reviews.data.length < WALKTHROUGH_PAGE_SIZE) {
-    return undefined;
+    return newLatest;
   }
 
-  return findMarkedWalkthroughReviewPage(context, command, repo, botLogin, page + 1);
+  return findMarkedWalkthroughReviewPage(context, command, repo, botLogin, page + 1, newLatest);
 }
 
 async function findMarkedWalkthroughIssueComment(
@@ -566,7 +566,7 @@ async function findMarkedWalkthroughIssueComment(
   repo: RepoRef,
   botLogin: string,
 ): Promise<IssueComment | undefined> {
-  return findMarkedWalkthroughIssueCommentPage(context, command, repo, botLogin, 1);
+  return findMarkedWalkthroughIssueCommentPage(context, command, repo, botLogin, 1, undefined);
 }
 
 async function findMarkedWalkthroughIssueCommentPage(
@@ -575,6 +575,7 @@ async function findMarkedWalkthroughIssueCommentPage(
   repo: RepoRef,
   botLogin: string,
   page: number,
+  latest: IssueComment | undefined,
 ): Promise<IssueComment | undefined> {
   const comments = await context.octokit.rest.issues.listComments({
     issue_number: command.pullRequestNumber,
@@ -583,22 +584,28 @@ async function findMarkedWalkthroughIssueCommentPage(
     per_page: WALKTHROUGH_PAGE_SIZE,
     repo: repo.repo,
   });
-  const match = comments.data.find(
-    (comment) =>
+  const newLatest = comments.data.reduce<IssueComment | undefined>(
+    (acc, comment) =>
       typeof comment.body === "string" &&
       comment.body.includes(WALKTHROUGH_MARKER) &&
-      comment.user?.login === botLogin,
+      comment.user?.login === botLogin
+        ? comment
+        : acc,
+    latest,
   );
 
-  if (match !== undefined) {
-    return match;
-  }
-
   if (comments.data.length < WALKTHROUGH_PAGE_SIZE) {
-    return undefined;
+    return newLatest;
   }
 
-  return findMarkedWalkthroughIssueCommentPage(context, command, repo, botLogin, page + 1);
+  return findMarkedWalkthroughIssueCommentPage(
+    context,
+    command,
+    repo,
+    botLogin,
+    page + 1,
+    newLatest,
+  );
 }
 
 function renderWalkthroughWithoutDismissedFindings(

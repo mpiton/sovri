@@ -32,6 +32,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   dismissed finding.
 - `fix(bot)`: fetch dismiss reactions sequentially to avoid bursting GitHub
   concurrent-request limits on PRs with many findings.
+- `fix(bot)`: when multiple marked walkthroughs exist, the dismiss command now
+  updates the newest matching walkthrough review (and fallback issue comment)
+  instead of the oldest one returned first by `listReviews`.
 
 ### Added
 
