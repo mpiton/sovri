@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(bot)`: add dismiss coverage proving visible finding text without the
+  hidden marker is still treated as an unknown finding id.
+
 - `feat(bot)`: react to a matched `@sovri-bot dismiss` inline finding comment
   with a `-1` review-comment reaction instead of reporting the finding as unknown.
 

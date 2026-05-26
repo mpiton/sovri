@@ -17,6 +17,11 @@ const KnownInlineCommentBody = [
   "Add a guard before reading payload.user.",
   "<!-- sovri-finding-id: finding-known-001 -->",
 ].join("\n");
+const VisibleOnlyInlineCommentBody = [
+  "**finding-visible-only**",
+  "",
+  "This comment mentions finding-visible-only in visible Markdown only.",
+].join("\n");
 
 describe("dismiss command handler", () => {
   it("posts one error comment without mutating state when the finding id is unknown", async () => {
@@ -166,9 +171,35 @@ describe("dismiss command handler", () => {
     });
     expect(runtime.octokit.rest.issues.createComment).not.toHaveBeenCalled();
   });
+
+  it("does not treat visible finding text without a hidden marker as a match", async () => {
+    const runtime = buildRuntime({
+      inlineCommentBody: VisibleOnlyInlineCommentBody,
+    });
+    const context = buildIssueCommentContext(runtime.octokit, {
+      findingId: "finding-visible-only",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(runtime.octokit.rest.issues.createComment).toHaveBeenCalledTimes(1);
+    expect(runtime.octokit.rest.issues.createComment).toHaveBeenCalledWith({
+      body: expect.stringContaining("finding-visible-only"),
+      issue_number: PullRequestNumber,
+      owner: "octo-org",
+      repo: "sovri-target",
+    });
+    expect(runtime.octokit.rest.reactions.createForPullRequestReviewComment).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.pulls.updateReview).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.issues.updateComment).not.toHaveBeenCalled();
+  });
 });
 
-function buildRuntime() {
+function buildRuntime(options: { readonly inlineCommentBody?: string } = {}) {
+  const inlineCommentBody = options.inlineCommentBody ?? KnownInlineCommentBody;
   const octokit = {
     rest: {
       issues: {
@@ -192,7 +223,7 @@ function buildRuntime() {
         listReviewComments: vi.fn(async () => ({
           data: [
             {
-              body: KnownInlineCommentBody,
+              body: inlineCommentBody,
               id: InlineCommentId,
               user: {
                 login: "sovri-bot",
@@ -212,7 +243,7 @@ function buildRuntime() {
 
   return {
     inlineComment: {
-      body: KnownInlineCommentBody,
+      body: inlineCommentBody,
       id: InlineCommentId,
       user: {
         login: "sovri-bot",
