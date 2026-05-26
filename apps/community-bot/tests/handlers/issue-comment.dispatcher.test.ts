@@ -18,6 +18,7 @@ const CommandRoutingDeliveryId = "delivery-issue-comment-005";
 const UnknownCommandDeliveryId = "delivery-issue-comment-006";
 const DismissFormatDeliveryId = "delivery-dismiss-format-001";
 const MalformedDismissFormatDeliveryId = "delivery-dismiss-format-002";
+const ExtraDismissTokensDeliveryId = "delivery-dismiss-format-003";
 const ReReviewDispatcherBoundaryDeliveryId = "delivery-re-review-003";
 const RepoFullName = "octo-org/sovri-target";
 const PullRequestNumber = 42;
@@ -440,6 +441,47 @@ describe("issue comment dispatcher - ATDD task 76", () => {
       expect(dependencies.fetchPullRequestDiff).not.toHaveBeenCalled();
     },
   );
+
+  it("does not partially parse a dismiss command with extra tokens", async () => {
+    const dependencies = buildDependencies();
+    dependencies.parseCommand.mockImplementation(parseCommand);
+    const context = buildIssueCommentContext({
+      author: "alice",
+      body: "@sovri-bot dismiss finding-abc-123 duplicate",
+      deliveryId: ExtraDismissTokensDeliveryId,
+      pullRequestNumber: PullRequestNumber,
+      repoFullName: RepoFullName,
+    });
+
+    // Given Probot has accepted delivery "delivery-dismiss-format-003" for event "issue_comment.created"
+    expect(context.id).toBe(ExtraDismissTokensDeliveryId);
+    expect(context.name).toBe("issue_comment.created");
+    // And the repository is "octo-org/sovri-target"
+    expect(context.payload.repository.full_name).toBe(RepoFullName);
+    // And issue 42 is pull request 42
+    expect(context.payload.issue.number).toBe(PullRequestNumber);
+    expect(context.payload.issue.pull_request).toEqual({});
+    // And comment 98765 was authored by "alice"
+    expect(context.payload.comment.id).toBe(CommentId);
+    expect(context.payload.comment.user.login).toBe("alice");
+    // And the comment body is "@sovri-bot dismiss finding-abc-123 duplicate"
+    expect(context.payload.comment.body).toBe("@sovri-bot dismiss finding-abc-123 duplicate");
+
+    // When Sovri dispatches the issue comment webhook context
+    await handleIssueCommentCreated(context, dependencies);
+
+    // Then GitHub receives one reaction request for comment 98765 with content "confused"
+    expect(dependencies.reactToUnknown).toHaveBeenCalledTimes(1);
+    expect(dependencies.reactToUnknown).toHaveBeenCalledWith({
+      commentId: CommentId,
+      content: "confused",
+    });
+    // And no command handler is called
+    expect(dependencies.handleReReview).not.toHaveBeenCalled();
+    expect(dependencies.handleDismiss).not.toHaveBeenCalled();
+    // And no GitHub request searches pull request review comments
+    expect(dependencies.fetchPullRequestDiff).not.toHaveBeenCalled();
+  });
 
   it("silently skips no-mention comments", async () => {
     const dependencies = buildDependencies({ kind: "no-mention" });

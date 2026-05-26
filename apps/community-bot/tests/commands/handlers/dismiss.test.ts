@@ -7,6 +7,7 @@ import { createIssueCommentHandlerDependencies } from "../../../src/github/issue
 import { handleIssueCommentCreated } from "../../../src/handlers/issue-comment.js";
 
 const DeliveryId = "delivery-dismiss-unknown-001";
+const ExtraDismissTokensDeliveryId = "delivery-dismiss-format-003";
 const RepoFullName = "octo-org/sovri-target";
 const PullRequestNumber = 42;
 const CommentId = 98_765;
@@ -96,6 +97,53 @@ const EndToEndWalkthroughWithCostFooter = [
 ].join("\n");
 
 describe("dismiss command handler", () => {
+  it("treats a dismiss command with extra tokens as unknown before review comment search", async () => {
+    const runtime = buildRuntime();
+    const context = buildIssueCommentContext(runtime.octokit, {
+      commentBody: "@sovri-bot dismiss finding-abc-123 duplicate",
+      deliveryId: ExtraDismissTokensDeliveryId,
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    // Given Probot has accepted delivery "delivery-dismiss-format-003" for event "issue_comment.created"
+    expect(context.id).toBe(ExtraDismissTokensDeliveryId);
+    expect(context.name).toBe("issue_comment.created");
+    // And the repository is "octo-org/sovri-target"
+    expect(context.payload.repository.full_name).toBe(RepoFullName);
+    // And issue 42 is pull request 42
+    expect(context.payload.issue.number).toBe(PullRequestNumber);
+    expect(context.payload.issue.pull_request).toEqual({
+      user: {
+        login: "alice",
+      },
+    });
+    // And comment 98765 was authored by "alice"
+    expect(context.payload.comment.id).toBe(CommentId);
+    expect(context.payload.comment.user?.login).toBe("alice");
+    // And the comment body is "@sovri-bot dismiss finding-abc-123 duplicate"
+    expect(context.payload.comment.body).toBe("@sovri-bot dismiss finding-abc-123 duplicate");
+
+    // When Sovri dispatches the issue comment webhook context
+    await handleIssueCommentCreated(context, dependencies);
+
+    // Then GitHub receives one reaction request for comment 98765 with content "confused"
+    expect(runtime.octokit.rest.reactions.createForIssueComment).toHaveBeenCalledTimes(1);
+    expect(runtime.octokit.rest.reactions.createForIssueComment).toHaveBeenCalledWith({
+      comment_id: CommentId,
+      content: "confused",
+      owner: "octo-org",
+      repo: "sovri-target",
+    });
+    // And no command handler is called
+    expect(runtime.octokit.rest.pulls.get).not.toHaveBeenCalled();
+    // And no GitHub request searches pull request review comments
+    expect(runtime.octokit.rest.pulls.listReviewComments).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.reactions.createForPullRequestReviewComment).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.issues.addLabels).not.toHaveBeenCalled();
+  });
+
   it("posts one error comment without mutating state when the finding id is unknown", async () => {
     const runtime = buildRuntime();
     const context = buildIssueCommentContext(runtime.octokit);
@@ -848,17 +896,22 @@ function lastNonEmptyLine(value: string): string | undefined {
 
 function buildIssueCommentContext(
   octokit: ReturnType<typeof buildRuntime>["octokit"],
-  options: { readonly commentAuthorLogin?: string; readonly findingId?: string } = {},
+  options: {
+    readonly commentAuthorLogin?: string;
+    readonly commentBody?: string;
+    readonly deliveryId?: string;
+    readonly findingId?: string;
+  } = {},
 ) {
   const commentAuthorLogin = options.commentAuthorLogin ?? "alice";
   const findingId = options.findingId ?? "finding-missing-001";
   return {
-    id: DeliveryId,
+    id: options.deliveryId ?? DeliveryId,
     name: "issue_comment.created",
     octokit,
     payload: {
       comment: {
-        body: `@sovri-bot dismiss ${findingId}`,
+        body: options.commentBody ?? `@sovri-bot dismiss ${findingId}`,
         id: CommentId,
         user: {
           login: commentAuthorLogin,

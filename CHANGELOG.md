@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(bot)`: add issue-comment acceptance coverage for extra dismiss tokens
+  becoming unknown commands before review comment search.
+
 - `test(bot)`: add dispatcher acceptance coverage for malformed dismiss finding
   ids becoming unknown commands.
 
