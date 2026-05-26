@@ -126,10 +126,12 @@ type IssueCommentDispatchLogger = {
 const REVIEW_COMMENT_PAGE_SIZE = 100;
 const WALKTHROUGH_PAGE_SIZE = 100;
 const DISMISSED_FINDING_LABEL = "sovri:dismissed-finding";
+const DISMISS_FAILURE_BODY = "Dismiss command could not be completed. Please retry later.";
 const NO_FINDINGS_LINE = "No findings.";
 const UNAUTHORIZED_DISMISS_BODY = "Only the pull request author can dismiss findings.";
 const FindingMarkerPattern = /<!--\s*sovri-finding-id:\s*([A-Za-z0-9-]{1,64})\s*-->/u;
 const AlreadyExistsMessagePattern = /already(?:_| )exists/iu;
+const GitHubErrorStatusSchema = z.object({ status: z.number().int() }).passthrough();
 
 const PullRequestAuthorSchema = z
   .object({
@@ -198,57 +200,67 @@ async function handleDismissCommand(
   const logContext = buildDismissLogContext(command);
   dispatchLogger.info(logContext, "Dismiss command started");
   const repo = splitRepoFullName(command.repoFullName);
-  const pullRequestAuthorLogin = await resolvePullRequestAuthorLogin(context, command, repo);
+  try {
+    const pullRequestAuthorLogin = await resolvePullRequestAuthorLogin(context, command, repo);
 
-  if (command.commentAuthorLogin !== pullRequestAuthorLogin) {
-    await context.octokit.rest.issues.createComment({
-      body: UNAUTHORIZED_DISMISS_BODY,
-      issue_number: command.pullRequestNumber,
-      owner: repo.owner,
-      repo: repo.repo,
-    });
-    return;
-  }
-
-  const reviewComments = await listReviewCommentsOnAllPages(context, command, repo);
-  const findingComment = reviewComments.find((comment) =>
-    hasFindingMarker(comment, command.findingId),
-  );
-
-  if (findingComment !== undefined) {
-    const dismissedFindingIds = await collectBotDismissedFindingIds(
-      context,
-      repo,
-      reviewComments,
-      botLogin,
-    );
-    if (!dismissedFindingIds.has(command.findingId)) {
-      await createDismissReaction(context, repo, findingComment.id);
-      dismissedFindingIds.add(command.findingId);
+    if (command.commentAuthorLogin !== pullRequestAuthorLogin) {
+      await context.octokit.rest.issues.createComment({
+        body: UNAUTHORIZED_DISMISS_BODY,
+        issue_number: command.pullRequestNumber,
+        owner: repo.owner,
+        repo: repo.repo,
+      });
+      return;
     }
-    await context.octokit.rest.issues.addLabels({
-      issue_number: command.pullRequestNumber,
-      labels: [DISMISSED_FINDING_LABEL],
-      owner: repo.owner,
-      repo: repo.repo,
-    });
-    await updateWalkthroughReview(context, command, repo, dismissedFindingIds, botLogin);
-    await context.octokit.rest.reactions.createForIssueComment({
-      comment_id: command.commentId,
-      content: "+1",
-      owner: repo.owner,
-      repo: repo.repo,
-    });
-    dispatchLogger.info({ ...logContext, result: "success" }, "Dismiss command completed");
-    return;
-  }
 
-  await context.octokit.rest.issues.createComment({
-    body: `Finding \`${command.findingId}\` was not found on this pull request. No review state was changed.`,
-    issue_number: command.pullRequestNumber,
-    owner: repo.owner,
-    repo: repo.repo,
-  });
+    const reviewComments = await listReviewCommentsOnAllPages(context, command, repo);
+    const findingComment = reviewComments.find((comment) =>
+      hasFindingMarker(comment, command.findingId),
+    );
+
+    if (findingComment !== undefined) {
+      const dismissedFindingIds = await collectBotDismissedFindingIds(
+        context,
+        repo,
+        reviewComments,
+        botLogin,
+      );
+      if (!dismissedFindingIds.has(command.findingId)) {
+        await createDismissReaction(context, repo, findingComment.id);
+        dismissedFindingIds.add(command.findingId);
+      }
+      await context.octokit.rest.issues.addLabels({
+        issue_number: command.pullRequestNumber,
+        labels: [DISMISSED_FINDING_LABEL],
+        owner: repo.owner,
+        repo: repo.repo,
+      });
+      await updateWalkthroughReview(context, command, repo, dismissedFindingIds, botLogin);
+      await context.octokit.rest.reactions.createForIssueComment({
+        comment_id: command.commentId,
+        content: "+1",
+        owner: repo.owner,
+        repo: repo.repo,
+      });
+      dispatchLogger.info({ ...logContext, result: "success" }, "Dismiss command completed");
+      return;
+    }
+
+    await context.octokit.rest.issues.createComment({
+      body: `Finding \`${command.findingId}\` was not found on this pull request. No review state was changed.`,
+      issue_number: command.pullRequestNumber,
+      owner: repo.owner,
+      repo: repo.repo,
+    });
+  } catch (error) {
+    dispatchLogger.error(buildDismissErrorLogContext(logContext, error), "Dismiss command failed");
+    await context.octokit.rest.issues.createComment({
+      body: DISMISS_FAILURE_BODY,
+      issue_number: command.pullRequestNumber,
+      owner: repo.owner,
+      repo: repo.repo,
+    });
+  }
 }
 
 function buildDismissLogContext(
@@ -259,6 +271,26 @@ function buildDismissLogContext(
     pr_number: command.pullRequestNumber,
     repo: command.repoFullName,
   };
+}
+
+function buildDismissErrorLogContext(
+  logContext: Readonly<Record<string, unknown>>,
+  error: unknown,
+): Readonly<Record<string, unknown>> {
+  const status = githubStatusFrom(error);
+  if (status === undefined) {
+    return logContext;
+  }
+
+  return {
+    ...logContext,
+    github_status: status,
+  };
+}
+
+function githubStatusFrom(error: unknown): number | undefined {
+  const result = GitHubErrorStatusSchema.safeParse(error);
+  return result.success ? result.data.status : undefined;
 }
 
 async function createDismissReaction(

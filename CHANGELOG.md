@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `fix(bot)`: log dismiss GitHub update failures with delivery id and status
+  while posting a generic retry comment without raw response bodies.
+
 - `test(bot)`: add dismiss logging coverage proving secret-like webhook fields
   and installation tokens stay out of logs.
 
