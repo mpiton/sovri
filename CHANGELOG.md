@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(bot)`: add dispatcher acceptance coverage for valid boundary dismiss
+  finding ids reaching the dismiss handler.
+
 - `test(bot)`: add end-to-end dismiss update coverage proving the marked
   walkthrough cost footer is preserved.
 
