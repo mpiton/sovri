@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(bot)`: add dismiss logging coverage proving secret-like webhook fields
+  and installation tokens stay out of logs.
+
 - `feat(bot)`: log successful dismiss command handling with GitHub delivery
   correlation fields and without raw issue comment payloads.
 

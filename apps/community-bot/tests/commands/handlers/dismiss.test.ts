@@ -9,9 +9,12 @@ import { handleIssueCommentCreated } from "../../../src/handlers/issue-comment.j
 const DeliveryId = "delivery-dismiss-unknown-001";
 const ExtraDismissTokensDeliveryId = "delivery-dismiss-format-003";
 const DismissLogDeliveryId = "delivery-dismiss-log-001";
+const SecretLogDeliveryId = "delivery-dismiss-log-002";
 const RepoFullName = "octo-org/sovri-target";
 const PullRequestNumber = 42;
 const CommentId = 98_765;
+const WebhookCredential = "redacted-test-credential";
+const InstallationToken = "ghs_installation-token";
 const InlineCommentId = 501;
 const KnownInlineCommentBody = [
   "**Missing null guard**",
@@ -323,6 +326,70 @@ describe("dismiss command handler", () => {
     // And no dismiss log entry contains the raw issue comment payload
     expect(loggerOutput(logger)).not.toContain("@sovri-bot dismiss finding-abc-123");
     expect(loggerOutput(logger)).not.toContain('"payload"');
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it("does not copy secret-like webhook inputs into dismiss logs", async () => {
+    const runtime = buildRuntime({
+      inlineCommentBody: DismissLogInlineCommentBody,
+    });
+    const logger = buildLogger();
+    const baseContext = buildIssueCommentContext(runtime.octokit, {
+      deliveryId: SecretLogDeliveryId,
+      findingId: "finding-abc-123",
+    });
+    const context = {
+      ...baseContext,
+      payload: {
+        ...baseContext.payload,
+        installation: {
+          token: InstallationToken,
+        },
+        private_credential: WebhookCredential,
+      },
+    };
+    const dependencies = createIssueCommentHandlerDependencies(
+      context,
+      {
+        SOVRI_BOT_LOGIN: "sovri-bot",
+      },
+      logger,
+    );
+
+    // Given Probot has accepted delivery "delivery-dismiss-log-002" for event "issue_comment.created"
+    expect(context.id).toBe(SecretLogDeliveryId);
+    expect(context.name).toBe("issue_comment.created");
+    // And the repository is "octo-org/sovri-target"
+    expect(context.payload.repository.full_name).toBe(RepoFullName);
+    // And issue 42 is pull request 42
+    expect(context.payload.issue.number).toBe(PullRequestNumber);
+    // And pull request 42 was opened by "alice"
+    expect(context.payload.issue.pull_request).toEqual({
+      user: {
+        login: "alice",
+      },
+    });
+    // And comment 98765 was authored by "alice"
+    expect(context.payload.comment.id).toBe(CommentId);
+    expect(context.payload.comment.user?.login).toBe("alice");
+    // And the webhook payload includes private credential field "redacted-test-credential"
+    expect(context.payload.private_credential).toBe(WebhookCredential);
+    // And the command body is "@sovri-bot dismiss finding-abc-123"
+    expect(context.payload.comment.body).toBe("@sovri-bot dismiss finding-abc-123");
+    // And pull request review comment 501 contains hidden marker "<!-- sovri-finding-id: finding-abc-123 -->"
+    expect(runtime.inlineComment.body).toContain("<!-- sovri-finding-id: finding-abc-123 -->");
+
+    // When Sovri handles the dismiss command
+    await handleIssueCommentCreated(context, dependencies);
+
+    const output = loggerOutput(logger);
+    // Then no dismiss log entry contains "redacted-test-credential"
+    expect(output).not.toContain(WebhookCredential);
+    // And no dismiss log entry contains a webhook payload body
+    expect(output).not.toContain("@sovri-bot dismiss finding-abc-123");
+    expect(output).not.toContain('"payload"');
+    // And no dismiss log entry contains an installation token
+    expect(output).not.toContain(InstallationToken);
     expect(logger.error).not.toHaveBeenCalled();
   });
 
