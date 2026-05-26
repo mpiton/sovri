@@ -19,7 +19,127 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Security
+
+- `fix(bot)`: restrict dismiss finding marker matching to bot-authored review
+  comments so collaborator-planted `sovri-finding-id` markers cannot poison the
+  dismissed state set.
+
+### Fixed
+
+- `fix(bot)`: paginate the dismiss reaction lookup with `per_page=100` so a
+  bot `-1` reaction past the first reaction page is still recognised as a
+  dismissed finding.
+- `fix(bot)`: fetch dismiss reactions sequentially to avoid bursting GitHub
+  concurrent-request limits on PRs with many findings.
+- `fix(bot)`: when multiple marked walkthroughs exist, the dismiss command now
+  updates the newest matching walkthrough review (and fallback issue comment)
+  instead of the oldest one returned first by `listReviews`.
+
 ### Added
+
+- `fix(bot)`: log dismiss GitHub update failures with delivery id and status
+  while posting a generic retry comment without raw response bodies.
+
+- `test(bot)`: add dismiss logging coverage proving secret-like webhook fields
+  and installation tokens stay out of logs.
+
+- `feat(bot)`: log successful dismiss command handling with GitHub delivery
+  correlation fields and without raw issue comment payloads.
+
+- `test(bot)`: add issue-comment acceptance coverage for extra dismiss tokens
+  becoming unknown commands before review comment search.
+
+- `test(bot)`: add dispatcher acceptance coverage for malformed dismiss finding
+  ids becoming unknown commands.
+
+- `test(bot)`: add dispatcher acceptance coverage for valid boundary dismiss
+  finding ids reaching the dismiss handler.
+
+- `test(bot)`: add end-to-end dismiss update coverage proving the marked
+  walkthrough cost footer is preserved.
+
+- `fix(bot)`: insert `No findings.` when dismiss re-rendering removes every
+  visible finding while preserving the existing cost footer.
+
+- `test(bot)`: add dismiss coverage for removing the final visible finding.
+
+- `test(bot)`: add dismiss coverage proving walkthrough re-rendering keeps the
+  existing cost footer as the final non-empty line.
+
+- `fix(bot)`: treat duplicate GitHub dismiss reaction responses as accepted
+  dismissed state during concurrent retries.
+
+- `test(bot)`: add dismiss coverage for concurrent duplicate reaction responses.
+
+- `test(bot)`: add dismiss coverage proving already-dismissed findings are not
+  reported as errors or unknown ids.
+
+- `fix(bot)`: treat repeated dismiss commands as accepted when the bot already
+  reacted with `-1` on the matching review comment.
+
+- `test(bot)`: add dismiss coverage proving repeated commands do not create
+  duplicate finding reactions.
+
+- `feat(bot)`: update fallback issue-comment walkthroughs in place when
+  dismissing findings and no marked pull request review body exists.
+
+- `test(bot)`: add dismiss coverage requiring fallback walkthrough comments to
+  stay on their original issue-comment surface.
+
+- `test(bot)`: add dismiss coverage proving human `-1` reactions do not hide
+  findings from the walkthrough.
+
+- `feat(bot)`: update the marked walkthrough after dismissing a finding so
+  entries with bot-authored `-1` reactions are hidden.
+
+- `test(bot)`: add dismiss coverage requiring walkthrough updates to exclude
+  every finding dismissed by the bot while keeping visible finding markers.
+
+- `test(bot)`: add dismiss coverage proving inline finding markers are parsed
+  when surrounded by normal review Markdown.
+
+- `feat(bot)`: restrict `@sovri-bot dismiss` to the pull request author before
+  mutating dismissed finding state.
+
+- `test(bot)`: add dismiss coverage proving non-author commenters cannot
+  dismiss a finding even when its inline marker exists.
+
+- `test(bot)`: strengthen visible-only dismiss coverage to require no PR label
+  and no accepted command reaction when the hidden marker is absent.
+
+- `feat(bot)`: add the dismiss success state mutations: PR label
+  `sovri:dismissed-finding` and `+1` reaction on the accepted command comment.
+
+- `test(bot)`: extend dismiss success coverage to require the PR label and
+  accepted command reaction for matched inline markers.
+
+- `test(bot)`: add dismiss coverage proving visible finding text without the
+  hidden marker is still treated as an unknown finding id.
+
+- `feat(bot)`: react to a matched `@sovri-bot dismiss` inline finding comment
+  with a `-1` review-comment reaction instead of reporting the finding as unknown.
+
+- `test(bot)`: extend existing dismiss finding coverage to require the `-1`
+  review-comment reaction for matched inline markers.
+
+- `fix(bot)`: paginate `@sovri-bot dismiss` review-comment marker lookup
+  before reporting a finding id as unknown.
+
+- `test(bot)`: add regression coverage for a matching dismiss finding marker
+  beyond the first review-comment page.
+
+- `fix(bot)`: gate unknown `@sovri-bot dismiss` errors on actual inline
+  finding markers so known findings are not rejected as missing.
+
+- `test(bot)`: add regression coverage proving known dismiss finding markers
+  do not trigger the unknown-finding error path.
+
+- `feat(bot)`: report an unknown `@sovri-bot dismiss` finding id with one
+  issue comment and no GitHub review-state mutation.
+
+- `test(bot)`: add ATDD RED coverage requiring `@sovri-bot dismiss` to post
+  one unknown-finding error comment without mutating GitHub review state.
 
 - `feat(bot)`: route `@sovri-bot re-review` issue comments through the
   shared pull request synchronize review flow after resolving and validating
