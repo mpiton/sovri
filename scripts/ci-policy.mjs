@@ -69,21 +69,21 @@ const DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES = [
   "LGPL-3.0-or-later",
 ];
 const RELEASE_REQUIRED_JOBS = ["verify-tag", "build-and-push", "sbom", "gh-release"];
-const RELEASE_VERSION = "0.1.0";
+const RELEASE_VERSION = "0.2.0";
 const RELEASE_IMAGE_REPOSITORY = "ghcr.io/mpiton/sovri/community-bot";
 const RELEASE_REQUIRED_IMAGE_TAGS = [
   {
-    label: "v0.1.0",
+    label: "v0.2.0",
     values: [
-      `${RELEASE_IMAGE_REPOSITORY}:v0.1.0`,
+      `${RELEASE_IMAGE_REPOSITORY}:v0.2.0`,
       `${RELEASE_IMAGE_REPOSITORY}:\${{ github.ref_name }}`,
       `${RELEASE_IMAGE_REPOSITORY}:\${{ steps.image-tags.outputs.full }}`,
     ],
   },
   {
-    label: "v0.1",
+    label: "v0.2",
     values: [
-      `${RELEASE_IMAGE_REPOSITORY}:v0.1`,
+      `${RELEASE_IMAGE_REPOSITORY}:v0.2`,
       `${RELEASE_IMAGE_REPOSITORY}:\${{ steps.image-tags.outputs.minor }}`,
     ],
   },
@@ -2573,16 +2573,19 @@ const getChangelogReleaseSection = (changelog, version) => {
   return changelog.slice(sectionStart, sectionEnd);
 };
 
+const cosignDeferralPattern = /Cosign\s+signing\s+(?:is|remains)\s+deferred to /;
+const cosignDeferralToV05Pattern = /Cosign\s+signing\s+(?:is|remains)\s+deferred to v0\.5\./;
+
 const getCosignDeferralFailure = (sectionText, changelog) => {
-  if (!/Cosign signing is deferred to /.test(sectionText)) {
-    if (/Cosign signing is deferred to v0\.5\./.test(changelog)) {
-      return "deferral must be documented in ## [0.1.0]";
+  if (!cosignDeferralPattern.test(sectionText)) {
+    if (cosignDeferralToV05Pattern.test(changelog)) {
+      return `deferral must be documented in ## [${RELEASE_VERSION}]`;
     }
     return "document cosign signing deferral to v0.5";
   }
 
-  if (/Cosign signing is deferred to v0\.5\./.test(sectionText)) return undefined;
-  if (/Cosign signing is deferred to v1\.0\./.test(sectionText)) {
+  if (cosignDeferralToV05Pattern.test(sectionText)) return undefined;
+  if (/Cosign\s+signing\s+(?:is|remains)\s+deferred to v1\.0\./.test(sectionText)) {
     return "target version is too late";
   }
   return "target version is not concrete";
