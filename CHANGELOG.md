@@ -19,7 +19,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+
+## [0.2.0] - 2026-05-26
 ### Changed
+
+- `release`: prepare the v0.2.0 release metadata and keep the Community image
+  pipeline aligned with the v0.1 multi-arch GHCR + SBOM contract. Cosign
+  signing remains deferred to v0.5.
 
 - `ci`: add the llm-providers branch coverage gate to backend checks and keep
   the TypeScript coverage artifact for 90 days.
