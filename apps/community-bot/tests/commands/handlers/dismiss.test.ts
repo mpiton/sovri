@@ -38,6 +38,7 @@ const VisibleOnlyInlineCommentBody = [
   "This comment mentions finding-visible-only in visible Markdown only.",
 ].join("\n");
 const CostFooter = "_Tokens: 1234 in / 567 out. Estimated cost: $0.0123._";
+const FinalFindingCostFooter = "_Tokens: 40 in / 10 out. Estimated cost: $0.0004._";
 const MarkedWalkthroughBody = [
   "<!-- sovri:walkthrough -->",
   "## Sovri review",
@@ -66,6 +67,18 @@ const MarkedWalkthroughWithCostFooter = [
   "---",
   "",
   CostFooter,
+].join("\n");
+const SingleFindingWalkthroughWithCostFooter = [
+  "<!-- sovri:walkthrough -->",
+  "## Sovri review",
+  "",
+  "### Findings",
+  "",
+  "- <!-- sovri-finding-id: finding-only --> finding-only",
+  "",
+  "---",
+  "",
+  FinalFindingCostFooter,
 ].join("\n");
 
 describe("dismiss command handler", () => {
@@ -472,6 +485,41 @@ describe("dismiss command handler", () => {
     expect(updateRequest?.body).not.toContain("finding-beta");
     expect(updateRequest?.body).toContain(CostFooter);
     expect(lastNonEmptyLine(updateRequest?.body ?? "")).toBe(CostFooter);
+  });
+
+  it("keeps the cost footer after no findings when dismissing the final visible finding", async () => {
+    const runtime = buildRuntime({
+      reviewComments: [
+        {
+          body: "<!-- sovri-finding-id: finding-only -->",
+          id: InlineCommentId,
+          user: {
+            login: "sovri-bot",
+          },
+        },
+      ],
+      reviewCommentReactions: {
+        [InlineCommentId]: [{ content: "-1", user: { login: "sovri-bot" } }],
+      },
+      walkthroughReviewBody: SingleFindingWalkthroughWithCostFooter,
+    });
+    const context = buildIssueCommentContext(runtime.octokit, {
+      findingId: "finding-only",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    const updateBody = runtime.octokit.rest.pulls.updateReview.mock.calls[0]?.[0]?.body ?? "";
+    expect(updateBody).toContain("No findings.");
+    expect(updateBody).not.toContain("finding-only");
+    expect(updateBody).toContain(FinalFindingCostFooter);
+    expect(updateBody.indexOf("No findings.")).toBeLessThan(
+      updateBody.indexOf(FinalFindingCostFooter),
+    );
+    expect(lastNonEmptyLine(updateBody)).toBe(FinalFindingCostFooter);
   });
 
   it("accepts repeated dismiss without creating a duplicate finding reaction", async () => {

@@ -119,6 +119,7 @@ type RepoRef = {
 const REVIEW_COMMENT_PAGE_SIZE = 100;
 const WALKTHROUGH_PAGE_SIZE = 100;
 const DISMISSED_FINDING_LABEL = "sovri:dismissed-finding";
+const NO_FINDINGS_LINE = "No findings.";
 const UNAUTHORIZED_DISMISS_BODY = "Only the pull request author can dismiss findings.";
 const FindingMarkerPattern = /<!--\s*sovri-finding-id:\s*([A-Za-z0-9-]{1,64})\s*-->/u;
 const AlreadyExistsMessagePattern = /already(?:_| )exists/iu;
@@ -483,13 +484,16 @@ function renderWalkthroughWithoutDismissedFindings(
   body: string,
   dismissedFindingIds: ReadonlySet<string>,
 ): string {
-  return body
-    .split("\n")
-    .filter((line) => {
-      const findingId = extractFindingId(line);
-      return findingId === undefined || !dismissedFindingIds.has(findingId);
-    })
-    .join("\n");
+  const lines = body.split("\n").filter((line) => {
+    const findingId = extractFindingId(line);
+    return findingId === undefined || !dismissedFindingIds.has(findingId);
+  });
+
+  if (hasVisibleFinding(lines) || lines.some((line) => line.trim() === NO_FINDINGS_LINE)) {
+    return lines.join("\n");
+  }
+
+  return insertNoFindingsLine(lines).join("\n");
 }
 
 function extractFindingId(value: string | null | undefined): string | undefined {
@@ -498,6 +502,24 @@ function extractFindingId(value: string | null | undefined): string | undefined 
   }
 
   return FindingMarkerPattern.exec(value)?.[1];
+}
+
+function hasVisibleFinding(lines: readonly string[]): boolean {
+  return lines.some((line) => extractFindingId(line) !== undefined);
+}
+
+function insertNoFindingsLine(lines: readonly string[]): string[] {
+  const findingsHeadingIndex = lines.findIndex((line) => line.trim() === "### Findings");
+  if (findingsHeadingIndex === -1) {
+    return [NO_FINDINGS_LINE, "", ...lines];
+  }
+
+  let insertionIndex = findingsHeadingIndex + 1;
+  while (lines[insertionIndex]?.trim() === "") {
+    insertionIndex += 1;
+  }
+
+  return [...lines.slice(0, insertionIndex), NO_FINDINGS_LINE, "", ...lines.slice(insertionIndex)];
 }
 
 function isDefined<T>(value: T | undefined): value is T {

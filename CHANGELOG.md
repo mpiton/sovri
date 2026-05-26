@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `fix(bot)`: insert `No findings.` when dismiss re-rendering removes every
+  visible finding while preserving the existing cost footer.
+
+- `test(bot)`: add dismiss coverage for removing the final visible finding.
+
 - `test(bot)`: add dismiss coverage proving walkthrough re-rendering keeps the
   existing cost footer as the final non-empty line.
 
