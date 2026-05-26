@@ -14,6 +14,7 @@ import type {
   IssueCommentHandlerDependencies,
   IssueCommentUnknownReaction,
 } from "../handlers/issue-comment.js";
+import { WALKTHROUGH_MARKER } from "./comment-poster.js";
 
 const DEFAULT_BOT_LOGIN = "sovri-bot[bot]";
 
@@ -39,6 +40,9 @@ export type IssueCommentDispatchOctokit = ReReviewOctokit & {
       readonly createForPullRequestReviewComment: (
         parameters: PullRequestReviewCommentReactionParameters,
       ) => Promise<{ readonly data: unknown }>;
+      readonly listForPullRequestReviewComment: (
+        parameters: PullRequestReviewCommentReactionListParameters,
+      ) => Promise<{ readonly data: readonly PullRequestReviewCommentReaction[] }>;
     };
   };
 };
@@ -55,6 +59,19 @@ type PullRequestReviewCommentReactionParameters = {
   readonly content: "-1";
   readonly owner: string;
   readonly repo: string;
+};
+
+type PullRequestReviewCommentReactionListParameters = {
+  readonly comment_id: number;
+  readonly owner: string;
+  readonly repo: string;
+};
+
+type PullRequestReviewCommentReaction = {
+  readonly content?: string;
+  readonly user?: {
+    readonly login?: string;
+  } | null;
 };
 
 type IssueAddLabelsParameters = {
@@ -84,9 +101,24 @@ type PullRequestReviewComment = {
   readonly id: number;
 };
 
+type PullRequestReview = {
+  readonly body?: string | null;
+  readonly id: number;
+  readonly user?: {
+    readonly login?: string;
+  } | null;
+};
+
+type RepoRef = {
+  readonly owner: string;
+  readonly repo: string;
+};
+
 const REVIEW_COMMENT_PAGE_SIZE = 100;
+const WALKTHROUGH_PAGE_SIZE = 100;
 const DISMISSED_FINDING_LABEL = "sovri:dismissed-finding";
 const UNAUTHORIZED_DISMISS_BODY = "Only the pull request author can dismiss findings.";
+const FindingMarkerPattern = /<!--\s*sovri-finding-id:\s*([A-Za-z0-9-]{1,64})\s*-->/u;
 
 const PullRequestAuthorSchema = z
   .object({
@@ -112,9 +144,10 @@ export function createIssueCommentHandlerDependencies(
   context: IssueCommentDispatchContext,
   env: NodeJS.ProcessEnv = process.env,
 ): IssueCommentHandlerDependencies {
+  const botLogin = readBotLogin(env);
   return {
-    botLogin: readBotLogin(env),
-    handleDismiss: (command) => handleDismissCommand(context, command),
+    botLogin,
+    handleDismiss: (command) => handleDismissCommand(context, command, botLogin),
     handleReReview: (command) =>
       handleReReviewCommand(command, createReReviewCommandDependencies(context.octokit, env)),
     parseCommand,
@@ -147,6 +180,7 @@ async function reactConfused(
 async function handleDismissCommand(
   context: IssueCommentDispatchContext,
   command: IssueCommentDismissCommandContext,
+  botLogin: string,
 ): Promise<void> {
   const repo = splitRepoFullName(command.repoFullName);
   const pullRequestAuthorLogin = await resolvePullRequestAuthorLogin(context, command, repo);
@@ -161,7 +195,10 @@ async function handleDismissCommand(
     return;
   }
 
-  const findingComment = await findFindingCommentOnAnyReviewCommentPage(context, command, repo);
+  const reviewComments = await listReviewCommentsOnAllPages(context, command, repo);
+  const findingComment = reviewComments.find((comment) =>
+    hasFindingMarker(comment, command.findingId),
+  );
 
   if (findingComment !== undefined) {
     await context.octokit.rest.reactions.createForPullRequestReviewComment({
@@ -176,6 +213,14 @@ async function handleDismissCommand(
       owner: repo.owner,
       repo: repo.repo,
     });
+    const dismissedFindingIds = await collectBotDismissedFindingIds(
+      context,
+      repo,
+      reviewComments,
+      botLogin,
+    );
+    dismissedFindingIds.add(command.findingId);
+    await updateWalkthroughReview(context, command, repo, dismissedFindingIds, botLogin);
     await context.octokit.rest.reactions.createForIssueComment({
       comment_id: command.commentId,
       content: "+1",
@@ -196,7 +241,7 @@ async function handleDismissCommand(
 async function resolvePullRequestAuthorLogin(
   context: IssueCommentDispatchContext,
   command: IssueCommentDismissCommandContext,
-  repo: { readonly owner: string; readonly repo: string },
+  repo: RepoRef,
 ): Promise<string> {
   const response = await context.octokit.rest.pulls.get({
     owner: repo.owner,
@@ -212,20 +257,20 @@ async function resolvePullRequestAuthorLogin(
   return pullRequest.user.login;
 }
 
-async function findFindingCommentOnAnyReviewCommentPage(
+async function listReviewCommentsOnAllPages(
   context: IssueCommentDispatchContext,
   command: IssueCommentDismissCommandContext,
-  repo: { readonly owner: string; readonly repo: string },
-): Promise<PullRequestReviewComment | undefined> {
-  return findFindingCommentOnReviewCommentPage(context, command, repo, 1);
+  repo: RepoRef,
+): Promise<PullRequestReviewComment[]> {
+  return listReviewCommentsPage(context, command, repo, 1);
 }
 
-async function findFindingCommentOnReviewCommentPage(
+async function listReviewCommentsPage(
   context: IssueCommentDispatchContext,
   command: IssueCommentDismissCommandContext,
-  repo: { readonly owner: string; readonly repo: string },
+  repo: RepoRef,
   page: number,
-): Promise<PullRequestReviewComment | undefined> {
+): Promise<PullRequestReviewComment[]> {
   const comments = await context.octokit.rest.pulls.listReviewComments({
     owner: repo.owner,
     page,
@@ -233,23 +278,137 @@ async function findFindingCommentOnReviewCommentPage(
     pull_number: command.pullRequestNumber,
     repo: repo.repo,
   });
-  const findingComment = comments.data.find((comment) =>
-    hasFindingMarker(comment, command.findingId),
-  );
-
-  if (findingComment !== undefined) {
-    return findingComment;
-  }
 
   if (comments.data.length < REVIEW_COMMENT_PAGE_SIZE) {
-    return undefined;
+    return [...comments.data];
   }
 
-  return findFindingCommentOnReviewCommentPage(context, command, repo, page + 1);
+  return [...comments.data, ...(await listReviewCommentsPage(context, command, repo, page + 1))];
 }
 
 function hasFindingMarker(comment: PullRequestReviewComment, findingId: string): boolean {
-  return comment.body?.includes(`<!-- sovri-finding-id: ${findingId} -->`) ?? false;
+  return extractFindingId(comment.body) === findingId;
+}
+
+async function collectBotDismissedFindingIds(
+  context: IssueCommentDispatchContext,
+  repo: RepoRef,
+  comments: readonly PullRequestReviewComment[],
+  botLogin: string,
+): Promise<Set<string>> {
+  const dismissedIds = await Promise.all(
+    comments.map(async (comment) => {
+      const findingId = extractFindingId(comment.body);
+      if (findingId === undefined) {
+        return undefined;
+      }
+
+      const reactions = await context.octokit.rest.reactions.listForPullRequestReviewComment({
+        comment_id: comment.id,
+        owner: repo.owner,
+        repo: repo.repo,
+      });
+
+      const botDismissed = reactions.data.some(
+        (reaction) => reaction.content === "-1" && reaction.user?.login === botLogin,
+      );
+      return botDismissed ? findingId : undefined;
+    }),
+  );
+
+  return new Set(dismissedIds.filter(isDefined));
+}
+
+async function updateWalkthroughReview(
+  context: IssueCommentDispatchContext,
+  command: IssueCommentDismissCommandContext,
+  repo: RepoRef,
+  dismissedFindingIds: ReadonlySet<string>,
+  botLogin: string,
+): Promise<void> {
+  const walkthrough = await findMarkedWalkthroughReview(context, command, repo, botLogin);
+  if (walkthrough?.body === undefined || walkthrough.body === null) {
+    return;
+  }
+
+  const body = renderWalkthroughWithoutDismissedFindings(walkthrough.body, dismissedFindingIds);
+  if (body === walkthrough.body) {
+    return;
+  }
+
+  await context.octokit.rest.pulls.updateReview({
+    body,
+    owner: repo.owner,
+    pull_number: command.pullRequestNumber,
+    repo: repo.repo,
+    review_id: walkthrough.id,
+  });
+}
+
+async function findMarkedWalkthroughReview(
+  context: IssueCommentDispatchContext,
+  command: IssueCommentDismissCommandContext,
+  repo: RepoRef,
+  botLogin: string,
+): Promise<PullRequestReview | undefined> {
+  return findMarkedWalkthroughReviewPage(context, command, repo, botLogin, 1);
+}
+
+async function findMarkedWalkthroughReviewPage(
+  context: IssueCommentDispatchContext,
+  command: IssueCommentDismissCommandContext,
+  repo: RepoRef,
+  botLogin: string,
+  page: number,
+): Promise<PullRequestReview | undefined> {
+  const reviews = await context.octokit.rest.pulls.listReviews({
+    owner: repo.owner,
+    page,
+    per_page: WALKTHROUGH_PAGE_SIZE,
+    pull_number: command.pullRequestNumber,
+    repo: repo.repo,
+  });
+  const match = reviews.data.find(
+    (review) =>
+      typeof review.body === "string" &&
+      review.body.includes(WALKTHROUGH_MARKER) &&
+      review.user?.login === botLogin,
+  );
+
+  if (match !== undefined) {
+    return match;
+  }
+
+  if (reviews.data.length < WALKTHROUGH_PAGE_SIZE) {
+    return undefined;
+  }
+
+  return findMarkedWalkthroughReviewPage(context, command, repo, botLogin, page + 1);
+}
+
+function renderWalkthroughWithoutDismissedFindings(
+  body: string,
+  dismissedFindingIds: ReadonlySet<string>,
+): string {
+  return body
+    .split("\n")
+    .filter((line) => {
+      const findingId = extractFindingId(line);
+      return findingId === undefined || !dismissedFindingIds.has(findingId);
+    })
+    .join("\n");
+}
+
+function extractFindingId(value: string | null | undefined): string | undefined {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  return FindingMarkerPattern.exec(value)?.[1];
+}
+
+function isDefined<T>(value: T | undefined): value is T {
+  return value !== undefined;
 }
 
 function splitRepoFullName(repoFullName: string | undefined): {

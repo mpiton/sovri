@@ -21,6 +21,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(bot)`: update the marked walkthrough after dismissing a finding so
+  entries with bot-authored `-1` reactions are hidden.
+
+- `test(bot)`: add dismiss coverage requiring walkthrough updates to exclude
+  every finding dismissed by the bot while keeping visible finding markers.
+
 - `test(bot)`: add dismiss coverage proving inline finding markers are parsed
   when surrounded by normal review Markdown.
 

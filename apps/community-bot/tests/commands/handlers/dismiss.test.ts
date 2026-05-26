@@ -37,6 +37,22 @@ const VisibleOnlyInlineCommentBody = [
   "",
   "This comment mentions finding-visible-only in visible Markdown only.",
 ].join("\n");
+const MarkedWalkthroughBody = [
+  "<!-- sovri:walkthrough -->",
+  "## Sovri review",
+  "",
+  "### Findings",
+  "",
+  "- <!-- sovri-finding-id: finding-alpha --> finding-alpha",
+  "- <!-- sovri-finding-id: finding-beta --> finding-beta",
+  "- <!-- sovri-finding-id: finding-gamma --> finding-gamma",
+  "",
+  "### File-by-file",
+  "",
+  "- <!-- sovri-finding-id: finding-alpha --> src/alpha.ts finding-alpha",
+  "- <!-- sovri-finding-id: finding-beta --> src/beta.ts finding-beta",
+  "- <!-- sovri-finding-id: finding-gamma --> src/gamma.ts finding-gamma",
+].join("\n");
 
 describe("dismiss command handler", () => {
   it("posts one error comment without mutating state when the finding id is unknown", async () => {
@@ -268,6 +284,62 @@ describe("dismiss command handler", () => {
     expect(runtime.octokit.rest.issues.createComment).not.toHaveBeenCalled();
   });
 
+  it("updates the walkthrough without findings dismissed by the bot", async () => {
+    const runtime = buildRuntime({
+      reviewComments: [
+        {
+          body: "<!-- sovri-finding-id: finding-alpha -->",
+          id: 501,
+          user: {
+            login: "sovri-bot",
+          },
+        },
+        {
+          body: "<!-- sovri-finding-id: finding-beta -->",
+          id: 502,
+          user: {
+            login: "sovri-bot",
+          },
+        },
+        {
+          body: "<!-- sovri-finding-id: finding-gamma -->",
+          id: 503,
+          user: {
+            login: "sovri-bot",
+          },
+        },
+      ],
+      reviewCommentReactions: {
+        502: [{ content: "-1", user: { login: "sovri-bot" } }],
+        503: [{ content: "-1", user: { login: "sovri-bot" } }],
+      },
+      walkthroughReviewBody: MarkedWalkthroughBody,
+    });
+    const context = buildIssueCommentContext(runtime.octokit, {
+      findingId: "finding-beta",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(runtime.octokit.rest.pulls.updateReview).toHaveBeenCalledTimes(1);
+    const updateRequest = runtime.octokit.rest.pulls.updateReview.mock.calls[0]?.[0];
+    expect(updateRequest).toEqual(
+      expect.objectContaining({
+        owner: "octo-org",
+        pull_number: PullRequestNumber,
+        repo: "sovri-target",
+        review_id: 6000,
+      }),
+    );
+    expect(updateRequest?.body).toContain("finding-alpha");
+    expect(updateRequest?.body).toContain("<!-- sovri-finding-id: finding-alpha -->");
+    expect(updateRequest?.body).not.toContain("finding-beta");
+    expect(updateRequest?.body).not.toContain("finding-gamma");
+  });
+
   it("does not treat visible finding text without a hidden marker as a match", async () => {
     const runtime = buildRuntime({
       inlineCommentBody: VisibleOnlyInlineCommentBody,
@@ -296,8 +368,41 @@ describe("dismiss command handler", () => {
   });
 });
 
-function buildRuntime(options: { readonly inlineCommentBody?: string } = {}) {
+type ReviewCommentFixture = {
+  readonly body?: string | null;
+  readonly id: number;
+  readonly user?: {
+    readonly login?: string;
+  };
+};
+
+type ReactionFixture = {
+  readonly content: string;
+  readonly user?: {
+    readonly login?: string;
+  } | null;
+};
+
+function buildRuntime(
+  options: {
+    readonly inlineCommentBody?: string;
+    readonly reviewCommentReactions?: Readonly<Record<number, readonly ReactionFixture[]>>;
+    readonly reviewComments?: readonly ReviewCommentFixture[];
+    readonly walkthroughReviewBody?: string;
+  } = {},
+) {
   const inlineCommentBody = options.inlineCommentBody ?? KnownInlineCommentBody;
+  const reviewComments = options.reviewComments ?? [
+    {
+      body: inlineCommentBody,
+      id: InlineCommentId,
+      user: {
+        login: "sovri-bot",
+      },
+    },
+  ];
+  const walkthroughReviewBody =
+    options.walkthroughReviewBody ?? "<!-- sovri:walkthrough -->\n## Sovri review";
   const octokit = {
     rest: {
       issues: {
@@ -317,12 +422,17 @@ function buildRuntime(options: { readonly inlineCommentBody?: string } = {}) {
         updateComment: vi.fn(async () => ({ data: { id: 7000 } })),
       },
       pulls: {
+        createReview: vi.fn(async () => ({ data: { id: 6000 } })),
+        createReviewComment: vi.fn(async () => ({ data: { id: 8000 } })),
         get: vi.fn(async () => ({ data: { user: { login: "alice" } } })),
         listReviewComments: vi.fn(async () => ({
+          data: reviewComments,
+        })),
+        listReviews: vi.fn(async () => ({
           data: [
             {
-              body: inlineCommentBody,
-              id: InlineCommentId,
+              body: walkthroughReviewBody,
+              id: 6000,
               user: {
                 login: "sovri-bot",
               },
@@ -334,7 +444,9 @@ function buildRuntime(options: { readonly inlineCommentBody?: string } = {}) {
       reactions: {
         createForIssueComment: vi.fn(async () => ({ data: {} })),
         createForPullRequestReviewComment: vi.fn(async () => ({ data: {} })),
-        listForPullRequestReviewComment: vi.fn(async () => ({ data: [] })),
+        listForPullRequestReviewComment: vi.fn(async (parameters: { comment_id: number }) => ({
+          data: options.reviewCommentReactions?.[parameters.comment_id] ?? [],
+        })),
       },
     },
   };
