@@ -139,7 +139,7 @@ const releaseVerifyTagUsage =
 const releaseBuildAndPushUsage =
   "Usage: node scripts/ci-policy.mjs release-build-and-push --workflow <path>";
 const releaseExtractNotesUsage =
-  "Usage: node scripts/ci-policy.mjs release-extract-notes --changelog <path> --version <X.Y.Z>";
+  "Usage: node scripts/ci-policy.mjs release-extract-notes --changelog <path> --version <X.Y.Z> [--max-bytes <n>] [--repo-url <url>]";
 const releaseVerifyTagAnnotationUsage =
   "Usage: node scripts/ci-policy.mjs release-verify-tag-annotation --tag <vX.Y.Z> --repo <path>";
 const releaseVerifyCommitSubjectUsage =
@@ -2344,10 +2344,111 @@ const runReleaseVerifyCommitSubject = (args) => {
   writeStdout(`verify_commit_subject=pass\ntag_subject=${subject}\n`);
 };
 
+const RELEASE_NOTES_MAX_BYTES_PATTERN = /^[1-9]\d{0,9}$/;
+const RELEASE_NOTES_REPO_URL_PATTERN = /^https?:\/\/[^\s)]+$/;
+const RELEASE_NOTES_TRUNCATION_NOTICE_HEAD =
+  "\n\n_Release notes truncated to stay under the GitHub Releases body limit. See ";
+const RELEASE_NOTES_TRUNCATION_NOTICE_TAIL = " for the complete entry._";
+
+const findChangelogReleaseHeadingDate = (changelog, version) => {
+  const pattern = new RegExp(
+    `^## \\[${escapeRegExp(version)}\\][ \\t]*-[ \\t]*(\\d{4}-\\d{2}-\\d{2})[ \\t]*$`,
+    "m",
+  );
+  return pattern.exec(changelog)?.[1] ?? null;
+};
+
+const buildChangelogHeadingAnchor = (version, date) =>
+  `[${version}] - ${date}`
+    .toLowerCase()
+    .replace(/[^a-z0-9 _-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+
+const buildReleaseNotesTruncationNotice = ({ version, date, repoUrl }) => {
+  const trimmedRepoUrl = typeof repoUrl === "string" ? repoUrl.trim() : "";
+  if (trimmedRepoUrl.length > 0 && date !== null) {
+    const normalizedRepoUrl = trimmedRepoUrl.replace(/\/+$/, "");
+    const anchor = buildChangelogHeadingAnchor(version, date);
+    const link = `${normalizedRepoUrl}/blob/v${version}/CHANGELOG.md#${anchor}`;
+    const linkText = `[full v${version} changelog](${link})`;
+    return `${RELEASE_NOTES_TRUNCATION_NOTICE_HEAD}${linkText}${RELEASE_NOTES_TRUNCATION_NOTICE_TAIL}`;
+  }
+  return `${RELEASE_NOTES_TRUNCATION_NOTICE_HEAD}CHANGELOG.md at tag v${version}${RELEASE_NOTES_TRUNCATION_NOTICE_TAIL}`;
+};
+
+const closeDanglingCodeFence = (text) => {
+  const fences = text.match(/^(?:`{3,}|~{3,})/gm) ?? [];
+  if (fences.length === 0) return text;
+  const openMarkers = [];
+  for (const marker of fences) {
+    const last = openMarkers.at(-1);
+    if (last !== undefined && marker[0] === last[0] && marker.length >= last.length) {
+      openMarkers.pop();
+    } else {
+      openMarkers.push(marker);
+    }
+  }
+  if (openMarkers.length === 0) return text;
+  const closers = openMarkers.toReversed().join("\n");
+  const separator = text.endsWith("\n") ? "" : "\n";
+  return `${text}${separator}${closers}\n`;
+};
+
+const stripTrailingInvalidUnicode = (text) => text.replace(/[�\uD800-\uDFFF]+$/, "");
+
+const truncateReleaseNotes = ({ body, maxBytes, notice }) => {
+  const noticeBytes = Buffer.byteLength(notice, "utf8");
+  if (noticeBytes >= maxBytes) {
+    fail(
+      `ERROR: --max-bytes ${maxBytes} is smaller than the truncation notice (${noticeBytes} bytes).`,
+      2,
+    );
+  }
+  const budget = maxBytes - noticeBytes;
+  const bodyBuffer = Buffer.from(body, "utf8");
+  let head = stripTrailingInvalidUnicode(bodyBuffer.slice(0, budget).toString("utf8"));
+  while (Buffer.byteLength(head, "utf8") > budget) {
+    head = stripTrailingInvalidUnicode(head.slice(0, -1));
+  }
+  const lastNewline = head.lastIndexOf("\n");
+  const safeHead = lastNewline > 0 ? head.slice(0, lastNewline) : head;
+  const fenceSafe = closeDanglingCodeFence(safeHead.replace(/\s+$/, ""));
+  return `${fenceSafe}${notice}`;
+};
+
+const applyReleaseNotesCap = ({ body, version, changelog, maxBytesRaw, repoUrl }) => {
+  if (maxBytesRaw === undefined) return body;
+  if (!RELEASE_NOTES_MAX_BYTES_PATTERN.test(maxBytesRaw)) {
+    fail(
+      `ERROR: --max-bytes must be a positive integer (got "${maxBytesRaw}").\n${releaseExtractNotesUsage}`,
+      2,
+    );
+  }
+  const maxBytes = Number(maxBytesRaw);
+  if (Buffer.byteLength(body, "utf8") <= maxBytes) return body;
+  const date = findChangelogReleaseHeadingDate(changelog, version);
+  if (date === null && typeof repoUrl === "string" && repoUrl.trim().length > 0) {
+    writeStderr(
+      `WARN: --repo-url provided but heading date for ${version} could not be parsed; emitting notice without link.\n`,
+    );
+  }
+  const notice = buildReleaseNotesTruncationNotice({ version, date, repoUrl });
+  return truncateReleaseNotes({ body, maxBytes, notice });
+};
+
 const runReleaseExtractNotes = (args) => {
   const options = parseOptions(args);
   const changelogPath = readRequiredOption(options, "changelog", releaseExtractNotesUsage);
   const version = readRequiredOption(options, "version", releaseExtractNotesUsage);
+  const maxBytesRaw = options.get("max-bytes");
+  const repoUrl = options.get("repo-url");
+  if (repoUrl !== undefined && !RELEASE_NOTES_REPO_URL_PATTERN.test(repoUrl.trim())) {
+    fail(
+      `ERROR: --repo-url must be an http(s) URL without spaces or ')' (got "${repoUrl}").\n${releaseExtractNotesUsage}`,
+      2,
+    );
+  }
 
   const changelog = readTextFile(changelogPath, "changelog");
   if (!hasChangelogReleaseSection(changelog, version)) {
@@ -2355,7 +2456,14 @@ const runReleaseExtractNotes = (args) => {
   }
 
   const body = getChangelogReleaseSection(changelog, version).trim();
-  writeStdout(`${body}\n`);
+  const output = applyReleaseNotesCap({
+    body,
+    version,
+    changelog,
+    maxBytesRaw,
+    repoUrl,
+  });
+  writeStdout(`${output}\n`);
 };
 
 const PROMOTE_CHANGELOG_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;

@@ -129,6 +129,8 @@ jobs:
       - name: Extract release notes
         env:
           RELEASE_TAG: ${{ github.ref_name }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"
@@ -138,7 +140,9 @@ jobs:
           fi
           node scripts/ci-policy.mjs release-extract-notes \
             --changelog CHANGELOG.md \
-            --version "$version" > release-notes.md
+            --version "$version" \
+            --max-bytes 100000 \
+            --repo-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" > release-notes.md
 
       - name: Create or update GitHub Release
         env:

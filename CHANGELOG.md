@@ -36,6 +36,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `fix(ci)`: cap `release-extract-notes` output via opt-in `--max-bytes` and
+  `--repo-url` flags so the `release.yml` `gh-release` job no longer trips the
+  GitHub Releases 125 000-character body limit when the promoted changelog
+  section is large; truncated bodies now end with a notice that links back to
+  the full `CHANGELOG.md` entry at the release tag (closes #1160).
+
 - `test(llm-providers)`: advance retry fake timers without an awaited loop so
   the full oxlint gate passes cleanly.
 

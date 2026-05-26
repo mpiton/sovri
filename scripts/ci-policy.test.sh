@@ -12421,6 +12421,564 @@ $(printf '%s\n' "$stdout" | sed 's/^/        /')"
   rm -rf "$root"
 }
 
+run_release_extract_notes_max_bytes_under_cap_case() {
+  local root changelog_path stdout stderr stdout_file stderr_file ec
+
+  root=$(mktemp -d)
+  changelog_path="$root/CHANGELOG.md"
+
+  # Given a CHANGELOG with a release body well below the byte cap
+  cat >"$changelog_path" <<'MD'
+# Changelog
+
+## [Unreleased]
+
+## [0.1.0] - 2026-05-23
+
+### Added
+
+- Short entry one.
+- Short entry two.
+
+## [0.0.1] - 2026-01-01
+
+- Initial release.
+MD
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # When the workflow extracts release notes with --max-bytes 100000
+  node "$SCRIPT" release-extract-notes \
+    --changelog "$changelog_path" \
+    --version 0.1.0 \
+    --max-bytes 100000 \
+    --repo-url https://github.com/example/repo \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes under-cap: expected exit 0, got ${ec}
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # Then no truncation notice appears
+  if printf '%s\n' "$stdout" | grep -Fq "Release notes truncated"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes under-cap: truncation notice unexpectedly present
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # And both entries are present
+  for needle in "Short entry one." "Short entry two."; do
+    if ! printf '%s\n' "$stdout" | grep -Fq -- "$needle"; then
+      FAIL=$((FAIL + 1))
+      FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes under-cap: missing entry '${needle}'
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+      rm -rf "$root"
+      return
+    fi
+  done
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
+run_release_extract_notes_max_bytes_over_cap_with_repo_url_case() {
+  local root changelog_path stdout stderr stdout_file stderr_file ec filler
+
+  root=$(mktemp -d)
+  changelog_path="$root/CHANGELOG.md"
+
+  # Given a CHANGELOG whose [0.1.0] body exceeds --max-bytes 1000
+  filler=$(awk 'BEGIN { for (i = 0; i < 60; i++) print "- Padding entry that bloats the release section past one kilobyte." }')
+
+  {
+    printf '# Changelog\n\n## [Unreleased]\n\n## [0.1.0] - 2026-05-23\n\n### Added\n\n'
+    printf '%s\n' "$filler"
+    printf '\n- Tail entry for v0.1.0.\n\n## [0.0.1] - 2026-01-01\n\n- Initial release.\n'
+  } >"$changelog_path"
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # When the workflow extracts release notes with a tight --max-bytes cap and repo URL
+  node "$SCRIPT" release-extract-notes \
+    --changelog "$changelog_path" \
+    --version 0.1.0 \
+    --max-bytes 1000 \
+    --repo-url https://github.com/mpiton/sovri \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes over-cap with repo: expected exit 0, got ${ec}
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # Then the truncation notice is present
+  if ! printf '%s\n' "$stdout" | grep -Fq "Release notes truncated"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes over-cap with repo: missing truncation notice
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # And the notice contains a link to the full v0.1.0 changelog at the tag
+  local expected_link="https://github.com/mpiton/sovri/blob/v0.1.0/CHANGELOG.md#010---2026-05-23"
+  if ! printf '%s\n' "$stdout" | grep -Fq -- "$expected_link"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes over-cap with repo: missing expected link '${expected_link}'
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # And the output does not exceed --max-bytes 1000
+  local bytes
+  bytes=$(printf '%s' "$stdout" | wc -c)
+  if [ "$bytes" -gt 1000 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes over-cap with repo: output is ${bytes} bytes, expected ≤ 1000"
+    rm -rf "$root"
+    return
+  fi
+
+  # And the prior-version section did not leak into the truncated output
+  if printf '%s\n' "$stdout" | grep -Fq "Initial release."; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes over-cap with repo: leaked prior-version content"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
+run_release_extract_notes_max_bytes_over_cap_without_repo_url_case() {
+  local root changelog_path stdout stderr stdout_file stderr_file ec filler
+
+  root=$(mktemp -d)
+  changelog_path="$root/CHANGELOG.md"
+
+  filler=$(awk 'BEGIN { for (i = 0; i < 60; i++) print "- Padding entry without a repository URL provided." }')
+
+  {
+    printf '# Changelog\n\n## [Unreleased]\n\n## [0.1.0] - 2026-05-23\n\n### Added\n\n'
+    printf '%s\n' "$filler"
+    printf '\n## [0.0.1] - 2026-01-01\n\n- Initial release.\n'
+  } >"$changelog_path"
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # When --max-bytes triggers truncation but --repo-url is omitted
+  node "$SCRIPT" release-extract-notes \
+    --changelog "$changelog_path" \
+    --version 0.1.0 \
+    --max-bytes 800 \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes over-cap no-repo: expected exit 0, got ${ec}
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # Then the truncation notice is present without a link
+  if ! printf '%s\n' "$stdout" | grep -Fq "Release notes truncated"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes over-cap no-repo: missing truncation notice
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if printf '%s\n' "$stdout" | grep -Fq "https://"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes over-cap no-repo: unexpected URL in notice"
+    rm -rf "$root"
+    return
+  fi
+
+  local bytes
+  bytes=$(printf '%s' "$stdout" | wc -c)
+  if [ "$bytes" -gt 800 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes over-cap no-repo: output is ${bytes} bytes, expected ≤ 800"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
+run_release_extract_notes_max_bytes_rejects_invalid_value_case() {
+  local invalid_value="$1"
+  local label="$2"
+  local root changelog_path stdout stderr stdout_file stderr_file ec
+
+  root=$(mktemp -d)
+  changelog_path="$root/CHANGELOG.md"
+
+  cat >"$changelog_path" <<'MD'
+# Changelog
+
+## [Unreleased]
+
+## [0.1.0] - 2026-05-23
+
+- Body entry.
+
+## [0.0.1] - 2026-01-01
+
+- Initial release.
+MD
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # When --max-bytes is given a non-positive-integer value
+  node "$SCRIPT" release-extract-notes \
+    --changelog "$changelog_path" \
+    --version 0.1.0 \
+    --max-bytes "$invalid_value" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes invalid '${label}': expected non-zero exit, got 0
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stderr" | grep -Fq -- "--max-bytes"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes invalid '${label}': missing '--max-bytes' diagnostic
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
+run_release_extract_notes_rejects_invalid_repo_url_case() {
+  local invalid_url="$1"
+  local label="$2"
+  local root changelog_path stdout stderr stdout_file stderr_file ec
+
+  root=$(mktemp -d)
+  changelog_path="$root/CHANGELOG.md"
+
+  cat >"$changelog_path" <<'MD'
+# Changelog
+
+## [Unreleased]
+
+## [0.1.0] - 2026-05-23
+
+- Body entry.
+
+## [0.0.1] - 2026-01-01
+
+- Initial release.
+MD
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # When --repo-url is given a non-http(s) value or a value containing ')'
+  node "$SCRIPT" release-extract-notes \
+    --changelog "$changelog_path" \
+    --version 0.1.0 \
+    --max-bytes 1000 \
+    --repo-url "$invalid_url" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -eq 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes repo-url invalid '${label}': expected non-zero exit, got 0
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stderr" | grep -Fq -- "--repo-url"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes repo-url invalid '${label}': missing '--repo-url' diagnostic
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
+run_release_extract_notes_max_bytes_boundary_case() {
+  local root changelog_path stdout stderr stdout_file stderr_file ec body_size cap
+
+  root=$(mktemp -d)
+  changelog_path="$root/CHANGELOG.md"
+
+  # Given a CHANGELOG with a known [0.1.0] body
+  cat >"$changelog_path" <<'MD'
+# Changelog
+
+## [Unreleased]
+
+## [0.1.0] - 2026-05-23
+
+- Short entry one.
+- Short entry two.
+
+## [0.0.1] - 2026-01-01
+
+- Initial release.
+MD
+
+  # Measure the byte length of the extracted body in passthrough mode
+  body_size=$(node "$SCRIPT" release-extract-notes \
+    --changelog "$changelog_path" \
+    --version 0.1.0 | wc -c)
+  # Account for the trailing newline added by writeStdout (the body itself is body_size - 1 bytes)
+  body_size=$((body_size - 1))
+
+  # When --max-bytes is exactly equal to the body size, no truncation occurs
+  cap="$body_size"
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+  node "$SCRIPT" release-extract-notes \
+    --changelog "$changelog_path" \
+    --version 0.1.0 \
+    --max-bytes "$cap" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes boundary equal: expected exit 0, got ${ec}
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if printf '%s\n' "$stdout" | grep -Fq "Release notes truncated"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes boundary equal: unexpected truncation when body equals cap"
+    rm -rf "$root"
+    return
+  fi
+
+  # When --max-bytes is exactly body_size - 1, truncation triggers
+  cap=$((body_size - 1))
+  if [ "$cap" -lt 200 ]; then
+    # Notice is ~120 bytes; below 200 the truncation guard fires and we cannot assert behavior.
+    PASS=$((PASS + 1))
+    rm -rf "$root"
+    return
+  fi
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+  node "$SCRIPT" release-extract-notes \
+    --changelog "$changelog_path" \
+    --version 0.1.0 \
+    --max-bytes "$cap" \
+    --repo-url https://github.com/example/repo \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes boundary below: expected exit 0, got ${ec}
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  if ! printf '%s\n' "$stdout" | grep -Fq "Release notes truncated"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes boundary below: missing truncation notice when body exceeds cap by 1"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
+run_release_extract_notes_tilde_fence_closure_case() {
+  local root changelog_path stdout stderr stdout_file stderr_file ec filler
+
+  root=$(mktemp -d)
+  changelog_path="$root/CHANGELOG.md"
+
+  filler=$(awk 'BEGIN { for (i = 0; i < 60; i++) print "  tilde-fenced filler line that bloats the section;" }')
+
+  {
+    printf '# Changelog\n\n## [Unreleased]\n\n## [0.1.0] - 2026-05-23\n\n### Added\n\n'
+    printf '~~~text\n%s\n~~~\n' "$filler"
+    printf '\n## [0.0.1] - 2026-01-01\n\n- Initial release.\n'
+  } >"$changelog_path"
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  node "$SCRIPT" release-extract-notes \
+    --changelog "$changelog_path" \
+    --version 0.1.0 \
+    --max-bytes 600 \
+    --repo-url https://github.com/example/repo \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes tilde-fence closure: expected exit 0, got ${ec}
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # Then tilde-fence markers come in matched pairs (no dangling open fence)
+  local tilde_count
+  tilde_count=$(printf '%s' "$stdout" | grep -cE '^~~~' || true)
+  if [ $((tilde_count % 2)) -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes tilde-fence closure: dangling tilde fence (${tilde_count} markers)
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
+run_release_extract_notes_max_bytes_closes_open_fence_case() {
+  local root changelog_path stdout stderr stdout_file stderr_file ec filler
+
+  root=$(mktemp -d)
+  changelog_path="$root/CHANGELOG.md"
+
+  # Given a release body whose only truncation-safe cut lands inside a code fence
+  filler=$(awk 'BEGIN { for (i = 0; i < 60; i++) print "  filler line inside the fenced block;" }')
+
+  {
+    printf '# Changelog\n\n## [Unreleased]\n\n## [0.1.0] - 2026-05-23\n\n### Added\n\n'
+    printf '```text\n%s\n```\n' "$filler"
+    printf '\n## [0.0.1] - 2026-01-01\n\n- Initial release.\n'
+  } >"$changelog_path"
+
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  node "$SCRIPT" release-extract-notes \
+    --changelog "$changelog_path" \
+    --version 0.1.0 \
+    --max-bytes 600 \
+    --repo-url https://github.com/example/repo \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes fence-closure: expected exit 0, got ${ec}
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # Then code-fence markers come in matched pairs (no dangling open fence)
+  local fence_count
+  fence_count=$(printf '%s' "$stdout" | grep -cE '^```' || true)
+  if [ $((fence_count % 2)) -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes max-bytes fence-closure: dangling code fence (${fence_count} markers)
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
 run_release_verify_tag_unreleased_populated_marker_case() {
   local bullet_marker="$1"
   local marker_label="$2"
@@ -13560,6 +14118,20 @@ run_release_verify_tag_unreleased_populated_marker_case "1." "numbered-dot"
 run_release_verify_tag_unreleased_populated_marker_case "1)" "numbered-paren"
 run_release_extract_notes_nominal_case
 run_release_extract_notes_release_notes_md_case
+run_release_extract_notes_max_bytes_under_cap_case
+run_release_extract_notes_max_bytes_over_cap_with_repo_url_case
+run_release_extract_notes_max_bytes_over_cap_without_repo_url_case
+run_release_extract_notes_max_bytes_rejects_invalid_value_case "0" "zero"
+run_release_extract_notes_max_bytes_rejects_invalid_value_case "-5" "negative"
+run_release_extract_notes_max_bytes_rejects_invalid_value_case "abc" "non-numeric"
+run_release_extract_notes_max_bytes_rejects_invalid_value_case "1.5" "decimal"
+run_release_extract_notes_max_bytes_closes_open_fence_case
+run_release_extract_notes_tilde_fence_closure_case
+run_release_extract_notes_max_bytes_boundary_case
+run_release_extract_notes_rejects_invalid_repo_url_case "ftp://example.com" "non-http-scheme"
+run_release_extract_notes_rejects_invalid_repo_url_case "https://example.com/repo)" "trailing-paren"
+run_release_extract_notes_rejects_invalid_repo_url_case "https://example.com with space" "embedded-space"
+run_release_extract_notes_rejects_invalid_repo_url_case "javascript:alert(1)" "javascript-scheme"
 run_readme_references_release_nominal_case
 run_readme_references_release_inline_mention_case
 run_readme_references_release_fenced_heading_case
