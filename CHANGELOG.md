@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(bot)`: add end-to-end dismiss update coverage proving the marked
+  walkthrough cost footer is preserved.
+
 - `fix(bot)`: insert `No findings.` when dismiss re-rendering removes every
   visible finding while preserving the existing cost footer.
 

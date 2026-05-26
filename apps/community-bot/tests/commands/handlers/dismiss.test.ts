@@ -39,6 +39,7 @@ const VisibleOnlyInlineCommentBody = [
 ].join("\n");
 const CostFooter = "_Tokens: 1234 in / 567 out. Estimated cost: $0.0123._";
 const FinalFindingCostFooter = "_Tokens: 40 in / 10 out. Estimated cost: $0.0004._";
+const EndToEndCostFooter = "_Tokens: 2048 in / 256 out. Estimated cost: $0.0188._";
 const MarkedWalkthroughBody = [
   "<!-- sovri:walkthrough -->",
   "## Sovri review",
@@ -79,6 +80,19 @@ const SingleFindingWalkthroughWithCostFooter = [
   "---",
   "",
   FinalFindingCostFooter,
+].join("\n");
+const EndToEndWalkthroughWithCostFooter = [
+  "<!-- sovri:walkthrough -->",
+  "## Sovri review",
+  "",
+  "### Findings",
+  "",
+  "- <!-- sovri-finding-id: finding-alpha --> finding-alpha",
+  "- <!-- sovri-finding-id: finding-beta --> finding-beta",
+  "",
+  "---",
+  "",
+  EndToEndCostFooter,
 ].join("\n");
 
 describe("dismiss command handler", () => {
@@ -520,6 +534,44 @@ describe("dismiss command handler", () => {
       updateBody.indexOf(FinalFindingCostFooter),
     );
     expect(lastNonEmptyLine(updateBody)).toBe(FinalFindingCostFooter);
+  });
+
+  it("preserves the marked walkthrough footer during end-to-end dismiss update", async () => {
+    const runtime = buildRuntime({
+      reviewComments: [
+        {
+          body: "<!-- sovri-finding-id: finding-alpha -->",
+          id: 501,
+          user: {
+            login: "sovri-bot",
+          },
+        },
+        {
+          body: "<!-- sovri-finding-id: finding-beta -->",
+          id: 502,
+          user: {
+            login: "sovri-bot",
+          },
+        },
+      ],
+      reviewCommentReactions: {
+        502: [{ content: "-1", user: { login: "sovri-bot" } }],
+      },
+      walkthroughReviewBody: EndToEndWalkthroughWithCostFooter,
+    });
+    const context = buildIssueCommentContext(runtime.octokit, {
+      findingId: "finding-beta",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    const updateBody = runtime.octokit.rest.pulls.updateReview.mock.calls[0]?.[0]?.body ?? "";
+    expect(updateBody).not.toContain("finding-beta");
+    expect(updateBody).toContain("finding-alpha");
+    expect(lastNonEmptyLine(updateBody)).toBe(EndToEndCostFooter);
   });
 
   it("accepts repeated dismiss without creating a duplicate finding reaction", async () => {
