@@ -181,7 +181,13 @@ const changelogRemediationMessageUsage =
   "Usage: node scripts/ci-policy.mjs changelog-remediation-message --message <text>";
 const changelogDocumentationOnlyAssertUsage =
   "Usage: node scripts/ci-policy.mjs changelog-documentation-only-assert --changed-files <comma-separated-paths> --gate-result <success|failure>";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dependencyReviewWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${releaseExtractNotesUsage}\n${releaseVerifyTagAnnotationUsage}\n${releaseVerifyCommitSubjectUsage}\n${readmeReferencesReleaseUsage}\n${promoteChangelogUsage}\n${cosignDeferralUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}`;
+const coverageGateUsage =
+  "Usage: node scripts/ci-policy.mjs coverage-gate --input <coverage-summary.json> --package <package-path> --branches <threshold>";
+const llmProvidersCoverageWorkflowUsage =
+  "Usage: node scripts/ci-policy.mjs llm-providers-coverage-workflow --workflow <path>";
+const coverageArtifactPolicyUsage =
+  "Usage: node scripts/ci-policy.mjs coverage-artifact-policy --workflow <path>";
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dependencyReviewWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${releaseExtractNotesUsage}\n${releaseVerifyTagAnnotationUsage}\n${releaseVerifyCommitSubjectUsage}\n${readmeReferencesReleaseUsage}\n${promoteChangelogUsage}\n${cosignDeferralUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}\n${coverageGateUsage}\n${llmProvidersCoverageWorkflowUsage}\n${coverageArtifactPolicyUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -377,6 +383,231 @@ const runForbiddenJobsDurationBudget = (args) => {
           `job=${jobName}\nmeasured_duration_ms=${elapsedMs}\nreported_duration=${formatDuration(elapsedMs)}\n`,
       )
       .join("")}`,
+  );
+};
+
+const readPercentageOption = (options, key, commandUsage) => {
+  const value = readRequiredOption(options, key, commandUsage);
+  if (!/^\d+(?:\.\d+)?$/.test(value)) {
+    fail(`ERROR: --${key} must be a number in [0, 100].`, 2);
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+    fail(`ERROR: --${key} must be a number in [0, 100].`, 2);
+  }
+  return parsed;
+};
+
+const validateWorkspaceRelativePackage = (packagePath, commandUsage) => {
+  if (
+    packagePath.length === 0 ||
+    packagePath.startsWith("/") ||
+    packagePath.startsWith("-") ||
+    packagePath.includes("..")
+  ) {
+    fail(
+      `ERROR: --package must be a relative workspace path, got "${packagePath}".\n${commandUsage}`,
+      2,
+    );
+  }
+};
+
+const coverageSummaryEntriesForPackage = (summary, packagePath) => {
+  const segment = `/${packagePath}/`;
+  const relativePrefix = `${packagePath}/`;
+  return Object.entries(summary).filter(([key]) => {
+    if (key === "total") return false;
+    return key.includes(segment) || key.startsWith(relativePrefix);
+  });
+};
+
+const aggregateCoverageMetric = (entries, metric) => {
+  let total = 0;
+  let covered = 0;
+  let skipped = 0;
+  for (const [, entry] of entries) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const slot = entry[metric];
+    if (slot === null || typeof slot !== "object" || Array.isArray(slot)) continue;
+    const currentTotal = Number(slot.total);
+    const currentCovered = Number(slot.covered);
+    const currentSkipped = Number(slot.skipped);
+    if (Number.isFinite(currentTotal)) total += currentTotal;
+    if (Number.isFinite(currentCovered)) covered += currentCovered;
+    if (Number.isFinite(currentSkipped)) skipped += currentSkipped;
+  }
+  const denom = total - skipped;
+  const pct = denom > 0 ? (covered / denom) * 100 : 100;
+  return { covered, denom, pct, skipped, total };
+};
+
+const runCoverageGate = (args) => {
+  const options = parseOptions(args);
+  const inputPath = readRequiredOption(options, "input", coverageGateUsage);
+  const packagePath = readRequiredOption(options, "package", coverageGateUsage);
+  const branchThreshold = readPercentageOption(options, "branches", coverageGateUsage);
+  validateWorkspaceRelativePackage(packagePath, coverageGateUsage);
+
+  const summary = readJsonFile(inputPath, "coverage summary");
+  if (summary === null || typeof summary !== "object" || Array.isArray(summary)) {
+    fail("ERROR: coverage summary must be a JSON object keyed by file path.", 2);
+  }
+
+  const entries = coverageSummaryEntriesForPackage(summary, packagePath);
+  if (entries.length === 0) {
+    fail(`ERROR: no coverage entries match package "${packagePath}".`, 2);
+  }
+
+  const branches = aggregateCoverageMetric(entries, "branches");
+  const thresholdText = branchThreshold.toFixed(2);
+  const branchText = branches.pct.toFixed(2);
+  const comparator =
+    branches.denom > 0 && branches.covered * 100 < branchThreshold * branches.denom ? "<" : ">=";
+  const status = comparator === "<" ? "fail" : "pass";
+  const statusLine = `${packagePath} branches ${branchText} ${comparator} ${thresholdText}`;
+
+  writeStdout(`coverage_gate=${status}\n${statusLine}\n`);
+  if (status === "fail") {
+    fail(statusLine, 1);
+  }
+};
+
+const readCoverageWorkflowThreshold = (workflow) => {
+  const match = workflow.match(
+    /node\s+scripts\/check-coverage\.mjs\s+coverage\/coverage-summary\.json\s+packages\/llm-providers\s+(\d+(?:\.\d+)?)/u,
+  );
+  return match?.[1] === undefined ? undefined : Number(match[1]);
+};
+
+const isCorepackEnableStep = (step) =>
+  /^\s*run:\s*corepack\s+enable(?:\s+pnpm)?\s*$/mu.test(step.block);
+
+const workflowBootstrapsPnpmBeforeSetupNodeCache = (workflow) => {
+  const steps = getBackendChecksStepEntries(workflow);
+  const setupNodeIndex = steps.findIndex(
+    (step) =>
+      /^\s*(?:-\s*)?uses:\s*actions\/setup-node@[^\s#]+/mu.test(step.block) &&
+      getStepInput(step.block, "cache", workflow, step.startIndex) === "pnpm",
+  );
+
+  if (setupNodeIndex === -1) {
+    return true;
+  }
+
+  return steps.slice(0, setupNodeIndex).some(isCorepackEnableStep);
+};
+
+const stepRunsCommand = (step, commandPattern) => {
+  const command = getStepPropertyValue(step.block, "run");
+  return command !== undefined && commandPattern.test(command);
+};
+
+const workflowBuildsBeforeTypecheck = (workflow) => {
+  const steps = getBackendChecksStepEntries(workflow);
+  const buildIndex = steps.findIndex((step) => stepRunsCommand(step, /^pnpm\s+turbo\s+build$/u));
+  const typecheckIndex = steps.findIndex((step) =>
+    stepRunsCommand(step, /^pnpm\s+exec\s+tsc\s+-b$/u),
+  );
+
+  return typecheckIndex === -1 || (buildIndex !== -1 && buildIndex < typecheckIndex);
+};
+
+const runLlmProvidersCoverageWorkflow = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", llmProvidersCoverageWorkflowUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const threshold = readCoverageWorkflowThreshold(workflow);
+
+  if (!/pnpm\s+exec\s+vitest\s+run\s+--coverage/u.test(workflow)) {
+    writeStdout("llm_providers_threshold=fail\ncoverage_run=missing\n");
+    fail("workflow must run Vitest with coverage before evaluating package gates", 1);
+  }
+
+  if (threshold === undefined) {
+    writeStdout("llm_providers_threshold=fail\ncoverage_gate=missing\n");
+    fail("workflow must run the packages/llm-providers coverage gate", 1);
+  }
+
+  if (threshold < 85) {
+    writeStdout(
+      `llm_providers_threshold=fail\nthreshold=${threshold}\nfix missing llm-providers tests instead of lowering branch coverage\n`,
+    );
+    fail("fix missing llm-providers tests instead of lowering branch coverage", 1);
+  }
+
+  if (!workflowBootstrapsPnpmBeforeSetupNodeCache(workflow)) {
+    writeStdout("llm_providers_threshold=fail\npnpm_cache_bootstrap=missing\n");
+    fail("setup-node pnpm cache requires corepack enable before setup-node", 1);
+  }
+
+  if (!workflowBuildsBeforeTypecheck(workflow)) {
+    writeStdout("llm_providers_threshold=fail\nbuild_before_typecheck=missing\n");
+    fail("workspace packages must be built before tsc -b on clean runners", 1);
+  }
+
+  writeStdout(
+    `llm_providers_threshold=pass\nthreshold=${threshold}\npnpm_cache_bootstrap=pass\nbuild_before_typecheck=pass\n`,
+  );
+};
+
+const getBackendChecksStepEntries = (workflow) => {
+  const stepsBlockEntry = getJobStepsBlockEntry(workflow, "backend-checks");
+  if (stepsBlockEntry === undefined) return [];
+  return getTopLevelListItemBlockEntries(stepsBlockEntry.block, stepsBlockEntry.startIndex);
+};
+
+const getCoverageUploadStep = (workflow) =>
+  getBackendChecksStepEntries(workflow).find((step) =>
+    /^\s*(?:-\s*)?uses:\s*actions\/upload-artifact@[^\s#]+/mu.test(step.block),
+  );
+
+const runCoverageArtifactPolicy = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", coverageArtifactPolicyUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const uploadStep = getCoverageUploadStep(workflow);
+
+  if (uploadStep === undefined) {
+    writeStdout("coverage_artifact_retention=fail\ncoverage_artifact=missing\n");
+    fail("backend-checks must upload the TypeScript coverage artifact", 1);
+  }
+
+  const actionReference = extractActionReferences(uploadStep.block)[0];
+  const name = getStepInput(uploadStep.block, "name", workflow, uploadStep.startIndex);
+  const path = getStepInput(uploadStep.block, "path", workflow, uploadStep.startIndex);
+  const retentionDaysRaw = getStepInput(
+    uploadStep.block,
+    "retention-days",
+    workflow,
+    uploadStep.startIndex,
+  );
+  const condition = getStepPropertyValue(uploadStep.block, "if");
+  const retentionDays = Number(retentionDaysRaw);
+
+  if (actionReference === undefined || !PINNED_EXTERNAL_ACTION_PATTERN.test(actionReference)) {
+    writeStdout("coverage_artifact_retention=fail\nupload_artifact_pin=missing\n");
+    fail("coverage artifact upload action must be pinned to a full commit SHA", 1);
+  }
+
+  if (name !== "ts-coverage" || path !== "coverage/") {
+    writeStdout(`coverage_artifact_retention=fail\nartifact_name=${name}\nartifact_path=${path}\n`);
+    fail('coverage artifact must be named "ts-coverage" and upload "coverage/"', 1);
+  }
+
+  if (condition === undefined || !isAlwaysCondition(condition)) {
+    writeStdout("coverage_artifact_retention=fail\ncoverage artifact upload must use always()\n");
+    fail("coverage artifact upload must use always()", 1);
+  }
+
+  if (!Number.isFinite(retentionDays) || retentionDays < 90) {
+    writeStdout(
+      `coverage_artifact_retention=fail\ncoverage artifact retention < 90\nretention_days=${retentionDaysRaw}\n`,
+    );
+    fail("coverage artifact retention < 90", 1);
+  }
+
+  writeStdout(
+    `coverage_artifact_retention=pass\nartifact_name=ts-coverage\nretention_days=${retentionDays}\nupload_condition=always()\n`,
   );
 };
 
@@ -3605,6 +3836,12 @@ if (command === "duration-budget") {
   runChangelogRemediationMessage(args);
 } else if (command === "changelog-documentation-only-assert") {
   runChangelogDocumentationOnlyAssert(args);
+} else if (command === "coverage-gate") {
+  runCoverageGate(args);
+} else if (command === "llm-providers-coverage-workflow") {
+  runLlmProvidersCoverageWorkflow(args);
+} else if (command === "coverage-artifact-policy") {
+  runCoverageArtifactPolicy(args);
 } else {
   fail(usage, 2);
 }

@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Changed
 
+- `ci`: add the llm-providers branch coverage gate to backend checks and keep
+  the TypeScript coverage artifact for 90 days.
+
 - `docs(ci)`: add verification evidence that the Mistral SDK dependency keeps
   audit, dedupe, coverage, forbidden import/tool, and CycloneDX SBOM checks
   green.

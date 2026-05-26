@@ -38,7 +38,7 @@ export default defineConfig({
       ],
       include: ["packages/*/src/**/*.ts", "apps/*/src/**/*.ts"],
       provider: "v8",
-      reporter: ["text", "json-summary"],
+      reporter: ["text", "json-summary", "html"],
       reportsDirectory: "coverage",
     },
     environment: "node",
