@@ -137,6 +137,39 @@ describe("dismiss command handler", () => {
     });
   });
 
+  it("does not dismiss a finding when the commenter is not the pull request author", async () => {
+    const runtime = buildRuntime();
+    const context = buildIssueCommentContext(runtime.octokit, {
+      commentAuthorLogin: "mallory",
+      findingId: "finding-known-001",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(runtime.octokit.rest.pulls.get).toHaveBeenCalledTimes(1);
+    expect(runtime.octokit.rest.pulls.get).toHaveBeenCalledWith({
+      owner: "octo-org",
+      pull_number: PullRequestNumber,
+      repo: "sovri-target",
+    });
+    expect(runtime.octokit.rest.issues.createComment).toHaveBeenCalledTimes(1);
+    expect(runtime.octokit.rest.issues.createComment).toHaveBeenCalledWith({
+      body: expect.stringContaining("Only the pull request author can dismiss findings."),
+      issue_number: PullRequestNumber,
+      owner: "octo-org",
+      repo: "sovri-target",
+    });
+    expect(runtime.octokit.rest.pulls.listReviewComments).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.reactions.createForPullRequestReviewComment).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.issues.addLabels).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.reactions.createForIssueComment).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.pulls.updateReview).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.issues.updateComment).not.toHaveBeenCalled();
+  });
+
   it("does not post the unknown-finding error when the matching marker is on a later review comment page", async () => {
     const runtime = buildRuntime();
     runtime.octokit.rest.pulls.listReviewComments
@@ -271,8 +304,9 @@ function buildRuntime(options: { readonly inlineCommentBody?: string } = {}) {
 
 function buildIssueCommentContext(
   octokit: ReturnType<typeof buildRuntime>["octokit"],
-  options: { readonly findingId?: string } = {},
+  options: { readonly commentAuthorLogin?: string; readonly findingId?: string } = {},
 ) {
+  const commentAuthorLogin = options.commentAuthorLogin ?? "alice";
   const findingId = options.findingId ?? "finding-missing-001";
   return {
     id: DeliveryId,
@@ -283,7 +317,7 @@ function buildIssueCommentContext(
         body: `@sovri-bot dismiss ${findingId}`,
         id: CommentId,
         user: {
-          login: "alice",
+          login: commentAuthorLogin,
         },
       },
       issue: {

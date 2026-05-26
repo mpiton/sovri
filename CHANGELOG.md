@@ -21,6 +21,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(bot)`: restrict `@sovri-bot dismiss` to the pull request author before
+  mutating dismissed finding state.
+
+- `test(bot)`: add dismiss coverage proving non-author commenters cannot
+  dismiss a finding even when its inline marker exists.
+
 - `test(bot)`: strengthen visible-only dismiss coverage to require no PR label
   and no accepted command reaction when the hidden marker is absent.
 

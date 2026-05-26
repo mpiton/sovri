@@ -33,6 +33,7 @@ export type IssueCommentCommandContext = {
 };
 
 export type IssueCommentDismissCommandContext = IssueCommentCommandContext & {
+  readonly commentAuthorLogin: string;
   readonly findingId: string;
 };
 
@@ -87,6 +88,7 @@ export async function handleIssueCommentCreated(
   if (command.kind === "dismiss") {
     await dependencies.handleDismiss({
       ...commandContext,
+      commentAuthorLogin: requireString(context.payload.comment.user?.login, "comment.user.login"),
       findingId: command.findingId,
     });
   }

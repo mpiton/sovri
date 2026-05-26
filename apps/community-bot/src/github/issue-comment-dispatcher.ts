@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+import { z } from "@sovri/core";
+
 import {
   createReReviewCommandDependencies,
   handleReReviewCommand,
@@ -84,6 +86,17 @@ type PullRequestReviewComment = {
 
 const REVIEW_COMMENT_PAGE_SIZE = 100;
 const DISMISSED_FINDING_LABEL = "sovri:dismissed-finding";
+const UNAUTHORIZED_DISMISS_BODY = "Only the pull request author can dismiss findings.";
+
+const PullRequestAuthorSchema = z
+  .object({
+    user: z
+      .object({
+        login: z.string().min(1),
+      })
+      .nullable(),
+  })
+  .passthrough();
 
 export type IssueCommentDispatchContext = {
   readonly id: string;
@@ -136,6 +149,18 @@ async function handleDismissCommand(
   command: IssueCommentDismissCommandContext,
 ): Promise<void> {
   const repo = splitRepoFullName(command.repoFullName);
+  const pullRequestAuthorLogin = await resolvePullRequestAuthorLogin(context, command, repo);
+
+  if (command.commentAuthorLogin !== pullRequestAuthorLogin) {
+    await context.octokit.rest.issues.createComment({
+      body: UNAUTHORIZED_DISMISS_BODY,
+      issue_number: command.pullRequestNumber,
+      owner: repo.owner,
+      repo: repo.repo,
+    });
+    return;
+  }
+
   const findingComment = await findFindingCommentOnAnyReviewCommentPage(context, command, repo);
 
   if (findingComment !== undefined) {
@@ -166,6 +191,25 @@ async function handleDismissCommand(
     owner: repo.owner,
     repo: repo.repo,
   });
+}
+
+async function resolvePullRequestAuthorLogin(
+  context: IssueCommentDispatchContext,
+  command: IssueCommentDismissCommandContext,
+  repo: { readonly owner: string; readonly repo: string },
+): Promise<string> {
+  const response = await context.octokit.rest.pulls.get({
+    owner: repo.owner,
+    pull_number: command.pullRequestNumber,
+    repo: repo.repo,
+  });
+  const pullRequest = PullRequestAuthorSchema.parse(response.data);
+
+  if (pullRequest.user === null) {
+    throw new IssueCommentDispatcherAdapterError("Pull request author is missing");
+  }
+
+  return pullRequest.user.login;
 }
 
 async function findFindingCommentOnAnyReviewCommentPage(
