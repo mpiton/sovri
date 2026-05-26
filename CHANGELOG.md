@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(bot)`: report an unknown `@sovri-bot dismiss` finding id with one
+  issue comment and no GitHub review-state mutation.
+
 - `test(bot)`: add ATDD RED coverage requiring `@sovri-bot dismiss` to post
   one unknown-finding error comment without mutating GitHub review state.
 
