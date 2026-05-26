@@ -2346,6 +2346,7 @@ const runReleaseVerifyCommitSubject = (args) => {
 
 const RELEASE_NOTES_MAX_BYTES_PATTERN = /^[1-9]\d{0,9}$/;
 const RELEASE_NOTES_REPO_URL_PATTERN = /^https?:\/\/[^\s)]+$/;
+const RELEASE_NOTES_TRAILING_NEWLINE_BYTES = 1;
 const RELEASE_NOTES_TRUNCATION_NOTICE_HEAD =
   "\n\n_Release notes truncated to stay under the GitHub Releases body limit. See ";
 const RELEASE_NOTES_TRUNCATION_NOTICE_TAIL = " for the complete entry._";
@@ -2397,23 +2398,32 @@ const closeDanglingCodeFence = (text) => {
 
 const stripTrailingInvalidUnicode = (text) => text.replace(/[�\uD800-\uDFFF]+$/, "");
 
+const buildFenceSafeHead = (value) => {
+  const lastNewline = value.lastIndexOf("\n");
+  const safeHead = lastNewline > 0 ? value.slice(0, lastNewline) : value;
+  return closeDanglingCodeFence(safeHead.replace(/\s+$/, ""));
+};
+
 const truncateReleaseNotes = ({ body, maxBytes, notice }) => {
   const noticeBytes = Buffer.byteLength(notice, "utf8");
-  if (noticeBytes >= maxBytes) {
+  const overhead = noticeBytes + RELEASE_NOTES_TRAILING_NEWLINE_BYTES;
+  if (overhead >= maxBytes) {
     fail(
-      `ERROR: --max-bytes ${maxBytes} is smaller than the truncation notice (${noticeBytes} bytes).`,
+      `ERROR: --max-bytes ${maxBytes} is too small for the truncation notice and trailing newline (${overhead} bytes).`,
       2,
     );
   }
-  const budget = maxBytes - noticeBytes;
+  const budget = maxBytes - overhead;
   const bodyBuffer = Buffer.from(body, "utf8");
   let head = stripTrailingInvalidUnicode(bodyBuffer.slice(0, budget).toString("utf8"));
   while (Buffer.byteLength(head, "utf8") > budget) {
     head = stripTrailingInvalidUnicode(head.slice(0, -1));
   }
-  const lastNewline = head.lastIndexOf("\n");
-  const safeHead = lastNewline > 0 ? head.slice(0, lastNewline) : head;
-  const fenceSafe = closeDanglingCodeFence(safeHead.replace(/\s+$/, ""));
+  let fenceSafe = buildFenceSafeHead(head);
+  while (Buffer.byteLength(fenceSafe, "utf8") > budget && head.length > 0) {
+    head = stripTrailingInvalidUnicode(head.slice(0, -1));
+    fenceSafe = buildFenceSafeHead(head);
+  }
   return `${fenceSafe}${notice}`;
 };
 
@@ -2426,7 +2436,8 @@ const applyReleaseNotesCap = ({ body, version, changelog, maxBytesRaw, repoUrl }
     );
   }
   const maxBytes = Number(maxBytesRaw);
-  if (Buffer.byteLength(body, "utf8") <= maxBytes) return body;
+  if (Buffer.byteLength(body, "utf8") + RELEASE_NOTES_TRAILING_NEWLINE_BYTES <= maxBytes)
+    return body;
   const date = findChangelogReleaseHeadingDate(changelog, version);
   if (date === null && typeof repoUrl === "string" && repoUrl.trim().length > 0) {
     writeStderr(

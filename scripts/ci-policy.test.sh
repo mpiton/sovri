@@ -12522,6 +12522,8 @@ run_release_extract_notes_max_bytes_over_cap_with_repo_url_case() {
     --repo-url https://github.com/mpiton/sovri \
     >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
 
+  local bytes
+  bytes=$(wc -c <"$stdout_file")
   stdout=$(cat "$stdout_file" 2>/dev/null || true)
   stderr=$(cat "$stderr_file" 2>/dev/null || true)
   rm -f "$stdout_file" "$stderr_file"
@@ -12557,9 +12559,7 @@ $(printf '%s\n' "$stdout" | sed 's/^/        /')"
     return
   fi
 
-  # And the output does not exceed --max-bytes 1000
-  local bytes
-  bytes=$(printf '%s' "$stdout" | wc -c)
+  # And the output file does not exceed --max-bytes 1000
   if [ "$bytes" -gt 1000 ]; then
     FAIL=$((FAIL + 1))
     FAILURES="${FAILURES}
@@ -12605,6 +12605,8 @@ run_release_extract_notes_max_bytes_over_cap_without_repo_url_case() {
     --max-bytes 800 \
     >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
 
+  local bytes
+  bytes=$(wc -c <"$stdout_file")
   stdout=$(cat "$stdout_file" 2>/dev/null || true)
   stderr=$(cat "$stderr_file" 2>/dev/null || true)
   rm -f "$stdout_file" "$stderr_file"
@@ -12637,8 +12639,6 @@ $(printf '%s\n' "$stdout" | sed 's/^/        /')"
     return
   fi
 
-  local bytes
-  bytes=$(printf '%s' "$stdout" | wc -c)
   if [ "$bytes" -gt 800 ]; then
     FAIL=$((FAIL + 1))
     FAILURES="${FAILURES}
@@ -12792,14 +12792,18 @@ run_release_extract_notes_max_bytes_boundary_case() {
 - Initial release.
 MD
 
-  # Measure the byte length of the extracted body in passthrough mode
-  body_size=$(node "$SCRIPT" release-extract-notes \
+  # Measure the file size of the extracted body in passthrough mode (includes
+  # the trailing newline writeStdout always appends).
+  local passthrough_file
+  passthrough_file=$(mktemp)
+  node "$SCRIPT" release-extract-notes \
     --changelog "$changelog_path" \
-    --version 0.1.0 | wc -c)
-  # Account for the trailing newline added by writeStdout (the body itself is body_size - 1 bytes)
-  body_size=$((body_size - 1))
+    --version 0.1.0 >"$passthrough_file"
+  body_size=$(wc -c <"$passthrough_file")
+  rm -f "$passthrough_file"
 
-  # When --max-bytes is exactly equal to the body size, no truncation occurs
+  # When --max-bytes is exactly equal to the passthrough file size, the body
+  # already fits and no truncation occurs.
   cap="$body_size"
   stdout_file=$(mktemp)
   stderr_file=$(mktemp)
@@ -12915,6 +12919,75 @@ $(printf '%s\n' "$stderr" | sed 's/^/        /')"
     FAIL=$((FAIL + 1))
     FAILURES="${FAILURES}
   ✗ release-extract-notes tilde-fence closure: dangling tilde fence (${tilde_count} markers)
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+  rm -rf "$root"
+}
+
+run_release_extract_notes_max_bytes_fence_does_not_overflow_case() {
+  local root changelog_path stdout stderr stdout_file stderr_file ec bytes filler cap
+
+  root=$(mktemp -d)
+  changelog_path="$root/CHANGELOG.md"
+
+  # Given a release body whose truncation-safe cut lands near a newline while a
+  # code fence is still open. Use single-character lines so safeHead lands close
+  # to the budget; without the post-closure re-trim the fence closer pushes the
+  # final output bytes past --max-bytes.
+  filler=$(awk 'BEGIN { for (i = 0; i < 500; i++) print "x" }')
+
+  {
+    printf '# Changelog\n\n## [Unreleased]\n\n## [0.1.0] - 2026-05-23\n\n### Added\n\n'
+    printf '```text\n%s\n```\n' "$filler"
+    printf '\n## [0.0.1] - 2026-01-01\n\n- Initial release.\n'
+  } >"$changelog_path"
+
+  cap=300
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  node "$SCRIPT" release-extract-notes \
+    --changelog "$changelog_path" \
+    --version 0.1.0 \
+    --max-bytes "$cap" \
+    --repo-url https://github.com/example/repo \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  bytes=$(wc -c <"$stdout_file")
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes fence-no-overflow: expected exit 0, got ${ec}
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # The whole file (including the trailing newline writeStdout appends) must fit the cap.
+  if [ "$bytes" -gt "$cap" ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes fence-no-overflow: output is ${bytes} bytes, expected ≤ ${cap}
+$(printf '%s\n' "$stdout" | sed 's/^/        /')"
+    rm -rf "$root"
+    return
+  fi
+
+  # Fence markers still come in matched pairs (closure ran).
+  local fence_count
+  fence_count=$(printf '%s' "$stdout" | grep -cE '^```' || true)
+  if [ $((fence_count % 2)) -ne 0 ]; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ release-extract-notes fence-no-overflow: dangling code fence (${fence_count} markers)
 $(printf '%s\n' "$stdout" | sed 's/^/        /')"
     rm -rf "$root"
     return
@@ -14126,6 +14199,7 @@ run_release_extract_notes_max_bytes_rejects_invalid_value_case "-5" "negative"
 run_release_extract_notes_max_bytes_rejects_invalid_value_case "abc" "non-numeric"
 run_release_extract_notes_max_bytes_rejects_invalid_value_case "1.5" "decimal"
 run_release_extract_notes_max_bytes_closes_open_fence_case
+run_release_extract_notes_max_bytes_fence_does_not_overflow_case
 run_release_extract_notes_tilde_fence_closure_case
 run_release_extract_notes_max_bytes_boundary_case
 run_release_extract_notes_rejects_invalid_repo_url_case "ftp://example.com" "non-http-scheme"
