@@ -109,6 +109,8 @@ type PullRequestReview = {
   } | null;
 };
 
+type IssueComment = PullRequestReview;
+
 type RepoRef = {
   readonly owner: string;
   readonly repo: string;
@@ -327,21 +329,37 @@ async function updateWalkthroughReview(
   botLogin: string,
 ): Promise<void> {
   const walkthrough = await findMarkedWalkthroughReview(context, command, repo, botLogin);
-  if (walkthrough?.body === undefined || walkthrough.body === null) {
+  if (walkthrough?.body !== undefined && walkthrough.body !== null) {
+    const body = renderWalkthroughWithoutDismissedFindings(walkthrough.body, dismissedFindingIds);
+    if (body === walkthrough.body) {
+      return;
+    }
+
+    await context.octokit.rest.pulls.updateReview({
+      body,
+      owner: repo.owner,
+      pull_number: command.pullRequestNumber,
+      repo: repo.repo,
+      review_id: walkthrough.id,
+    });
     return;
   }
 
-  const body = renderWalkthroughWithoutDismissedFindings(walkthrough.body, dismissedFindingIds);
-  if (body === walkthrough.body) {
+  const fallback = await findMarkedWalkthroughIssueComment(context, command, repo, botLogin);
+  if (fallback?.body === undefined || fallback.body === null) {
     return;
   }
 
-  await context.octokit.rest.pulls.updateReview({
+  const body = renderWalkthroughWithoutDismissedFindings(fallback.body, dismissedFindingIds);
+  if (body === fallback.body) {
+    return;
+  }
+
+  await context.octokit.rest.issues.updateComment({
     body,
+    comment_id: fallback.id,
     owner: repo.owner,
-    pull_number: command.pullRequestNumber,
     repo: repo.repo,
-    review_id: walkthrough.id,
   });
 }
 
@@ -384,6 +402,47 @@ async function findMarkedWalkthroughReviewPage(
   }
 
   return findMarkedWalkthroughReviewPage(context, command, repo, botLogin, page + 1);
+}
+
+async function findMarkedWalkthroughIssueComment(
+  context: IssueCommentDispatchContext,
+  command: IssueCommentDismissCommandContext,
+  repo: RepoRef,
+  botLogin: string,
+): Promise<IssueComment | undefined> {
+  return findMarkedWalkthroughIssueCommentPage(context, command, repo, botLogin, 1);
+}
+
+async function findMarkedWalkthroughIssueCommentPage(
+  context: IssueCommentDispatchContext,
+  command: IssueCommentDismissCommandContext,
+  repo: RepoRef,
+  botLogin: string,
+  page: number,
+): Promise<IssueComment | undefined> {
+  const comments = await context.octokit.rest.issues.listComments({
+    issue_number: command.pullRequestNumber,
+    owner: repo.owner,
+    page,
+    per_page: WALKTHROUGH_PAGE_SIZE,
+    repo: repo.repo,
+  });
+  const match = comments.data.find(
+    (comment) =>
+      typeof comment.body === "string" &&
+      comment.body.includes(WALKTHROUGH_MARKER) &&
+      comment.user?.login === botLogin,
+  );
+
+  if (match !== undefined) {
+    return match;
+  }
+
+  if (comments.data.length < WALKTHROUGH_PAGE_SIZE) {
+    return undefined;
+  }
+
+  return findMarkedWalkthroughIssueCommentPage(context, command, repo, botLogin, page + 1);
 }
 
 function renderWalkthroughWithoutDismissedFindings(

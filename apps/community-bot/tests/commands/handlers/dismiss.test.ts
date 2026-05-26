@@ -380,6 +380,47 @@ describe("dismiss command handler", () => {
     expect(updateRequest?.body).not.toContain("finding-beta");
   });
 
+  it("updates a fallback issue-comment walkthrough on its original surface", async () => {
+    const runtime = buildRuntime({
+      reviewComments: [
+        {
+          body: "<!-- sovri-finding-id: finding-beta -->",
+          id: 502,
+          user: {
+            login: "sovri-bot",
+          },
+        },
+      ],
+      reviewCommentReactions: {
+        502: [{ content: "-1", user: { login: "sovri-bot" } }],
+      },
+      walkthroughIssueCommentBody: MarkedWalkthroughBody,
+      walkthroughReviewBody: null,
+    });
+    const context = buildIssueCommentContext(runtime.octokit, {
+      findingId: "finding-beta",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(runtime.octokit.rest.pulls.updateReview).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.issues.updateComment).toHaveBeenCalledTimes(1);
+    const updateRequest = runtime.octokit.rest.issues.updateComment.mock.calls[0]?.[0];
+    expect(updateRequest).toEqual(
+      expect.objectContaining({
+        comment_id: 7000,
+        owner: "octo-org",
+        repo: "sovri-target",
+      }),
+    );
+    expect(updateRequest?.body).toContain("finding-alpha");
+    expect(updateRequest?.body).toContain("<!-- sovri-finding-id: finding-alpha -->");
+    expect(updateRequest?.body).not.toContain("finding-beta");
+  });
+
   it("does not treat visible finding text without a hidden marker as a match", async () => {
     const runtime = buildRuntime({
       inlineCommentBody: VisibleOnlyInlineCommentBody,
@@ -428,7 +469,8 @@ function buildRuntime(
     readonly inlineCommentBody?: string;
     readonly reviewCommentReactions?: Readonly<Record<number, readonly ReactionFixture[]>>;
     readonly reviewComments?: readonly ReviewCommentFixture[];
-    readonly walkthroughReviewBody?: string;
+    readonly walkthroughIssueCommentBody?: string;
+    readonly walkthroughReviewBody?: string | null;
   } = {},
 ) {
   const inlineCommentBody = options.inlineCommentBody ?? KnownInlineCommentBody;
@@ -441,8 +483,12 @@ function buildRuntime(
       },
     },
   ];
+  const walkthroughIssueCommentBody =
+    options.walkthroughIssueCommentBody ?? "<!-- sovri:walkthrough -->\n## Sovri review";
   const walkthroughReviewBody =
-    options.walkthroughReviewBody ?? "<!-- sovri:walkthrough -->\n## Sovri review";
+    options.walkthroughReviewBody === undefined
+      ? "<!-- sovri:walkthrough -->\n## Sovri review"
+      : options.walkthroughReviewBody;
   const octokit = {
     rest: {
       issues: {
@@ -451,7 +497,7 @@ function buildRuntime(
         listComments: vi.fn(async () => ({
           data: [
             {
-              body: "<!-- sovri:walkthrough -->\n## Sovri review",
+              body: walkthroughIssueCommentBody,
               id: 7000,
               user: {
                 login: "sovri-bot",
@@ -469,15 +515,18 @@ function buildRuntime(
           data: reviewComments,
         })),
         listReviews: vi.fn(async () => ({
-          data: [
-            {
-              body: walkthroughReviewBody,
-              id: 6000,
-              user: {
-                login: "sovri-bot",
-              },
-            },
-          ],
+          data:
+            walkthroughReviewBody === null
+              ? []
+              : [
+                  {
+                    body: walkthroughReviewBody,
+                    id: 6000,
+                    user: {
+                      login: "sovri-bot",
+                    },
+                  },
+                ],
         })),
         updateReview: vi.fn(async () => ({ data: { id: 6000 } })),
       },

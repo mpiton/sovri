@@ -21,6 +21,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(bot)`: update fallback issue-comment walkthroughs in place when
+  dismissing findings and no marked pull request review body exists.
+
+- `test(bot)`: add dismiss coverage requiring fallback walkthrough comments to
+  stay on their original issue-comment surface.
+
 - `test(bot)`: add dismiss coverage proving human `-1` reactions do not hide
   findings from the walkthrough.
 
