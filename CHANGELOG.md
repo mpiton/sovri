@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(bot)`: add dismiss coverage proving human `-1` reactions do not hide
+  findings from the walkthrough.
+
 - `feat(bot)`: update the marked walkthrough after dismissing a finding so
   entries with bot-authored `-1` reactions are hidden.
 

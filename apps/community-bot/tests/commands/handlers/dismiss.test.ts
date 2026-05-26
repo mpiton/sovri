@@ -340,6 +340,46 @@ describe("dismiss command handler", () => {
     expect(updateRequest?.body).not.toContain("finding-gamma");
   });
 
+  it("keeps findings with only human thumbs-down reactions visible in the walkthrough", async () => {
+    const runtime = buildRuntime({
+      reviewComments: [
+        {
+          body: "<!-- sovri-finding-id: finding-alpha -->",
+          id: 501,
+          user: {
+            login: "sovri-bot",
+          },
+        },
+        {
+          body: "<!-- sovri-finding-id: finding-beta -->",
+          id: 502,
+          user: {
+            login: "sovri-bot",
+          },
+        },
+      ],
+      reviewCommentReactions: {
+        501: [{ content: "-1", user: { login: "bob" } }],
+        502: [{ content: "-1", user: { login: "sovri-bot" } }],
+      },
+      walkthroughReviewBody: MarkedWalkthroughBody,
+    });
+    const context = buildIssueCommentContext(runtime.octokit, {
+      findingId: "finding-beta",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(runtime.octokit.rest.pulls.updateReview).toHaveBeenCalledTimes(1);
+    const updateRequest = runtime.octokit.rest.pulls.updateReview.mock.calls[0]?.[0];
+    expect(updateRequest?.body).toContain("finding-alpha");
+    expect(updateRequest?.body).toContain("<!-- sovri-finding-id: finding-alpha -->");
+    expect(updateRequest?.body).not.toContain("finding-beta");
+  });
+
   it("does not treat visible finding text without a hidden marker as a match", async () => {
     const runtime = buildRuntime({
       inlineCommentBody: VisibleOnlyInlineCommentBody,
