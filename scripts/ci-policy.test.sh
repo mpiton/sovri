@@ -148,6 +148,10 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      - name: Build
+        run: pnpm turbo build
+      - name: Typecheck
+        run: pnpm exec tsc -b
       - name: Run coverage
         run: pnpm exec vitest run --coverage --reporter=verbose
       - name: Coverage gate — packages/llm-providers ≥ 85 %
@@ -246,6 +250,67 @@ EOF
     FAIL=$((FAIL + 1))
     FAILURES="${FAILURES}
   ✗ llm-providers workflow pnpm cache bootstrap should fail before corepack
+      exit: ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+run_llm_providers_workflow_typecheck_before_build_case() {
+  local tmp stdout stderr stdout_file stderr_file ec
+
+  tmp=$(mktemp -d 2>/dev/null || mktemp -d -t 'ci-policy-workflow')
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  cat >"$tmp/ci.yml" <<EOF
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  backend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable pnpm for setup-node cache
+        run: corepack enable
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Typecheck
+        run: pnpm exec tsc -b
+      - name: Build
+        run: pnpm turbo build
+      - name: Run coverage
+        run: pnpm exec vitest run --coverage --reporter=verbose
+      - name: Coverage gate — packages/llm-providers ≥ 85 %
+        run: node scripts/check-coverage.mjs coverage/coverage-summary.json packages/llm-providers 85
+EOF
+
+  # Given typecheck runs before workspace packages emit dist declarations
+  node "$SCRIPT" llm-providers-coverage-workflow --workflow "$tmp/ci.yml" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -rf "$tmp"
+  rm -f "$stdout_file" "$stderr_file"
+
+  # When the release engineer evaluates the coverage workflow
+  # Then the policy rejects typecheck before build on clean runners
+  if [ "$ec" -ne 1 ] ||
+    ! printf '%s\n' "$stdout" | grep -Fq "build_before_typecheck=missing"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ llm-providers workflow typecheck should not run before build
       exit: ${ec}
       stdout:
 $(printf '%s\n' "$stdout" | sed 's/^/        /')
@@ -13545,6 +13610,7 @@ run_coverage_gate_workspace_total_case
 run_llm_providers_workflow_threshold_case 85 0 "llm_providers_threshold=pass"
 run_llm_providers_workflow_threshold_case 84 1 "llm_providers_threshold=fail"
 run_llm_providers_workflow_pnpm_cache_bootstrap_case
+run_llm_providers_workflow_typecheck_before_build_case
 run_coverage_artifact_policy_case 90 "always()" 0 "coverage_artifact_retention=pass"
 run_coverage_artifact_policy_case 89 "always()" 1 "coverage artifact retention < 90"
 run_coverage_artifact_policy_case 90 "success()" 1 "coverage artifact upload must use always()"

@@ -497,6 +497,21 @@ const workflowBootstrapsPnpmBeforeSetupNodeCache = (workflow) => {
   return steps.slice(0, setupNodeIndex).some(isCorepackEnableStep);
 };
 
+const stepRunsCommand = (step, commandPattern) => {
+  const command = getStepPropertyValue(step.block, "run");
+  return command !== undefined && commandPattern.test(command);
+};
+
+const workflowBuildsBeforeTypecheck = (workflow) => {
+  const steps = getBackendChecksStepEntries(workflow);
+  const buildIndex = steps.findIndex((step) => stepRunsCommand(step, /^pnpm\s+turbo\s+build$/u));
+  const typecheckIndex = steps.findIndex((step) =>
+    stepRunsCommand(step, /^pnpm\s+exec\s+tsc\s+-b$/u),
+  );
+
+  return typecheckIndex === -1 || (buildIndex !== -1 && buildIndex < typecheckIndex);
+};
+
 const runLlmProvidersCoverageWorkflow = (args) => {
   const options = parseOptions(args);
   const workflowPath = readRequiredOption(options, "workflow", llmProvidersCoverageWorkflowUsage);
@@ -525,7 +540,14 @@ const runLlmProvidersCoverageWorkflow = (args) => {
     fail("setup-node pnpm cache requires corepack enable before setup-node", 1);
   }
 
-  writeStdout(`llm_providers_threshold=pass\nthreshold=${threshold}\npnpm_cache_bootstrap=pass\n`);
+  if (!workflowBuildsBeforeTypecheck(workflow)) {
+    writeStdout("llm_providers_threshold=fail\nbuild_before_typecheck=missing\n");
+    fail("workspace packages must be built before tsc -b on clean runners", 1);
+  }
+
+  writeStdout(
+    `llm_providers_threshold=pass\nthreshold=${threshold}\npnpm_cache_bootstrap=pass\nbuild_before_typecheck=pass\n`,
+  );
 };
 
 const getBackendChecksStepEntries = (workflow) => {
