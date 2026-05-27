@@ -46,6 +46,8 @@ export type ComplianceReferenceEntry = z.infer<typeof ComplianceReferenceEntrySc
 const classicBufferOverflowCweId = "CWE-120";
 const isoSecureCodingFramework = "ISO27001-2022";
 const isoSecureCodingIdentifier = "A.8.28";
+const missingAuthorizationCweId = "CWE-862";
+const doraFramework = "DORA";
 
 export const ComplianceMappingEntrySchema = z
   .object({
@@ -56,22 +58,34 @@ export const ComplianceMappingEntrySchema = z
     references: z.array(ComplianceReferenceEntrySchema),
   })
   .superRefine((entry, context) => {
-    if (entry.cwe_id !== classicBufferOverflowCweId) {
-      return;
+    if (entry.cwe_id === classicBufferOverflowCweId) {
+      const hasIsoSecureCodingReference = entry.references.some(
+        (reference) =>
+          reference.framework === isoSecureCodingFramework &&
+          reference.identifier === isoSecureCodingIdentifier,
+      );
+
+      if (!hasIsoSecureCodingReference) {
+        context.addIssue({
+          code: "custom",
+          path: ["references"],
+          message: `${classicBufferOverflowCweId} requires ${isoSecureCodingFramework} reference ${isoSecureCodingIdentifier}`,
+        });
+      }
     }
 
-    const hasIsoSecureCodingReference = entry.references.some(
-      (reference) =>
-        reference.framework === isoSecureCodingFramework &&
-        reference.identifier === isoSecureCodingIdentifier,
-    );
+    if (entry.cwe_id === missingAuthorizationCweId) {
+      const hasDoraReference = entry.references.some(
+        (reference) => reference.framework === doraFramework,
+      );
 
-    if (!hasIsoSecureCodingReference) {
-      context.addIssue({
-        code: "custom",
-        path: ["references"],
-        message: `${classicBufferOverflowCweId} requires ${isoSecureCodingFramework} reference ${isoSecureCodingIdentifier}`,
-      });
+      if (!hasDoraReference) {
+        context.addIssue({
+          code: "custom",
+          path: ["references"],
+          message: `${missingAuthorizationCweId} requires ${doraFramework} reference`,
+        });
+      }
     }
   });
 export type ComplianceMappingEntry = z.infer<typeof ComplianceMappingEntrySchema>;

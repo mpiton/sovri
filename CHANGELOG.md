@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(compliance)`: reject `CWE-862` mapping candidates missing a DORA
+  reference.
+
 - `test(compliance)`: add acceptance coverage for the critical ICT missing-DORA
   data audit.
 
