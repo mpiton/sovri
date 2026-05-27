@@ -1,23 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { type FileHandle, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-// vi.mock is hoisted; wrapping `readFile` in `vi.fn(actual.readFile)` lets a
-// per-test `mockRejectedValueOnce(...)` simulate the TOCTOU race between
-// stat() and readFile() that motivated the second missing-file catch in
-// loader.ts, while every other test continues to hit the real filesystem.
+// vi.mock is hoisted; wrapping `open` in `vi.fn(actual.open)` lets a
+// per-test `mockRejectedValueOnce(...)` simulate I/O errors at open() time
+// while every other test continues to hit the real filesystem.
 vi.mock("node:fs/promises", async () => {
   const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
-  return { ...actual, readFile: vi.fn(actual.readFile) };
+  return { ...actual, open: vi.fn(actual.open) };
 });
 
-import { readFile as mockedReadFile } from "node:fs/promises";
+import { open as mockedOpen } from "node:fs/promises";
 
 import { DEFAULT_CONFIG, loadConfig } from "./loader.js";
 import { SovriConfigParseError, SovriConfigValidationError } from "./errors.js";
@@ -130,23 +129,43 @@ describe("loadConfig — malformed YAML", () => {
   });
 });
 
-describe("loadConfig — TOCTOU race between stat and readFile", () => {
-  it("returns DEFAULT_CONFIG if the file disappears (ENOENT) between stat and read", async () => {
-    const root = path.join(FIXTURES_ROOT, "valid-minimal");
-    const enoent = Object.assign(new Error("ENOENT: file vanished"), { code: "ENOENT" });
-    vi.mocked(mockedReadFile).mockRejectedValueOnce(enoent);
-
-    const cfg = await loadConfig(root);
-
-    expect(cfg).toEqual(DEFAULT_CONFIG);
-  });
-
-  it("propagates non-missing-file errors raised during read (e.g. EACCES)", async () => {
+describe("loadConfig — I/O errors at open()", () => {
+  it("propagates non-missing-file errors raised during open (e.g. EACCES)", async () => {
     const root = path.join(FIXTURES_ROOT, "valid-minimal");
     const eacces = Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
-    vi.mocked(mockedReadFile).mockRejectedValueOnce(eacces);
+    vi.mocked(mockedOpen).mockRejectedValueOnce(eacces);
 
     await expect(loadConfig(root)).rejects.toMatchObject({ code: "EACCES" });
+  });
+});
+
+describe("loadConfig — I/O errors after open()", () => {
+  it("propagates errors raised during fd.stat()", async () => {
+    const root = path.join(FIXTURES_ROOT, "valid-minimal");
+    const eio = Object.assign(new Error("EIO: input/output error"), { code: "EIO" });
+    const closeMock = vi.fn<FileHandle["close"]>().mockResolvedValue(undefined);
+    vi.mocked(mockedOpen).mockResolvedValueOnce({
+      stat: vi.fn<FileHandle["stat"]>().mockRejectedValueOnce(eio),
+      readFile: vi.fn<FileHandle["readFile"]>(),
+      close: closeMock,
+    } as unknown as FileHandle);
+
+    await expect(loadConfig(root)).rejects.toMatchObject({ code: "EIO" });
+    expect(closeMock).toHaveBeenCalledOnce();
+  });
+
+  it("propagates errors raised during fd.readFile() and still closes the fd", async () => {
+    const root = path.join(FIXTURES_ROOT, "valid-minimal");
+    const eio = Object.assign(new Error("EIO: input/output error"), { code: "EIO" });
+    const closeMock = vi.fn<FileHandle["close"]>().mockResolvedValue(undefined);
+    vi.mocked(mockedOpen).mockResolvedValueOnce({
+      stat: vi.fn<FileHandle["stat"]>().mockResolvedValue({ size: 100 } as import("node:fs").Stats),
+      readFile: vi.fn<FileHandle["readFile"]>().mockRejectedValueOnce(eio),
+      close: closeMock,
+    } as unknown as FileHandle);
+
+    await expect(loadConfig(root)).rejects.toMatchObject({ code: "EIO" });
+    expect(closeMock).toHaveBeenCalledOnce();
   });
 });
 

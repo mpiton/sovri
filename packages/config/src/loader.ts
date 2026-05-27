@@ -2,7 +2,7 @@
 // Copyright 2026 Sovri SAS
 
 import { Buffer } from "node:buffer";
-import { readFile, stat } from "node:fs/promises";
+import { open, type FileHandle } from "node:fs/promises";
 import path from "node:path";
 
 import { load as parseYaml } from "js-yaml";
@@ -87,10 +87,9 @@ export const DEFAULT_CONFIG: SovriConfig = deepFreeze(
 export async function loadConfig(repoRoot: string): Promise<SovriConfig> {
   const filePath = path.join(repoRoot, CONFIG_FILENAME);
 
-  let size: number;
+  let fd: FileHandle | undefined;
   try {
-    const stats = await stat(filePath);
-    size = stats.size;
+    fd = await open(filePath, "r");
   } catch (err) {
     if (isMissingFileError(err)) {
       logger.debug({ filePath }, "no .sovri.yml found, falling back to defaults");
@@ -99,30 +98,28 @@ export async function loadConfig(repoRoot: string): Promise<SovriConfig> {
     throw err;
   }
 
-  if (size > MAX_CONFIG_BYTES) {
-    throw new SovriConfigParseError(
-      filePath,
-      new Error(
-        `.sovri.yml is ${String(size)} bytes; maximum allowed is ${String(MAX_CONFIG_BYTES)} bytes`,
-      ),
-    );
-  }
-
-  // The same fallback applies if the file disappears between `stat` and
-  // `readFile` (TOCTOU on a long-lived bot host where another process can
-  // delete `.sovri.yml` between the two syscalls).
-  let raw: string;
   try {
-    raw = await readFile(filePath, "utf8");
-  } catch (err) {
-    if (isMissingFileError(err)) {
-      logger.debug({ filePath }, "no .sovri.yml found during read, falling back to defaults");
-      return DEFAULT_CONFIG;
+    const stats = await fd.stat();
+    if (stats.size > MAX_CONFIG_BYTES) {
+      throw new SovriConfigParseError(
+        filePath,
+        new Error(
+          `.sovri.yml is ${String(stats.size)} bytes; maximum allowed is ${String(MAX_CONFIG_BYTES)} bytes`,
+        ),
+      );
     }
-    throw err;
-  }
 
-  return parseConfigContent(raw, filePath);
+    const raw = await fd.readFile({ encoding: "utf8" });
+    return parseConfigContent(raw, filePath);
+  } finally {
+    if (fd !== undefined) {
+      try {
+        await fd.close();
+      } catch (closeErr) {
+        logger.warn({ err: closeErr, filePath }, "failed to close .sovri.yml fd");
+      }
+    }
+  }
 }
 
 export function parseConfigContent(raw: string, filePath: string = CONFIG_FILENAME): SovriConfig {
