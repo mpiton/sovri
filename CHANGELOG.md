@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(compliance)`: add acceptance coverage for the canonical MITRE URL
+  mismatch data audit.
+
 - `feat(compliance)`: reject `CWE-862` mapping candidates missing a DORA
   reference.
 
