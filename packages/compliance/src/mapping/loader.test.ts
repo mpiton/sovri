@@ -27,6 +27,11 @@ const batchOneCweIds = [
 ] satisfies readonly string[];
 const regulatedContextPattern =
   /personal data|financial entity|essential or important entity|high-risk AI system/u;
+const canonicalConditions = {
+  dora: "The affected system is part of the ICT infrastructure of a financial entity subject to DORA",
+  gdpr: "The affected system processes personal data as defined by GDPR Art. 4",
+  nis2: "The entity is an essential or important entity subject to NIS2",
+};
 
 function findForbiddenLoaderPattern(source: string): string | undefined {
   return forbiddenLoaderPatterns.find((pattern) => source.includes(pattern));
@@ -89,6 +94,47 @@ describe("getCweMap", () => {
       // And each condition names the regulated context that makes the reference applicable
       expect(condition).toMatch(regulatedContextPattern);
     }
+  });
+
+  it("uses canonical condition wording for repeated conditional references", () => {
+    // Given the batch 1 mapping entries are read from getCweMap
+    const references = batchOneCweIds.flatMap((cweId) => {
+      const entry = getCweMap().get(cweId);
+      if (entry === undefined) {
+        throw new TypeError(`Expected ${cweId} to be mapped.`);
+      }
+      return entry.references;
+    });
+
+    // When a GDPR Art. 32 applicable_if reference is inspected
+    const gdprReference = references.find(
+      (reference) =>
+        reference.framework === "GDPR" &&
+        reference.identifier === "Art. 32" &&
+        reference.applicability === "applicable_if",
+    );
+
+    // Then its condition is "The affected system processes personal data as defined by GDPR Art. 4"
+    expect(gdprReference?.condition).toBe(canonicalConditions.gdpr);
+
+    // When a DORA Art. 9 applicable_if reference is inspected
+    const doraReference = references.find(
+      (reference) =>
+        reference.framework === "DORA" &&
+        reference.identifier === "Art. 9" &&
+        reference.applicability === "applicable_if",
+    );
+
+    // Then its condition is "The affected system is part of the ICT infrastructure of a financial entity subject to DORA"
+    expect(doraReference?.condition).toBe(canonicalConditions.dora);
+
+    // When a NIS2 applicable_if reference is inspected
+    const nis2Reference = references.find(
+      (reference) => reference.framework === "NIS2" && reference.applicability === "applicable_if",
+    );
+
+    // Then its condition is "The entity is an essential or important entity subject to NIS2"
+    expect(nis2Reference?.condition).toBe(canonicalConditions.nis2);
   });
 
   it("does not return a placeholder entry for an unknown CWE", () => {

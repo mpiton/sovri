@@ -152,6 +152,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(compliance)`: add acceptance coverage for canonical GDPR, DORA, and
+  NIS2 `applicable_if` condition wording in batch 1 CWE mapping data.
+
 - `feat(compliance)`: add the first 13 static CWE mapping data files and
   import them in the static compliance map loader.
 
