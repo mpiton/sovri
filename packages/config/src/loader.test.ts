@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+import { execFile } from "node:child_process";
 import { type FileHandle, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -462,6 +464,120 @@ describe.skipIf(process.platform === "win32")(
     });
   },
 );
+
+// `mkfifo(1)` is POSIX-only; Windows has no equivalent and the production
+// threat model is Linux Docker. The post-open mocked tests below still run
+// cross-platform and pin the same contract via fd.stat() injection.
+describe.skipIf(process.platform === "win32")(
+  "loadConfig — FIFO rejection at lstat() (issue #1745)",
+  () => {
+    const execFileAsync = promisify(execFile);
+    let fifoDir: string;
+
+    beforeAll(async () => {
+      fifoDir = await mkdtemp(path.join(tmpdir(), "sovri-cfg-fifo-"));
+      // mkfifo creates a named pipe whose `stats.size` is 0 — would slip past
+      // the 64 KiB cap and let `fd.readFile()` block indefinitely (or, when
+      // the FIFO actually points at /dev/zero via a writer, OOM the worker).
+      await execFileAsync("mkfifo", [path.join(fifoDir, ".sovri.yml")]);
+    });
+
+    afterAll(async () => {
+      await rm(fifoDir, { recursive: true, force: true });
+    });
+
+    it("rejects .sovri.yml that is a FIFO with SovriConfigParseError before open()", async () => {
+      // Pre-open `lstat` sees a non-regular file (FIFO) and rejects before
+      // any byte flows into `readFile()`. This is the documented contract
+      // for issue #1745. The `mockedOpen` assertion proves the rejection
+      // fired at lstat() — not at the post-open `fd.stat()` guard which
+      // would emit the same SovriConfigParseError sentinel.
+      await expect(loadConfig(fifoDir)).rejects.toBeInstanceOf(SovriConfigParseError);
+      expect(mockedOpen).not.toHaveBeenCalled();
+
+      try {
+        await loadConfig(fifoDir);
+        expect.unreachable("loadConfig should have thrown SovriConfigParseError");
+      } catch (err) {
+        if (!(err instanceof SovriConfigParseError)) throw err;
+        expect(err.filePath.endsWith(".sovri.yml")).toBe(true);
+        expect(err.cause).toBeInstanceOf(Error);
+        if (err.cause instanceof Error) {
+          expect(err.cause.message).toMatch(/regular file/i);
+        }
+      }
+    });
+  },
+);
+
+describe("loadConfig — TOCTOU type-flip at fd.stat() (issue #1745)", () => {
+  // Verbatim issue #1745 scenario: regular file at lstat time, non-regular
+  // (FIFO or chardev symlinked to /dev/zero) at open time. `size:0` passes
+  // the 64 KiB cap; without the `!isFile()` guard, `fd.readFile()` would
+  // read until EOF — unbounded for /dev/zero, OOM on the webhook worker.
+  it.each([
+    {
+      kind: "FIFO",
+      stats: {
+        size: 0,
+        isFile: () => false,
+        isDirectory: () => false,
+        isFIFO: () => true,
+        isCharacterDevice: () => false,
+        isSymbolicLink: () => false,
+      },
+    },
+    {
+      kind: "character device",
+      stats: {
+        size: 0,
+        isFile: () => false,
+        isDirectory: () => false,
+        isFIFO: () => false,
+        isCharacterDevice: () => true,
+        isSymbolicLink: () => false,
+      },
+    },
+  ])(
+    "throws SovriConfigParseError when fd.stat() reveals a $kind with size 0",
+    async ({ stats }) => {
+      const root = path.join(FIXTURES_ROOT, "valid-minimal");
+      const closeMock = vi.fn<FileHandle["close"]>().mockResolvedValue(undefined);
+      const readFileMock = vi.fn<FileHandle["readFile"]>();
+      vi.mocked(mockedOpen).mockResolvedValueOnce({
+        stat: vi
+          .fn<FileHandle["stat"]>()
+          .mockResolvedValue(stats as unknown as import("node:fs").Stats),
+        readFile: readFileMock,
+        close: closeMock,
+      } as unknown as FileHandle);
+
+      // Single call: `mockResolvedValueOnce` fires only once, so capture the
+      // error here rather than re-invoking loadConfig (which would hit the
+      // real `valid-minimal/.sovri.yml` and resolve normally).
+      const err = await loadConfig(root).then(
+        () => {
+          throw new Error("loadConfig should have thrown SovriConfigParseError");
+        },
+        (caught: unknown) => caught,
+      );
+
+      expect(err).toBeInstanceOf(SovriConfigParseError);
+      if (err instanceof SovriConfigParseError) {
+        expect(err.cause).toBeInstanceOf(Error);
+        if (err.cause instanceof Error) {
+          expect(err.cause.message).toMatch(/regular file/i);
+        }
+      }
+
+      // Critical invariant: readFile MUST NOT be invoked on a non-regular
+      // file. Calling it is precisely the OOM path the !isFile() guard
+      // exists to prevent.
+      expect(readFileMock).not.toHaveBeenCalled();
+      expect(closeMock).toHaveBeenCalledOnce();
+    },
+  );
+});
 
 describe("loadConfig — schema violation", () => {
   it("throws SovriConfigValidationError when an unknown top-level key is present", async () => {
