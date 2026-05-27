@@ -21,6 +21,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(compliance)`: reject mapping candidates whose `mitre_url` does not
+  match the canonical MITRE definition URL for their `cwe_id`.
+
+- `test(compliance)`: add acceptance coverage for the canonical MITRE URL
+  mismatch data audit.
+
 - `feat(compliance)`: reject `CWE-862` mapping candidates missing a DORA
   reference.
 
@@ -125,6 +131,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   cannot drift from the release tag.
 
 ### Fixed
+
+- `fix(compliance)`: normalize zero-padded CWE identifiers before comparing
+  canonical MITRE definition URLs.
 
 - `fix(test)`: inline arrow functions in `expect(...).toThrow()` calls in
   `parser.mapping.test.ts` and `parser.entries.test.ts` to satisfy the new

@@ -48,6 +48,19 @@ const isoSecureCodingFramework = "ISO27001-2022";
 const isoSecureCodingIdentifier = "A.8.28";
 const missingAuthorizationCweId = "CWE-862";
 const doraFramework = "DORA";
+const cweIdentifierPattern = /^CWE-(\d+)$/u;
+
+function buildCanonicalMitreUrl(cweId: string): string | undefined {
+  const cweIdMatch = cweIdentifierPattern.exec(cweId);
+  const cweNumber = cweIdMatch?.[1];
+  if (cweNumber === undefined) {
+    return undefined;
+  }
+
+  const canonicalCweNumber = Number.parseInt(cweNumber, 10).toString();
+
+  return `https://cwe.mitre.org/data/definitions/${canonicalCweNumber}.html`;
+}
 
 export const ComplianceMappingEntrySchema = z
   .object({
@@ -58,6 +71,15 @@ export const ComplianceMappingEntrySchema = z
     references: z.array(ComplianceReferenceEntrySchema),
   })
   .superRefine((entry, context) => {
+    const canonicalMitreUrl = buildCanonicalMitreUrl(entry.cwe_id);
+    if (canonicalMitreUrl !== undefined && entry.mitre_url !== canonicalMitreUrl) {
+      context.addIssue({
+        code: "custom",
+        path: ["mitre_url"],
+        message: `${entry.cwe_id} requires canonical MITRE URL ${canonicalMitreUrl}`,
+      });
+    }
+
     if (entry.cwe_id === classicBufferOverflowCweId) {
       const hasIsoSecureCodingReference = entry.references.some(
         (reference) =>

@@ -70,6 +70,43 @@ function buildCwe862EntryWithoutDoraReference(): ComplianceMappingEntry {
   };
 }
 
+function buildCwe89EntryWithMismatchedMitreUrl(): ComplianceMappingEntry {
+  return {
+    cwe_id: "CWE-89",
+    title: "Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')",
+    mitre_url: "https://cwe.mitre.org/data/definitions/79.html",
+    impacts: ["Data breach", "Unauthorized data modification"],
+    references: [
+      {
+        framework: "CWE",
+        identifier: "CWE-89",
+        description:
+          "Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')",
+        source_url: "https://cwe.mitre.org/data/definitions/89.html",
+        applicability: "informational",
+      },
+      {
+        framework: "GDPR",
+        identifier: "Art. 32",
+        description:
+          "Security of processing for SQL injection exposure when personal data storage is affected.",
+        source_url:
+          "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679#d1e3316-1-1",
+        applicability: "applicable_if",
+        condition: "The affected system processes personal data as defined by GDPR Art. 4",
+      },
+    ],
+  };
+}
+
+function buildZeroPaddedCwe89Entry(): ComplianceMappingEntry {
+  return {
+    ...buildCwe89EntryWithMismatchedMitreUrl(),
+    cwe_id: "CWE-089",
+    mitre_url: "https://cwe.mitre.org/data/definitions/089.html",
+  };
+}
+
 describe("Compliance mapping data audits", () => {
   it("rejects CWE-120 when the ISO 27001 A.8.28 reference is missing", () => {
     // Given a candidate batch 1 map contains "CWE-120"
@@ -129,5 +166,42 @@ describe("Compliance mapping data audits", () => {
 
     // And the failure reports missing framework "DORA"
     expect(failureText).toContain("DORA");
+  });
+
+  it("rejects a CWE mapping entry whose MITRE URL identifier does not match", () => {
+    // Given a candidate mapping entry has cwe_id "CWE-89"
+    const candidateEntry = buildCwe89EntryWithMismatchedMitreUrl();
+
+    // And mitre_url is "https://cwe.mitre.org/data/definitions/79.html"
+
+    // When the batch 1 data audit checks canonical MITRE URLs
+    const result = ComplianceMappingEntrySchema.safeParse(candidateEntry);
+
+    // Then the audit fails
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError("Expected the canonical MITRE URL audit to fail.");
+    }
+
+    const failureText = result.error.issues.map((issue) => issue.message).join("\n");
+
+    // And the failure reports "CWE-89"
+    expect(failureText).toContain("CWE-89");
+  });
+
+  it("normalizes zero-padded CWE identifiers before auditing MITRE URLs", () => {
+    const candidateEntry = buildZeroPaddedCwe89Entry();
+
+    const result = ComplianceMappingEntrySchema.safeParse(candidateEntry);
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError("Expected the canonical MITRE URL audit to fail.");
+    }
+
+    const failureText = result.error.issues.map((issue) => issue.message).join("\n");
+
+    expect(failureText).toContain("CWE-089");
+    expect(failureText).toContain("https://cwe.mitre.org/data/definitions/89.html");
   });
 });
