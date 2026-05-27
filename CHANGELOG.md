@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(compliance)`: reject mapping candidates whose `mitre_url` does not
+  match the canonical MITRE definition URL for their `cwe_id`.
+
 - `test(compliance)`: add acceptance coverage for the canonical MITRE URL
   mismatch data audit.
 
