@@ -37,6 +37,17 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   contract, and type-flip (regular file becomes a directory) throws
   `SovriConfigParseError` instead of raw `EISDIR` at `readFile()` time.
   Resolves issue #1744 (identified during adversarial review of PR #1743).
+- `test(config)`: add explicit FIFO/chardev regression tests for `loadConfig`
+  (`packages/config/src/loader.test.ts`) — the underlying `stats.isFile()`
+  guards landed with the issue #1744 fix, but the issue #1745 scenario
+  (`.sovri.yml` is a FIFO or symlinks to `/dev/zero`, `stats.size` is 0 and
+  passes the 64 KiB cap, `fd.readFile()` reads until EOF and OOMs the
+  webhook worker) was not pinned by a named regression test. Adds: a real
+  POSIX `mkfifo` test for the pre-open `lstat()` path, and two cross-platform
+  mocked TOCTOU type-flip tests (FIFO and character device) asserting that
+  `readFile()` is never invoked and the file descriptor is closed. The FIFO
+  test also mocks `open()` so a guard regression fails fast instead of
+  blocking on a readerless named pipe. Resolves issue #1745.
 - `fix(config)`: harden `loadConfig` against path-traversal (CWE-22) in
   `packages/config/src/loader.ts` — added early input validation that throws
   `TypeError` when `repoRoot` is not a non-empty string, is not absolute
