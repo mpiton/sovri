@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(compliance)`: add acceptance coverage for the `CWE-120`
+  missing-ISO-reference data audit.
+
 - `feat(compliance)`: map `CWE-120` to the ISO 27001:2022 A.8.28 secure
   coding control as an informational reference.
 
