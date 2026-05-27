@@ -18,6 +18,7 @@ import {
 } from "./loader.js";
 import {
   SovriConfigParseError as ParseErrorFromErrors,
+  SovriConfigSymlinkError as SymlinkErrorFromErrors,
   SovriConfigValidationError as ValidationErrorFromErrors,
 } from "./errors.js";
 
@@ -27,6 +28,7 @@ import {
   parseConfigContent,
   SovriConfigParseError,
   SovriConfigSchema,
+  SovriConfigSymlinkError,
   SovriConfigValidationError,
   type Logger,
   type Severity,
@@ -62,5 +64,9 @@ describe("@sovri/config barrel", () => {
   it("re-exports SovriConfigParseError and SovriConfigValidationError from ./errors.js", () => {
     expect(SovriConfigParseError).toBe(ParseErrorFromErrors);
     expect(SovriConfigValidationError).toBe(ValidationErrorFromErrors);
+  });
+
+  it("re-exports SovriConfigSymlinkError from ./errors.js (issue #1744)", () => {
+    expect(SovriConfigSymlinkError).toBe(SymlinkErrorFromErrors);
   });
 });

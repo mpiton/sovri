@@ -5,7 +5,11 @@ import { describe, expect, it } from "vitest";
 
 import { z } from "@sovri/core";
 
-import { SovriConfigParseError, SovriConfigValidationError } from "./errors.js";
+import {
+  SovriConfigParseError,
+  SovriConfigSymlinkError,
+  SovriConfigValidationError,
+} from "./errors.js";
 
 describe("SovriConfigParseError", () => {
   it("preserves the original parser error in cause", () => {
@@ -28,6 +32,27 @@ describe("SovriConfigParseError", () => {
     const err = new SovriConfigParseError("/x", { not: "an error" });
 
     expect(err.cause).toEqual({ not: "an error" });
+  });
+});
+
+describe("SovriConfigSymlinkError", () => {
+  it("carries the offending filePath and the canonical name", () => {
+    const err = new SovriConfigSymlinkError("/repo/.sovri.yml");
+
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe("SovriConfigSymlinkError");
+    expect(err.filePath).toBe("/repo/.sovri.yml");
+    expect(err.message).toContain("/repo/.sovri.yml");
+    expect(err.message).toMatch(/symlink/i);
+  });
+
+  it("intentionally exposes NO cause field (no file-fragment disclosure vector)", () => {
+    // Issue #1744: the whole point of this error class is that it cannot
+    // carry attacker-controlled byte fragments via `Error.cause` into a
+    // PR-comment renderer. Test pins that contract.
+    const err = new SovriConfigSymlinkError("/repo/.sovri.yml");
+
+    expect(err.cause).toBeUndefined();
   });
 });
 

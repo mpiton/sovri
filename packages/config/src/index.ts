@@ -21,4 +21,8 @@ export {
 } from "./types/SovriConfig.js";
 
 export { DEFAULT_CONFIG, loadConfig, parseConfigContent } from "./loader.js";
-export { SovriConfigParseError, SovriConfigValidationError } from "./errors.js";
+export {
+  SovriConfigParseError,
+  SovriConfigSymlinkError,
+  SovriConfigValidationError,
+} from "./errors.js";

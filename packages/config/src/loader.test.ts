@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { type FileHandle, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { type FileHandle, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.mock is hoisted; wrapping `open` in `vi.fn(actual.open)` lets a
 // per-test `mockRejectedValueOnce(...)` simulate I/O errors at open() time
-// while every other test continues to hit the real filesystem.
+// while every other test continues to hit the real filesystem. The
+// `beforeEach` below restores the real implementation between tests so a
+// stray `mockRejectedValue` (without `Once`) can never bleed into the next
+// test.
 vi.mock("node:fs/promises", async () => {
   const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
   return { ...actual, open: vi.fn(actual.open) };
@@ -18,8 +21,20 @@ vi.mock("node:fs/promises", async () => {
 
 import { open as mockedOpen } from "node:fs/promises";
 
+const { open: realOpen } =
+  await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+
+beforeEach(() => {
+  vi.mocked(mockedOpen).mockReset();
+  vi.mocked(mockedOpen).mockImplementation(realOpen);
+});
+
 import { DEFAULT_CONFIG, loadConfig } from "./loader.js";
-import { SovriConfigParseError, SovriConfigValidationError } from "./errors.js";
+import {
+  SovriConfigParseError,
+  SovriConfigSymlinkError,
+  SovriConfigValidationError,
+} from "./errors.js";
 import { SovriConfigSchema } from "./types/SovriConfig.js";
 
 const FIXTURES_ROOT = path.resolve(
@@ -211,7 +226,10 @@ describe("loadConfig — I/O errors after open()", () => {
     const eio = Object.assign(new Error("EIO: input/output error"), { code: "EIO" });
     const closeMock = vi.fn<FileHandle["close"]>().mockResolvedValue(undefined);
     vi.mocked(mockedOpen).mockResolvedValueOnce({
-      stat: vi.fn<FileHandle["stat"]>().mockResolvedValue({ size: 100 } as import("node:fs").Stats),
+      stat: vi.fn<FileHandle["stat"]>().mockResolvedValue({
+        size: 100,
+        isFile: () => true,
+      } as unknown as import("node:fs").Stats),
       readFile: vi.fn<FileHandle["readFile"]>().mockRejectedValueOnce(eio),
       close: closeMock,
     } as unknown as FileHandle);
@@ -252,6 +270,198 @@ describe("loadConfig — oversize file", () => {
     }
   });
 });
+
+// `symlink()` on Windows requires SeCreateSymbolicLinkPrivilege (admin or
+// Developer Mode) and CI runners lack it. The production threat model is
+// Linux Docker (community-bot runs distroless Linux), so POSIX coverage is
+// the safety net that matters; the `lstat` check still runs on Windows at
+// runtime, this `describe` only skips test creation.
+describe.skipIf(process.platform === "win32")(
+  "loadConfig — symlink rejection (issue #1744)",
+  () => {
+    let symlinkDir: string;
+    let externalTargetDir: string;
+
+    beforeAll(async () => {
+      symlinkDir = await mkdtemp(path.join(tmpdir(), "sovri-cfg-symlink-"));
+      externalTargetDir = await mkdtemp(path.join(tmpdir(), "sovri-cfg-symlink-target-"));
+
+      // Stand-in for `/etc/passwd` or a private key — kept inside the test
+      // tmpdir so the test does not depend on host-file readability.
+      await writeFile(
+        path.join(externalTargetDir, "secret.txt"),
+        "SENSITIVE_HOST_CONTENT\n",
+        "utf8",
+      );
+
+      // Case A: .sovri.yml → /tmp/<external>/secret.txt (out-of-repo).
+      const externalCase = path.join(symlinkDir, "case-external");
+      await mkdir(externalCase, { recursive: true });
+      await symlink(
+        path.join(externalTargetDir, "secret.txt"),
+        path.join(externalCase, ".sovri.yml"),
+      );
+
+      // Case B: .sovri.yml → sibling actual.yml (intra-repo, still rejected).
+      const intraDir = path.join(symlinkDir, "case-intra");
+      await mkdir(intraDir, { recursive: true });
+      await writeFile(
+        path.join(intraDir, "actual.yml"),
+        "llm:\n  provider: anthropic\n  model: claude-3-5-sonnet-latest\n  apiKeySecret: ANTHROPIC_API_KEY\n",
+        "utf8",
+      );
+      await symlink(path.join(intraDir, "actual.yml"), path.join(intraDir, ".sovri.yml"));
+
+      // Case C: dangling symlink (target does not exist).
+      const danglingDir = path.join(symlinkDir, "case-dangling");
+      await mkdir(danglingDir, { recursive: true });
+      await symlink(
+        path.join(danglingDir, "does-not-exist.yml"),
+        path.join(danglingDir, ".sovri.yml"),
+      );
+
+      // Case D: regular file (negative control).
+      const regularDir = path.join(symlinkDir, "case-regular");
+      await mkdir(regularDir, { recursive: true });
+      await writeFile(
+        path.join(regularDir, ".sovri.yml"),
+        "llm:\n  provider: anthropic\n  model: claude-3-5-sonnet-latest\n  apiKeySecret: ANTHROPIC_API_KEY\n",
+        "utf8",
+      );
+
+      // Case E: .sovri.yml is itself a directory (regression for L1 finding).
+      const dirAsConfigDir = path.join(symlinkDir, "case-directory");
+      await mkdir(path.join(dirAsConfigDir, ".sovri.yml"), { recursive: true });
+    });
+
+    afterAll(async () => {
+      await rm(symlinkDir, { recursive: true, force: true });
+      await rm(externalTargetDir, { recursive: true, force: true });
+    });
+
+    it("rejects .sovri.yml that symlinks to an out-of-repo file", async () => {
+      const root = path.join(symlinkDir, "case-external");
+
+      await expect(loadConfig(root)).rejects.toBeInstanceOf(SovriConfigSymlinkError);
+
+      try {
+        await loadConfig(root);
+        expect.unreachable("loadConfig should have thrown SovriConfigSymlinkError");
+      } catch (err) {
+        if (!(err instanceof SovriConfigSymlinkError)) throw err;
+        expect(err.name).toBe("SovriConfigSymlinkError");
+        expect(err.filePath.endsWith(".sovri.yml")).toBe(true);
+        expect(err.filePath).toContain("case-external");
+        // Critical: no `cause` chain means no file-fragment disclosure vector.
+        expect(err.cause).toBeUndefined();
+      }
+    });
+
+    it("rejects .sovri.yml that symlinks to a sibling file inside the same repo", async () => {
+      // Policy: ALL symlinks rejected, including intra-repo. Simpler audit
+      // story than realpath+containment; legitimate `.sovri.yml` symlink use
+      // cases are not observed in the wild and would be surprising to a
+      // reviewer reading a malicious repo.
+      const root = path.join(symlinkDir, "case-intra");
+
+      await expect(loadConfig(root)).rejects.toBeInstanceOf(SovriConfigSymlinkError);
+    });
+
+    it("rejects a dangling symlink rather than treating it as a missing file", async () => {
+      // Without lstat, a dangling symlink would surface as ENOENT at open()
+      // and return DEFAULT_CONFIG silently — masking the malicious intent.
+      const root = path.join(symlinkDir, "case-dangling");
+
+      await expect(loadConfig(root)).rejects.toBeInstanceOf(SovriConfigSymlinkError);
+    });
+
+    it("loads normally when .sovri.yml is a regular file (negative control)", async () => {
+      const root = path.join(symlinkDir, "case-regular");
+
+      const cfg = await loadConfig(root);
+
+      expect(cfg.llm.provider).toBe("anthropic");
+    });
+
+    it("rejects .sovri.yml that is itself a directory with SovriConfigParseError", async () => {
+      // Without the !isFile() guard, this would surface as a raw EISDIR at
+      // readFile() time — undocumented and untyped (L1 finding).
+      const root = path.join(symlinkDir, "case-directory");
+
+      await expect(loadConfig(root)).rejects.toBeInstanceOf(SovriConfigParseError);
+
+      try {
+        await loadConfig(root);
+        expect.unreachable("loadConfig should have thrown SovriConfigParseError");
+      } catch (err) {
+        if (!(err instanceof SovriConfigParseError)) throw err;
+        expect(err.filePath).toContain("case-directory");
+        // cause is a sanitized Error (no host-file content), not a YAMLException.
+        expect(err.cause).toBeInstanceOf(Error);
+        if (err.cause instanceof Error) {
+          expect(err.cause.message).toMatch(/regular file/i);
+        }
+      }
+    });
+
+    it("returns DEFAULT_CONFIG when open() races to ENOENT after lstat (TOCTOU disappearance)", async () => {
+      // Simulates the file vanishing between lstat (which saw a regular
+      // file) and open() (which now sees nothing). Per contract, missing
+      // file → DEFAULT_CONFIG, not raw ENOENT.
+      const root = path.join(symlinkDir, "case-regular");
+      const enoent = Object.assign(new Error("ENOENT: no such file"), { code: "ENOENT" });
+      vi.mocked(mockedOpen).mockRejectedValueOnce(enoent);
+
+      const cfg = await loadConfig(root);
+
+      expect(cfg).toEqual(DEFAULT_CONFIG);
+    });
+
+    it("returns DEFAULT_CONFIG when open() races to ENOTDIR after lstat", async () => {
+      const root = path.join(symlinkDir, "case-regular");
+      const enotdir = Object.assign(new Error("ENOTDIR: not a directory"), { code: "ENOTDIR" });
+      vi.mocked(mockedOpen).mockRejectedValueOnce(enotdir);
+
+      const cfg = await loadConfig(root);
+
+      expect(cfg).toEqual(DEFAULT_CONFIG);
+    });
+
+    it("throws SovriConfigParseError when fd.stat() reveals a non-regular file (TOCTOU type-flip)", async () => {
+      // Simulates the file morphing into a directory/FIFO between lstat
+      // and open. fd.stat().isFile() returns false; the loader must
+      // promote to the typed contract before readFile() surfaces raw EISDIR.
+      const root = path.join(symlinkDir, "case-regular");
+      const closeMock = vi.fn<FileHandle["close"]>().mockResolvedValue(undefined);
+      const fakeDirStats = {
+        size: 100,
+        isFile: () => false,
+        isDirectory: () => true,
+        isSymbolicLink: () => false,
+      } as unknown as import("node:fs").Stats;
+      vi.mocked(mockedOpen).mockResolvedValueOnce({
+        stat: vi.fn<FileHandle["stat"]>().mockResolvedValue(fakeDirStats),
+        readFile: vi.fn<FileHandle["readFile"]>(),
+        close: closeMock,
+      } as unknown as FileHandle);
+
+      await expect(loadConfig(root)).rejects.toBeInstanceOf(SovriConfigParseError);
+      expect(closeMock).toHaveBeenCalledOnce();
+    });
+
+    it("maps ELOOP from O_NOFOLLOW open() to SovriConfigSymlinkError (TOCTOU defense)", async () => {
+      // Force the open() path even though lstat succeeds on a regular file:
+      // simulates a TOCTOU swap where the file becomes a symlink between
+      // lstat and open. O_NOFOLLOW refuses atomically on POSIX with ELOOP,
+      // which the loader maps to the typed contract.
+      const root = path.join(symlinkDir, "case-regular");
+      const eloop = Object.assign(new Error("ELOOP: too many symbolic links"), { code: "ELOOP" });
+      vi.mocked(mockedOpen).mockRejectedValueOnce(eloop);
+
+      await expect(loadConfig(root)).rejects.toBeInstanceOf(SovriConfigSymlinkError);
+    });
+  },
+);
 
 describe("loadConfig — schema violation", () => {
   it("throws SovriConfigValidationError when an unknown top-level key is present", async () => {
