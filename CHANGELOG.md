@@ -152,6 +152,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(compliance)`: add acceptance coverage for the `CWE-120` ISO
+  27001:2022 A.8.28 informational mapping.
+
 - `test(compliance)`: verify every repeated GDPR batch 1 reference uses
   canonical `applicable_if` condition wording.
 

@@ -146,6 +146,31 @@ describe("getCweMap", () => {
     }
   });
 
+  it("maps CWE-120 to informational ISO 27001 secure coding guidance", () => {
+    // Given the batch 1 mapping entry has cwe_id "CWE-120"
+    const entry = getCweMap().get("CWE-120");
+    if (entry === undefined) {
+      throw new TypeError("Expected CWE-120 to be mapped.");
+    }
+
+    // When the mapping entry is read from getCweMap
+    const isoReference = entry.references.find(
+      (reference) => reference.framework === "ISO27001-2022",
+    );
+
+    // Then it includes a reference with framework "ISO27001-2022"
+    expect(isoReference).toBeDefined();
+
+    // And that reference identifier is "A.8.28"
+    expect(isoReference?.identifier).toBe("A.8.28");
+
+    // And that reference applicability is "informational"
+    expect(isoReference?.applicability).toBe("informational");
+
+    // And that reference has no condition
+    expect(isoReference?.condition).toBeUndefined();
+  });
+
   it("does not return a placeholder entry for an unknown CWE", () => {
     const entry = getCweMap().get("CWE-9999");
 
