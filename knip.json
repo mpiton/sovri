@@ -20,6 +20,11 @@
       "project": ["src/**/*.{ts,tsx,mts}!"],
       "ignoreDependencies": ["zod"]
     },
+    "packages/compliance": {
+      "entry": ["src/index.ts!", "src/{cli,bin,server,worker}.ts!"],
+      "project": ["src/**/*.{ts,tsx,mts}!"],
+      "ignoreDependencies": ["@sovri/core", "zod"]
+    },
     "packages/llm-providers": {
       "entry": ["src/index.ts!", "src/{cli,bin,server,worker}.ts!"],
       "project": ["src/**/*.{ts,tsx,mts}!"],
