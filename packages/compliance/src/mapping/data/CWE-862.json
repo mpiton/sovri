@@ -18,6 +18,22 @@
       "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679#d1e3316-1-1",
       "applicability": "applicable_if",
       "condition": "The affected system processes personal data as defined by GDPR Art. 4"
+    },
+    {
+      "framework": "DORA",
+      "identifier": "Art. 9",
+      "description": "ICT risk management controls for missing authorization in financial entity infrastructure.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022R2554",
+      "applicability": "applicable_if",
+      "condition": "The affected system is part of the ICT infrastructure of a financial entity subject to DORA"
+    },
+    {
+      "framework": "NIS2",
+      "identifier": "Art. 21(2)(i)",
+      "description": "Access control policies and asset management for essential or important entities.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022L2555",
+      "applicability": "applicable_if",
+      "condition": "The entity is an essential or important entity subject to NIS2"
     }
   ]
 }
