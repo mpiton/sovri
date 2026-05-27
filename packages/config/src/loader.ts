@@ -67,6 +67,12 @@ export const DEFAULT_CONFIG: SovriConfig = deepFreeze(
 /**
  * Load and validate `.sovri.yml` from a repository root.
  *
+ * @param repoRoot Absolute path to the repository root. Must be a non-empty
+ *   string and an absolute path (`path.isAbsolute(repoRoot)` must return
+ *   true). Relative paths are rejected to eliminate any ambiguity about the
+ *   resolved file location and to prevent a future caller from accidentally
+ *   reading outside the intended directory (e.g. passing `"../../etc"`).
+ *
  * Resolution order:
  *   1. File missing (`ENOENT`/`ENOTDIR`)         → returns `DEFAULT_CONFIG`.
  *   2. File empty or YAML root is null/undefined → returns `DEFAULT_CONFIG`.
@@ -78,6 +84,10 @@ export const DEFAULT_CONFIG: SovriConfig = deepFreeze(
  * Any other I/O failure (`EACCES`, `EISDIR`, …) is propagated as-is so the
  * caller can decide whether to bail out or surface it to the operator.
  *
+ * @throws {TypeError} If `repoRoot` is not a non-empty absolute path. This is
+ *   a programmer-error guard (CWE-22 hardening) — every caller in this repo
+ *   already resolves to an absolute path before invoking `loadConfig`.
+ *
  * SECURITY: `SovriConfigParseError.cause` (`YAMLException`) may quote a
  * fragment of the offending YAML. Callers must NOT log `err.cause` raw —
  * the snippet may contain text from the repo's `.sovri.yml` (e.g. a real
@@ -85,6 +95,15 @@ export const DEFAULT_CONFIG: SovriConfig = deepFreeze(
  * env-var-name regex would have rejected it).
  */
 export async function loadConfig(repoRoot: string): Promise<SovriConfig> {
+  if (typeof repoRoot !== "string" || repoRoot.length === 0) {
+    throw new TypeError("loadConfig: repoRoot must be a non-empty string");
+  }
+  if (!path.isAbsolute(repoRoot)) {
+    throw new TypeError(
+      `loadConfig: repoRoot must be an absolute path (got ${JSON.stringify(repoRoot)})`,
+    );
+  }
+
   const filePath = path.join(repoRoot, CONFIG_FILENAME);
 
   let fd: FileHandle | undefined;
