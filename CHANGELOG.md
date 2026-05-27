@@ -149,6 +149,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(compliance)`: add acceptance coverage for the new `@sovri/compliance`
+  workspace package scaffold manifest fields.
+
 - `docs(config)`: add the public [`.sovri.yml` reference](docs/sovri-yml-reference.md)
   covering active providers, review modes, ignores, limits, and safe API key
   environment variable usage.
