@@ -118,7 +118,7 @@ describe("getCweMap", () => {
     expect(gdprReference?.condition).toBe(canonicalConditions.gdpr);
 
     // When a DORA Art. 9 applicable_if reference is inspected
-    const doraReference = references.find(
+    const doraReferences = references.filter(
       (reference) =>
         reference.framework === "DORA" &&
         reference.identifier === "Art. 9" &&
@@ -126,15 +126,21 @@ describe("getCweMap", () => {
     );
 
     // Then its condition is "The affected system is part of the ICT infrastructure of a financial entity subject to DORA"
-    expect(doraReference?.condition).toBe(canonicalConditions.dora);
+    expect(doraReferences.length).toBeGreaterThan(0);
+    for (const reference of doraReferences) {
+      expect(reference.condition).toBe(canonicalConditions.dora);
+    }
 
     // When a NIS2 applicable_if reference is inspected
-    const nis2Reference = references.find(
+    const nis2References = references.filter(
       (reference) => reference.framework === "NIS2" && reference.applicability === "applicable_if",
     );
 
     // Then its condition is "The entity is an essential or important entity subject to NIS2"
-    expect(nis2Reference?.condition).toBe(canonicalConditions.nis2);
+    expect(nis2References.length).toBeGreaterThan(0);
+    for (const reference of nis2References) {
+      expect(reference.condition).toBe(canonicalConditions.nis2);
+    }
   });
 
   it("does not return a placeholder entry for an unknown CWE", () => {

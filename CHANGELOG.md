@@ -152,6 +152,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(compliance)`: verify every repeated DORA and NIS2 batch 1 reference
+  uses canonical `applicable_if` condition wording.
+
 - `feat(compliance)`: add canonical DORA Art. 9 and NIS2 conditional
   references for `CWE-78` and `CWE-862` batch 1 mappings.
 
