@@ -19,6 +19,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Security
+
+- `fix(config)`: eliminate TOCTOU race condition (CWE-367) in `loadConfig`
+  (`packages/config/src/loader.ts`) — replaced separate `stat(path)` +
+  `readFile(path)` path-based calls with a single file-descriptor approach
+  (`open()` → `fd.stat()` → `fd.readFile()` → `fd.close()`), so the 64 KiB
+  size check and the read operate on the same inode; an attacker-controlled
+  symlink swap or file replacement between the two syscalls can no longer
+  bypass the cap. Flagged by CodeQL `js/file-system-race` (alert #1).
+
 ### Changed
 
 - `chore(deps)`: bump `@anthropic-ai/sdk` 0.96.0 → 0.99.0 (features: cache
