@@ -68,10 +68,13 @@ export const DEFAULT_CONFIG: SovriConfig = deepFreeze(
  * Load and validate `.sovri.yml` from a repository root.
  *
  * @param repoRoot Absolute path to the repository root. Must be a non-empty
- *   string and an absolute path (`path.isAbsolute(repoRoot)` must return
- *   true). Relative paths are rejected to eliminate any ambiguity about the
- *   resolved file location and to prevent a future caller from accidentally
- *   reading outside the intended directory (e.g. passing `"../../etc"`).
+ *   string, an absolute path (`path.isAbsolute(repoRoot)` must return true),
+ *   AND already normalized (`path.normalize(repoRoot) === repoRoot`).
+ *   Relative paths are rejected to eliminate any ambiguity about the
+ *   resolved file location; non-normalized absolute paths (containing `.`
+ *   or `..` segments, e.g. `"/repo/../../etc"`) are rejected because
+ *   `path.join` would silently collapse them and read outside the intended
+ *   directory.
  *
  * Resolution order:
  *   1. File missing (`ENOENT`/`ENOTDIR`)         → returns `DEFAULT_CONFIG`.
@@ -101,6 +104,11 @@ export async function loadConfig(repoRoot: string): Promise<SovriConfig> {
   if (!path.isAbsolute(repoRoot)) {
     throw new TypeError(
       `loadConfig: repoRoot must be an absolute path (got ${JSON.stringify(repoRoot)})`,
+    );
+  }
+  if (path.normalize(repoRoot) !== repoRoot) {
+    throw new TypeError(
+      `loadConfig: repoRoot must be normalized — no ".", "..", or duplicate "/" segments (got ${JSON.stringify(repoRoot)})`,
     );
   }
 
