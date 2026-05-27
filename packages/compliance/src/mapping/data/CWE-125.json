@@ -1,0 +1,23 @@
+{
+  "cwe_id": "CWE-125",
+  "title": "Out-of-bounds Read",
+  "mitre_url": "https://cwe.mitre.org/data/definitions/125.html",
+  "impacts": ["Information disclosure", "Process instability"],
+  "references": [
+    {
+      "framework": "CWE",
+      "identifier": "CWE-125",
+      "description": "Out-of-bounds Read",
+      "source_url": "https://cwe.mitre.org/data/definitions/125.html",
+      "applicability": "informational"
+    },
+    {
+      "framework": "GDPR",
+      "identifier": "Art. 32",
+      "description": "Security of processing for services affected by out-of-bounds reads when personal data is exposed.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679#d1e3316-1-1",
+      "applicability": "applicable_if",
+      "condition": "The affected system processes personal data as defined by GDPR Art. 4"
+    }
+  ]
+}

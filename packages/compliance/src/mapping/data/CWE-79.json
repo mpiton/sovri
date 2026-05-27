@@ -1,0 +1,23 @@
+{
+  "cwe_id": "CWE-79",
+  "title": "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')",
+  "mitre_url": "https://cwe.mitre.org/data/definitions/79.html",
+  "impacts": ["Session compromise", "Unauthorized script execution"],
+  "references": [
+    {
+      "framework": "CWE",
+      "identifier": "CWE-79",
+      "description": "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')",
+      "source_url": "https://cwe.mitre.org/data/definitions/79.html",
+      "applicability": "informational"
+    },
+    {
+      "framework": "GDPR",
+      "identifier": "Art. 32",
+      "description": "Security of processing for systems affected by cross-site scripting when personal data is processed.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679#d1e3316-1-1",
+      "applicability": "applicable_if",
+      "condition": "The affected system processes personal data as defined by GDPR Art. 4"
+    }
+  ]
+}

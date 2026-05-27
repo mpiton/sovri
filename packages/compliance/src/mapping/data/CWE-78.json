@@ -1,0 +1,23 @@
+{
+  "cwe_id": "CWE-78",
+  "title": "Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')",
+  "mitre_url": "https://cwe.mitre.org/data/definitions/78.html",
+  "impacts": ["Command execution", "Host compromise"],
+  "references": [
+    {
+      "framework": "CWE",
+      "identifier": "CWE-78",
+      "description": "Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')",
+      "source_url": "https://cwe.mitre.org/data/definitions/78.html",
+      "applicability": "informational"
+    },
+    {
+      "framework": "GDPR",
+      "identifier": "Art. 32",
+      "description": "Security of processing for command injection exposure when personal data is reachable from the compromised process.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679#d1e3316-1-1",
+      "applicability": "applicable_if",
+      "condition": "The affected system processes personal data as defined by GDPR Art. 4"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "cwe_id": "CWE-862",
+  "title": "Missing Authorization",
+  "mitre_url": "https://cwe.mitre.org/data/definitions/862.html",
+  "impacts": ["Unauthorized access", "Privilege boundary bypass"],
+  "references": [
+    {
+      "framework": "CWE",
+      "identifier": "CWE-862",
+      "description": "Missing Authorization",
+      "source_url": "https://cwe.mitre.org/data/definitions/862.html",
+      "applicability": "informational"
+    },
+    {
+      "framework": "GDPR",
+      "identifier": "Art. 32",
+      "description": "Security of processing for resources affected by missing authorization when personal data is exposed.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679#d1e3316-1-1",
+      "applicability": "applicable_if",
+      "condition": "The affected system processes personal data as defined by GDPR Art. 4"
+    }
+  ]
+}

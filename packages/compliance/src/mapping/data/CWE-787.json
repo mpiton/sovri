@@ -1,0 +1,23 @@
+{
+  "cwe_id": "CWE-787",
+  "title": "Out-of-bounds Write",
+  "mitre_url": "https://cwe.mitre.org/data/definitions/787.html",
+  "impacts": ["Memory corruption", "Process compromise"],
+  "references": [
+    {
+      "framework": "CWE",
+      "identifier": "CWE-787",
+      "description": "Out-of-bounds Write",
+      "source_url": "https://cwe.mitre.org/data/definitions/787.html",
+      "applicability": "informational"
+    },
+    {
+      "framework": "GDPR",
+      "identifier": "Art. 32",
+      "description": "Security of processing for services affected by out-of-bounds writes when personal data is processed.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679#d1e3316-1-1",
+      "applicability": "applicable_if",
+      "condition": "The affected system processes personal data as defined by GDPR Art. 4"
+    }
+  ]
+}

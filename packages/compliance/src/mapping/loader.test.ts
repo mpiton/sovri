@@ -10,6 +10,23 @@ import { getCweMap } from "../index.js";
 
 const loaderSourcePath = fileURLToPath(new URL("./loader.ts", import.meta.url));
 const forbiddenLoaderPatterns = ["import(", "fs.readFile", "readFileSync"];
+const batchOneCweIds = [
+  "CWE-79",
+  "CWE-89",
+  "CWE-352",
+  "CWE-862",
+  "CWE-787",
+  "CWE-22",
+  "CWE-416",
+  "CWE-125",
+  "CWE-78",
+  "CWE-94",
+  "CWE-120",
+  "CWE-434",
+  "CWE-476",
+] satisfies readonly string[];
+const regulatedContextPattern =
+  /personal data|financial entity|essential or important entity|high-risk AI system/u;
 
 function findForbiddenLoaderPattern(source: string): string | undefined {
   return forbiddenLoaderPatterns.find((pattern) => source.includes(pattern));
@@ -38,6 +55,40 @@ describe("getCweMap", () => {
     expect(entry?.cwe_id).toBe("CWE-798");
     expect(entry?.title).toBe("Use of Hard-coded Credentials");
     expect(entry?.references[0]?.framework).toBe("CWE");
+  });
+
+  it("keeps every batch 1 applicable-if reference explicit", () => {
+    // Given the batch 1 mapping entries are read from getCweMap
+    const cweMap = getCweMap();
+    const batchOneEntries = batchOneCweIds.map((cweId) => {
+      const entry = cweMap.get(cweId);
+      if (entry === undefined) {
+        throw new TypeError(`Expected ${cweId} to be mapped.`);
+      }
+      return entry;
+    });
+
+    // When every reference with applicability "applicable_if" is inspected
+    const applicableIfReferences = batchOneEntries.flatMap((entry) =>
+      entry.references.filter((reference) => reference.applicability === "applicable_if"),
+    );
+
+    expect(applicableIfReferences.length).toBeGreaterThan(0);
+    for (const reference of applicableIfReferences) {
+      const condition = reference.condition;
+
+      // Then each inspected reference has a condition
+      expect(condition).toBeDefined();
+      if (condition === undefined) {
+        throw new TypeError("Expected applicable_if reference to have a condition.");
+      }
+
+      // And each condition is not an empty string
+      expect(condition.trim()).not.toBe("");
+
+      // And each condition names the regulated context that makes the reference applicable
+      expect(condition).toMatch(regulatedContextPattern);
+    }
   });
 
   it("does not return a placeholder entry for an unknown CWE", () => {

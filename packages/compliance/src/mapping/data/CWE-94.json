@@ -1,0 +1,23 @@
+{
+  "cwe_id": "CWE-94",
+  "title": "Improper Control of Generation of Code ('Code Injection')",
+  "mitre_url": "https://cwe.mitre.org/data/definitions/94.html",
+  "impacts": ["Code execution", "Application compromise"],
+  "references": [
+    {
+      "framework": "CWE",
+      "identifier": "CWE-94",
+      "description": "Improper Control of Generation of Code ('Code Injection')",
+      "source_url": "https://cwe.mitre.org/data/definitions/94.html",
+      "applicability": "informational"
+    },
+    {
+      "framework": "GDPR",
+      "identifier": "Art. 32",
+      "description": "Security of processing for code injection exposure when personal data is reachable from the compromised application.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679#d1e3316-1-1",
+      "applicability": "applicable_if",
+      "condition": "The affected system processes personal data as defined by GDPR Art. 4"
+    }
+  ]
+}

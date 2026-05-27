@@ -1,0 +1,23 @@
+{
+  "cwe_id": "CWE-352",
+  "title": "Cross-Site Request Forgery (CSRF)",
+  "mitre_url": "https://cwe.mitre.org/data/definitions/352.html",
+  "impacts": ["Unauthorized state change", "User action forgery"],
+  "references": [
+    {
+      "framework": "CWE",
+      "identifier": "CWE-352",
+      "description": "Cross-Site Request Forgery (CSRF)",
+      "source_url": "https://cwe.mitre.org/data/definitions/352.html",
+      "applicability": "informational"
+    },
+    {
+      "framework": "GDPR",
+      "identifier": "Art. 32",
+      "description": "Security of processing for endpoints affected by CSRF when personal data is modified or exposed.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679#d1e3316-1-1",
+      "applicability": "applicable_if",
+      "condition": "The affected system processes personal data as defined by GDPR Art. 4"
+    }
+  ]
+}
