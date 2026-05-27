@@ -43,11 +43,35 @@ export const ComplianceReferenceEntrySchema = z
   });
 export type ComplianceReferenceEntry = z.infer<typeof ComplianceReferenceEntrySchema>;
 
-export const ComplianceMappingEntrySchema = z.object({
-  cwe_id: z.string().regex(/^CWE-\d+$/),
-  title: z.string().min(1),
-  mitre_url: z.string().url(),
-  impacts: z.array(z.string()),
-  references: z.array(ComplianceReferenceEntrySchema),
-});
+const classicBufferOverflowCweId = "CWE-120";
+const isoSecureCodingFramework = "ISO27001-2022";
+const isoSecureCodingIdentifier = "A.8.28";
+
+export const ComplianceMappingEntrySchema = z
+  .object({
+    cwe_id: z.string().regex(/^CWE-\d+$/),
+    title: z.string().min(1),
+    mitre_url: z.string().url(),
+    impacts: z.array(z.string()),
+    references: z.array(ComplianceReferenceEntrySchema),
+  })
+  .superRefine((entry, context) => {
+    if (entry.cwe_id !== classicBufferOverflowCweId) {
+      return;
+    }
+
+    const hasIsoSecureCodingReference = entry.references.some(
+      (reference) =>
+        reference.framework === isoSecureCodingFramework &&
+        reference.identifier === isoSecureCodingIdentifier,
+    );
+
+    if (!hasIsoSecureCodingReference) {
+      context.addIssue({
+        code: "custom",
+        path: ["references"],
+        message: `${classicBufferOverflowCweId} requires ${isoSecureCodingFramework} reference ${isoSecureCodingIdentifier}`,
+      });
+    }
+  });
 export type ComplianceMappingEntry = z.infer<typeof ComplianceMappingEntrySchema>;
