@@ -145,6 +145,44 @@ function buildCwe89EntryWithNonHttpsGdprSourceUrl(): ComplianceMappingEntry {
   );
 }
 
+function buildCwe79EntryWithoutGdprReference(): ComplianceMappingEntry {
+  return {
+    cwe_id: "CWE-79",
+    title: "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')",
+    mitre_url: "https://cwe.mitre.org/data/definitions/79.html",
+    impacts: ["Session compromise", "Unauthorized script execution"],
+    references: [
+      {
+        framework: "CWE",
+        identifier: "CWE-79",
+        description:
+          "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')",
+        source_url: "https://cwe.mitre.org/data/definitions/79.html",
+        applicability: "informational",
+      },
+    ],
+  };
+}
+
+function buildZeroPaddedCwe89EntryWithoutGdprReference(): ComplianceMappingEntry {
+  return {
+    cwe_id: "CWE-089",
+    title: "Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')",
+    mitre_url: "https://cwe.mitre.org/data/definitions/89.html",
+    impacts: ["Data breach", "Unauthorized data modification"],
+    references: [
+      {
+        framework: "CWE",
+        identifier: "CWE-89",
+        description:
+          "Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')",
+        source_url: "https://cwe.mitre.org/data/definitions/89.html",
+        applicability: "informational",
+      },
+    ],
+  };
+}
+
 describe("Compliance mapping data audits", () => {
   it("rejects CWE-120 when the ISO 27001 A.8.28 reference is missing", () => {
     // Given a candidate batch 1 map contains "CWE-120"
@@ -283,5 +321,51 @@ describe("Compliance mapping data audits", () => {
     expect(failureText).toContain(
       "http://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679",
     );
+  });
+
+  it("rejects a web vulnerability CWE when the GDPR Art. 32 reference is missing", () => {
+    // Given a candidate batch 1 map contains "CWE-79"
+    const candidateBatchOneMap = new Map<string, ComplianceMappingEntry>([
+      ["CWE-79", buildCwe79EntryWithoutGdprReference()],
+    ]);
+
+    // And the "CWE-79" entry has no GDPR reference
+    const candidateEntry = candidateBatchOneMap.get("CWE-79");
+    if (candidateEntry === undefined) {
+      throw new TypeError("Expected candidate batch 1 map to contain CWE-79.");
+    }
+
+    // When the web vulnerability GDPR audit runs
+    const result = ComplianceMappingEntrySchema.safeParse(candidateEntry);
+
+    // Then the audit fails
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError("Expected the web vulnerability GDPR audit to fail.");
+    }
+
+    const failureText = result.error.issues.map((issue) => issue.message).join("\n");
+
+    // And the failure reports "CWE-79"
+    expect(failureText).toContain("CWE-79");
+
+    // And the failure reports missing framework "GDPR"
+    expect(failureText).toContain("GDPR");
+  });
+
+  it("normalizes zero-padded web vulnerability CWE identifiers before auditing GDPR references", () => {
+    const candidateEntry = buildZeroPaddedCwe89EntryWithoutGdprReference();
+
+    const result = ComplianceMappingEntrySchema.safeParse(candidateEntry);
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError("Expected the web vulnerability GDPR audit to fail.");
+    }
+
+    const failureText = result.error.issues.map((issue) => issue.message).join("\n");
+
+    expect(failureText).toContain("CWE-089");
+    expect(failureText).toContain("GDPR");
   });
 });

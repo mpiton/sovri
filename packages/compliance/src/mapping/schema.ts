@@ -85,16 +85,26 @@ const isoSecureCodingFramework = "ISO27001-2022";
 const isoSecureCodingIdentifier = "A.8.28";
 const missingAuthorizationCweId = "CWE-862";
 const doraFramework = "DORA";
+const webVulnerabilityCweIds = new Set(["CWE-79", "CWE-89"]);
+const gdprFramework = "GDPR";
+const gdprArt32Identifier = "Art. 32";
 const cweIdentifierPattern = /^CWE-(\d+)$/u;
 
-function buildCanonicalMitreUrl(cweId: string): string | undefined {
+function getCanonicalCweNumber(cweId: string): string | undefined {
   const cweIdMatch = cweIdentifierPattern.exec(cweId);
   const cweNumber = cweIdMatch?.[1];
   if (cweNumber === undefined) {
     return undefined;
   }
 
-  const canonicalCweNumber = Number.parseInt(cweNumber, 10).toString();
+  return Number.parseInt(cweNumber, 10).toString();
+}
+
+function buildCanonicalMitreUrl(cweId: string): string | undefined {
+  const canonicalCweNumber = getCanonicalCweNumber(cweId);
+  if (canonicalCweNumber === undefined) {
+    return undefined;
+  }
 
   return `https://cwe.mitre.org/data/definitions/${canonicalCweNumber}.html`;
 }
@@ -143,6 +153,24 @@ export const ComplianceMappingEntrySchema = z
           code: "custom",
           path: ["references"],
           message: `${missingAuthorizationCweId} requires ${doraFramework} reference`,
+        });
+      }
+    }
+
+    const canonicalCweNumber = getCanonicalCweNumber(entry.cwe_id);
+    const canonicalCweId =
+      canonicalCweNumber === undefined ? undefined : `CWE-${canonicalCweNumber}`;
+    if (canonicalCweId !== undefined && webVulnerabilityCweIds.has(canonicalCweId)) {
+      const hasGdprArt32Reference = entry.references.some(
+        (reference) =>
+          reference.framework === gdprFramework && reference.identifier === gdprArt32Identifier,
+      );
+
+      if (!hasGdprArt32Reference) {
+        context.addIssue({
+          code: "custom",
+          path: ["references"],
+          message: `${entry.cwe_id} requires ${gdprFramework} reference ${gdprArt32Identifier}`,
         });
       }
     }
