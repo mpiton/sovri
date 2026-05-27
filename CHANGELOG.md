@@ -100,6 +100,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   (tracks Node 24 LTS engine constraint), `pino` major (ADR-006 API
   stability), `turbo` major (ADR-002), and Docker `node` major (ADR-001) to
   prevent recurring ADR-violating PRs.
+- `ci(release)`: include `packages/compliance/package.json` in the
+  `release-verify-tag` `--package-files` list so the new workspace package
+  cannot drift from the release tag.
 
 ### Fixed
 
@@ -148,6 +151,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   instead of the oldest one returned first by `listReviews`.
 
 ### Added
+
+- `test(compliance)`: add acceptance coverage for the new `@sovri/compliance`
+  workspace package scaffold manifest fields.
+
+- `feat(compliance)`: scaffold the `@sovri/compliance` workspace package with
+  ESM package metadata, build/test/typecheck scripts, tsup, Vitest coverage
+  thresholds, and placeholder source directories.
 
 - `docs(config)`: add the public [`.sovri.yml` reference](docs/sovri-yml-reference.md)
   covering active providers, review modes, ignores, limits, and safe API key
