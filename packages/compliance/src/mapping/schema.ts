@@ -31,9 +31,9 @@ export type ComplianceReferenceApplicability = z.infer<
   typeof ComplianceReferenceApplicabilitySchema
 >;
 
-function getUrlHost(url: string): string | undefined {
+function parseUrl(url: string): URL | undefined {
   try {
-    return new URL(url).host;
+    return new URL(url);
   } catch {
     return undefined;
   }
@@ -61,8 +61,16 @@ export const ComplianceReferenceEntrySchema = z
     }
 
     const expectedSourceHost = officialSourceHostByFramework[reference.framework];
-    const sourceHost = getUrlHost(reference.source_url);
-    if (sourceHost !== undefined && sourceHost !== expectedSourceHost) {
+    const sourceUrl = parseUrl(reference.source_url);
+    if (sourceUrl !== undefined && sourceUrl.protocol !== "https:") {
+      context.addIssue({
+        code: "custom",
+        path: ["source_url"],
+        message: `${reference.framework} source_url must use HTTPS: ${reference.source_url}`,
+      });
+    }
+
+    if (sourceUrl !== undefined && sourceUrl.host !== expectedSourceHost) {
       context.addIssue({
         code: "custom",
         path: ["source_url"],

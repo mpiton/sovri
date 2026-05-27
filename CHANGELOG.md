@@ -22,6 +22,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Added
 
 - `feat(compliance)`: reject compliance mapping references whose `source_url`
+  does not use HTTPS.
+
+- `test(compliance)`: add acceptance coverage for the non-HTTPS compliance
+  reference source URL audit.
+
+- `feat(compliance)`: reject compliance mapping references whose `source_url`
   host does not match the official host for the referenced framework.
 
 - `test(compliance)`: add acceptance coverage for the non-official

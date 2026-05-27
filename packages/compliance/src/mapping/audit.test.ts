@@ -107,7 +107,7 @@ function buildZeroPaddedCwe89Entry(): ComplianceMappingEntry {
   };
 }
 
-function buildCwe89EntryWithNonOfficialGdprSourceUrl(): ComplianceMappingEntry {
+function buildCwe89EntryWithGdprSourceUrl(sourceUrl: string): ComplianceMappingEntry {
   return {
     cwe_id: "CWE-89",
     title: "Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')",
@@ -127,12 +127,22 @@ function buildCwe89EntryWithNonOfficialGdprSourceUrl(): ComplianceMappingEntry {
         identifier: "Art. 32",
         description:
           "Security of processing for SQL injection exposure when personal data storage is affected.",
-        source_url: "https://example.com/gdpr-art-32",
+        source_url: sourceUrl,
         applicability: "applicable_if",
         condition: "The affected system processes personal data as defined by GDPR Art. 4",
       },
     ],
   };
+}
+
+function buildCwe89EntryWithNonOfficialGdprSourceUrl(): ComplianceMappingEntry {
+  return buildCwe89EntryWithGdprSourceUrl("https://example.com/gdpr-art-32");
+}
+
+function buildCwe89EntryWithNonHttpsGdprSourceUrl(): ComplianceMappingEntry {
+  return buildCwe89EntryWithGdprSourceUrl(
+    "http://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679",
+  );
 }
 
 describe("Compliance mapping data audits", () => {
@@ -255,5 +265,23 @@ describe("Compliance mapping data audits", () => {
 
     // And the failure reports source_url "https://example.com/gdpr-art-32"
     expect(failureText).toContain("https://example.com/gdpr-art-32");
+  });
+
+  it("rejects a compliance reference whose source URL does not use HTTPS", () => {
+    const candidateEntry = buildCwe89EntryWithNonHttpsGdprSourceUrl();
+
+    const result = ComplianceMappingEntrySchema.safeParse(candidateEntry);
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError("Expected the HTTPS source URL audit to fail.");
+    }
+
+    const failureText = result.error.issues.map((issue) => issue.message).join("\n");
+
+    expect(failureText).toContain("HTTPS");
+    expect(failureText).toContain(
+      "http://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679",
+    );
   });
 });
