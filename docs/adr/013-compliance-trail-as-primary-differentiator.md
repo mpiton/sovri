@@ -38,7 +38,7 @@ The mapping package remains Apache 2.0 because Community code must stay auditabl
 - `@sovri/compliance` depends on `@sovri/core`, but not on the review engine.
 - `@sovri/review-engine` depends on `@sovri/compliance` for deterministic enrichment.
 - Walkthrough output uses wording such as "Potential compliance references", not "compliance violations".
-- Inline comments stay focused on the finding and only carry a discreet audit reference.
+- Inline comments stay focused on the finding and only carry a discrete audit reference.
 - Unknown or unmapped CWE identifiers do not block findings; they produce an empty compliance reference list.
 
 ## Rejected alternatives

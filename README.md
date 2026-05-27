@@ -75,7 +75,7 @@ packages/review-engine       (diff → prompt → LLM call → Zod parsing → f
 packages/core                (pure domain, Zod schemas, zero I/O)
 ```
 
-Detailed technical decisions are tracked as Architecture Decision Records under [`docs/adr/`](docs/adr/). The full toolchain (Node.js 24 LTS, pnpm 10, Turborepo 2, Probot 14, Zod 4, Vitest 4, oxlint, oxfmt, tsup, Docker on GHCR) is locked through ADRs 001 to 012.
+Detailed technical decisions are tracked as Architecture Decision Records under [`docs/adr/`](docs/adr/). The full toolchain (Node.js 24 LTS, pnpm 10, Turborepo 2, Probot 14, Zod 4, Vitest 4, oxlint, oxfmt, tsup, Docker on GHCR) is locked through ADRs 001 to 014.
 
 ---
 
