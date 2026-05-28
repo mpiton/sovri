@@ -70,6 +70,20 @@ function buildCwe862EntryWithoutDoraReference(): ComplianceMappingEntry {
   };
 }
 
+function buildZeroPaddedCwe120EntryWithoutIsoReference(): ComplianceMappingEntry {
+  return {
+    ...buildCwe120EntryWithoutIsoReference(),
+    cwe_id: "CWE-0120",
+  };
+}
+
+function buildZeroPaddedCwe862EntryWithoutDoraReference(): ComplianceMappingEntry {
+  return {
+    ...buildCwe862EntryWithoutDoraReference(),
+    cwe_id: "CWE-0862",
+  };
+}
+
 function buildCwe89EntryWithMismatchedMitreUrl(): ComplianceMappingEntry {
   return {
     cwe_id: "CWE-89",
@@ -367,5 +381,37 @@ describe("Compliance mapping data audits", () => {
 
     expect(failureText).toContain("CWE-089");
     expect(failureText).toContain("GDPR");
+  });
+
+  it("normalizes zero-padded CWE identifiers before auditing the ISO 27001 reference", () => {
+    const candidateEntry = buildZeroPaddedCwe120EntryWithoutIsoReference();
+
+    const result = ComplianceMappingEntrySchema.safeParse(candidateEntry);
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError("Expected the buffer overflow ISO audit to fail.");
+    }
+
+    const failureText = result.error.issues.map((issue) => issue.message).join("\n");
+
+    expect(failureText).toContain("CWE-120");
+    expect(failureText).toContain("A.8.28");
+  });
+
+  it("normalizes zero-padded CWE identifiers before auditing the DORA reference", () => {
+    const candidateEntry = buildZeroPaddedCwe862EntryWithoutDoraReference();
+
+    const result = ComplianceMappingEntrySchema.safeParse(candidateEntry);
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError("Expected the critical ICT regulatory audit to fail.");
+    }
+
+    const failureText = result.error.issues.map((issue) => issue.message).join("\n");
+
+    expect(failureText).toContain("CWE-862");
+    expect(failureText).toContain("DORA");
   });
 });

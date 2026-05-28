@@ -118,6 +118,10 @@ export const ComplianceMappingEntrySchema = z
     references: z.array(ComplianceReferenceEntrySchema),
   })
   .superRefine((entry, context) => {
+    const canonicalCweNumber = getCanonicalCweNumber(entry.cwe_id);
+    const canonicalCweId =
+      canonicalCweNumber === undefined ? undefined : `CWE-${canonicalCweNumber}`;
+
     const canonicalMitreUrl = buildCanonicalMitreUrl(entry.cwe_id);
     if (canonicalMitreUrl !== undefined && entry.mitre_url !== canonicalMitreUrl) {
       context.addIssue({
@@ -127,7 +131,7 @@ export const ComplianceMappingEntrySchema = z
       });
     }
 
-    if (entry.cwe_id === classicBufferOverflowCweId) {
+    if (canonicalCweId === classicBufferOverflowCweId) {
       const hasIsoSecureCodingReference = entry.references.some(
         (reference) =>
           reference.framework === isoSecureCodingFramework &&
@@ -143,7 +147,7 @@ export const ComplianceMappingEntrySchema = z
       }
     }
 
-    if (entry.cwe_id === missingAuthorizationCweId) {
+    if (canonicalCweId === missingAuthorizationCweId) {
       const hasDoraReference = entry.references.some(
         (reference) => reference.framework === doraFramework,
       );
@@ -157,9 +161,6 @@ export const ComplianceMappingEntrySchema = z
       }
     }
 
-    const canonicalCweNumber = getCanonicalCweNumber(entry.cwe_id);
-    const canonicalCweId =
-      canonicalCweNumber === undefined ? undefined : `CWE-${canonicalCweNumber}`;
     if (canonicalCweId !== undefined && webVulnerabilityCweIds.has(canonicalCweId)) {
       const hasGdprArt32Reference = entry.references.some(
         (reference) =>

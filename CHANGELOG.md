@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(compliance)`: add acceptance coverage for zero-padded CWE
+  normalization before the ISO 27001 and DORA required-reference audits.
+
 - `feat(compliance)`: reject web vulnerability CWE mapping candidates missing
   a GDPR Art. 32 reference.
 
@@ -62,6 +65,24 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `test(compliance)`: add acceptance coverage for the `CWE-120` ISO
   27001:2022 A.8.28 informational mapping.
+
+- `test(compliance)`: verify every repeated GDPR batch 1 reference uses
+  canonical `applicable_if` condition wording.
+
+- `test(compliance)`: verify every repeated DORA and NIS2 batch 1 reference
+  uses canonical `applicable_if` condition wording.
+
+- `feat(compliance)`: add canonical DORA Art. 9 and NIS2 conditional
+  references for `CWE-78` and `CWE-862` batch 1 mappings.
+
+- `test(compliance)`: add acceptance coverage for canonical GDPR, DORA, and
+  NIS2 `applicable_if` condition wording in batch 1 CWE mapping data.
+
+- `feat(compliance)`: add the first 13 static CWE mapping data files and
+  import them in the static compliance map loader.
+
+- `test(compliance)`: add acceptance coverage proving batch 1 CWE mapping
+  `applicable_if` references carry explicit regulated-context conditions.
 
 ### Security
 
@@ -150,6 +171,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `fix(compliance)`: normalize zero-padded CWE identifiers before enforcing
+  the ISO 27001 secure coding and DORA required references.
+
 - `fix(compliance)`: normalize zero-padded CWE identifiers before applying
   the web vulnerability GDPR Art. 32 audit.
 
@@ -201,24 +225,6 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   instead of the oldest one returned first by `listReviews`.
 
 ### Added
-
-- `test(compliance)`: verify every repeated GDPR batch 1 reference uses
-  canonical `applicable_if` condition wording.
-
-- `test(compliance)`: verify every repeated DORA and NIS2 batch 1 reference
-  uses canonical `applicable_if` condition wording.
-
-- `feat(compliance)`: add canonical DORA Art. 9 and NIS2 conditional
-  references for `CWE-78` and `CWE-862` batch 1 mappings.
-
-- `test(compliance)`: add acceptance coverage for canonical GDPR, DORA, and
-  NIS2 `applicable_if` condition wording in batch 1 CWE mapping data.
-
-- `feat(compliance)`: add the first 13 static CWE mapping data files and
-  import them in the static compliance map loader.
-
-- `test(compliance)`: add acceptance coverage proving batch 1 CWE mapping
-  `applicable_if` references carry explicit regulated-context conditions.
 
 - `feat(compliance)`: add the compliance mapping entry schema, static CWE map
   loader API implementation with defensive map reads and frozen mapping
