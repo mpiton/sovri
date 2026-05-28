@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = fileURLToPath(new URL(".", import.meta.url));
@@ -42,6 +42,9 @@ export default defineConfig({
       reportsDirectory: "coverage",
     },
     environment: "node",
+    // Never descend into gitignored git worktrees: they hold stale duplicate
+    // test files that resolve workspace aliases to the live source and break.
+    exclude: [...configDefaults.exclude, "**/.worktrees/**"],
     // Vitest globals stay disabled; tests import APIs from vitest.
     globals: false,
   },

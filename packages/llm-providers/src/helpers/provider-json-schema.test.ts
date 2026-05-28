@@ -131,11 +131,13 @@ describe("zodToProviderJsonSchema — @sovri/core integration", () => {
       "body",
       "source",
       "confidence",
+      "compliance_references",
     ];
     expect(json.required).toHaveLength(expectedRequired.length);
     expect(json.required).toEqual(expect.arrayContaining(expectedRequired));
     expect(json.required).not.toContain("suggestion");
     expect(json.required).not.toContain("cwe");
+    expect(json.required).not.toContain("audit_reference");
   });
 
   it("converts LLMResponseSchema producing a nested array of finding objects with full inner required", () => {
