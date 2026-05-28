@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add acceptance coverage for `generateAuditReference` —
+  the canonical `SOVRI-XX-HHHH-HHHH` format, the seven fixed category codes, hex
+  segments built from `node:crypto` random bytes, boundary byte values, and
+  distinct references across different entropy draws.
+
 - `feat(compliance)`: add `enrichFindingCompliance(finding)` — a pure function
   that recomputes a finding's `compliance_references` from its `cwe` against the
   static CWE map (mapped CWE → its references; unmapped or absent CWE → `[]`),
