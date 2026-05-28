@@ -3,6 +3,7 @@
 
 export const compliancePackageName = "@sovri/compliance";
 
+export { enrichFindingCompliance } from "./mapping/enricher.js";
 export { getCweMap } from "./mapping/loader.js";
 export {
   ComplianceFrameworkSchema,
