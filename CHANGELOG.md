@@ -28,6 +28,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   the finding degrades to empty references with a logged error and the review
   still completes. Adds `@sovri/compliance` as a workspace dependency.
 
+- `test(review-engine)`: assert the R-07 enrichment-failure test against the
+  compliance-specific error message, so it cannot pass on an unrelated error log.
+
 - `test(review-engine)`: add MSW integration coverage for compliance wiring in
   `reviewPullRequest()` — a finding with a mapped `cwe` (`CWE-798`) gains an
   `audit_reference` and its compliance references, a finding without a `cwe` or

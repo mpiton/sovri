@@ -108,6 +108,8 @@ describe("reviewPullRequest compliance enrichment failure", () => {
     // And that finding's compliance_references is empty
     expect(finding?.compliance_references).toEqual([]);
     // And an error is logged describing the enrichment failure
-    expect(errorLogs.length).toBeGreaterThan(0);
+    expect(errorLogs.some(({ message }) => message.includes("Compliance enrichment failed"))).toBe(
+      true,
+    );
   });
 });
