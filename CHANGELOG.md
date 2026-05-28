@@ -21,6 +21,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(compliance)`: add `enrichFindingCompliance(finding)` — a pure function
+  that recomputes a finding's `compliance_references` from its `cwe` against the
+  static CWE map (mapped CWE → its references; unmapped or absent CWE → `[]`),
+  never mutating the input and performing no I/O. Re-exported from
+  `@sovri/compliance` so the review-engine orchestrator imports it from the
+  package root rather than an internal path.
+
 - `feat(core)`: extend the `Finding` schema for the Compliance Trail — add a
   defaulted `compliance_references` array and an optional `audit_reference`
   (`SOVRI-XX-HHHH-HHHH`), plus `ComplianceFrameworkSchema` (CWE, OWASP Top 10,
