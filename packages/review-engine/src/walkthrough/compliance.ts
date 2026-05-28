@@ -17,22 +17,23 @@ const FRAMEWORK_LABELS: Record<ComplianceFramework, string> = {
 };
 
 export function renderComplianceSection(findings: readonly Finding[]): string[] {
-  const annotated = findings.filter((finding) => finding.compliance_references.length > 0);
-
-  if (annotated.length === 0) {
+  if (findings.length === 0) {
     return [];
   }
 
   const lines: string[] = ["### Compliance & audit"];
 
-  for (const finding of annotated) {
-    lines.push(
-      "",
-      `#### ${formatMarkdownText(finding.title)} — ${formatLocation(finding)}`,
-      "📋 Potential compliance references",
-      ...finding.compliance_references.map(renderReferenceLine),
-      `🔍 Audit Reference: ${finding.audit_reference ?? "n/a"}`,
-    );
+  for (const finding of findings) {
+    lines.push("", `#### ${formatMarkdownText(finding.title)} — ${formatLocation(finding)}`, "");
+
+    if (finding.compliance_references.length > 0) {
+      lines.push(
+        "📋 Potential compliance references",
+        ...finding.compliance_references.map(renderReferenceLine),
+      );
+    }
+
+    lines.push(`🔍 Audit Reference: ${finding.audit_reference ?? "n/a"}`);
   }
 
   return lines;

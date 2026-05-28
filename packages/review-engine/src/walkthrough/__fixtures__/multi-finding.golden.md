@@ -39,6 +39,20 @@ Three review findings need attention.
 
 - src/auth/session.ts:42-45 Unvalidated session token
 
+### Compliance & audit
+
+#### Unvalidated session token — src/auth/session.ts:42-45
+
+🔍 Audit Reference: n/a
+
+#### Missing payload null guard — src/api/review.ts:18
+
+🔍 Audit Reference: n/a
+
+#### Duplicated branch — src/api/review.ts:31
+
+🔍 Audit Reference: n/a
+
 ---
 
 _Tokens: 1200 in / 300 out · Estimated cost: unavailable (test-provider test-model)_

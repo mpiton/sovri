@@ -21,6 +21,17 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(review-engine)`: render a `🔍 Audit Reference` line for every finding in the
+  walkthrough `### Compliance & audit` section (task-93, #1919) — the section now
+  lists all findings (not only those with compliance references), each with its audit
+  reference and an `n/a` placeholder when `audit_reference` is undefined; the `📋`
+  references tree stays conditional and the section is still omitted for empty reviews.
+
+- `test(review-engine)`: add failing acceptance test for the per-finding audit
+  reference line (task-93, #1919) — every finding must render a `🔍 Audit Reference`
+  line (incl. ref-less findings), with an `n/a` placeholder when `audit_reference`
+  is undefined.
+
 - `feat(review-engine)`: render a `### Compliance & audit` walkthrough section
   (task-93, #1918) — `composeWalkthrough()` now appends, for each finding carrying
   `compliance_references`, the `📋 Potential compliance references` tree (`├─`/`└─`)
