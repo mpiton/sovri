@@ -3,11 +3,16 @@
 
 import { describe, expect, it } from "vitest";
 
+import * as core from "../index.js";
 import {
   CategorySchema,
+  ComplianceFrameworkSchema,
+  ComplianceReferenceSchema,
   FindingSchema,
   SeveritySchema,
   type Category,
+  type ComplianceFramework,
+  type ComplianceReference,
   type Finding,
   type Severity,
 } from "./Finding.js";
@@ -23,6 +28,7 @@ const baseFinding: Finding = {
   body: "Variable `foo` may be `null` here because the early-return guard above only checks `bar`.",
   source: "llm",
   confidence: 0.85,
+  compliance_references: [],
 };
 
 describe("SeveritySchema", () => {
@@ -326,5 +332,266 @@ describe("FindingSchema — type inference", () => {
   it("infers Category as the schema's literal union", () => {
     const c: Category = "security";
     expect(CategorySchema.parse(c)).toBe("security");
+  });
+});
+
+const baseReference = {
+  framework: "GDPR",
+  identifier: "Art. 32",
+  description: "Security of processing",
+  source_url: "https://eur-lex.europa.eu/eli/reg/2016/679/oj",
+  applicability: "informational",
+};
+
+describe("ComplianceFrameworkSchema (R-01)", () => {
+  const frameworks = [
+    "CWE",
+    "OWASP-TOP10-2021",
+    "ISO27001-2022",
+    "GDPR",
+    "DORA",
+    "NIS2",
+    "AI-ACT",
+    "CRA",
+  ] satisfies readonly ComplianceFramework[];
+
+  it.each(frameworks)("accepts %s", (value) => {
+    expect(ComplianceFrameworkSchema.parse(value)).toBe(value);
+  });
+
+  it.each(["SOC2", "PCI-DSS", "cwe", "gdpr", ""])("rejects %p", (value) => {
+    expect(ComplianceFrameworkSchema.safeParse(value).success).toBe(false);
+  });
+
+  it("exposes exactly the eight regulated options", () => {
+    expect(ComplianceFrameworkSchema.options).toEqual(frameworks);
+  });
+});
+
+describe("ComplianceReferenceSchema — applicability (R-02)", () => {
+  it("accepts an informational reference without a condition", () => {
+    expect(ComplianceReferenceSchema.parse(baseReference).applicability).toBe("informational");
+  });
+
+  it("accepts an applicable_if reference with a condition", () => {
+    const parsed = ComplianceReferenceSchema.parse({
+      ...baseReference,
+      applicability: "applicable_if",
+      condition: "Personal data is processed by the reviewed code",
+    });
+    expect(parsed.applicability).toBe("applicable_if");
+  });
+
+  it("rejects a confirmed applicability (path: applicability)", () => {
+    const result = ComplianceReferenceSchema.safeParse({
+      framework: "DORA",
+      identifier: "Art. 9",
+      description: "ICT risk management framework",
+      source_url: "https://eur-lex.europa.eu/eli/reg/2022/2554/oj",
+      applicability: "confirmed",
+      condition: "ICT risk management is in scope",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.path.join(".") === "applicability")).toBe(
+        true,
+      );
+    }
+  });
+
+  it("accepts exactly the two automatic applicability values", () => {
+    expect(ComplianceReferenceSchema.safeParse(baseReference).success).toBe(true);
+    expect(
+      ComplianceReferenceSchema.safeParse({
+        ...baseReference,
+        applicability: "applicable_if",
+        condition: "Personal data is processed",
+      }).success,
+    ).toBe(true);
+    for (const applicability of ["confirmed", "manual", "auto"]) {
+      expect(
+        ComplianceReferenceSchema.safeParse({ ...baseReference, applicability, condition: "x" })
+          .success,
+      ).toBe(false);
+    }
+  });
+});
+
+describe("ComplianceReferenceSchema — applicable_if condition (R-03)", () => {
+  const isoReference = {
+    framework: "ISO27001-2022",
+    identifier: "A.5.17",
+    description: "Authentication information",
+    source_url: "https://www.iso.org/standard/27001",
+  };
+
+  it("accepts an applicable_if reference carrying its condition", () => {
+    const parsed = ComplianceReferenceSchema.parse({
+      ...isoReference,
+      applicability: "applicable_if",
+      condition: "Authentication information is present in the finding",
+    });
+    expect(parsed.condition).toBe("Authentication information is present in the finding");
+  });
+
+  it("rejects an applicable_if reference without a condition (path: condition)", () => {
+    const result = ComplianceReferenceSchema.safeParse({
+      ...isoReference,
+      applicability: "applicable_if",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.path.join(".") === "condition")).toBe(true);
+    }
+  });
+
+  it("accepts an informational reference with the condition omitted", () => {
+    const parsed = ComplianceReferenceSchema.parse({
+      framework: "CWE",
+      identifier: "CWE-798",
+      description: "Use of Hard-coded Credentials",
+      source_url: "https://cwe.mitre.org/data/definitions/798.html",
+      applicability: "informational",
+    });
+    expect(parsed.condition).toBeUndefined();
+  });
+
+  it("rejects an empty-string condition (path: condition)", () => {
+    const result = ComplianceReferenceSchema.safeParse({
+      ...baseReference,
+      applicability: "applicable_if",
+      condition: "",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.path.includes("condition"))).toBe(true);
+    }
+  });
+});
+
+describe("FindingSchema — audit_reference (R-04)", () => {
+  it("accepts a canonical audit reference", () => {
+    expect(
+      FindingSchema.parse({ ...baseFinding, audit_reference: "SOVRI-AB-1F3C-9D02" })
+        .audit_reference,
+    ).toBe("SOVRI-AB-1F3C-9D02");
+  });
+
+  it("is absent by default", () => {
+    expect(FindingSchema.parse(baseFinding).audit_reference).toBeUndefined();
+  });
+
+  it.each([
+    "SOVRI-AB-1f3c-9D02",
+    "SOVRI-ab-1F3C-9D02",
+    "SOVRI-AB-1F3-9D02",
+    "SOVRI-AB-1F3C-9D02-AAAA",
+    "AB-1F3C-9D02",
+    "SOVRI-AB-1G3C-9D02",
+    "sovri-AB-1F3C-9D02",
+  ])("rejects a malformed audit_reference %p (path: audit_reference)", (value) => {
+    const result = FindingSchema.safeParse({ ...baseFinding, audit_reference: value });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.path.join(".") === "audit_reference")).toBe(
+        true,
+      );
+    }
+  });
+});
+
+describe("FindingSchema — compliance_references (R-05)", () => {
+  it("defaults to an empty array when omitted", () => {
+    expect(FindingSchema.parse(baseFinding).compliance_references).toEqual([]);
+  });
+
+  it("preserves a single valid reference", () => {
+    const parsed = FindingSchema.parse({
+      ...baseFinding,
+      compliance_references: [baseReference],
+    });
+    expect(parsed.compliance_references).toHaveLength(1);
+    expect(parsed.compliance_references[0]?.identifier).toBe("Art. 32");
+  });
+
+  it("preserves an explicit empty array", () => {
+    expect(
+      FindingSchema.parse({ ...baseFinding, compliance_references: [] }).compliance_references,
+    ).toEqual([]);
+  });
+
+  it("rejects an invalid nested reference (paths: compliance_references, condition)", () => {
+    const result = FindingSchema.safeParse({
+      ...baseFinding,
+      compliance_references: [
+        {
+          framework: "ISO27001-2022",
+          identifier: "A.5.17",
+          description: "Authentication information",
+          source_url: "https://www.iso.org/standard/27001",
+          applicability: "applicable_if",
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((issue) => issue.path.join("."));
+      expect(paths.some((path) => path.includes("compliance_references"))).toBe(true);
+      expect(paths.some((path) => path.includes("condition"))).toBe(true);
+    }
+  });
+});
+
+describe("FindingSchema — backward compatibility (R-06)", () => {
+  it("parses a pre-v0.3 finding and applies the new defaults", () => {
+    const legacyFinding = {
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      severity: "major",
+      category: "bug",
+      file: "src/index.ts",
+      line_start: 10,
+      line_end: 12,
+      title: "Possible null dereference",
+      body: "Variable foo may be null here.",
+      source: "llm",
+      confidence: 0.85,
+    };
+    const parsed = FindingSchema.parse(legacyFinding);
+    expect(parsed.compliance_references).toEqual([]);
+    expect(parsed.audit_reference).toBeUndefined();
+  });
+
+  it("keeps the severity domain unchanged", () => {
+    expect(SeveritySchema.options).toEqual(["blocker", "major", "minor", "info", "nitpick"]);
+  });
+
+  it("keeps the category domain unchanged", () => {
+    expect(CategorySchema.options).toEqual([
+      "bug",
+      "security",
+      "performance",
+      "maintainability",
+      "style",
+      "documentation",
+      "test-coverage",
+    ]);
+  });
+});
+
+describe("@sovri/core — compliance exports (R-07)", () => {
+  it("re-exports the compliance schemas from the package root", () => {
+    expect(typeof core.ComplianceFrameworkSchema.parse).toBe("function");
+    expect(typeof core.ComplianceReferenceSchema.parse).toBe("function");
+  });
+
+  it("parses a value typed as the exported ComplianceReference", () => {
+    const reference: ComplianceReference = {
+      framework: "CWE",
+      identifier: "CWE-798",
+      description: "Use of Hard-coded Credentials",
+      source_url: "https://cwe.mitre.org/data/definitions/798.html",
+      applicability: "informational",
+    };
+    expect(core.ComplianceReferenceSchema.parse(reference).framework).toBe("CWE");
   });
 });

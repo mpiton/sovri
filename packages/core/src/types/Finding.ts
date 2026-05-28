@@ -23,9 +23,43 @@ const SuggestionSchema = z.object({
 });
 
 const CwePattern = /^CWE-\d+$/;
+const AuditReferencePattern = /^SOVRI-[A-Z]{2}-[A-F0-9]{4}-[A-F0-9]{4}$/;
+
+export const ComplianceFrameworkSchema = z.enum([
+  "CWE",
+  "OWASP-TOP10-2021",
+  "ISO27001-2022",
+  "GDPR",
+  "DORA",
+  "NIS2",
+  "AI-ACT",
+  "CRA",
+]);
+export type ComplianceFramework = z.infer<typeof ComplianceFrameworkSchema>;
+
+export const ComplianceReferenceSchema = z
+  .object({
+    framework: ComplianceFrameworkSchema,
+    identifier: z.string().min(1),
+    description: z.string().min(1),
+    source_url: z.string().url(),
+    applicability: z.enum(["applicable_if", "informational"]),
+    condition: z.string().min(1).optional(),
+  })
+  .superRefine((reference, context) => {
+    if (reference.applicability === "applicable_if" && reference.condition === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["condition"],
+        message: "condition is required when applicability is applicable_if",
+      });
+    }
+  });
+export type ComplianceReference = z.infer<typeof ComplianceReferenceSchema>;
 
 export const FindingSchema = z.object({
   id: z.uuidv4(),
+  audit_reference: z.string().regex(AuditReferencePattern).optional(),
   severity: SeveritySchema,
   category: CategorySchema,
   file: z.string().min(1),
@@ -37,5 +71,6 @@ export const FindingSchema = z.object({
   source: z.enum(["llm", "sarif"]),
   confidence: z.number().min(0).max(1),
   cwe: z.string().regex(CwePattern).optional(),
+  compliance_references: z.array(ComplianceReferenceSchema).default([]),
 });
 export type Finding = z.infer<typeof FindingSchema>;

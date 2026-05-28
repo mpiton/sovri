@@ -31,6 +31,7 @@ const baseReview: Review = {
       body: "Variable `foo` may be `null` here because the early-return guard only checks `bar`.",
       source: "llm",
       confidence: 0.85,
+      compliance_references: [],
     },
   ],
   walkthrough_markdown: "## Sovri review\n\n1 finding.",

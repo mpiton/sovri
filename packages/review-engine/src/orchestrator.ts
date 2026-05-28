@@ -621,6 +621,7 @@ function buildReviewFailedFinding(diff: Diff, error: string): Finding {
     body: buildReviewFailedFindingBody(error),
     source: "llm",
     confidence: 1,
+    compliance_references: [],
   };
 }
 
@@ -669,6 +670,7 @@ function toFinding(finding: ProviderFinding): Finding {
     body: finding.body,
     source: "llm",
     confidence: finding.confidence,
+    compliance_references: [],
   };
 }
 
