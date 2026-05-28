@@ -58,7 +58,8 @@ const mappingEntries = [
   cwe863Entry,
   cwe918Entry,
 ] satisfies readonly unknown[];
-const cweMap = buildCweMap(mappingEntries);
+
+let cachedCweMap: ReadonlyMap<string, ComplianceMappingEntry> | undefined;
 
 function buildCweMap(entries: readonly unknown[]): ReadonlyMap<string, ComplianceMappingEntry> {
   const parsedEntries = entries.map((entry) =>
@@ -89,5 +90,9 @@ function freezeMappingEntry(entry: ComplianceMappingEntry): ComplianceMappingEnt
 }
 
 export function getCweMap(): ReadonlyMap<string, ComplianceMappingEntry> {
-  return new Map(cweMap);
+  // Build lazily on first access (memoized): a malformed bundled entry then
+  // throws here, inside a caller's guarded path, rather than at module import.
+  cachedCweMap ??= buildCweMap(mappingEntries);
+
+  return new Map(cachedCweMap);
 }

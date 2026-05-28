@@ -167,6 +167,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `fix(compliance)`: build the CWE map lazily (memoized in `getCweMap()`) instead
+  of at module import. A malformed bundled entry now throws inside a caller's
+  guarded path rather than crashing `@sovri/compliance` consumers at load time —
+  this is what lets the review-engine orchestrator degrade an affected finding
+  to empty `compliance_references` instead of failing the whole review.
+
 - `test`: exclude gitignored git worktrees (`.worktrees/**`) from Vitest test
   discovery, so stale duplicate test files inside local worktrees no longer run
   against the live workspace sources and surface false failures.
