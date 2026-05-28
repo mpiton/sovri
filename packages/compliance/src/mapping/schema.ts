@@ -3,6 +3,8 @@
 
 import { z } from "@sovri/core";
 
+import { findMissingRequiredReference } from "./required-references.js";
+
 export const ComplianceFrameworkSchema = z.enum([
   "CWE",
   "OWASP-TOP10-2021",
@@ -177,6 +179,18 @@ export const ComplianceMappingEntrySchema = z
           message: `${entry.cwe_id} requires ${gdprFramework} reference ${gdprArt32Identifier}`,
         });
       }
+    }
+
+    const missingRequiredReference =
+      canonicalCweId === undefined
+        ? undefined
+        : findMissingRequiredReference(canonicalCweId, entry.references);
+    if (missingRequiredReference !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["references"],
+        message: `${canonicalCweId} requires ${missingRequiredReference.framework} reference ${missingRequiredReference.identifier}`,
+      });
     }
   });
 export type ComplianceMappingEntry = z.infer<typeof ComplianceMappingEntrySchema>;
