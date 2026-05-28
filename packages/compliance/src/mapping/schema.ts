@@ -85,6 +85,7 @@ const isoSecureCodingFramework = "ISO27001-2022";
 const isoSecureCodingIdentifier = "A.8.28";
 const missingAuthorizationCweId = "CWE-862";
 const doraFramework = "DORA";
+const doraIctRiskManagementIdentifier = "Art. 9";
 const webVulnerabilityCweIds = new Set(["CWE-79", "CWE-89"]);
 const gdprFramework = "GDPR";
 const gdprArt32Identifier = "Art. 32";
@@ -149,14 +150,16 @@ export const ComplianceMappingEntrySchema = z
 
     if (canonicalCweId === missingAuthorizationCweId) {
       const hasDoraReference = entry.references.some(
-        (reference) => reference.framework === doraFramework,
+        (reference) =>
+          reference.framework === doraFramework &&
+          reference.identifier === doraIctRiskManagementIdentifier,
       );
 
       if (!hasDoraReference) {
         context.addIssue({
           code: "custom",
           path: ["references"],
-          message: `${missingAuthorizationCweId} requires ${doraFramework} reference`,
+          message: `${missingAuthorizationCweId} requires ${doraFramework} reference ${doraIctRiskManagementIdentifier}`,
         });
       }
     }

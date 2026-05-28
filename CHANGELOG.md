@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(compliance)`: add acceptance coverage rejecting `CWE-862` mappings
+  whose DORA reference is not Art. 9.
+
 - `test(compliance)`: add acceptance coverage for zero-padded CWE
   normalization before the ISO 27001 and DORA required-reference audits.
 
@@ -170,6 +173,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   cannot drift from the release tag.
 
 ### Fixed
+
+- `fix(compliance)`: require the canonical DORA Art. 9 identifier for `CWE-862`
+  mappings instead of accepting any DORA reference.
 
 - `fix(compliance)`: normalize zero-padded CWE identifiers before enforcing
   the ISO 27001 secure coding and DORA required references.

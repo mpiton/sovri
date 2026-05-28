@@ -84,6 +84,33 @@ function buildZeroPaddedCwe862EntryWithoutDoraReference(): ComplianceMappingEntr
   };
 }
 
+function buildCwe862EntryWithWrongDoraIdentifier(): ComplianceMappingEntry {
+  return {
+    cwe_id: "CWE-862",
+    title: "Missing Authorization",
+    mitre_url: "https://cwe.mitre.org/data/definitions/862.html",
+    impacts: ["Unauthorized access", "Privilege abuse"],
+    references: [
+      {
+        framework: "CWE",
+        identifier: "CWE-862",
+        description: "Missing Authorization",
+        source_url: "https://cwe.mitre.org/data/definitions/862.html",
+        applicability: "informational",
+      },
+      {
+        framework: "DORA",
+        identifier: "Art. 5",
+        description:
+          "Unrelated DORA governance article that does not cover ICT risk management controls.",
+        source_url: "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022R2554",
+        applicability: "applicable_if",
+        condition: "The entity is a financial entity subject to DORA",
+      },
+    ],
+  };
+}
+
 function buildCwe89EntryWithMismatchedMitreUrl(): ComplianceMappingEntry {
   return {
     cwe_id: "CWE-89",
@@ -413,5 +440,21 @@ describe("Compliance mapping data audits", () => {
 
     expect(failureText).toContain("CWE-862");
     expect(failureText).toContain("DORA");
+  });
+
+  it("rejects a critical ICT CWE whose DORA reference is not Art. 9", () => {
+    const candidateEntry = buildCwe862EntryWithWrongDoraIdentifier();
+
+    const result = ComplianceMappingEntrySchema.safeParse(candidateEntry);
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError("Expected the critical ICT regulatory audit to fail.");
+    }
+
+    const failureText = result.error.issues.map((issue) => issue.message).join("\n");
+
+    expect(failureText).toContain("CWE-862");
+    expect(failureText).toContain("Art. 9");
   });
 });
