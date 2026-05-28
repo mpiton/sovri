@@ -25,8 +25,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   candidates that miss any required reference: CWE-200 (GDPR Art. 32),
   CWE-284 and CWE-863 (GDPR Art. 32 + DORA Art. 9), CWE-639 (GDPR Art. 32 +
   ISO 27001 A.5.15), CWE-770 (DORA Art. 9 + NIS2 Art. 21(2)(b)), and CWE-918
-  (AI Act Art. 12), and audit the full CWE-798 flagship reference set by
-  framework and identifier.
+  (AI Act Art. 12), and enforce the full CWE-798 flagship reference set
+  (by framework and identifier) when the static CWE map is built.
 
 - `test(compliance)`: add acceptance coverage for the batch 2 regulatory
   gates (CWE-798 flagship, CWE-200, CWE-770, CWE-639, CWE-863/284, CWE-918).

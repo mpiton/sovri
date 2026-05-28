@@ -2,6 +2,7 @@
 // Copyright 2026 Sovri SAS
 
 import { ComplianceMappingEntrySchema, type ComplianceMappingEntry } from "./schema.js";
+import { auditFlagshipCredentials } from "./required-references.js";
 import cwe22Entry from "./data/CWE-22.json" with { type: "json" };
 import cwe78Entry from "./data/CWE-78.json" with { type: "json" };
 import cwe79Entry from "./data/CWE-79.json" with { type: "json" };
@@ -63,6 +64,15 @@ function buildCweMap(entries: readonly unknown[]): ReadonlyMap<string, Complianc
   const parsedEntries = entries.map((entry) =>
     freezeMappingEntry(ComplianceMappingEntrySchema.parse(entry)),
   );
+
+  for (const entry of parsedEntries) {
+    const flagshipFailure = auditFlagshipCredentials(entry);
+    if (flagshipFailure !== undefined) {
+      throw new Error(
+        `${flagshipFailure.cwe_id} flagship mapping is missing required frameworks: ${flagshipFailure.missingFrameworks.join(", ")}`,
+      );
+    }
+  }
 
   return new Map(parsedEntries.map((entry) => [entry.cwe_id, entry]));
 }
