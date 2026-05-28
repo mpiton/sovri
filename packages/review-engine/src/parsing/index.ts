@@ -14,6 +14,10 @@ export const ProviderFindingSchema = z
     title: z.string().min(1).max(200),
     body: z.string().min(1).max(2000),
     confidence: z.number().min(0).max(1).default(1),
+    cwe: z
+      .string()
+      .regex(/^CWE-\d+$/)
+      .optional(),
   })
   .refine(({ line_start, line_end }) => line_end >= line_start, {
     path: ["line_end"],
