@@ -6,9 +6,13 @@ export { z } from "zod";
 
 export {
   CategorySchema,
+  ComplianceFrameworkSchema,
+  ComplianceReferenceSchema,
   FindingSchema,
   SeveritySchema,
   type Category,
+  type ComplianceFramework,
+  type ComplianceReference,
   type Finding,
   type Severity,
 } from "./types/Finding.js";

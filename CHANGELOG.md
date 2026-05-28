@@ -21,6 +21,21 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(core)`: extend the `Finding` schema for the Compliance Trail — add a
+  defaulted `compliance_references` array and an optional `audit_reference`
+  (`SOVRI-XX-HHHH-HHHH`), plus `ComplianceFrameworkSchema` (CWE, OWASP Top 10,
+  ISO 27001, GDPR, DORA, NIS2, AI Act, CRA) and `ComplianceReferenceSchema`
+  (applicability `applicable_if` | `informational`, never `confirmed`;
+  `condition` required when `applicable_if`), all re-exported from
+  `@sovri/core`. Pre-v0.3 findings still parse (backward compatible). Internal
+  `@sovri/review-engine` finding constructors set `compliance_references: []`
+  to match the extended shape (real-reference enrichment is wired separately).
+
+- `test(core)`: add acceptance coverage for the compliance framework enum,
+  reference applicability and condition rules, the audit-reference format,
+  `compliance_references` defaulting, backward compatibility, and the new
+  public exports.
+
 - `feat(compliance)`: require batch 2 regulatory references — reject mapping
   candidates that miss any required reference: CWE-200 (GDPR Art. 32),
   CWE-284 and CWE-863 (GDPR Art. 32 + DORA Art. 9), CWE-639 (GDPR Art. 32 +
@@ -105,6 +120,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `test(compliance)`: add acceptance coverage proving batch 1 CWE mapping
   `applicable_if` references carry explicit regulated-context conditions.
+
+### Fixed
+
+- `test`: exclude gitignored git worktrees (`.worktrees/**`) from Vitest test
+  discovery, so stale duplicate test files inside local worktrees no longer run
+  against the live workspace sources and surface false failures.
 
 ### Security
 
