@@ -27,7 +27,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   ISO 27001, GDPR, DORA, NIS2, AI Act, CRA) and `ComplianceReferenceSchema`
   (applicability `applicable_if` | `informational`, never `confirmed`;
   `condition` required when `applicable_if`), all re-exported from
-  `@sovri/core`. Pre-v0.3 findings still parse (backward compatible).
+  `@sovri/core`. Pre-v0.3 findings still parse (backward compatible). Internal
+  `@sovri/review-engine` finding constructors set `compliance_references: []`
+  to match the extended shape (real-reference enrichment is wired separately).
 
 - `test(core)`: add acceptance coverage for the compliance framework enum,
   reference applicability and condition rules, the audit-reference format,
