@@ -21,6 +21,15 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(compliance)`: add the in-memory `AuditTrailSink` (task-96, #1937) —
+  `AuditTrailSink` is the orchestrator-facing port (`append(event): Promise<void>`) and
+  `MemoryAuditTrailSink` stores unsigned `AuditTrailLogicalEvent`s for orchestrator tests.
+  `append()` re-validates each event against `AuditTrailLogicalEventSchema` and rejects
+  malformed input — including any event carrying `previous_hash` / `entry_hash` /
+  `signature` — without storing it; `getEvents()` returns a defensive deep copy in insertion
+  order (neither the array nor its events alias the stored trail). Signing stays in the file
+  writer (task-98). Both are exported from `@sovri/compliance`.
+
 - `feat(compliance)`: harden audit-trail field validation to match the core review
   contract (task-95, #1932) — `review.started.pr_id` is a positive integer, `commit_sha`
   is a 40-char hex sha, `llm.called.tokens_in` / `tokens_out` are non-negative integers,

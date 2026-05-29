@@ -10,6 +10,8 @@ export {
   type SignedAuditTrailEntry,
 } from "./audit-trail/schema.js";
 
+export { type AuditTrailSink, MemoryAuditTrailSink } from "./audit-trail/sink.js";
+
 export { enrichFindingCompliance } from "./mapping/enricher.js";
 export { getCweMap } from "./mapping/loader.js";
 export {
