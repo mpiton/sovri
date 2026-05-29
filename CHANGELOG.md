@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `chore(config)`: add the repository-level `.sovri.yml` used by Sovri's own
+  PR reviews, selecting the Mistral provider through the `MISTRAL_API_KEY`
+  runtime environment variable and applying standard review limits/ignores.
+
 - `feat(compliance)`: add the offline audit-trail verifier (task-99, #1952) —
   `verifyAuditTrail(entries, publicKey)` validates a `SignedAuditTrailEntry[]` offline with no I/O
   and returns `VerifyResult` (`{ valid: true }`, or `{ valid: false, failAt, reason }` at the first
@@ -281,6 +285,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `applicable_if` references carry explicit regulated-context conditions.
 
 ### Fixed
+
+- `test`: alias `@sovri/compliance` to its source entrypoint in the root Vitest
+  config so review-engine source tests do not resolve the package through
+  built `dist` output.
+
+- `fix(compliance)`: reject non-canonical Ed25519 audit-trail signature
+  encodings in `verifyAuditTrail`, including missing `ed25519:` prefixes,
+  padding, ignored junk, or extra base64url suffixes.
 
 - `fix(compliance)`: build the CWE map lazily (memoized in `getCweMap()`) instead
   of at module import. A malformed bundled entry now throws inside a caller's

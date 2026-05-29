@@ -7,6 +7,9 @@ import { fileURLToPath } from "node:url";
 const repoRoot = fileURLToPath(new URL(".", import.meta.url));
 
 const workspaceSourceAliases = {
+  "@sovri/compliance": fileURLToPath(
+    new URL("./packages/compliance/src/index.ts", import.meta.url),
+  ),
   "@sovri/config": fileURLToPath(new URL("./packages/config/src/index.ts", import.meta.url)),
   "@sovri/core": fileURLToPath(new URL("./packages/core/src/index.ts", import.meta.url)),
   "@sovri/llm-providers": fileURLToPath(

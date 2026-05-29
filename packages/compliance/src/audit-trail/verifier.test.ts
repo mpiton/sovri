@@ -195,6 +195,45 @@ describe("Offline audit-trail verification — a corrupted signature on one entr
   });
 });
 
+describe("Offline audit-trail verification — non-canonical signature encodings are rejected (R-06, R-07)", () => {
+  const cases: ReadonlyArray<{
+    name: string;
+    mutate: (signature: string) => string;
+  }> = [
+    {
+      name: "missing ed25519 prefix",
+      mutate: (signature) => signature.replace(/^ed25519:/u, ""),
+    },
+    {
+      name: "base64url padding suffix",
+      mutate: (signature) => `${signature}==`,
+    },
+    {
+      name: "ignored non-base64url junk suffix",
+      mutate: (signature) => `${signature}!!`,
+    },
+    {
+      name: "extra base64url suffix",
+      mutate: (signature) => `${signature}AA`,
+    },
+  ];
+
+  it.each(cases)("reports signature invalid at index 0 for $name", ({ mutate }) => {
+    // Given the signed 5-entry trail from the background
+    const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+    const trail = signedTrail(createSigner(privateKey));
+
+    // When entry 0's signature encoding is changed without changing its decoded signature bytes
+    const tampered = withPatch(trail.all, 0, { signature: mutate(trail.started.signature) });
+
+    // And I verify the trail against the matching public key
+    const result = verifyAuditTrail(tampered, publicKey);
+
+    // Then the result is { valid: false } with failAt 0 and reason "signature invalid"
+    expect(result).toEqual({ valid: false, failAt: 0, reason: "signature invalid" });
+  });
+});
+
 describe("Offline audit-trail verification — when an entry fails several checks at once the chain check wins (R-05, R-04, R-07)", () => {
   it("reports previous_hash mismatch, not entry_hash mismatch, when both break at index 2", () => {
     // Given the signed 5-entry trail from the background

@@ -5,6 +5,9 @@ import { createHash, verify, type KeyObject } from "node:crypto";
 
 import type { SignedAuditTrailEntry } from "./schema.js";
 
+const ED25519_SIGNATURE_LENGTH_BYTES = 64;
+const ED25519_SIGNATURE_PATTERN = /^ed25519:([A-Za-z0-9_-]+)$/u;
+
 /**
  * Outcome of an offline audit-trail verification. `valid` is the only field on success; on the
  * first failing entry the verifier adds `failAt` (its 0-based index) and a fixed `reason`.
@@ -24,6 +27,20 @@ function canonicalize(entry: SignedAuditTrailEntry): string {
   delete withoutCryptoFields.entry_hash;
   delete withoutCryptoFields.signature;
   return JSON.stringify(withoutCryptoFields);
+}
+
+function decodeCanonicalSignature(signature: string): Buffer | undefined {
+  const encoded = ED25519_SIGNATURE_PATTERN.exec(signature)?.[1];
+  if (encoded === undefined) {
+    return undefined;
+  }
+
+  const decoded = Buffer.from(encoded, "base64url");
+  if (decoded.length !== ED25519_SIGNATURE_LENGTH_BYTES) {
+    return undefined;
+  }
+
+  return decoded.toString("base64url") === encoded ? decoded : undefined;
 }
 
 /**
@@ -56,10 +73,11 @@ export function verifyAuditTrail(
       return { valid: false, failAt: index, reason: "entry_hash mismatch" };
     }
 
-    const signatureBytes: Buffer = Buffer.from(
-      entry.signature.replace(/^ed25519:/, ""),
-      "base64url",
-    );
+    const signatureBytes = decodeCanonicalSignature(entry.signature);
+    if (signatureBytes === undefined) {
+      return { valid: false, failAt: index, reason: "signature invalid" };
+    }
+
     if (!verify(null, Buffer.from(entry.entry_hash), publicKey, signatureBytes)) {
       return { valid: false, failAt: index, reason: "signature invalid" };
     }

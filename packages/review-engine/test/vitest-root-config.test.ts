@@ -75,6 +75,15 @@ const documentationViolationExamples: readonly DocumentationViolationExample[] =
   { documentation: "Coverage provider is v8" },
 ];
 
+const workspaceSourceAliasExamples: readonly string[] = [
+  "@sovri/compliance",
+  "@sovri/config",
+  "@sovri/core",
+  "@sovri/llm-providers",
+  "@sovri/observability",
+  "@sovri/review-engine",
+];
+
 function readRepoFile(relativePath: string): string {
   return readFileSync(resolve(repoRoot, relativePath), "utf8");
 }
@@ -137,6 +146,18 @@ function extractVitestImports(source: string): Set<string> {
 }
 
 describe("Vitest root config explicit import policy", () => {
+  it("aliases workspace packages to source entrypoints", () => {
+    // Given Vitest imports workspace packages from source during test runs
+    const config = readVitestConfig();
+
+    // Then every workspace package consumed by source tests is covered
+    for (const packageName of workspaceSourceAliasExamples) {
+      const packagePath = packageName.replace("@sovri/", "");
+      expect(config).toContain(`"${packageName}"`);
+      expect(config).toContain(`./packages/${packagePath}/src/index.ts`);
+    }
+  });
+
   it.each(explicitImportExamples)("keeps explicit imports in $file", (example) => {
     // Given "vitest.config.ts" sets "test.globals" to false
     const config = readVitestConfig();
