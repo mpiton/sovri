@@ -21,6 +21,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(compliance)`: add the ADR-014 `trail.completed` seal to
+  `SignedAuditTrailEntrySchema` (task-95, #1933) — a signed-only 8th variant carrying
+  `entry_count` (a non-negative integer) plus the chain/signature fields. The seal is not
+  an `AuditTrailLogicalEvent` (the logical union stays at 7 types) and is rejected by
+  `AuditTrailLogicalEventSchema`. Addresses the Codex review note on #1931.
+
 - `feat(compliance)`: add audit trail event Zod schemas (task-95, #1930) —
   `AuditTrailLogicalEventSchema` is a strict `z.discriminatedUnion` over the 7 logical
   event types (`trail.started`, `review.started`, `llm.called`, `finding.created`,

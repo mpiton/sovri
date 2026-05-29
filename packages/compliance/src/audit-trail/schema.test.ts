@@ -330,3 +330,53 @@ describe("public exports from @sovri/compliance (R-07)", () => {
     expectTypeOf<SignedAuditTrailEntry>().not.toBeNever();
   });
 });
+
+describe("SignedAuditTrailEntrySchema — trail.completed seal (R-08)", () => {
+  const SEAL_SIGNING = {
+    previous_hash: "sha256:1111",
+    entry_hash: "sha256:2222",
+    signature: "ed25519:zzzz",
+  };
+
+  it("validates a signed trail.completed seal", () => {
+    // Given a signed entry with ts "2026-05-26T14:35:00Z" and event "trail.completed"
+    // And the seal payload {"entry_count":5} / And the signing fields
+    // When it is parsed by SignedAuditTrailEntrySchema / Then the result is valid
+    const result = SignedAuditTrailEntrySchema.safeParse({
+      ts: "2026-05-26T14:35:00Z",
+      event: "trail.completed",
+      entry_count: 5,
+      ...SEAL_SIGNING,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a trail.completed seal missing entry_count", () => {
+    // Then the result is invalid / the error path includes "entry_count"
+    const error = rejectSigned({
+      ts: "2026-05-26T14:35:00Z",
+      event: "trail.completed",
+      ...SEAL_SIGNING,
+    });
+    expect(errorLocus(error)).toContain("entry_count");
+  });
+
+  it.each([-1, 5.5])("rejects a trail.completed seal whose entry_count is %s", (entry_count) => {
+    // Given a seal payload with a non-count entry_count
+    // Then the result is invalid / the error path includes "entry_count"
+    const error = rejectSigned({
+      ts: "2026-05-26T14:35:00Z",
+      event: "trail.completed",
+      entry_count,
+      ...SEAL_SIGNING,
+    });
+    expect(errorLocus(error)).toContain("entry_count");
+  });
+
+  it("does not accept trail.completed as a logical event", () => {
+    // Given a logical event with ts "2026-05-26T14:35:00Z" and event "trail.completed"
+    // And the payload {"entry_count":5}
+    // When it is parsed by AuditTrailLogicalEventSchema / Then the result is invalid
+    rejectLogical({ ts: "2026-05-26T14:35:00Z", event: "trail.completed", entry_count: 5 });
+  });
+});

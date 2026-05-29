@@ -86,9 +86,18 @@ const chainFields = {
   signature: z.string(),
 };
 
+// Writer-generated closing seal (ADR-014): signed-only, records the final entry
+// count. It is not a logical event, so it appears in the signed union alone.
+const TrailCompletedSealSchema = z.strictObject({
+  ts: timestamp,
+  event: z.literal("trail.completed"),
+  entry_count: z.number().int().nonnegative(),
+  ...chainFields,
+});
+
 /**
- * Signed JSONL entry: a logical event plus the writer's `previous_hash`,
- * `entry_hash` and `signature`.
+ * Signed JSONL entry: a signed logical event (logical event + the writer's
+ * `previous_hash` / `entry_hash` / `signature`), or the `trail.completed` seal.
  */
 export const SignedAuditTrailEntrySchema = z.discriminatedUnion("event", [
   z.strictObject({ ...TrailStartedEventSchema.shape, ...chainFields }),
@@ -98,5 +107,6 @@ export const SignedAuditTrailEntrySchema = z.discriminatedUnion("event", [
   z.strictObject({ ...ReviewCompletedEventSchema.shape, ...chainFields }),
   z.strictObject({ ...ReviewFailedEventSchema.shape, ...chainFields }),
   z.strictObject({ ...CorrectionEventSchema.shape, ...chainFields }),
+  TrailCompletedSealSchema,
 ]);
 export type SignedAuditTrailEntry = z.infer<typeof SignedAuditTrailEntrySchema>;
