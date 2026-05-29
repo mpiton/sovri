@@ -21,6 +21,19 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(compliance)`: add the internal Ed25519 audit-trail signer (task-97, #1942) —
+  `createSigner(privateKey)` returns `(event, previousHash) => SignedAuditTrailEntry`. It
+  hashes the canonical JSON of the logical event plus its `previous_hash` (`entry_hash =
+  "sha256:" + sha256(canonical)`, excluding only `entry_hash` and `signature`) and signs
+  that hash with Ed25519 through `node:crypto` (`signature = "ed25519:" + base64url(...)`).
+  Folding `previous_hash` into the signed content makes deletion and reordering of entries
+  tamper-evident. The input event is re-parsed against `AuditTrailLogicalEventSchema` before
+  hashing, so stray `entry_hash` / `signature` fields can never leak into the canonical, and
+  the assembled entry is validated against `SignedAuditTrailEntrySchema` before return, forcing
+  a first entry (`trail.started`) to carry a null `previous_hash`.
+  Internal in v0.3: not exported from `@sovri/compliance`, reserved for the Cloud writer to
+  keep the attack surface small.
+
 - `feat(compliance)`: add the in-memory `AuditTrailSink` (task-96, #1937) —
   `AuditTrailSink` is the orchestrator-facing port (`append(event): Promise<void>`) and
   `MemoryAuditTrailSink` stores unsigned `AuditTrailLogicalEvent`s for orchestrator tests.
