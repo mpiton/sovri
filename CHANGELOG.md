@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add a failing acceptance test for the inline comment audit
+  reference line (task-94, #1925) — each inline comment must append a `🔍 Audit Reference`
+  line as its last line (separated by a blank line); an undefined `audit_reference` adds
+  no line; the `📋 Potential compliance references` tree stays walkthrough-only.
+
 - `chore(review-engine)`: drop an internal-doc reference from a walkthrough test
   comment so the public Apache surface carries no dead link.
 
