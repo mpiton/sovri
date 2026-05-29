@@ -25,8 +25,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `AuditTrailSink` is the orchestrator-facing port (`append(event): Promise<void>`) and
   `MemoryAuditTrailSink` stores unsigned `AuditTrailLogicalEvent`s for orchestrator tests.
   `append()` re-validates each event against `AuditTrailLogicalEventSchema` and rejects
-  malformed input (nothing is stored on rejection); `getEvents()` returns a defensive copy
-  in insertion order. Signing stays in the file writer (task-98). Both are exported from
+  malformed input — including any event carrying `previous_hash` / `entry_hash` /
+  `signature` — without storing it; `getEvents()` returns a defensive copy in insertion
+  order. Signing stays in the file writer (task-98). Both are exported from
   `@sovri/compliance`.
 
 - `feat(compliance)`: harden audit-trail field validation to match the core review
