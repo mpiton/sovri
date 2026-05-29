@@ -1,0 +1,19 @@
+llm:
+  provider: mistral
+  model: mistral-large-latest
+  apiKeySecret: MISTRAL_API_KEY
+
+review:
+  mode: full
+  autoReviewDrafts: false
+  severityThreshold: minor
+
+ignores:
+  - "dist/**"
+  - "coverage/**"
+  - "**/*.generated.ts"
+  - "**/*.snap"
+
+limits:
+  maxFilesPerReview: 75
+  maxLinesPerReview: 8000

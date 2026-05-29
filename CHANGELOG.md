@@ -21,6 +21,23 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `chore(config)`: add the repository-level `.sovri.yml` used by Sovri's own
+  PR reviews, selecting the Mistral provider through the `MISTRAL_API_KEY`
+  runtime environment variable and applying standard review limits/ignores.
+
+- `feat(compliance)`: add the offline audit-trail verifier (task-99, #1952) —
+  `verifyAuditTrail(entries, publicKey)` validates a `SignedAuditTrailEntry[]` offline with no I/O
+  and returns a discriminated-union `VerifyResult` (`{ valid: true }`, or `{ valid: false, failAt,
+  reason }` at the first failing entry, where `reason` is one of `previous_hash mismatch`,
+  `entry_hash mismatch`, `signature invalid`). Each entry runs three checks in a fixed order —
+  hash-chain (null anchor on the first entry, then `previous_hash[N] === entry_hash[N-1]`),
+  `entry_hash` recompute over the same canonical the signer hashes (`previous_hash` included, only
+  `entry_hash` + `signature` excluded), and the Ed25519 `signature` over the `entry_hash`, which is
+  accepted only as a canonical `ed25519:<base64url>` encoding of the 64-byte signature (a missing
+  prefix, padding, stray characters, or a re-encoded suffix are rejected) — stopping at the first
+  failure. Exported from `@sovri/compliance` so an external auditor can confirm a trail without
+  trusting Sovri's servers.
+
 - `feat(compliance)`: add the internal file-backed audit-trail writer (task-98, #1947) —
   `createFileAuditTrailWriter(filePath, signer)` returns an `AuditTrailSink` whose `append()`
   signs each unsigned `AuditTrailLogicalEvent` through the injected signer and appends the
@@ -271,6 +288,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `applicable_if` references carry explicit regulated-context conditions.
 
 ### Fixed
+
+- `test`: alias `@sovri/compliance` to its source entrypoint in the root Vitest
+  config so review-engine source tests do not resolve the package through
+  built `dist` output.
+
+- `fix(compliance)`: reject non-canonical Ed25519 audit-trail signature
+  encodings in `verifyAuditTrail`, including missing `ed25519:` prefixes,
+  padding, ignored junk, or extra base64url suffixes.
 
 - `fix(compliance)`: build the CWE map lazily (memoized in `getCweMap()`) instead
   of at module import. A malformed bundled entry now throws inside a caller's

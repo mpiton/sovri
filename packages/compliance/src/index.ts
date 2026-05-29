@@ -12,6 +12,8 @@ export {
 
 export { type AuditTrailSink, MemoryAuditTrailSink } from "./audit-trail/sink.js";
 
+export { verifyAuditTrail, type VerifyResult } from "./audit-trail/verifier.js";
+
 export { enrichFindingCompliance } from "./mapping/enricher.js";
 export { getCweMap } from "./mapping/loader.js";
 export {
