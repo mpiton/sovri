@@ -73,7 +73,11 @@ function buildInlineCommentDraft(finding: Finding): InlineCommentDraft {
 }
 
 function formatInlineBody(finding: Finding): string {
-  return [`**${finding.title}**`, "", finding.body].join("\n");
+  const body = [`**${finding.title}**`, "", finding.body].join("\n");
+  const auditLine = finding.audit_reference
+    ? `\n\n🔍 Audit Reference: ${finding.audit_reference}`
+    : "";
+  return `${body}${auditLine}`;
 }
 
 function collectRightSideLines(diff: Diff): ReadonlyMap<string, ReadonlySet<number>> {
