@@ -21,6 +21,17 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(compliance)`: add the internal file-backed audit-trail writer (task-98, #1947) —
+  `createFileAuditTrailWriter(filePath, signer)` returns an `AuditTrailSink` whose `append()`
+  signs each unsigned `AuditTrailLogicalEvent` through the injected signer and appends the
+  resulting `SignedAuditTrailEntry` as one JSONL line (`JSON.stringify(entry) + "\n"`) in append
+  mode, so existing entries are never rewritten. The `previousHash` is held in a closure (null
+  for the first entry, advanced after each successful write) so consecutive lines chain by hash;
+  a failed disk write propagates to the caller and leaves the chain un-advanced. All signing is
+  delegated to the injected signer, so the writer holds no key material, and appends must be
+  serialised — the closure head is read at the start of each `append`. Internal in v0.3: not
+  exported from `@sovri/compliance`, reserved for the Cloud writer.
+
 - `feat(compliance)`: add the internal Ed25519 audit-trail signer (task-97, #1942) —
   `createSigner(privateKey)` returns `(event, previousHash) => SignedAuditTrailEntry`. It
   hashes the canonical JSON of the logical event plus its `previous_hash` (`entry_hash =
