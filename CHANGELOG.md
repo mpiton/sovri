@@ -25,8 +25,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   contract (task-95, #1932) — `review.started.pr_id` is a positive integer, `commit_sha`
   is a 40-char hex sha, `llm.called.tokens_in` / `tokens_out` are non-negative integers,
   the `trail.completed` seal `entry_count` is a positive integer, and a signed entry's
-  `previous_hash` is non-null except for the first entry (`trail.started`). Addresses the
-  Codex and CodeRabbit review notes on #1932.
+  `previous_hash` is non-null except for the first entry (`trail.started`), whose
+  `previous_hash` is exactly `null`. Addresses the Codex and CodeRabbit review notes on
+  #1932.
 
 - `feat(compliance)`: add the ADR-014 `trail.completed` seal to
   `SignedAuditTrailEntrySchema` (task-95, #1933) — a signed-only 8th variant carrying

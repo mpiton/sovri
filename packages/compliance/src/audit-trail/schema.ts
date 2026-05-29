@@ -88,10 +88,11 @@ const chainFields = {
   signature: z.string(),
 };
 
-// The trail's first entry (trail.started) has no predecessor: its `previous_hash` is null.
+// The trail's first entry (trail.started) has no predecessor: its `previous_hash` is
+// exactly null, never a hash string.
 const firstEntryChainFields = {
   ...chainFields,
-  previous_hash: z.string().nullable(),
+  previous_hash: z.null(),
 };
 
 // Writer-generated closing seal (ADR-014): signed-only, records the final entry

@@ -455,4 +455,18 @@ describe("SignedAuditTrailEntrySchema — previous_hash is null only for the fir
     });
     expect(errorLocus(error)).toContain("previous_hash");
   });
+
+  it("rejects a trail.started first entry whose previous_hash is a non-null string", () => {
+    // Given a trail.started signed entry with a string previous_hash (it has no predecessor)
+    // Then the result is invalid / the error path includes "previous_hash"
+    const error = rejectSigned({
+      ts: TS,
+      event: "trail.started",
+      ...NOMINAL_PAYLOADS["trail.started"],
+      previous_hash: "sha256:0000",
+      entry_hash: "sha256:1111",
+      signature: "ed25519:zzzz",
+    });
+    expect(errorLocus(error)).toContain("previous_hash");
+  });
 });
