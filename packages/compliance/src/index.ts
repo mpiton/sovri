@@ -3,6 +3,13 @@
 
 export const compliancePackageName = "@sovri/compliance";
 
+export {
+  AuditTrailLogicalEventSchema,
+  SignedAuditTrailEntrySchema,
+  type AuditTrailLogicalEvent,
+  type SignedAuditTrailEntry,
+} from "./audit-trail/schema.js";
+
 export { enrichFindingCompliance } from "./mapping/enricher.js";
 export { getCweMap } from "./mapping/loader.js";
 export {
