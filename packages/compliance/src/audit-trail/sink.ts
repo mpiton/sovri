@@ -26,8 +26,10 @@ export class MemoryAuditTrailSink implements AuditTrailSink {
     this.#events.push(AuditTrailLogicalEventSchema.parse(event));
   }
 
-  // Defensive copy: mutating the returned array cannot corrupt the stored trail.
+  // Defensive deep copy: neither the returned array nor the event objects it holds alias
+  // the stored trail, so a caller cannot corrupt it — not via push/pop on the array, nor by
+  // mutating a returned event's fields. Integrity is the whole point of an audit trail.
   getEvents(): readonly AuditTrailLogicalEvent[] {
-    return [...this.#events];
+    return structuredClone(this.#events);
   }
 }

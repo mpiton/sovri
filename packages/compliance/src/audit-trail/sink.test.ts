@@ -107,6 +107,22 @@ describe("MemoryAuditTrailSink — getEvents preserves insertion order (R-03)", 
     // Then a subsequent getEvents still returns 1 event
     expect(sink.getEvents()).toHaveLength(1);
   });
+
+  it("returns events that do not alias the stored trail", async () => {
+    // Given a MemoryAuditTrailSink with 1 appended event
+    const sink = new MemoryAuditTrailSink();
+    await sink.append(findingCreated);
+
+    // When the caller mutates a field of a returned event
+    // (cast past readonly to simulate a hostile caller mutating a returned event object)
+    const [returned] = sink.getEvents() as AuditTrailLogicalEvent[];
+    if (returned?.event === "finding.created") {
+      returned.compliance_references.push("INJECTED");
+    }
+
+    // Then a subsequent getEvents still returns the event unchanged
+    expect(sink.getEvents()).toEqual([findingCreated]);
+  });
 });
 
 describe("MemoryAuditTrailSink — append runtime-validates and stores nothing on rejection (R-01, R-02, R-04)", () => {
