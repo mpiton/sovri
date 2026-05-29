@@ -217,6 +217,27 @@ describe("Ed25519 signer — the signed entry conforms to SignedAuditTrailEntryS
   );
 });
 
+describe("Ed25519 signer — input is normalised so stale signing fields never enter the canonical (R-03)", () => {
+  it("rejects an event that already carries entry_hash or signature fields", () => {
+    // Given an Ed25519 key pair
+    // And a signer created from the private key
+    const { privateKey } = generateKeyPairSync("ed25519");
+    const signEntry = createSigner(privateKey);
+
+    // And an event still carrying signing fields (a SignedAuditTrailEntry is structurally
+    // assignable to AuditTrailLogicalEvent; cast past the static type to feed the runtime guard)
+    const taintedEvent: unknown = {
+      ts: TS,
+      event: "review.completed",
+      entry_hash: "sha256:dead",
+      signature: "ed25519:beef",
+    };
+
+    // When I sign that event, Then signing is rejected (the stale fields never reach the canonical)
+    expect(() => signEntry(taintedEvent as AuditTrailLogicalEvent, SEED_PREVIOUS_HASH)).toThrow();
+  });
+});
+
 describe("Ed25519 signer — createSigner is not part of the public package surface (R-08)", () => {
   it("is absent from the @sovri/compliance entrypoint and reachable only via the internal module", () => {
     // Given the @sovri/compliance public entrypoint at src/index.ts
