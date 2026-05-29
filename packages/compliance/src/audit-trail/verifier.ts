@@ -8,15 +8,21 @@ import type { SignedAuditTrailEntry } from "./schema.js";
 const ED25519_SIGNATURE_LENGTH_BYTES = 64;
 const ED25519_SIGNATURE_PATTERN = /^ed25519:([A-Za-z0-9_-]+)$/u;
 
+/** The fixed reasons a verification can fail, in the order the per-entry checks run. */
+type VerificationFailureReason =
+  | "previous_hash mismatch"
+  | "entry_hash mismatch"
+  | "signature invalid";
+
 /**
- * Outcome of an offline audit-trail verification. `valid` is the only field on success; on the
- * first failing entry the verifier adds `failAt` (its 0-based index) and a fixed `reason`.
+ * Outcome of an offline audit-trail verification. A success carries only `valid: true`; a failure
+ * carries the 0-based `failAt` index of the first failing entry and one fixed `reason`. The two
+ * shapes are a discriminated union, so a `valid` check narrows away the absent fields — there is
+ * no `valid: true` that also has a `reason`, and no `valid: false` missing its `failAt`.
  */
-export interface VerifyResult {
-  valid: boolean;
-  failAt?: number;
-  reason?: string;
-}
+export type VerifyResult =
+  | { valid: true }
+  | { valid: false; failAt: number; reason: VerificationFailureReason };
 
 // The canonical bytes the signer hashed: the entry minus its crypto fields, with `previous_hash`
 // and every logical field kept in their original order (R-03 — only `entry_hash` + `signature`

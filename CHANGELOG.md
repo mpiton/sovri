@@ -27,13 +27,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `feat(compliance)`: add the offline audit-trail verifier (task-99, #1952) —
   `verifyAuditTrail(entries, publicKey)` validates a `SignedAuditTrailEntry[]` offline with no I/O
-  and returns `VerifyResult` (`{ valid: true }`, or `{ valid: false, failAt, reason }` at the first
-  failing entry, where `reason` is one of `previous_hash mismatch`, `entry_hash mismatch`,
-  `signature invalid`). Each entry runs three checks in a fixed order — hash-chain (null anchor on the
-  first entry, then `previous_hash[N] === entry_hash[N-1]`), `entry_hash` recompute over the same
-  canonical the signer hashes (`previous_hash` included, only `entry_hash` + `signature` excluded),
-  and the Ed25519 `signature` over the `entry_hash` — stopping at the first failure. Exported from
-  `@sovri/compliance` so an external auditor can confirm a trail without trusting Sovri's servers.
+  and returns a discriminated-union `VerifyResult` (`{ valid: true }`, or `{ valid: false, failAt,
+  reason }` at the first failing entry, where `reason` is one of `previous_hash mismatch`,
+  `entry_hash mismatch`, `signature invalid`). Each entry runs three checks in a fixed order —
+  hash-chain (null anchor on the first entry, then `previous_hash[N] === entry_hash[N-1]`),
+  `entry_hash` recompute over the same canonical the signer hashes (`previous_hash` included, only
+  `entry_hash` + `signature` excluded), and the Ed25519 `signature` over the `entry_hash`, which is
+  accepted only as a canonical `ed25519:<base64url>` encoding of the 64-byte signature (a missing
+  prefix, padding, stray characters, or a re-encoded suffix are rejected) — stopping at the first
+  failure. Exported from `@sovri/compliance` so an external auditor can confirm a trail without
+  trusting Sovri's servers.
 
 - `feat(compliance)`: add the internal file-backed audit-trail writer (task-98, #1947) —
   `createFileAuditTrailWriter(filePath, signer)` returns an `AuditTrailSink` whose `append()`
