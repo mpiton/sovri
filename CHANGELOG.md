@@ -346,8 +346,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   one file keep separate identities); on re-review the bot reads its own prior
   comments and reconciles the new findings against them — skipping
   already-posted ones, collapsing intra-run duplicates, and marking comments
-  whose code left the diff as outdated. Reconciliation logic stays pure in
-  `@sovri/review-engine`; the bot remains a thin GitHub adapter.
+  whose finding the current run no longer produces as outdated (minimized).
+  Reconciliation logic stays pure in `@sovri/review-engine` (exposed as
+  `computeFindingFingerprint`, `reconcileFindings`, `classifyResolvedComments`);
+  the bot remains a thin GitHub adapter.
 
 - `test`: alias `@sovri/compliance` to its source entrypoint in the root Vitest
   config so review-engine source tests do not resolve the package through
