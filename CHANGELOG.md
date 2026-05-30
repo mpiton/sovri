@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `ci(compliance)`: enforce the `@sovri/compliance` branch coverage gate at >= 90 % in the
+  `backend-checks` CI job (via `scripts/check-coverage.mjs`), mirroring the existing
+  `@sovri/llm-providers` gate, so the v0.3 Compliance Trail package cannot regress below its
+  coverage floor (task-103)
+
 - `docs(adr)`: record ADR-013 (Compliance Trail as primary differentiator) and ADR-014
   (Ed25519 hash-chain audit trail), both accepted 2026-05-27 — ADR-013 makes the Compliance
   Trail Sovri's product distinction for regulated EU buyers, and ADR-014 defines the
