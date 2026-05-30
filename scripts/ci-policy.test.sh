@@ -14276,6 +14276,126 @@ $(printf '%s\n' "$stderr" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
+# A backend-checks job that runs coverage but wires NO package gate, plus a separate job
+# that echoes the gate command. A whole-YAML match would be fooled; step-scoped parsing
+# must report the gate as missing.
+run_package_coverage_workflow_decoy_job_case() {
+  local package="$1" min="$2"
+  local tmp stdout stderr stdout_file stderr_file ec
+
+  tmp=$(mktemp -d 2>/dev/null || mktemp -d -t 'ci-policy-pkg-decoy')
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+  cat >"$tmp/ci.yml" <<EOF
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  backend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable pnpm for setup-node cache
+        run: corepack enable
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Build
+        run: pnpm turbo build
+      - name: Typecheck
+        run: pnpm exec tsc -b
+      - name: Run coverage
+        run: pnpm exec vitest run --coverage --reporter=verbose
+  decoy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo the gate so a whole-file match would be fooled
+        run: echo "node scripts/check-coverage.mjs coverage/coverage-summary.json ${package} ${min}"
+EOF
+
+  node "$SCRIPT" package-coverage-workflow --workflow "$tmp/ci.yml" \
+    --package "$package" --branches "$min" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -rf "$tmp"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 1 ] || ! printf '%s\n' "$stdout" | grep -Fq "coverage_gate=missing"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ ${package} decoy gate in another job must not satisfy the policy
+      exit: ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+# A backend-checks job whose gate step precedes the Vitest coverage step: the gate would
+# read a coverage summary that does not yet exist, so the policy must reject the ordering.
+run_package_coverage_workflow_gate_before_coverage_case() {
+  local package="$1" min="$2"
+  local tmp stdout stderr stdout_file stderr_file ec
+
+  tmp=$(mktemp -d 2>/dev/null || mktemp -d -t 'ci-policy-pkg-order')
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+  cat >"$tmp/ci.yml" <<EOF
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  backend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable pnpm for setup-node cache
+        run: corepack enable
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Coverage gate — ${package}
+        run: node scripts/check-coverage.mjs coverage/coverage-summary.json ${package} ${min}
+      - name: Run coverage
+        run: pnpm exec vitest run --coverage --reporter=verbose
+EOF
+
+  node "$SCRIPT" package-coverage-workflow --workflow "$tmp/ci.yml" \
+    --package "$package" --branches "$min" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -rf "$tmp"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne 1 ] || ! printf '%s\n' "$stdout" | grep -Fq "gate_before_coverage_run"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ ${package} gate before the coverage step must be rejected
+      exit: ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_duration_pass_case 180000 "180 s"
 run_duration_pass_case 299999 "299.999 s"
 run_secrets_duration_pass_case 15000 "15 s"
@@ -14560,6 +14680,8 @@ run_package_coverage_workflow_case "compliance gate missing emits fail" packages
 run_package_coverage_workflow_case "compliance wired at 90" packages/compliance 90 "90" 0 "compliance_threshold=pass"
 run_package_coverage_workflow_case "compliance wired at 89" packages/compliance 90 "89" 1 "packages/compliance threshold 89 < 90"
 run_package_coverage_gate_summary_case "compliance branches at 90" packages/compliance 90 9000 10000 0 "coverage_gate=pass"
+run_package_coverage_workflow_decoy_job_case packages/compliance 90
+run_package_coverage_workflow_gate_before_coverage_case packages/compliance 90
 # R-03 — CI enforces the @sovri/review-engine branch coverage gate (>= 85 %).
 run_package_coverage_workflow_real_ci_case packages/review-engine 85 review_engine_threshold
 run_package_coverage_workflow_case "review-engine gate missing" packages/review-engine 85 "" 1 "coverage_gate=missing"

@@ -559,11 +559,15 @@ const runLlmProvidersCoverageWorkflow = (args) => {
 const coverageWorkflowStatusKey = (packagePath) =>
   `${packagePath.slice(packagePath.lastIndexOf("/") + 1).replace(/-/gu, "_")}_threshold`;
 
-// Read the branch threshold a workflow wires for an arbitrary package's coverage
+// Branch threshold a single backend-checks step wires for `packagePath`'s coverage
 // gate, e.g. `node scripts/check-coverage.mjs coverage/coverage-summary.json
-// packages/compliance 90`. Returns undefined when the gate for that package is absent.
-const readPackageCoverageWorkflowThreshold = (workflow, packagePath) => {
-  const match = workflow.match(
+// packages/compliance 90`. Returns undefined when the step's `run` is not that gate
+// invocation. Reading the threshold off the step (not the whole YAML) is what stops a
+// decoy occurrence in another job, a comment, or a multiline shell from satisfying it.
+const stepCoverageGateThreshold = (step, packagePath) => {
+  const command = getStepPropertyValue(step.block, "run");
+  if (command === undefined) return undefined;
+  const match = command.match(
     new RegExp(
       `node\\s+scripts/check-coverage\\.mjs\\s+coverage/coverage-summary\\.json\\s+${escapeRegExp(packagePath)}\\s+(\\d+(?:\\.\\d+)?)`,
       "u",
@@ -585,18 +589,32 @@ const runPackageCoverageWorkflow = (args) => {
 
   const workflow = readWorkflowFile(workflowPath);
   const key = coverageWorkflowStatusKey(packagePath);
-  const threshold = readPackageCoverageWorkflowThreshold(workflow, packagePath);
+  // Validate against the backend-checks step list, not the whole YAML: a gate command
+  // echoed from another job or buried in a comment must NOT satisfy the policy.
+  const steps = getBackendChecksStepEntries(workflow);
 
-  if (!/pnpm\s+exec\s+vitest\s+run\s+--coverage/u.test(workflow)) {
+  const coverageRunIndex = steps.findIndex((step) =>
+    stepRunsCommand(step, /pnpm\s+exec\s+vitest\s+run\s+--coverage/u),
+  );
+  if (coverageRunIndex === -1) {
     writeStdout(`${key}=fail\ncoverage_run=missing\n`);
-    fail("workflow must run Vitest with coverage before evaluating package gates", 1);
+    fail("backend-checks must run Vitest with coverage before evaluating package gates", 1);
   }
 
-  if (threshold === undefined) {
+  const gateIndex = steps.findIndex(
+    (step) => stepCoverageGateThreshold(step, packagePath) !== undefined,
+  );
+  if (gateIndex === -1) {
     writeStdout(`${key}=fail\ncoverage_gate=missing\n`);
-    fail(`workflow must run the ${packagePath} coverage gate`, 1);
+    fail(`backend-checks must run the ${packagePath} coverage gate`, 1);
   }
 
+  if (gateIndex < coverageRunIndex) {
+    writeStdout(`${key}=fail\ngate_before_coverage_run\n`);
+    fail(`${packagePath} coverage gate must run after the Vitest coverage step`, 1);
+  }
+
+  const threshold = stepCoverageGateThreshold(steps[gateIndex], packagePath);
   if (threshold < minThreshold) {
     writeStdout(`${key}=fail\n${packagePath} threshold ${threshold} < ${minThreshold}\n`);
     fail(`${packagePath} threshold ${threshold} < ${minThreshold}`, 1);
