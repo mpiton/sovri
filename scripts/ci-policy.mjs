@@ -185,9 +185,11 @@ const coverageGateUsage =
   "Usage: node scripts/ci-policy.mjs coverage-gate --input <coverage-summary.json> --package <package-path> --branches <threshold>";
 const llmProvidersCoverageWorkflowUsage =
   "Usage: node scripts/ci-policy.mjs llm-providers-coverage-workflow --workflow <path>";
+const packageCoverageWorkflowUsage =
+  "Usage: node scripts/ci-policy.mjs package-coverage-workflow --workflow <path> --package <package-path> --branches <min>";
 const coverageArtifactPolicyUsage =
   "Usage: node scripts/ci-policy.mjs coverage-artifact-policy --workflow <path>";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dependencyReviewWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${releaseExtractNotesUsage}\n${releaseVerifyTagAnnotationUsage}\n${releaseVerifyCommitSubjectUsage}\n${readmeReferencesReleaseUsage}\n${promoteChangelogUsage}\n${cosignDeferralUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}\n${coverageGateUsage}\n${llmProvidersCoverageWorkflowUsage}\n${coverageArtifactPolicyUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dependencyReviewWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${releaseExtractNotesUsage}\n${releaseVerifyTagAnnotationUsage}\n${releaseVerifyCommitSubjectUsage}\n${readmeReferencesReleaseUsage}\n${promoteChangelogUsage}\n${cosignDeferralUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}\n${coverageGateUsage}\n${llmProvidersCoverageWorkflowUsage}\n${packageCoverageWorkflowUsage}\n${coverageArtifactPolicyUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -548,6 +550,59 @@ const runLlmProvidersCoverageWorkflow = (args) => {
   writeStdout(
     `llm_providers_threshold=pass\nthreshold=${threshold}\npnpm_cache_bootstrap=pass\nbuild_before_typecheck=pass\n`,
   );
+};
+
+// Status key for a package coverage workflow result, derived from the package's
+// directory name: `packages/compliance` -> `compliance_threshold`,
+// `packages/review-engine` -> `review_engine_threshold`. Mirrors the existing
+// `llm_providers_threshold` token so each package gate has a stable stdout marker.
+const coverageWorkflowStatusKey = (packagePath) =>
+  `${packagePath.slice(packagePath.lastIndexOf("/") + 1).replace(/-/gu, "_")}_threshold`;
+
+// Read the branch threshold a workflow wires for an arbitrary package's coverage
+// gate, e.g. `node scripts/check-coverage.mjs coverage/coverage-summary.json
+// packages/compliance 90`. Returns undefined when the gate for that package is absent.
+const readPackageCoverageWorkflowThreshold = (workflow, packagePath) => {
+  const match = workflow.match(
+    new RegExp(
+      `node\\s+scripts/check-coverage\\.mjs\\s+coverage/coverage-summary\\.json\\s+${escapeRegExp(packagePath)}\\s+(\\d+(?:\\.\\d+)?)`,
+      "u",
+    ),
+  );
+  return match?.[1] === undefined ? undefined : Number(match[1]);
+};
+
+// Generic per-package coverage workflow gate. Asserts the backend-checks job runs
+// Vitest with coverage and wires `<package>` at a branch threshold of at least
+// `--branches`. Generalises `runLlmProvidersCoverageWorkflow` to any workspace
+// package so v0.3 additions (compliance, review-engine) are protected identically.
+const runPackageCoverageWorkflow = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", packageCoverageWorkflowUsage);
+  const packagePath = readRequiredOption(options, "package", packageCoverageWorkflowUsage);
+  const minThreshold = readPercentageOption(options, "branches", packageCoverageWorkflowUsage);
+  validateWorkspaceRelativePackage(packagePath, packageCoverageWorkflowUsage);
+
+  const workflow = readWorkflowFile(workflowPath);
+  const key = coverageWorkflowStatusKey(packagePath);
+  const threshold = readPackageCoverageWorkflowThreshold(workflow, packagePath);
+
+  if (!/pnpm\s+exec\s+vitest\s+run\s+--coverage/u.test(workflow)) {
+    writeStdout(`${key}=fail\ncoverage_run=missing\n`);
+    fail("workflow must run Vitest with coverage before evaluating package gates", 1);
+  }
+
+  if (threshold === undefined) {
+    writeStdout(`${key}=fail\ncoverage_gate=missing\n`);
+    fail(`workflow must run the ${packagePath} coverage gate`, 1);
+  }
+
+  if (threshold < minThreshold) {
+    writeStdout(`${key}=fail\n${packagePath} threshold ${threshold} < ${minThreshold}\n`);
+    fail(`${packagePath} threshold ${threshold} < ${minThreshold}`, 1);
+  }
+
+  writeStdout(`${key}=pass\nthreshold=${threshold}\n`);
 };
 
 const getBackendChecksStepEntries = (workflow) => {
@@ -3971,6 +4026,8 @@ if (command === "duration-budget") {
   runCoverageGate(args);
 } else if (command === "llm-providers-coverage-workflow") {
   runLlmProvidersCoverageWorkflow(args);
+} else if (command === "package-coverage-workflow") {
+  runPackageCoverageWorkflow(args);
 } else if (command === "coverage-artifact-policy") {
   runCoverageArtifactPolicy(args);
 } else {

@@ -14114,6 +14114,168 @@ run_cosign_deferred_version_boundary_case() {
   rm -rf "$root"
 }
 
+# Writes a minimal, valid backend-checks workflow that bootstraps pnpm before the
+# setup-node cache, builds before typecheck, runs Vitest with coverage, and always
+# wires the packages/llm-providers gate. When <gate_threshold> is non-empty it also
+# wires a check-coverage gate for <package> at that threshold; pass "" to omit it.
+write_package_coverage_workflow_fixture() {
+  local file="$1" package="$2" gate_threshold="$3"
+  {
+    cat <<'HEAD'
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  backend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable pnpm for setup-node cache
+        run: corepack enable
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Build
+        run: pnpm turbo build
+      - name: Typecheck
+        run: pnpm exec tsc -b
+      - name: Run coverage
+        run: pnpm exec vitest run --coverage --reporter=verbose
+      - name: Coverage gate — packages/llm-providers ≥ 85 %
+        run: node scripts/check-coverage.mjs coverage/coverage-summary.json packages/llm-providers 85
+HEAD
+    if [ -n "$gate_threshold" ]; then
+      printf '      - name: Coverage gate — %s >= %s %%\n        run: node scripts/check-coverage.mjs coverage/coverage-summary.json %s %s\n' \
+        "$package" "$gate_threshold" "$package" "$gate_threshold"
+    fi
+  } >"$file"
+}
+
+# Evaluates the package-coverage-workflow policy against the REAL repository ci.yml.
+# Then the workflow must wire the <package> gate so the policy passes.
+run_package_coverage_workflow_real_ci_case() {
+  local package="$1" min="$2" expected_key="$3"
+  local ci_yml stdout stderr stdout_file stderr_file ec
+  ci_yml="$SCRIPT_DIR/../.github/workflows/ci.yml"
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  # Given the backend-checks job runs "pnpm exec vitest run --coverage" before any package gate
+  # When the release engineer evaluates the <package> coverage workflow policy
+  node "$SCRIPT" package-coverage-workflow --workflow "$ci_yml" \
+    --package "$package" --branches "$min" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -f "$stdout_file" "$stderr_file"
+
+  # Then the policy exits with code 0 and stdout includes "<key>=pass"
+  if [ "$ec" -ne 0 ] || ! printf '%s\n' "$stdout" | grep -Fq "${expected_key}=pass"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ ${package} coverage gate must be wired in ci.yml at >= ${min}
+      exit: ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+# Evaluates the package-coverage-workflow policy against a fixture wired at
+# <gate_threshold> (or omitted when empty) for <package> with minimum <min>.
+run_package_coverage_workflow_case() {
+  local label="$1" package="$2" min="$3" gate_threshold="$4" expected_exit="$5" expected_status="$6"
+  local tmp stdout stderr stdout_file stderr_file ec
+
+  tmp=$(mktemp -d 2>/dev/null || mktemp -d -t 'ci-policy-pkg-workflow')
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+  write_package_coverage_workflow_fixture "$tmp/ci.yml" "$package" "$gate_threshold"
+
+  node "$SCRIPT" package-coverage-workflow --workflow "$tmp/ci.yml" \
+    --package "$package" --branches "$min" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -rf "$tmp"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne "$expected_exit" ] ||
+    ! printf '%s\n' "$stdout" | grep -Fq "$expected_status"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ package coverage workflow ${label}: expected exit ${expected_exit} with ${expected_status}
+      exit: ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+# Evaluates the real coverage-gate command against a synthesized summary so the
+# @technical branch (real package coverage stays at or above the threshold) is
+# exercised without depending on a live coverage run.
+run_package_coverage_gate_summary_case() {
+  local label="$1" package="$2" min="$3" covered="$4" total="$5" expected_exit="$6" expected_status="$7"
+  local tmp stdout stderr stdout_file stderr_file ec
+
+  tmp=$(mktemp -d 2>/dev/null || mktemp -d -t 'ci-policy-pkg-coverage')
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+
+  mkdir -p "$tmp/coverage"
+  cat >"$tmp/coverage/coverage-summary.json" <<EOF
+{
+  "total": {
+    "branches": { "total": ${total}, "covered": ${covered}, "skipped": 0, "pct": 0 }
+  },
+  "/repo/${package}/src/index.ts": {
+    "branches": { "total": ${total}, "covered": ${covered}, "skipped": 0, "pct": 0 },
+    "lines": { "total": ${total}, "covered": ${total}, "skipped": 0, "pct": 100 }
+  }
+}
+EOF
+
+  node "$SCRIPT" coverage-gate \
+    --input "$tmp/coverage/coverage-summary.json" \
+    --package "$package" \
+    --branches "$min" \
+    >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
+
+  stdout=$(cat "$stdout_file" 2>/dev/null || true)
+  stderr=$(cat "$stderr_file" 2>/dev/null || true)
+  rm -rf "$tmp"
+  rm -f "$stdout_file" "$stderr_file"
+
+  if [ "$ec" -ne "$expected_exit" ] ||
+    ! printf '%s\n' "$stdout" | grep -Fq "$expected_status"; then
+    FAIL=$((FAIL + 1))
+    FAILURES="${FAILURES}
+  ✗ package coverage summary ${label}: expected exit ${expected_exit} with ${expected_status}
+      exit: ${ec}
+      stdout:
+$(printf '%s\n' "$stdout" | sed 's/^/        /')
+      stderr:
+$(printf '%s\n' "$stderr" | sed 's/^/        /')"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 run_duration_pass_case 180000 "180 s"
 run_duration_pass_case 299999 "299.999 s"
 run_secrets_duration_pass_case 15000 "15 s"
@@ -14391,6 +14553,13 @@ run_llm_providers_workflow_threshold_case 85 0 "llm_providers_threshold=pass"
 run_llm_providers_workflow_threshold_case 84 1 "llm_providers_threshold=fail"
 run_llm_providers_workflow_pnpm_cache_bootstrap_case
 run_llm_providers_workflow_typecheck_before_build_case
+# R-02 — CI enforces the @sovri/compliance branch coverage gate (>= 90 %).
+run_package_coverage_workflow_real_ci_case packages/compliance 90 compliance_threshold
+run_package_coverage_workflow_case "compliance gate missing" packages/compliance 90 "" 1 "coverage_gate=missing"
+run_package_coverage_workflow_case "compliance gate missing emits fail" packages/compliance 90 "" 1 "compliance_threshold=fail"
+run_package_coverage_workflow_case "compliance wired at 90" packages/compliance 90 "90" 0 "compliance_threshold=pass"
+run_package_coverage_workflow_case "compliance wired at 89" packages/compliance 90 "89" 1 "packages/compliance threshold 89 < 90"
+run_package_coverage_gate_summary_case "compliance branches at 90" packages/compliance 90 9000 10000 0 "coverage_gate=pass"
 run_coverage_artifact_policy_case 90 "always()" 0 "coverage_artifact_retention=pass"
 run_coverage_artifact_policy_case 89 "always()" 1 "coverage artifact retention < 90"
 run_coverage_artifact_policy_case 90 "success()" 1 "coverage artifact upload must use always()"
