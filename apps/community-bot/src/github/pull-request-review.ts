@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { DEFAULT_CONFIG, parseConfigContent, type SovriConfig } from "@sovri/config";
+import { parseConfigContent, type SovriConfig } from "@sovri/config";
 import { createProviderFromConfig } from "@sovri/llm-providers";
 import { createLogger } from "@sovri/observability";
 import {
@@ -20,6 +20,7 @@ import type {
   ReviewPostTarget,
 } from "../handlers/pull-request.js";
 import { fetchDiff as fetchPullRequestDiff } from "./diff-fetcher.js";
+import { buildDeploymentDefaultConfig } from "../runtime-env.js";
 
 const logger = createLogger("community-bot.pull-request");
 export const ReviewTimeoutMs = 300_000;
@@ -32,7 +33,7 @@ export function createPullRequestHandlerDependencies(
     buildReviewOptions: (config) => buildReviewOptions(config, env),
     fetchDiff: (target) =>
       fetchPullRequestDiff(context.octokit, splitRepoFullName(target.repoFullName), target.number),
-    loadConfig: (target) => loadRepositoryConfig(context, target),
+    loadConfig: (target) => loadRepositoryConfig(context, target, env),
     logger,
     postErrorComment: (target, message) => postErrorComment(context, target, message),
     postReview: (target, review, diff) => postReview(context, target, review, diff),
@@ -43,6 +44,7 @@ export function createPullRequestHandlerDependencies(
 async function loadRepositoryConfig(
   context: PullRequestWebhookContext,
   target: ReviewPostTarget,
+  env: NodeJS.ProcessEnv,
 ): Promise<SovriConfig> {
   const repo = splitRepoFullName(target.repoFullName);
   try {
@@ -60,10 +62,16 @@ async function loadRepositoryConfig(
       throw new PullRequestReviewAdapterError("Repository config content is invalid");
     }
 
-    return parseConfigContent(response.data, ".sovri.yml");
+    // `.sovri.yml` is optional: an absent (404) or empty file resolves to the
+    // deployment default provider (issue #1959), never a hard-coded provider.
+    // The fallback is lazy so a repository that ships its own config is never
+    // shadowed and a deployment-config error never fires for those repos.
+    return parseConfigContent(response.data, ".sovri.yml", () =>
+      buildDeploymentDefaultConfig(env, logger),
+    );
   } catch (error) {
     if (isMissingRepositoryConfig(error)) {
-      return DEFAULT_CONFIG;
+      return buildDeploymentDefaultConfig(env, logger);
     }
 
     throw error;

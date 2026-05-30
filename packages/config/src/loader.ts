@@ -224,7 +224,11 @@ export async function loadConfig(repoRoot: string): Promise<SovriConfig> {
   return parseConfigContent(raw, filePath);
 }
 
-export function parseConfigContent(raw: string, filePath: string = CONFIG_FILENAME): SovriConfig {
+export function parseConfigContent(
+  raw: string,
+  filePath: string = CONFIG_FILENAME,
+  onEmpty?: () => SovriConfig,
+): SovriConfig {
   const size = Buffer.byteLength(raw, "utf8");
   if (size > MAX_CONFIG_BYTES) {
     throw new SovriConfigParseError(
@@ -247,7 +251,7 @@ export function parseConfigContent(raw: string, filePath: string = CONFIG_FILENA
   // schema validation on a missing `llm` block.
   if (parsed === null || parsed === undefined) {
     logger.debug({ filePath }, "empty .sovri.yml, falling back to defaults");
-    return DEFAULT_CONFIG;
+    return onEmpty === undefined ? DEFAULT_CONFIG : onEmpty();
   }
 
   const result = SovriConfigSchema.safeParse(parsed);

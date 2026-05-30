@@ -11,6 +11,7 @@ import type {
 } from "@sovri/review-engine";
 import type { CommentPosterOctokit } from "../github/comment-poster.js";
 import type { DiffFetcherOctokit } from "../github/diff-fetcher.js";
+import { DeploymentConfigError } from "../runtime-env.js";
 
 export type PullRequestWebhookContext = {
   readonly id: string;
@@ -326,6 +327,18 @@ function describeReviewFailure(error: unknown): {
       commentMessage: `Configuration error: env var ${error.apiKeySecret} is required`,
       logFields: {
         api_key_secret: error.apiKeySecret,
+        error_message: error.message,
+        error_type: error.name,
+      },
+    };
+  }
+
+  if (error instanceof DeploymentConfigError) {
+    // The message is operator-facing guidance built from validated env-var
+    // names only — it never contains a secret value — so it is safe to post.
+    return {
+      commentMessage: error.message,
+      logFields: {
         error_message: error.message,
         error_type: error.name,
       },

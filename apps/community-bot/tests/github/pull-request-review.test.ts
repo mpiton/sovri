@@ -46,13 +46,94 @@ review:
     ]);
   });
 
-  it("falls back to default configuration when .sovri.yml is absent", async () => {
+  it("uses the deployment default provider when .sovri.yml is absent (Mistral-only deployment)", async () => {
+    const runtime = buildRuntimeContext({ missingConfig: true });
+    const dependencies = createPullRequestHandlerDependencies(runtime.context, {
+      MISTRAL_API_KEY: "test-key",
+    });
+
+    const config = await dependencies.loadConfig(buildTarget());
+
+    expect(config.llm.provider).toBe("mistral");
+    expect(config.llm.apiKeySecret).toBe("MISTRAL_API_KEY");
+  });
+
+  it("uses the deployment default provider when .sovri.yml is absent (Anthropic-only deployment)", async () => {
     const runtime = buildRuntimeContext({ missingConfig: true });
     const dependencies = createPullRequestHandlerDependencies(runtime.context, {
       ANTHROPIC_API_KEY: "test-key",
     });
 
-    await expect(dependencies.loadConfig(buildTarget())).resolves.toEqual(DEFAULT_CONFIG);
+    const config = await dependencies.loadConfig(buildTarget());
+
+    expect(config.llm.provider).toBe("anthropic");
+    expect(config.llm.apiKeySecret).toBe("ANTHROPIC_API_KEY");
+  });
+
+  it("treats an empty .sovri.yml like an absent one (deployment default, not Anthropic)", async () => {
+    const runtime = buildRuntimeContext({ configContent: "" });
+    const dependencies = createPullRequestHandlerDependencies(runtime.context, {
+      MISTRAL_API_KEY: "test-key",
+    });
+
+    const config = await dependencies.loadConfig(buildTarget());
+
+    expect(config.llm.provider).toBe("mistral");
+    expect(config.llm.apiKeySecret).toBe("MISTRAL_API_KEY");
+  });
+
+  it("does not shadow a repository .sovri.yml with the deployment default", async () => {
+    const runtime = buildRuntimeContext({
+      configContent: [
+        "llm:",
+        "  provider: mistral",
+        "  model: mistral-large-latest",
+        "  apiKeySecret: MISTRAL_API_KEY",
+      ].join("\n"),
+    });
+    const dependencies = createPullRequestHandlerDependencies(runtime.context, {
+      ANTHROPIC_API_KEY: "deployment-default-key",
+      MISTRAL_API_KEY: "repo-key",
+    });
+
+    const config = await dependencies.loadConfig(buildTarget());
+
+    expect(config.llm.provider).toBe("mistral");
+  });
+
+  it("rejects with deployment guidance when .sovri.yml is absent and no provider is configured", async () => {
+    const runtime = buildRuntimeContext({ missingConfig: true });
+    const dependencies = createPullRequestHandlerDependencies(runtime.context, {});
+
+    await expect(dependencies.loadConfig(buildTarget())).rejects.toThrow(
+      /SOVRI_DEFAULT_LLM_PROVIDER/u,
+    );
+  });
+
+  it("rejects with deployment guidance when .sovri.yml is empty and no provider is configured", async () => {
+    const runtime = buildRuntimeContext({ configContent: "" });
+    const dependencies = createPullRequestHandlerDependencies(runtime.context, {});
+
+    await expect(dependencies.loadConfig(buildTarget())).rejects.toThrow(
+      /SOVRI_DEFAULT_LLM_PROVIDER/u,
+    );
+  });
+
+  it("names the repository-selected provider key when it is missing from the environment", () => {
+    const runtime = buildRuntimeContext();
+    const dependencies = createPullRequestHandlerDependencies(runtime.context, {
+      ANTHROPIC_API_KEY: "deployment-default-key",
+    });
+    const repoMistralConfig: SovriConfig = {
+      ...DEFAULT_CONFIG,
+      llm: {
+        apiKeySecret: "MISTRAL_API_KEY",
+        model: "mistral-large-latest",
+        provider: "mistral",
+      },
+    };
+
+    expect(() => dependencies.buildReviewOptions?.(repoMistralConfig)).toThrow("MISTRAL_API_KEY");
   });
 
   it("fetches the diff from the pull request raw diff endpoint", async () => {
