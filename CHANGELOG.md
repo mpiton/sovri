@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `ci(review-engine)`: enforce the `@sovri/review-engine` branch coverage gate at >= 85 % in the
+  `backend-checks` CI job (via `scripts/check-coverage.mjs`), alongside the `@sovri/llm-providers` and
+  `@sovri/compliance` gates, so the diff, prompt, parsing and audit code paths added in v0.3 cannot
+  regress below their coverage floor (task-103)
+
 - `ci(compliance)`: enforce the `@sovri/compliance` branch coverage gate at >= 90 % in the
   `backend-checks` CI job (via `scripts/check-coverage.mjs`), mirroring the existing
   `@sovri/llm-providers` gate, so the v0.3 Compliance Trail package cannot regress below its

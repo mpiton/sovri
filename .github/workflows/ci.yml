@@ -56,6 +56,9 @@ jobs:
       - name: Coverage gate — packages/compliance ≥ 90 %
         run: node scripts/check-coverage.mjs coverage/coverage-summary.json packages/compliance 90
 
+      - name: Coverage gate — packages/review-engine ≥ 85 %
+        run: node scripts/check-coverage.mjs coverage/coverage-summary.json packages/review-engine 85
+
       - name: Upload TypeScript coverage
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
