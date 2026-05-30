@@ -56,6 +56,13 @@ export type {
 
 export { generateAuditReference } from "./audit-ref.js";
 
+export {
+  classifyResolvedComments,
+  computeFindingFingerprint,
+  reconcileFindings,
+} from "./reconcile/index.js";
+export type { PostedComment } from "./reconcile/index.js";
+
 export { reviewPullRequest, runReview } from "./orchestrator.js";
 export type {
   ReviewEngineResult,
