@@ -44,6 +44,12 @@ const FORBIDDEN_INTERNAL_DOCS = ["CLAUDE.md", "PRD.md", "ARCHI.md"] as const;
 // "- `<type>(<scope>)`: <summary>" — the lead of a well-formed entry's first line.
 const SCOPE_PREFIX = /^- `([a-z]+)\(([a-z0-9-]+)\)`:\s*(.*)$/;
 
+// A valid Conventional Commit lead for ANY [Unreleased] entry, in any category. The scope
+// is optional (type-only commits like `test:` are valid) and may contain "/" (e.g.
+// `chore(deps/ci)`), so this is deliberately looser than SCOPE_PREFIX, which the v0.3
+// feature entries under Added are additionally held to.
+const CONVENTIONAL_PREFIX = /^- `([a-z]+)(?:\([a-z0-9/._-]+\))?`:\s/;
+
 // --- inline helpers (no shipped parser) ---
 
 /** Body of a top-level "## <heading>" section, up to the next "## " heading. */
@@ -91,6 +97,9 @@ function splitBullets(block: string): string[] {
 
 const addedBullets = splitBullets(subsection(unreleased, "Added"));
 const addedFirstLines = addedBullets.map((b) => b.split("\n")[0] ?? "");
+
+// First lines of every top-level bullet in [Unreleased], across all categories.
+const unreleasedFirstLines = splitBullets(unreleased).map((b) => b.split("\n")[0] ?? "");
 
 /** The "`<type>(<scope>)`" tokens used by the Added entries. */
 function addedScopes(): string[] {
@@ -145,6 +154,16 @@ describe("CHANGELOG [Unreleased] documents the v0.3 Compliance Trail set (#1968)
   });
 
   // --- R-02: Conventional Commit scopes (docs(adr) is the RED trigger) ---
+
+  it("@nominal every [Unreleased] entry, in any category, has a Conventional Commit prefix", () => {
+    // Scope coverage below is asserted on Added, but the prefix contract holds for the
+    // whole section — including type-only leads (`test:`) and slashed scopes (`chore(deps/ci)`).
+    for (const line of unreleasedFirstLines) {
+      const match = CONVENTIONAL_PREFIX.exec(line);
+      expect(match, `entry has no Conventional Commit prefix: ${line}`).not.toBeNull();
+      expect(ALLOWED_TYPES).toContain(match?.[1]);
+    }
+  });
 
   it("@nominal every Added entry begins with a backticked Conventional Commit scope", () => {
     for (const line of addedFirstLines) {

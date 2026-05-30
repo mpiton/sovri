@@ -29,9 +29,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `test(docs)`: add a failing acceptance test (`tests/changelog.docs.test.ts`) pinning the
   `[Unreleased]` section to Keep a Changelog 1.1.0 — a single `Added` category, a Conventional
-  Commit scope on every entry, every v0.3 scope present (`feat(compliance)`, `feat(core)`,
+  Commit prefix on every entry in any category (type-only and slashed scopes allowed), the
+  required v0.3 scopes present under `Added` (`feat(compliance)`, `feat(core)`,
   `feat(review-engine)`, `docs(adr)`), no references to unversioned internal docs, and a
-  self-sufficient summary per entry (task-102, #1968)
+  self-sufficient summary per `Added` entry (task-102, #1968)
 
 - `feat(review-engine)`: wire an optional audit-trail sink into `reviewPullRequest`
   (task-100, #1957) — `ReviewPullRequestOptions` gains optional `auditTrailSink?` and
