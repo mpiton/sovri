@@ -4,7 +4,16 @@ This document describes the repository-level configuration file consumed by
 Sovri Community. The active schema is `SovriConfigSchema` in
 `packages/config/src/types/SovriConfig.ts`.
 
-The file must live at the root of the reviewed repository:
+`.sovri.yml` is **optional**. It is a repository-level override: when it is
+absent (or present but empty), the bot uses the deployment-level defaults
+configured on the bot host. See
+[deployment-configuration.md](./deployment-configuration.md) for how a self-host
+operator sets the default provider once and reviews many repositories without
+committing a `.sovri.yml` to each one. Add a `.sovri.yml` only when a repository
+needs settings that differ from the deployment defaults (a different provider or
+model, custom review mode, ignore patterns, or limits).
+
+When present, the file lives at the root of the reviewed repository:
 
 ```text
 .sovri.yml
@@ -113,6 +122,11 @@ limits:
 ```
 
 When `ignores` is omitted, no path patterns are ignored.
+
+When the whole file is absent or empty, the `llm` block is resolved from the
+deployment configuration instead of the file. See
+[deployment-configuration.md](./deployment-configuration.md). The `review`,
+`ignores`, and `limits` blocks then take the schema defaults listed above.
 
 ## Validation Behavior
 

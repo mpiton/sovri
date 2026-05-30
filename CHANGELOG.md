@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(bot)`: make `.sovri.yml` optional via deployment-level LLM defaults — `SOVRI_DEFAULT_LLM_PROVIDER`,
+  `SOVRI_DEFAULT_LLM_MODEL`, and `SOVRI_DEFAULT_LLM_API_KEY_SECRET` configure a default provider once for a
+  self-hosted bot, used when a repository has no (or an empty) `.sovri.yml`; documented in
+  `docs/deployment-configuration.md` (#1959)
 - `ci(review-engine)`: enforce the `@sovri/review-engine` branch coverage gate at >= 85 % in the
   `backend-checks` CI job (via `scripts/check-coverage.mjs`), alongside the `@sovri/llm-providers` and
   `@sovri/compliance` gates, so the diff, prompt, parsing and audit code paths added in v0.3 cannot
@@ -463,6 +467,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Removed
 
 - `refactor(compliance)`: drop `compliancePackageName` (dead scaffold constant) and `getCweMap` (internal helper, still used by `mapping/enricher.ts`) from the public `@sovri/compliance` exports (task-101, #1962), trimming the v0.3 public surface to the 17 intended exports. No external consumer imported either symbol.
+
+### Fixed
+
+- `fix(bot)`: a missing or empty `.sovri.yml` no longer forces Anthropic — the Community bot resolves the LLM
+  provider from deployment configuration (explicit `SOVRI_DEFAULT_LLM_PROVIDER`, or inference from the present
+  provider key, Anthropic-first when both are set), so a Mistral-only deployment reviews repositories without a
+  `.sovri.yml` instead of posting "env var ANTHROPIC_API_KEY is required" (#1959). A repository `.sovri.yml`
+  stays an override and is never shadowed; an unresolvable or malformed deployment configuration posts an
+  actionable error naming the variable to set.
+
 ## [0.2.0] - 2026-05-26
 ### Changed
 

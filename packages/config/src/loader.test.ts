@@ -31,7 +31,7 @@ beforeEach(() => {
   vi.mocked(mockedOpen).mockImplementation(realOpen);
 });
 
-import { DEFAULT_CONFIG, loadConfig } from "./loader.js";
+import { DEFAULT_CONFIG, loadConfig, parseConfigContent } from "./loader.js";
 import {
   SovriConfigParseError,
   SovriConfigSymlinkError,
@@ -663,5 +663,46 @@ describe("DEFAULT_CONFIG", () => {
     expect(Object.isFrozen(DEFAULT_CONFIG.review)).toBe(true);
     expect(Object.isFrozen(DEFAULT_CONFIG.limits)).toBe(true);
     expect(Object.isFrozen(DEFAULT_CONFIG.ignores)).toBe(true);
+  });
+});
+
+describe("parseConfigContent — empty body with an injected fallback", () => {
+  const fallback = SovriConfigSchema.parse({
+    llm: {
+      apiKeySecret: "MISTRAL_API_KEY",
+      model: "mistral-large-latest",
+      provider: "mistral",
+    },
+  });
+
+  it("calls the onEmpty fallback instead of DEFAULT_CONFIG for an empty body", () => {
+    expect(parseConfigContent("", ".sovri.yml", () => fallback)).toBe(fallback);
+  });
+
+  it("calls the onEmpty fallback for a comment-only body", () => {
+    expect(parseConfigContent("# only a comment\n", ".sovri.yml", () => fallback)).toBe(fallback);
+  });
+
+  it("calls the onEmpty fallback for a whitespace-only body", () => {
+    expect(parseConfigContent("   \n  \n", ".sovri.yml", () => fallback)).toBe(fallback);
+  });
+
+  it("still returns DEFAULT_CONFIG for an empty body when no fallback is supplied", () => {
+    expect(parseConfigContent("")).toEqual(DEFAULT_CONFIG);
+  });
+
+  it("ignores the fallback when the body is a valid non-empty config", () => {
+    const result = parseConfigContent(
+      [
+        "llm:",
+        "  provider: mistral",
+        "  model: mistral-large-latest",
+        "  apiKeySecret: MISTRAL_API_KEY",
+      ].join("\n"),
+      ".sovri.yml",
+      () => DEFAULT_CONFIG,
+    );
+
+    expect(result.llm.provider).toBe("mistral");
   });
 });
