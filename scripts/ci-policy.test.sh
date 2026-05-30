@@ -14560,6 +14560,13 @@ run_package_coverage_workflow_case "compliance gate missing emits fail" packages
 run_package_coverage_workflow_case "compliance wired at 90" packages/compliance 90 "90" 0 "compliance_threshold=pass"
 run_package_coverage_workflow_case "compliance wired at 89" packages/compliance 90 "89" 1 "packages/compliance threshold 89 < 90"
 run_package_coverage_gate_summary_case "compliance branches at 90" packages/compliance 90 9000 10000 0 "coverage_gate=pass"
+# R-03 — CI enforces the @sovri/review-engine branch coverage gate (>= 85 %).
+run_package_coverage_workflow_real_ci_case packages/review-engine 85 review_engine_threshold
+run_package_coverage_workflow_case "review-engine gate missing" packages/review-engine 85 "" 1 "coverage_gate=missing"
+run_package_coverage_workflow_case "review-engine gate missing emits fail" packages/review-engine 85 "" 1 "review_engine_threshold=fail"
+run_package_coverage_workflow_case "review-engine wired at 85" packages/review-engine 85 "85" 0 "review_engine_threshold=pass"
+run_package_coverage_workflow_case "review-engine wired at 84" packages/review-engine 85 "84" 1 "packages/review-engine threshold 84 < 85"
+run_package_coverage_gate_summary_case "review-engine branches at 85" packages/review-engine 85 8500 10000 0 "coverage_gate=pass"
 run_coverage_artifact_policy_case 90 "always()" 0 "coverage_artifact_retention=pass"
 run_coverage_artifact_policy_case 89 "always()" 1 "coverage artifact retention < 90"
 run_coverage_artifact_policy_case 90 "success()" 1 "coverage artifact upload must use always()"
