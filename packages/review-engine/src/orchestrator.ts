@@ -3,7 +3,7 @@
 
 import { posix } from "node:path";
 
-import { enrichFindingCompliance } from "@sovri/compliance";
+import { enrichFindingCompliance, type AuditTrailSink } from "@sovri/compliance";
 import {
   applyIgnoreRules,
   computeSeverityRank,
@@ -23,6 +23,14 @@ import type { Logger } from "@sovri/observability";
 import { v4 as uuidv4, v7 as uuidv7 } from "uuid";
 
 import { generateAuditReference } from "./audit-ref.js";
+import {
+  emitAuditEvent,
+  findingCreatedEvent,
+  llmCalledEvent,
+  reviewCompletedEvent,
+  reviewFailedEvent,
+  reviewStartedEvent,
+} from "./audit-events.js";
 import { filterDiffByIgnores, parseUnifiedDiff } from "./diff/index.js";
 import {
   buildReviewPrompt,
@@ -90,6 +98,8 @@ interface SuccessfulReviewGeneration {
   readonly parsed: ProviderReviewResponse;
   readonly tokenUsage: TokenUsage;
   readonly tokenUsageReported: boolean;
+  // True once the provider returned a response on any attempt. Success always has one.
+  readonly responseReturned: true;
   readonly status: "success" | "partial";
 }
 
@@ -98,6 +108,11 @@ interface FailedReviewGeneration {
   readonly failureKind: "parse" | "provider";
   readonly tokenUsage: TokenUsage;
   readonly tokenUsageReported: boolean;
+  // True if any attempt returned a response (even one that failed re-parse), so the
+  // orchestrator can record llm.called even when the final outcome is a failure. This
+  // is independent of failureKind: a malformed first response followed by a provider
+  // error on retry fails as "provider" yet a response was received.
+  readonly responseReturned: boolean;
   readonly status: "failed";
 }
 
@@ -111,6 +126,10 @@ type ProviderReviewAttempt =
   | {
       readonly success: false;
       readonly error: unknown;
+      // True when the model responded but the output was unusable — a response that
+      // failed re-parse, or a thrown error carrying token usage (charged tokens). False
+      // only when the provider threw with no response (e.g. a transport error).
+      readonly responseReturned: boolean;
       readonly tokenUsage: TokenUsage;
       readonly tokenUsageReported: boolean;
     };
@@ -175,6 +194,11 @@ export interface ReviewPullRequestInput {
 export interface ReviewPullRequestOptions {
   readonly provider: LLMProvider;
   readonly logger?: Logger;
+  // Cloud-only port for the unsigned audit trail. When absent (the Community
+  // path) the orchestrator emits nothing and behaves exactly as before.
+  readonly auditTrailSink?: AuditTrailSink;
+  // Accepted placeholder for Organisational Learning (v0.5+). No effect in v0.3.
+  readonly strictAudit?: boolean;
 }
 
 export async function runReview(
@@ -216,83 +240,127 @@ export async function reviewPullRequest(
   const reviewInput = ReviewPullRequestInputSchema.parse(input);
   const provider = parseInjectedProvider(options.provider);
   const startedAt = new Date();
-  const limitError = getLimitError(reviewInput.pullRequest, reviewInput.config);
-  if (limitError !== undefined) {
-    return buildFailedReview(reviewInput.pullRequest, provider, startedAt, limitError);
-  }
+  const sink = options.auditTrailSink;
+  const logger = options.logger;
 
-  const filteredDiff = filterDiffByIgnores(reviewInput.diff, reviewInput.config.ignores);
-  options.logger?.info(
-    {
-      provider: provider.name,
-      changed_files: reviewInput.diff.files.length,
-      reviewable_files: filteredDiff.files.length,
-      ignored_files: reviewInput.diff.files.length - filteredDiff.files.length,
-    },
-    "Review engine ignore filters applied",
-  );
+  await emitAuditEvent(sink, reviewStartedEvent(reviewInput.pullRequest, provider), logger);
 
-  if (filteredDiff.files.length === 0) {
-    return buildNoFilesReview(reviewInput.pullRequest, provider, startedAt);
-  }
+  try {
+    const limitError = getLimitError(reviewInput.pullRequest, reviewInput.config);
+    if (limitError !== undefined) {
+      await emitAuditEvent(sink, reviewFailedEvent("limit_exceeded"), logger);
 
-  const prompt = buildReviewPrompt({
-    unifiedDiff: filteredDiff.unified_diff,
-    mode: reviewInput.config.review.mode,
-    pullRequest: {
-      number: reviewInput.pullRequest.number,
-      repoFullName: reviewInput.pullRequest.repo_full_name,
-      title: reviewInput.pullRequest.title,
-      description: reviewInput.pullRequest.body ?? "",
-    },
-  });
+      return buildFailedReview(reviewInput.pullRequest, provider, startedAt, limitError);
+    }
 
-  options.logger?.info(
-    { provider: provider.name, changed_files: filteredDiff.files.length },
-    "Review engine request started",
-  );
+    const filteredDiff = filterDiffByIgnores(reviewInput.diff, reviewInput.config.ignores);
+    logger?.info(
+      {
+        provider: provider.name,
+        changed_files: reviewInput.diff.files.length,
+        reviewable_files: filteredDiff.files.length,
+        ignored_files: reviewInput.diff.files.length - filteredDiff.files.length,
+      },
+      "Review engine ignore filters applied",
+    );
 
-  const generation = await generateParsedProviderReview(provider, {
-    systemPrompt: prompt.systemPrompt,
-    userPrompt: prompt.userPrompt,
-    schema: ProviderReviewResponseSchema,
-    maxTokens: provider.maxTokens,
-  });
-  if (generation.status === "failed") {
-    const findings =
-      generation.failureKind === "parse"
-        ? [buildReviewFailedFinding(filteredDiff, generation.error)]
-        : [];
+    if (filteredDiff.files.length === 0) {
+      await emitAuditEvent(sink, reviewCompletedEvent(), logger);
 
-    return buildFailedReview(reviewInput.pullRequest, provider, startedAt, generation.error, {
-      findings,
-      tokenUsage: generation.tokenUsage,
-      tokenUsageReported: generation.tokenUsageReported,
+      return buildNoFilesReview(reviewInput.pullRequest, provider, startedAt);
+    }
+
+    const prompt = buildReviewPrompt({
+      unifiedDiff: filteredDiff.unified_diff,
+      mode: reviewInput.config.review.mode,
+      pullRequest: {
+        number: reviewInput.pullRequest.number,
+        repoFullName: reviewInput.pullRequest.repo_full_name,
+        title: reviewInput.pullRequest.title,
+        description: reviewInput.pullRequest.body ?? "",
+      },
     });
+
+    logger?.info(
+      { provider: provider.name, changed_files: filteredDiff.files.length },
+      "Review engine request started",
+    );
+
+    const generation = await generateParsedProviderReview(provider, {
+      systemPrompt: prompt.systemPrompt,
+      userPrompt: prompt.userPrompt,
+      schema: ProviderReviewResponseSchema,
+      maxTokens: provider.maxTokens,
+    });
+
+    if (generation.responseReturned) {
+      await emitAuditEvent(
+        sink,
+        llmCalledEvent(
+          prompt.systemPrompt,
+          prompt.userPrompt,
+          generation.tokenUsage.prompt,
+          generation.tokenUsage.completion,
+        ),
+        logger,
+      );
+    }
+
+    if (generation.status === "failed") {
+      const errorCode = generation.failureKind === "parse" ? "parse_error" : "provider_error";
+      await emitAuditEvent(sink, reviewFailedEvent(errorCode), logger);
+
+      const findings =
+        generation.failureKind === "parse"
+          ? [buildReviewFailedFinding(filteredDiff, generation.error)]
+          : [];
+
+      return buildFailedReview(reviewInput.pullRequest, provider, startedAt, generation.error, {
+        findings,
+        tokenUsage: generation.tokenUsage,
+        tokenUsageReported: generation.tokenUsageReported,
+      });
+    }
+
+    const findings = applyReviewFilters(
+      generation.parsed.findings.map((finding) => toFinding(finding, logger)),
+      reviewInput.config.review.severityThreshold,
+      reviewInput.config.ignores,
+    );
+
+    // Append findings in order: a chaining sink (the Cloud file writer) links
+    // entries by hash, so they must be awaited sequentially, never in parallel.
+    await findings.reduce(async (previous, finding) => {
+      await previous;
+      const event = findingCreatedEvent(finding);
+      if (event !== undefined) {
+        await emitAuditEvent(sink, event, logger);
+      }
+    }, Promise.resolve());
+
+    await emitAuditEvent(sink, reviewCompletedEvent(), logger);
+
+    return ReviewSchema.parse({
+      id: uuidv7(),
+      pr_number: reviewInput.pullRequest.number,
+      repo_full_name: reviewInput.pullRequest.repo_full_name,
+      commit_sha: reviewInput.pullRequest.head_sha,
+      started_at: startedAt,
+      completed_at: new Date(),
+      llm_provider: provider.name,
+      llm_model: provider.model,
+      tokens_used: generation.tokenUsage,
+      token_usage_reported: generation.tokenUsageReported,
+      summary: generation.parsed.summary,
+      findings,
+      walkthrough_markdown: generation.parsed.walkthrough_markdown,
+      status: generation.status,
+    });
+  } catch (error) {
+    await emitAuditEvent(sink, reviewFailedEvent("unexpected_error"), logger);
+
+    throw error;
   }
-
-  const findings = applyReviewFilters(
-    generation.parsed.findings.map((finding) => toFinding(finding, options.logger)),
-    reviewInput.config.review.severityThreshold,
-    reviewInput.config.ignores,
-  );
-
-  return ReviewSchema.parse({
-    id: uuidv7(),
-    pr_number: reviewInput.pullRequest.number,
-    repo_full_name: reviewInput.pullRequest.repo_full_name,
-    commit_sha: reviewInput.pullRequest.head_sha,
-    started_at: startedAt,
-    completed_at: new Date(),
-    llm_provider: provider.name,
-    llm_model: provider.model,
-    tokens_used: generation.tokenUsage,
-    token_usage_reported: generation.tokenUsageReported,
-    summary: generation.parsed.summary,
-    findings,
-    walkthrough_markdown: generation.parsed.walkthrough_markdown,
-    status: generation.status,
-  });
 }
 
 function buildNoFilesReview(
@@ -358,6 +426,7 @@ async function generateParsedProviderReview(
       parsed: firstAttempt.parsed,
       tokenUsage: firstAttempt.tokenUsage,
       tokenUsageReported: firstAttempt.tokenUsageReported,
+      responseReturned: true,
       status: "success",
     };
   }
@@ -372,6 +441,7 @@ async function generateParsedProviderReview(
       failureKind: "provider",
       tokenUsage: firstAttempt.tokenUsage,
       tokenUsageReported: firstAttempt.tokenUsageReported,
+      responseReturned: firstAttempt.responseReturned,
       status: "failed",
     };
   }
@@ -380,6 +450,7 @@ async function generateParsedProviderReview(
     ...params,
     systemPrompt: buildCorrectiveSystemPrompt(params.systemPrompt, firstAttempt.error),
   });
+  const responseReturned = firstAttempt.responseReturned || attemptReturnedResponse(retryAttempt);
 
   if (!retryAttempt.success) {
     if (!isRetryableSchemaFailure(retryAttempt.error)) {
@@ -392,6 +463,7 @@ async function generateParsedProviderReview(
         failureKind: "provider",
         tokenUsage: addTokenUsage(firstAttempt.tokenUsage, retryAttempt.tokenUsage),
         tokenUsageReported: hasReportedTokenUsage(firstAttempt, retryAttempt),
+        responseReturned,
         status: "failed",
       };
     }
@@ -401,6 +473,7 @@ async function generateParsedProviderReview(
       failureKind: "parse",
       tokenUsage: addTokenUsage(firstAttempt.tokenUsage, retryAttempt.tokenUsage),
       tokenUsageReported: hasReportedTokenUsage(firstAttempt, retryAttempt),
+      responseReturned,
       status: "failed",
     };
   }
@@ -409,8 +482,15 @@ async function generateParsedProviderReview(
     parsed: retryAttempt.parsed,
     tokenUsage: addTokenUsage(firstAttempt.tokenUsage, retryAttempt.tokenUsage),
     tokenUsageReported: hasReportedTokenUsage(firstAttempt, retryAttempt),
+    responseReturned: true,
     status: "partial",
   };
+}
+
+// A successful attempt always carried a response; a failed one only if it failed
+// re-parse (the provider threw with no response otherwise).
+function attemptReturnedResponse(attempt: ProviderReviewAttempt): boolean {
+  return attempt.success || attempt.responseReturned;
 }
 
 async function generateProviderReviewAttempt(
@@ -431,6 +511,7 @@ async function generateProviderReviewAttempt(
       return {
         success: false,
         error: new ProviderReviewSchemaError(error),
+        responseReturned: true,
         tokenUsage: generation.tokenUsage,
         tokenUsageReported: generation.tokenUsageReported,
       };
@@ -441,6 +522,11 @@ async function generateProviderReviewAttempt(
     return {
       success: false,
       error,
+      // The provider threw. A thrown error that carries token usage means the model did
+      // respond and was charged (e.g. a retryable schema-validation error after invalid
+      // structured output), so it counts as a returned response; a usage-less transport
+      // error does not.
+      responseReturned: tokenUsage.reported,
       tokenUsage: tokenUsage.usage,
       tokenUsageReported: tokenUsage.reported,
     };
