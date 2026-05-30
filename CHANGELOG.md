@@ -338,6 +338,17 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `fix(review-engine)`: reconcile findings across review runs so a re-review
+  no longer re-posts a still-valid finding nor re-posts one whose code was fixed
+  (#1965). Each inline comment carries a stable, content-derived finding
+  fingerprint (`<!-- sovri-finding-id: -->`, independent of line shifts and LLM
+  title drift, yet case-sensitive on the targeted code so two same-CWE sinks in
+  one file keep separate identities); on re-review the bot reads its own prior
+  comments, skips
+  already-posted findings, and marks comments whose code left the diff as
+  outdated. Reconciliation logic stays pure in `@sovri/review-engine`; the bot
+  remains a thin GitHub adapter.
+
 - `test`: alias `@sovri/compliance` to its source entrypoint in the root Vitest
   config so review-engine source tests do not resolve the package through
   built `dist` output.

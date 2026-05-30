@@ -3,6 +3,8 @@
 
 import { DiffSchema, FindingSchema, z, type Diff, type Finding } from "@sovri/core";
 
+import { iterateRightSideLines } from "../diff/right-side-lines.js";
+
 const InlineFindingSchema = FindingSchema.superRefine((finding, context) => {
   if (finding.line_start > finding.line_end) {
     context.addIssue({
@@ -98,15 +100,8 @@ function addHunkRightSideLines(
   rightSideLines: Set<number>,
   hunk: Diff["files"][number]["hunks"][number],
 ): void {
-  let lineNumber = hunk.new_start;
-
-  for (const line of hunk.lines) {
-    if (line.startsWith("-") || line.startsWith("\\")) {
-      continue;
-    }
-
+  for (const { lineNumber } of iterateRightSideLines(hunk)) {
     rightSideLines.add(lineNumber);
-    lineNumber += 1;
   }
 }
 
