@@ -14333,13 +14333,13 @@ $(printf '%s\n' "$stderr" | sed 's/^/        /')"
   PASS=$((PASS + 1))
 }
 
-# The coverage step only echoes the Vitest command, so no real coverage summary is produced.
-# The policy must not treat an echoed coverage run as the real one.
-run_package_coverage_workflow_echoed_coverage_case() {
-  local package="$1" min="$2"
+# The coverage step does not really run Vitest (echoed, or failure-suppressed with `|| true`),
+# so no enforced coverage summary is produced. The policy must not treat it as the real run.
+run_package_coverage_workflow_tampered_coverage_case() {
+  local label="$1" package="$2" min="$3" coverage_run="$4"
   local tmp stdout stderr stdout_file stderr_file ec
 
-  tmp=$(mktemp -d 2>/dev/null || mktemp -d -t 'ci-policy-pkg-echocov')
+  tmp=$(mktemp -d 2>/dev/null || mktemp -d -t 'ci-policy-pkg-tampcov')
   stdout_file=$(mktemp)
   stderr_file=$(mktemp)
   cat >"$tmp/ci.yml" <<EOF
@@ -14360,7 +14360,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - name: Run coverage
-        run: echo "pnpm exec vitest run --coverage --reporter=verbose"
+        run: ${coverage_run}
       - name: Coverage gate — ${package}
         run: node scripts/check-coverage.mjs coverage/coverage-summary.json ${package} ${min}
 EOF
@@ -14377,7 +14377,7 @@ EOF
   if [ "$ec" -ne 1 ] || ! printf '%s\n' "$stdout" | grep -Fq "coverage_run=missing"; then
     FAIL=$((FAIL + 1))
     FAILURES="${FAILURES}
-  ✗ ${package} echoed coverage run must not count as a real coverage step
+  ✗ ${label}
       exit: ${ec}
       stdout:
 $(printf '%s\n' "$stdout" | sed 's/^/        /')
@@ -14797,7 +14797,8 @@ run_package_coverage_workflow_decoy_job_case packages/compliance 90
 run_package_coverage_workflow_gate_before_coverage_case packages/compliance 90
 run_package_coverage_workflow_tampered_gate_case "compliance gate echoed only" packages/compliance 90 'echo "node scripts/check-coverage.mjs coverage/coverage-summary.json packages/compliance 90"' "coverage_gate=missing"
 run_package_coverage_workflow_tampered_gate_case "compliance gate failure suppressed" packages/compliance 90 "node scripts/check-coverage.mjs coverage/coverage-summary.json packages/compliance 90 || true" "coverage_gate=missing"
-run_package_coverage_workflow_echoed_coverage_case packages/compliance 90
+run_package_coverage_workflow_tampered_coverage_case "compliance coverage run echoed only" packages/compliance 90 'echo "pnpm exec vitest run --coverage --reporter=verbose"'
+run_package_coverage_workflow_tampered_coverage_case "compliance coverage run failure suppressed" packages/compliance 90 "pnpm exec vitest run --coverage --reporter=verbose || true"
 # R-03 — CI enforces the @sovri/review-engine branch coverage gate (>= 85 %).
 run_package_coverage_workflow_real_ci_case packages/review-engine 85 review_engine_threshold
 run_package_coverage_workflow_case "review-engine gate missing" packages/review-engine 85 "" 1 "coverage_gate=missing"

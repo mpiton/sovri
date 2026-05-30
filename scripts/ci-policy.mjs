@@ -582,15 +582,16 @@ const stepCoverageGateThreshold = (step, packagePath) => {
   return match?.[1] === undefined ? undefined : Number(match[1]);
 };
 
-// True when a backend-checks step's `run` is the Vitest coverage command itself (trailing
-// flags such as `--reporter=verbose` allowed), not an echoed copy. Same anchoring rationale
-// as the gate match above, so a decoy like `echo "pnpm exec vitest run --coverage"` does not
-// count as the coverage run that produces the summary.
+// True when a backend-checks step's `run` is the Vitest coverage command itself. Trailing
+// flag tokens such as `--reporter=verbose` are allowed, but no shell operator (`|`, `&`,
+// `;`) may follow: that rules out both an echoed copy (`echo "pnpm … --coverage"`) and a
+// failure-suppressed run (`pnpm … --coverage || true`), either of which would otherwise let
+// the policy treat a non-enforcing step as the coverage run that produces the summary.
 const stepRunsCoverage = (step) => {
   const command = getStepPropertyValue(step.block, "run");
   return (
     command !== undefined &&
-    /^pnpm\s+exec\s+vitest\s+run\s+--coverage(?:\s.*)?$/u.test(command.trim())
+    /^pnpm\s+exec\s+vitest\s+run\s+--coverage(?:\s+[^\s|&;]+)*$/u.test(command.trim())
   );
 };
 
