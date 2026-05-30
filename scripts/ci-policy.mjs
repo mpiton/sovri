@@ -567,12 +567,18 @@ const coverageWorkflowStatusKey = (packagePath) =>
 const stepCoverageGateThreshold = (step, packagePath) => {
   const command = getStepPropertyValue(step.block, "run");
   if (command === undefined) return undefined;
-  const match = command.match(
-    new RegExp(
-      `node\\s+scripts/check-coverage\\.mjs\\s+coverage/coverage-summary\\.json\\s+${escapeRegExp(packagePath)}\\s+(\\d+(?:\\.\\d+)?)`,
-      "u",
-    ),
-  );
+  // Anchor to the whole trimmed `run` value: the gate must BE the executed command, not a
+  // substring. This rejects an echoed copy (`echo "node …check-coverage… 90"`) and a
+  // failure-suppressed call (`node …check-coverage… 90 || true`), both of which would
+  // otherwise report pass while no real gate runs.
+  const match = command
+    .trim()
+    .match(
+      new RegExp(
+        `^node\\s+scripts/check-coverage\\.mjs\\s+coverage/coverage-summary\\.json\\s+${escapeRegExp(packagePath)}\\s+(\\d+(?:\\.\\d+)?)$`,
+        "u",
+      ),
+    );
   return match?.[1] === undefined ? undefined : Number(match[1]);
 };
 
