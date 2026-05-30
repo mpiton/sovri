@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { getCweMap } from "../index.js";
+import { getCweMap } from "./loader.js";
 
 const batchTwoNewCweIds = [
   "CWE-20",

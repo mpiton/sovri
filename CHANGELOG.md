@@ -431,6 +431,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `parser.mapping.test.ts` and `parser.entries.test.ts` to satisfy the new
   `unicorn/consistent-function-scoping` rule introduced in oxlint 1.67.
 
+
+### Changed
+
+- `refactor(compliance)`: finalize the `@sovri/compliance` public surface (task-101, #1962). `src/index.ts` now exposes exactly the intended v0.3 surface — 17 named exports (the mapping enricher and schemas with their inferred types, the audit-trail event/entry schemas and types, the `AuditTrailSink` port and `MemoryAuditTrailSink`, and `verifyAuditTrail` with `VerifyResult`). One unit test parses the barrel and asserts the exact export set, that every re-export specifier ends in `.js`, and that the internal signer and file-writer factories never leak into the public API; a second asserts the package `README.md` "Public API" section lists exactly the same identifiers and documents the two factories as internal, so the published docs cannot drift from the code.
+
+### Removed
+
+- `refactor(compliance)`: drop `compliancePackageName` (dead scaffold constant) and `getCweMap` (internal helper, still used by `mapping/enricher.ts`) from the public `@sovri/compliance` exports (task-101, #1962), trimming the v0.3 public surface to the 17 intended exports. No external consumer imported either symbol.
 ## [0.2.0] - 2026-05-26
 ### Changed
 

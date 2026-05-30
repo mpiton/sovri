@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+import { getCweMap } from "./loader.js";
+
 import { describe, expect, it } from "vitest";
 
-import { ComplianceMappingEntrySchema, getCweMap } from "../index.js";
+import { ComplianceMappingEntrySchema } from "../index.js";
 
 function gdprReference(cweId: string) {
   const entry = getCweMap().get(cweId);

@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { getCweMap } from "../index.js";
+import { getCweMap } from "./loader.js";
 
 const loaderSourcePath = fileURLToPath(new URL("./loader.ts", import.meta.url));
 const forbiddenLoaderPatterns = ["import(", "fs.readFile", "readFileSync"];

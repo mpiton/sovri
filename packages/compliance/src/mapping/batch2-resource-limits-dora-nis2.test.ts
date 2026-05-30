@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+import { getCweMap } from "./loader.js";
+
 import { describe, expect, it } from "vitest";
 
-import {
-  ComplianceMappingEntrySchema,
-  getCweMap,
-  type ComplianceReferenceEntry,
-} from "../index.js";
+import { ComplianceMappingEntrySchema, type ComplianceReferenceEntry } from "../index.js";
 
 function reference(cweId: string, framework: string): ComplianceReferenceEntry | undefined {
   const entry = getCweMap().get(cweId);

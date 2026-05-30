@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+import { getCweMap } from "./loader.js";
+
 import { describe, expect, it } from "vitest";
 
-import {
-  ComplianceReferenceEntrySchema,
-  getCweMap,
-  type ComplianceMappingEntry,
-} from "../index.js";
+import { ComplianceReferenceEntrySchema, type ComplianceMappingEntry } from "../index.js";
 
 const batchTwoCweIds = [
   "CWE-20",

@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+import { getCweMap } from "./loader.js";
+
 import { describe, expect, it } from "vitest";
 
-import { getCweMap, type ComplianceMappingEntry, type ComplianceReferenceEntry } from "../index.js";
+import { type ComplianceMappingEntry, type ComplianceReferenceEntry } from "../index.js";
 import { auditFlagshipCredentials } from "./required-references.js";
 
 function readFlagship(): ComplianceMappingEntry {
