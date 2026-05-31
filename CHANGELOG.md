@@ -47,6 +47,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `test(llm-providers)`: add grouped acceptance coverage for OpenAI token-usage mapping,
   invalid usage diagnostics, and data-only generation.
 
+- `test(llm-providers)`: add OpenAI provider no-network guards for forbidden real API
+  dependencies and accidental unhandled OpenAI requests in tests.
+
 - `fix(llm-providers)`: normalize OpenAI strict JSON schemas before requests, reject
   unsupported dynamic record schemas, and wrap SDK transport/authentication failures in
   typed provider errors with request metadata.
