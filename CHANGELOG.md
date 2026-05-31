@@ -25,11 +25,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Changed
 
 - `chore(release)`: prepare the v0.3.0 release metadata — the Compliance Trail
-  foundation ships in the Community edition (`@sovri/compliance`: CWE Top 25
-  2025 mapping to GDPR / DORA / ISO 27001 / NIS2 / AI Act / CRA references, the
-  Ed25519 hash-chain audit trail, and the offline `verifyAuditTrail` API), with
-  the optional audit-trail sink inert by default so the bot stays stateless.
-  Cosign signing remains deferred to v0.5.
+  foundation ships in the Community edition (`@sovri/compliance` mapping plus the
+  Ed25519 audit trail), with the audit-trail sink inert by default. Cosign
+  signing remains deferred to v0.5.
 
 ### Added
 
