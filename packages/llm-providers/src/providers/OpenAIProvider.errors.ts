@@ -15,7 +15,11 @@ export interface OpenAIProviderErrorOptions {
   readonly retryableWithCorrectivePrompt?: true;
 }
 
-type OpenAIProviderErrorName = "OpenAIProviderAuthError" | "OpenAIProviderError";
+type OpenAIProviderErrorName =
+  | "OpenAIProviderAuthError"
+  | "OpenAIProviderError"
+  | "OpenAIProviderRetryError"
+  | "OpenAIProviderTimeoutError";
 
 export class OpenAIProviderError<
   Name extends OpenAIProviderErrorName = "OpenAIProviderError",
@@ -62,6 +66,18 @@ export class OpenAIProviderError<
 export class OpenAIProviderAuthError extends OpenAIProviderError<"OpenAIProviderAuthError"> {
   protected override get errorName(): "OpenAIProviderAuthError" {
     return "OpenAIProviderAuthError";
+  }
+}
+
+export class OpenAIProviderRetryError extends OpenAIProviderError<"OpenAIProviderRetryError"> {
+  protected override get errorName(): "OpenAIProviderRetryError" {
+    return "OpenAIProviderRetryError";
+  }
+}
+
+export class OpenAIProviderTimeoutError extends OpenAIProviderError<"OpenAIProviderTimeoutError"> {
+  protected override get errorName(): "OpenAIProviderTimeoutError" {
+    return "OpenAIProviderTimeoutError";
   }
 }
 

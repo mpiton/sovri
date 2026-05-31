@@ -58,6 +58,8 @@ export {
   OpenAIProvider,
   OpenAIProviderAuthError,
   OpenAIProviderError,
+  OpenAIProviderRetryError,
+  OpenAIProviderTimeoutError,
   type OpenAIProviderErrorOptions,
   type OpenAIProviderOptions,
 } from "./providers/OpenAIProvider.js";

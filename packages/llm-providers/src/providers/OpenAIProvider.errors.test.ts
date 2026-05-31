@@ -6,7 +6,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as LlmProviders from "../index.js";
 import type { LLMProvider } from "../types/LLMProvider.js";
-import { OpenAIProviderAuthError, OpenAIProviderError } from "./OpenAIProvider.js";
+import {
+  OpenAIProviderAuthError,
+  OpenAIProviderError,
+  OpenAIProviderRetryError,
+} from "./OpenAIProvider.js";
 
 const TestApiKey = "test-openai-key";
 
@@ -63,9 +67,10 @@ describe("OpenAIProvider SDK errors", () => {
 
     const error = await captureAsyncOpenAIProviderError(provider.generateStructured(validParams));
 
+    expect(error).toBeInstanceOf(OpenAIProviderRetryError);
     expect(error).toBeInstanceOf(OpenAIProviderError);
     expect(error).not.toBeInstanceOf(OpenAIProviderAuthError);
-    expect(error.name).toBe("OpenAIProviderError");
+    expect(error.name).toBe("OpenAIProviderRetryError");
     expect(error.message).toContain("failed after 1 attempts");
     expect(error.cause).toBe(sdkError);
   });
@@ -95,6 +100,7 @@ describe("OpenAIProvider SDK errors", () => {
     await vi.advanceTimersByTimeAsync(500);
 
     const error = await capturedError;
+    expect(error).toBeInstanceOf(OpenAIProviderRetryError);
     expect(error).toBeInstanceOf(OpenAIProviderError);
     expect(error.message).toContain("2 attempts");
     expect(error.status).toBe(429);
