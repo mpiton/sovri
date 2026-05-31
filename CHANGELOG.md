@@ -21,9 +21,58 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(llm-providers)`: add the OpenAI provider contract implementation slice, covering
+  the public `LLMProvider` metadata, default model, data-only generation, and token-usage
+  generation expected from the v0.5 BYOK OpenAI adapter.
+
+- `test(llm-providers)`: cover OpenAI provider option validation, request shaping, schema
+  failures, and malformed response handling with injected fake clients so the adapter stays
+  above the package coverage gate without real network calls.
+
+- `test(llm-providers)`: add grouped acceptance coverage for OpenAI schema validation,
+  including response-format derivation, retryable Zod validation failures, and unsupported
+  schema preflight rejection.
+
+- `test(llm-providers)`: add grouped acceptance coverage for OpenAI API key validation,
+  including blank-key typed errors before requests and trimmed SDK constructor options.
+
+- `feat(llm-providers)`: add bounded OpenAI numeric options for timeout and retry-attempt
+  configuration alongside the existing max-token validation.
+
+- `fix(llm-providers)`: cap OpenAI retry attempts to keep exponential backoff bounded.
+
+- `feat(llm-providers)`: support optional OpenAI constructor base URL overrides for EU-hosted or
+  OpenAI-compatible endpoints while preserving the SDK default when omitted.
+
+- `test(llm-providers)`: add grouped acceptance coverage for OpenAI token-usage mapping,
+  invalid usage diagnostics, and data-only generation.
+
+- `test(llm-providers)`: add OpenAI provider no-network guards for forbidden real API
+  dependencies and accidental unhandled OpenAI requests in tests.
+
+- `feat(llm-providers)`: export typed OpenAI retry and timeout errors from the package
+  entrypoint alongside the provider and default constants.
+
+- `fix(llm-providers)`: normalize OpenAI strict JSON schemas before requests, reject
+  unsupported dynamic record schemas, and wrap SDK transport/authentication failures in
+  typed provider errors with request metadata.
+
 - `chore(deps)`: add the official `openai@6.39.1` SDK as an exactly pinned runtime dependency
   of `@sovri/llm-providers`, preparing the v0.5 BYOK provider slice for OpenAI and
   OpenAI-compatible adapters while keeping this task limited to supply-chain-gated dependency metadata.
+
+- `fix(llm-providers)`: address OpenAI provider review feedback by validating base URLs and
+  temperature values before requests, preserving optional-field semantics in strict OpenAI JSON
+  schemas, and hardening the no-network test guard against formatting bypasses.
+
+- `fix(llm-providers)`: make the OpenAI no-network guard use a CodeQL-safe host matcher while
+  preserving case-insensitive detection of forbidden real OpenAI API dependencies.
+
+- `fix(llm-providers)`: handle OpenAI optional null sentinels inside union schema branches and
+  optional enum schemas, rewrite literal/one-of schema keywords for OpenAI strict structured
+  outputs, reject unsupported all-of schemas before requests, preserve caller-allowed null values,
+  complete SDK mock exports, clarify provider validation and default-option comments, and document
+  the typed OpenAI provider error hierarchy.
 
 ## [0.3.0] - 2026-05-31
 
