@@ -1,4 +1,4 @@
 llm:
-  provider: openai
-  model: gpt-4o
-  apiKeySecret: OPENAI_API_KEY
+  provider: gemini
+  model: gemini-2.5-pro
+  apiKeySecret: GEMINI_API_KEY

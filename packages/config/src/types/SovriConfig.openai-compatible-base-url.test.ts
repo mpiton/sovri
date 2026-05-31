@@ -45,7 +45,7 @@ describe("SovriConfig OpenAI-compatible base URL boundary", () => {
     expect(createOpenAICompatibleProvider).not.toHaveBeenCalled();
   });
 
-  it("keeps openai-compatible config gated separately from HTTPS baseUrl validation", () => {
+  it("accepts openai-compatible config when HTTPS baseUrl is present", () => {
     const createOpenAICompatibleProvider = vi.fn();
 
     // Given a Sovri config selects provider "openai-compatible"
@@ -55,15 +55,46 @@ describe("SovriConfig OpenAI-compatible base URL boundary", () => {
       createOpenAICompatibleProvider();
     }
 
-    // Then validation fails on the provider gate in this release
+    // Then validation succeeds
+    // And createOpenAICompatibleProvider receives 1 call
+    // And the valid HTTPS baseUrl is preserved
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error("Expected openai-compatible provider config with HTTPS baseUrl to parse");
+    }
+    expect(result.data.llm.baseUrl).toBe(HttpsBaseUrl);
+    expect(createOpenAICompatibleProvider).toHaveBeenCalledOnce();
+  });
+
+  it("rejects openai-compatible config when baseUrl is omitted", () => {
+    const createOpenAICompatibleProvider = vi.fn();
+
+    // Given a Sovri config selects provider "openai-compatible"
+    // And baseUrl is missing
+    const result = SovriConfigSchema.safeParse({
+      llm: {
+        provider: CompatibleProvider,
+        model: "qwen2.5-coder-32b",
+        apiKeySecret: "OPENAI_COMPATIBLE_API_KEY",
+      },
+    });
+    if (result.success) {
+      createOpenAICompatibleProvider();
+    }
+
+    // Then validation fails on the baseUrl path
     // And createOpenAICompatibleProvider receives 0 calls
-    // And the valid HTTPS baseUrl is not the failing issue
     expect(result.success).toBe(false);
     if (result.success) {
-      throw new Error("Expected openai-compatible provider to remain gated in this release");
+      throw new Error("Expected openai-compatible provider config without baseUrl to fail");
     }
-    expect(result.error.issues.some((issue) => issue.path.join(".") === "llm.provider")).toBe(true);
-    expect(result.error.issues.some((issue) => issue.path.join(".") === "llm.baseUrl")).toBe(false);
+    const baseUrlIssues = result.error.issues.filter(
+      (issue) => issue.path.join(".") === "llm.baseUrl",
+    );
+    expect(baseUrlIssues).toHaveLength(1);
+    expect(baseUrlIssues[0]?.message).toBe(
+      "llm.baseUrl is required when llm.provider is 'openai-compatible'.",
+    );
     expect(createOpenAICompatibleProvider).not.toHaveBeenCalled();
   });
 });
