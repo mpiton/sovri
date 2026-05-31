@@ -57,15 +57,22 @@ const ForbiddenCompatibleNetworkPatterns = [
   },
   {
     label: "process.env.OPENAI_API_KEY",
-    matches: (source) => /\bprocess\s*\.\s*env\s*\.\s*OPENAI_API_KEY\b/.test(source),
+    matches: (source) => /\bOPENAI_API_KEY\b/.test(source),
     sample: "process.env.OPENAI_API_KEY",
   },
   {
     label: "process.env.OPENAI_COMPATIBLE_API_KEY",
-    matches: (source) => /\bprocess\s*\.\s*env\s*\.\s*OPENAI_COMPATIBLE_API_KEY\b/.test(source),
+    matches: (source) => /\bOPENAI_COMPATIBLE_API_KEY\b/.test(source),
     sample: "process.env.OPENAI_COMPATIBLE_API_KEY",
   },
 ] satisfies readonly ForbiddenCompatibleNetworkPattern[];
+
+const ForbiddenEnvironmentLookupSamples = [
+  ['process.env["OPENAI_API_KEY"]', "process.env.OPENAI_API_KEY"],
+  ["const { OPENAI_API_KEY } = process.env;", "process.env.OPENAI_API_KEY"],
+  ['process.env["OPENAI_COMPATIBLE_API_KEY"]', "process.env.OPENAI_COMPATIBLE_API_KEY"],
+  ["const { OPENAI_COMPATIBLE_API_KEY } = process.env;", "process.env.OPENAI_COMPATIBLE_API_KEY"],
+] satisfies ReadonlyArray<readonly [string, string]>;
 
 afterEach(() => {
   vi.doUnmock("openai");
@@ -111,6 +118,15 @@ describe("OpenAI-compatible no-network test guard", () => {
 
       // Then the guard fails
       // And the failure identifies "<forbidden_pattern>" as incompatible with provider unit tests
+      expect(violations).toContain(label);
+    },
+  );
+
+  it.each(ForbiddenEnvironmentLookupSamples)(
+    "rejects API-key environment lookup variant %s",
+    (sample, label) => {
+      const violations = findForbiddenCompatibleNetworkPatterns(sample);
+
       expect(violations).toContain(label);
     },
   );
