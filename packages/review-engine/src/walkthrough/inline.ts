@@ -4,6 +4,8 @@
 import { DiffSchema, FindingSchema, z, type Diff, type Finding } from "@sovri/core";
 
 import { iterateRightSideLines } from "../diff/right-side-lines.js";
+import { computeFindingFingerprint } from "../reconcile/fingerprint.js";
+import { renderFindingMarker } from "../reconcile/marker.js";
 
 const InlineFindingSchema = FindingSchema.superRefine((finding, context) => {
   if (finding.line_start > finding.line_end) {
@@ -44,17 +46,18 @@ export function buildInlineComments(
   diff: Diff,
 ): InlineCommentDraft[] {
   const validFindings = z.array(InlineFindingSchema).parse(findings);
-  const rightSideLinesByPath = collectRightSideLines(DiffSchema.parse(diff));
+  const parsedDiff = DiffSchema.parse(diff);
+  const rightSideLinesByPath = collectRightSideLines(parsedDiff);
 
   return validFindings
     .filter((finding) => isFindingAnchorable(finding, rightSideLinesByPath))
-    .map((finding) => buildInlineCommentDraft(finding));
+    .map((finding) => buildInlineCommentDraft(finding, parsedDiff));
 }
 
-function buildInlineCommentDraft(finding: Finding): InlineCommentDraft {
+function buildInlineCommentDraft(finding: Finding, diff: Diff): InlineCommentDraft {
   const base = {
     path: finding.file,
-    body: formatInlineBody(finding),
+    body: formatInlineBody(finding, computeFindingFingerprint(finding, diff)),
   };
 
   if (finding.line_start === finding.line_end) {
@@ -74,12 +77,12 @@ function buildInlineCommentDraft(finding: Finding): InlineCommentDraft {
   });
 }
 
-function formatInlineBody(finding: Finding): string {
+function formatInlineBody(finding: Finding, fingerprint: string): string {
   const body = [`**${finding.title}**`, "", finding.body].join("\n");
   const auditLine = finding.audit_reference
     ? `\n\n🔍 Audit Reference: ${finding.audit_reference}`
     : "";
-  return `${body}${auditLine}`;
+  return `${body}${auditLine}\n\n${renderFindingMarker(fingerprint)}`;
 }
 
 function collectRightSideLines(diff: Diff): ReadonlyMap<string, ReadonlySet<number>> {

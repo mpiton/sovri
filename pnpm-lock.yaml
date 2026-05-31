@@ -59,6 +59,9 @@ importers:
       probot:
         specifier: ^14.3.2
         version: 14.3.2
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/js-yaml':
         specifier: 4.0.9

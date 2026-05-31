@@ -59,7 +59,10 @@ export { generateAuditReference } from "./audit-ref.js";
 export {
   classifyResolvedComments,
   computeFindingFingerprint,
+  extractFindingFingerprint,
+  FINDING_MARKER_PATTERN,
   reconcileFindings,
+  renderFindingMarker,
 } from "./reconcile/index.js";
 export type { PostedComment } from "./reconcile/index.js";
 

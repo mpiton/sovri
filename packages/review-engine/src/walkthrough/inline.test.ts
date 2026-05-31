@@ -244,7 +244,7 @@ describe("buildInlineComments", () => {
 });
 
 describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04)", () => {
-  it("appends the audit reference as the last line of the inline comment body", () => {
+  it("renders the audit reference line just before the hidden finding marker", () => {
     // Given a finding "Missing null guard" in "src/session.ts" at line 18
     // And the finding body is "`session.user` can be undefined."
     // And the finding has audit reference "SOVRI-SC-AB12-CD34"
@@ -272,16 +272,21 @@ describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04)"
     // Then exactly one inline comment is produced for "src/session.ts"
     expect(comments).toHaveLength(1);
     expect(comments[0]?.path).toBe("src/session.ts");
-    // And the inline comment body renders exactly:
-    expect(comments[0]?.body).toBe(
-      [
-        "**Missing null guard**",
-        "",
-        "`session.user` can be undefined.",
-        "",
-        "🔍 Audit Reference: SOVRI-SC-AB12-CD34",
-      ].join("\n"),
-    );
+    // And the inline comment body renders the title, body and audit reference,
+    // then the hidden finding marker as the very last line
+    const body = comments[0]?.body ?? "";
+    expect(
+      body.startsWith(
+        [
+          "**Missing null guard**",
+          "",
+          "`session.user` can be undefined.",
+          "",
+          "🔍 Audit Reference: SOVRI-SC-AB12-CD34",
+        ].join("\n"),
+      ),
+    ).toBe(true);
+    expect(body).toMatch(/\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u);
   });
 
   it("omits the audit reference line when the finding has no audit reference", () => {
@@ -310,10 +315,15 @@ describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04)"
 
     // Then the inline comment body does not contain "🔍 Audit Reference:"
     expect(comments[0]?.body).not.toContain("🔍 Audit Reference:");
-    // And the inline comment body renders exactly:
-    expect(comments[0]?.body).toBe(
-      ["**Missing null guard**", "", "`session.user` can be undefined."].join("\n"),
-    );
+    // And the inline comment body renders the title and body, then the hidden
+    // finding marker as the very last line
+    const body = comments[0]?.body ?? "";
+    expect(
+      body.startsWith(
+        ["**Missing null guard**", "", "`session.user` can be undefined."].join("\n"),
+      ),
+    ).toBe(true);
+    expect(body).toMatch(/\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u);
   });
 
   it("carries only the audit reference, never the compliance references block", () => {
@@ -407,11 +417,19 @@ describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04)"
     // When the inline comments are built
     const comments = buildInlineComments(findings, diff);
 
-    // Then the inline comment for "src/session.ts" at line 18 ends with "🔍 Audit Reference: SOVRI-SC-AB12-CD34"
+    // Then the inline comment for "src/session.ts" at line 18 carries
+    // "🔍 Audit Reference: SOVRI-SC-AB12-CD34" just before its finding marker
     const at18 = comments.find((comment) => comment.line === 18);
-    expect(at18?.body.endsWith("🔍 Audit Reference: SOVRI-SC-AB12-CD34")).toBe(true);
-    // And the inline comment for "src/session.ts" at line 42 ends with "🔍 Audit Reference: SOVRI-BU-1A2B-3C4D"
+    expect(at18?.body).toContain(
+      "\n\n🔍 Audit Reference: SOVRI-SC-AB12-CD34\n\n<!-- sovri-finding-id: ",
+    );
+    expect(at18?.body).toMatch(/\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u);
+    // And the inline comment for "src/session.ts" at line 42 carries
+    // "🔍 Audit Reference: SOVRI-BU-1A2B-3C4D" just before its finding marker
     const at42 = comments.find((comment) => comment.line === 42);
-    expect(at42?.body.endsWith("🔍 Audit Reference: SOVRI-BU-1A2B-3C4D")).toBe(true);
+    expect(at42?.body).toContain(
+      "\n\n🔍 Audit Reference: SOVRI-BU-1A2B-3C4D\n\n<!-- sovri-finding-id: ",
+    );
+    expect(at42?.body).toMatch(/\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u);
   });
 });

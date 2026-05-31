@@ -42,7 +42,8 @@
     "@sovri/llm-providers": "workspace:*",
     "@sovri/observability": "workspace:*",
     "@sovri/review-engine": "workspace:*",
-    "probot": "^14.3.2"
+    "probot": "^14.3.2",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/js-yaml": "4.0.9",

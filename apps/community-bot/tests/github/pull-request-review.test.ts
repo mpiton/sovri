@@ -208,7 +208,9 @@ review:
         body: "<!-- sovri:walkthrough -->\nReview complete",
         comments: [
           {
-            body: "**Delegation check**\n\nThe handler should delegate review work.",
+            body: expect.stringMatching(
+              /^\*\*Delegation check\*\*\n\nThe handler should delegate review work\.\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u,
+            ),
             line: 42,
             path: "apps/community-bot/src/handlers/pull-request.ts",
             side: "RIGHT",
@@ -250,7 +252,9 @@ review:
       expect.objectContaining({
         comments: [
           {
-            body: "**Multi-line anchor**\n\nThe handler should anchor a range only when every line is in the diff.",
+            body: expect.stringMatching(
+              /^\*\*Multi-line anchor\*\*\n\nThe handler should anchor a range only when every line is in the diff\.\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u,
+            ),
             line: 43,
             path: "apps/community-bot/src/handlers/pull-request.ts",
             side: "RIGHT",
