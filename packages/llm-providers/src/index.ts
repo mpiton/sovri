@@ -48,6 +48,11 @@ export {
 } from "./providers/MistralProvider.js";
 
 export {
+  createOpenAICompatibleProvider,
+  type OpenAICompatibleProviderOptions,
+} from "./providers/OpenAICompatibleProvider.js";
+
+export {
   DEFAULT_OPENAI_MAX_ATTEMPTS,
   DEFAULT_OPENAI_MAX_TOKENS,
   DEFAULT_OPENAI_MODEL,
