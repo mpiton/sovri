@@ -16,6 +16,7 @@ export const MAX_OPENAI_MAX_ATTEMPTS = 10;
 export interface OpenAIProviderConfigOptions {
   readonly apiKey: string;
   readonly model?: string;
+  readonly baseUrl?: string;
   readonly maxTokens?: number;
   readonly timeoutMs?: number;
   readonly maxAttempts?: number;
@@ -24,6 +25,7 @@ export interface OpenAIProviderConfigOptions {
 export interface ResolvedOpenAIProviderOptions {
   readonly apiKey: string;
   readonly model: string;
+  readonly baseUrl: string | undefined;
   readonly maxTokens: number;
   readonly timeoutMs: number;
   readonly maxAttempts: number;
@@ -35,18 +37,29 @@ export function resolveOpenAIProviderOptions(
   return {
     apiKey: resolveApiKey(options.apiKey),
     model: resolveModel(options.model),
+    baseUrl: resolveBaseUrl(options.baseUrl),
     maxTokens: resolveMaxTokens(options.maxTokens),
     timeoutMs: resolveTimeoutMs(options.timeoutMs),
     maxAttempts: resolveMaxAttempts(options.maxAttempts),
   };
 }
 
-export function createOpenAIClientOptions(apiKey: string, timeoutMs: number): ClientOptions {
-  return {
+export function createOpenAIClientOptions(
+  apiKey: string,
+  timeoutMs: number,
+  baseUrl: string | undefined,
+): ClientOptions {
+  const clientOptions: ClientOptions = {
     apiKey,
     maxRetries: 0,
     timeout: timeoutMs,
   };
+
+  if (baseUrl !== undefined) {
+    clientOptions.baseURL = baseUrl;
+  }
+
+  return clientOptions;
 }
 
 export function resolveMaxTokens(maxTokens: number | undefined): number {
@@ -78,6 +91,19 @@ function resolveModel(model: string | undefined): string {
   const trimmed = (model ?? DEFAULT_OPENAI_MODEL).trim();
   if (trimmed.length === 0) {
     throw new OpenAIProviderError("OpenAI model must be a non-empty value");
+  }
+
+  return trimmed;
+}
+
+function resolveBaseUrl(baseUrl: string | undefined): string | undefined {
+  if (baseUrl === undefined) {
+    return undefined;
+  }
+
+  const trimmed = baseUrl.trim();
+  if (trimmed.length === 0) {
+    throw new OpenAIProviderError("OpenAI baseUrl must be a non-empty value");
   }
 
   return trimmed;

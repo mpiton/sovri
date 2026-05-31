@@ -67,7 +67,13 @@ export class OpenAIProvider implements LLMProvider {
     this.maxAttempts = resolvedOptions.maxAttempts;
     this.client =
       options.client ??
-      new OpenAI(createOpenAIClientOptions(resolvedOptions.apiKey, resolvedOptions.timeoutMs));
+      new OpenAI(
+        createOpenAIClientOptions(
+          resolvedOptions.apiKey,
+          resolvedOptions.timeoutMs,
+          resolvedOptions.baseUrl,
+        ),
+      );
   }
 
   async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
