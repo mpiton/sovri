@@ -25,6 +25,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `.sovri.yml` accepts Anthropic, Mistral, OpenAI, and OpenAI-compatible provider
   values while still rejecting providers outside the declared enum.
 
+- `feat(config)`: widen `.sovri.yml` provider validation to accept `openai` and
+  `openai-compatible` alongside Anthropic and Mistral.
+
 - `feat(llm-providers)`: add the OpenAI provider contract implementation slice, covering
   the public `LLMProvider` metadata, default model, data-only generation, and token-usage
   generation expected from the v0.5 BYOK OpenAI adapter.

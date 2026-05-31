@@ -29,12 +29,9 @@ const EnvVarNamePattern = /^[A-Z_][A-Z0-9_]*$/;
 const ModelNamePattern = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 
 /**
- * Full list of providers Sovri intends to support eventually. The runtime
- * `.refine()` on `LlmSchema.provider` narrows acceptance to the v0.2
- * allow-list `{"anthropic", "mistral"}`; the enum itself stays wide so
- * the inferred TypeScript shape stays stable across releases and
- * downstream switch/case branches do not need to be re-typed when later
- * releases lift the refinement to cover `openai` / `openai-compatible`.
+ * Full list of providers Sovri accepts in repository configuration. The enum
+ * is the runtime allow-list and the inferred TypeScript shape, so downstream
+ * switch/case branches stay stable as provider adapters are wired in.
  */
 export const ProviderSchema = z.enum(["anthropic", "mistral", "openai", "openai-compatible"]);
 export type Provider = z.infer<typeof ProviderSchema>;
@@ -50,9 +47,7 @@ export const SeverityThresholdSchema = z.enum(["blocker", "major", "minor"]);
 export type SeverityThreshold = z.infer<typeof SeverityThresholdSchema>;
 
 const LlmSchema = z.strictObject({
-  provider: ProviderSchema.refine((value) => value === "anthropic" || value === "mistral", {
-    message: "Only 'anthropic' and 'mistral' are enabled in this release.",
-  }),
+  provider: ProviderSchema,
   model: z
     .string()
     .min(1)

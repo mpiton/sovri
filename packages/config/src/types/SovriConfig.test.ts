@@ -171,171 +171,41 @@ describe("SovriConfigSchema — happy paths", () => {
   });
 });
 
-// v0.2 widens the refine to accept both `anthropic` and `mistral`. Each
-// scenario sub-issue under US #1162 adds the matching assertions here.
-// The companion describe block further down covers the rejected set
-// (`openai` / `openai-compatible`) and out-of-enum values.
-describe("SovriConfigSchema — v0.2 refine widening (anthropic + mistral allow-list)", () => {
-  // Issue #1163, R-01 nominal.
-  // Scenario:
-  //   Given the .sovri.yml has llm.provider "anthropic"
-  //   When SovriConfigSchema.safeParse() runs on the config
-  //   Then the result is success=true
-  //   And the parsed config has llm.provider equal to "anthropic"
-  it("R-01 nominal — provider=anthropic passes safeParse with success=true", () => {
-    const result = SovriConfigSchema.safeParse({
-      ...minimalConfig,
-      llm: { ...minimalConfig.llm, provider: "anthropic" },
-    });
-
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.llm.provider).toBe("anthropic");
-    }
-  });
-
-  // Issue #1164, R-01 nominal.
-  // Scenario:
-  //   Given the .sovri.yml has llm.provider "mistral"
-  //   When SovriConfigSchema.safeParse() runs on the config
-  //   Then the result is success=true
-  //   And the parsed config has llm.provider equal to "mistral"
-  it("R-01 nominal — provider=mistral passes safeParse with success=true", () => {
-    const result = SovriConfigSchema.safeParse({
-      ...minimalConfig,
-      llm: { ...minimalConfig.llm, provider: "mistral" },
-    });
-
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.llm.provider).toBe("mistral");
-    }
-  });
-
-  // Issue #1165, R-02 violation (Scenario Outline over the rejected set).
-  // Scenario:
-  //   Given the .sovri.yml has llm.provider "<provider>"
-  //   When SovriConfigSchema.safeParse() runs on the config
-  //   Then the result is success=false
-  //   And exactly one issue has path "llm.provider"
-  //   And that issue.message equals
-  //     "Only 'anthropic' and 'mistral' are enabled in this release."
-  it.each(["openai", "openai-compatible"] satisfies readonly Provider[])(
-    "R-02 violation — provider=%s yields exactly one llm.provider issue with the v0.2 message",
+describe("SovriConfigSchema — provider allow-list", () => {
+  it.each(["anthropic", "mistral", "openai"] satisfies readonly Provider[])(
+    "accepts provider=%s",
     (provider) => {
       const result = SovriConfigSchema.safeParse({
         ...minimalConfig,
         llm: { ...minimalConfig.llm, provider },
       });
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        const providerIssues = result.error.issues.filter(
-          (issue) => issue.path.join(".") === "llm.provider",
-        );
-        expect(providerIssues).toHaveLength(1);
-        expect(providerIssues[0]?.message).toBe(
-          "Only 'anthropic' and 'mistral' are enabled in this release.",
-        );
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.llm.provider).toBe(provider);
       }
     },
   );
 
-  // Issue #1166, R-02 technical (byte-identical message across the rejected
-  // set; guards against template drift if a future change introduces a
-  // per-value interpolation in the refine message).
-  // Scenario:
-  //   Given two parse attempts, one with llm.provider "openai" and one with
-  //     llm.provider "openai-compatible"
-  //   When SovriConfigSchema.safeParse() runs on each config
-  //   Then both results are success=false
-  //   And the message of the "llm.provider" issue is byte-identical between
-  //     the two errors
-  it("R-02 technical — rejection message is byte-identical between openai and openai-compatible", () => {
-    const openaiResult = SovriConfigSchema.safeParse({
-      ...minimalConfig,
-      llm: { ...minimalConfig.llm, provider: "openai" },
-    });
-    const openaiCompatibleResult = SovriConfigSchema.safeParse({
-      ...minimalConfig,
-      llm: { ...minimalConfig.llm, provider: "openai-compatible" },
-    });
-
-    expect(openaiResult.success).toBe(false);
-    expect(openaiCompatibleResult.success).toBe(false);
-    if (!openaiResult.success && !openaiCompatibleResult.success) {
-      const openaiMessage = openaiResult.error.issues.find(
-        (issue) => issue.path.join(".") === "llm.provider",
-      )?.message;
-      const openaiCompatibleMessage = openaiCompatibleResult.error.issues.find(
-        (issue) => issue.path.join(".") === "llm.provider",
-      )?.message;
-
-      expect(openaiMessage).toBeDefined();
-      expect(openaiMessage).toBe(openaiCompatibleMessage);
-    }
-  });
-
-  // Issue #1170, R-04 technical (safeParse exposes the provider refine
-  // failure via result.error.issues with a structured path array, not a
-  // dotted string).
-  // Scenario:
-  //   Given the .sovri.yml has llm.provider "openai"
-  //   When SovriConfigSchema.safeParse() runs on the config
-  //   Then the result is success=false
-  //   And result.error.issues has at least one entry with path
-  //     ["llm", "provider"]
-  //   And that entry.message equals
-  //     "Only 'anthropic' and 'mistral' are enabled in this release."
-  it("R-04 technical — safeParse error.issues exposes path=['llm','provider'] with the v0.2 message", () => {
+  it("accepts provider=openai-compatible when baseUrl is present", () => {
     const result = SovriConfigSchema.safeParse({
       ...minimalConfig,
-      llm: { ...minimalConfig.llm, provider: "openai" },
+      llm: {
+        ...minimalConfig.llm,
+        provider: "openai-compatible",
+        model: "qwen2.5-coder-32b",
+        baseUrl: "https://inference.eu.example/v1",
+        apiKeySecret: "OPENAI_COMPATIBLE_API_KEY",
+      },
     });
 
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      const providerIssue = result.error.issues.find(
-        (issue) =>
-          issue.path.length === 2 && issue.path[0] === "llm" && issue.path[1] === "provider",
-      );
-
-      expect(providerIssue).toBeDefined();
-      expect(providerIssue?.path).toEqual(["llm", "provider"]);
-      expect(providerIssue?.message).toBe(
-        "Only 'anthropic' and 'mistral' are enabled in this release.",
-      );
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.llm.provider).toBe("openai-compatible");
     }
   });
-});
 
-describe("SovriConfigSchema — provider refinement (v0.2 widened — rejected set)", () => {
-  it.each(["openai", "openai-compatible"] satisfies readonly Provider[])(
-    "rejects provider=%s with a forward-compatible error message",
-    (provider) => {
-      const result = SovriConfigSchema.safeParse({
-        ...minimalConfig,
-        llm: { ...minimalConfig.llm, provider },
-      });
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(
-          result.error.issues.some(
-            (issue) =>
-              issue.path.join(".") === "llm.provider" && issue.message.includes("anthropic"),
-          ),
-        ).toBe(true);
-      }
-    },
-  );
-
-  it("accepts provider=anthropic", () => {
-    expect(SovriConfigSchema.parse(minimalConfig).llm.provider).toBe("anthropic");
-  });
-
-  // Issue #1169, R-03 limit (out-of-enum value rejected at the enum step,
-  // before the refine fires).
+  // Out-of-enum values are rejected at the enum step.
   // Scenario:
   //   Given the .sovri.yml has llm.provider "gemini"
   //   And a minimal valid llm.model and llm.apiKeySecret are present

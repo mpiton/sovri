@@ -45,7 +45,7 @@ describe("SovriConfig OpenAI-compatible base URL boundary", () => {
     expect(createOpenAICompatibleProvider).not.toHaveBeenCalled();
   });
 
-  it("keeps openai-compatible config gated separately from HTTPS baseUrl validation", () => {
+  it("accepts openai-compatible config when HTTPS baseUrl is present", () => {
     const createOpenAICompatibleProvider = vi.fn();
 
     // Given a Sovri config selects provider "openai-compatible"
@@ -55,16 +55,15 @@ describe("SovriConfig OpenAI-compatible base URL boundary", () => {
       createOpenAICompatibleProvider();
     }
 
-    // Then validation fails on the provider gate in this release
-    // And createOpenAICompatibleProvider receives 0 calls
-    // And the valid HTTPS baseUrl is not the failing issue
-    expect(result.success).toBe(false);
-    if (result.success) {
-      throw new Error("Expected openai-compatible provider to remain gated in this release");
+    // Then validation succeeds
+    // And createOpenAICompatibleProvider receives 1 call
+    // And the valid HTTPS baseUrl is preserved
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error("Expected openai-compatible provider config with HTTPS baseUrl to parse");
     }
-    expect(result.error.issues.some((issue) => issue.path.join(".") === "llm.provider")).toBe(true);
-    expect(result.error.issues.some((issue) => issue.path.join(".") === "llm.baseUrl")).toBe(false);
-    expect(createOpenAICompatibleProvider).not.toHaveBeenCalled();
+    expect(result.data.llm.baseUrl).toBe(HttpsBaseUrl);
+    expect(createOpenAICompatibleProvider).toHaveBeenCalledOnce();
   });
 });
 
