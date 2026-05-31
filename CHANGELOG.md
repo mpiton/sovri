@@ -74,6 +74,54 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   complete SDK mock exports, clarify provider validation and default-option comments, and document
   the typed OpenAI provider error hierarchy.
 
+- `feat(llm-providers)`: add the OpenAI-compatible provider construction helper for BYOK
+  deployments that route reviews through self-hosted or EU-hosted OpenAI-compatible gateways,
+  covering `provider: openai-compatible`, required `baseUrl`, optional `model`, distinguishable
+  provider metadata, and no fallback to the public OpenAI endpoint.
+
+- `test(llm-providers)`: add OpenAI-compatible protocol parity coverage proving structured-output
+  request shaping, retryable schema errors, and transient retry behavior stay shared with the
+  OpenAI provider path.
+
+- `test(llm-providers)`: add OpenAI-compatible provider metadata coverage so logs and audit events
+  can distinguish compatible endpoints from the public OpenAI provider before and after generation.
+
+- `test(llm-providers/config)`: add OpenAI-compatible HTTPS base URL boundary coverage, proving
+  config validation rejects non-HTTPS URLs before provider construction, records the current
+  `openai-compatible` config gate explicitly, and proves the compatible helper passes accepted
+  HTTPS URLs unchanged to the OpenAI SDK constructor so future compatible endpoints cannot
+  accidentally route review data over plaintext transport or through SDK default endpoints.
+
+- `test(llm-providers)`: add OpenAI-compatible token-usage parity coverage for valid usage,
+  invalid usage diagnostics, and data-only generation so compatible endpoints keep the same
+  structured-output contract as the OpenAI provider.
+
+- `test(llm-providers)`: add OpenAI-compatible no-network guards that require injected fake
+  clients, reject public OpenAI host and real API-key environment lookups in compatible provider
+  tests including bracketed and destructured env-key references, and prove missing compatible
+  baseUrl fails before SDK construction with explicit guard scope, grouped fixture constants, and
+  same-test detection across `it` and `test` blocks for inline, variable, and helper compatible
+  provider options without a top-level fake client or mocked OpenAI SDK.
+
+- `test(llm-providers)`: add OpenAI-compatible package export and quality acceptance coverage,
+  proving the public barrel exposes the compatible helper and options type, source files keep SPDX
+  headers and explicit ESM extensions, forbidden TypeScript escape hatches are named, and the
+  entrypoint helper constructs an `LLMProvider` with an injected fake client while remaining under
+  the compatible no-network guard.
+
+- `fix(llm-providers)`: address OpenAI-compatible review feedback by making the missing-baseUrl
+  no-network guard exercise SDK-construction prevention without an injected client, sharing
+  compatible provider test helpers across base URL, metadata, and no-network suites, clarifying
+  metadata comments, preserving the missing-usage sentinel type in token-usage fixtures, and
+  documenting compatible-endpoint adoption details in the changelog.
+
+- `fix(llm-providers)`: reject non-HTTPS OpenAI-compatible `baseUrl` values at the direct provider
+  helper boundary before OpenAI SDK construction, matching the config-layer HTTPS contract.
+
+- `test(llm-providers)`: move OpenAI-compatible export, SDK mock, and no-network guard helpers into
+  package test utilities, document the direct provider helper HTTPS `baseUrl` constraint, and name
+  repeated compatible-provider token and default-limit test fixtures.
+
 ## [0.3.0] - 2026-05-31
 
 ### Changed
