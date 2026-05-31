@@ -78,6 +78,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   acceptance coverage for the required custom `baseUrl`, distinguishable provider metadata, and
   no fallback to the public OpenAI endpoint.
 
+- `test(llm-providers)`: add OpenAI-compatible protocol parity coverage proving structured-output
+  request shaping, retryable schema errors, and transient retry behavior stay shared with the
+  OpenAI provider path.
+
 ## [0.3.0] - 2026-05-31
 
 ### Changed
