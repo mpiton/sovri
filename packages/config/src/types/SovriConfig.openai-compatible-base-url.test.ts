@@ -91,10 +91,14 @@ describe("SovriConfig OpenAI-compatible base URL boundary", () => {
     const baseUrlIssues = result.error.issues.filter(
       (issue) => issue.path.join(".") === "llm.baseUrl",
     );
+    const providerIssues = result.error.issues.filter(
+      (issue) => issue.path.join(".") === "llm.provider",
+    );
     expect(baseUrlIssues).toHaveLength(1);
     expect(baseUrlIssues[0]?.message).toBe(
       "llm.baseUrl is required when llm.provider is 'openai-compatible'.",
     );
+    expect(providerIssues).toHaveLength(0);
     expect(createOpenAICompatibleProvider).not.toHaveBeenCalled();
   });
 });

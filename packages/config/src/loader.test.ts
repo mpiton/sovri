@@ -622,11 +622,16 @@ describe("loadConfig — schema violation", () => {
         (issue) =>
           issue.path.length === 2 && issue.path[0] === "llm" && issue.path[1] === "baseUrl",
       );
+      const providerIssue = err.issues.find(
+        (issue) =>
+          issue.path.length === 2 && issue.path[0] === "llm" && issue.path[1] === "provider",
+      );
 
       expect(baseUrlIssue).toBeDefined();
       expect(baseUrlIssue?.message).toBe(
         "llm.baseUrl is required when llm.provider is 'openai-compatible'.",
       );
+      expect(providerIssue).toBeUndefined();
     }
   });
 });

@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(config)`: assert OpenAI-compatible configs that omit `llm.baseUrl` fail on
+  `llm.baseUrl` without reviving the provider allow-list error.
+
 - `test(config)`: add acceptance coverage for the v0.5 provider allow-list so
   `.sovri.yml` accepts Anthropic, Mistral, OpenAI, and OpenAI-compatible provider
   values while still rejecting providers outside the declared enum.
