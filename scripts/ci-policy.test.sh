@@ -11579,14 +11579,14 @@ run_readme_references_release_wrong_repo_case() {
   root=$(mktemp -d)
   readme_path="$root/README.md"
 
-  # Given "README.md" contains `docker pull ghcr.io/mpiton/community-bot:v0.2.0`
+  # Given "README.md" contains `docker pull ghcr.io/mpiton/community-bot:v0.3.0`
   cat >"$readme_path" <<'MD'
 # Some Project
 
 ## Install
 
 ```bash
-docker pull ghcr.io/mpiton/community-bot:v0.2.0
+docker pull ghcr.io/mpiton/community-bot:v0.3.0
 ```
 
 End of file.
@@ -11599,7 +11599,7 @@ MD
   node "$SCRIPT" readme-references-release \
     --readme "$readme_path" \
     --image ghcr.io/mpiton/sovri/community-bot \
-    --version 0.2.0 \
+    --version 0.3.0 \
     >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
 
   stdout=$(cat "$stdout_file" 2>/dev/null || true)
@@ -11647,7 +11647,7 @@ run_readme_references_release_latest_only_case() {
   readme_path="$root/README.md"
 
   # Given "README.md" instructs users to run `docker pull ghcr.io/mpiton/sovri/community-bot:latest`
-  # And "README.md" does not contain the string "v0.2.0"
+  # And "README.md" does not contain the string "v0.3.0"
   cat >"$readme_path" <<'MD'
 # Some Project
 
@@ -11660,10 +11660,10 @@ docker pull ghcr.io/mpiton/sovri/community-bot:latest
 End of file.
 MD
 
-  if grep -Fq "v0.2.0" "$readme_path"; then
+  if grep -Fq "v0.3.0" "$readme_path"; then
     FAIL=$((FAIL + 1))
     FAILURES="${FAILURES}
-  ✗ readme-references-release latest-only: fixture unexpectedly contains 'v0.2.0'"
+  ✗ readme-references-release latest-only: fixture unexpectedly contains 'v0.3.0'"
     rm -rf "$root"
     return
   fi
@@ -11675,7 +11675,7 @@ MD
   node "$SCRIPT" readme-references-release \
     --readme "$readme_path" \
     --image ghcr.io/mpiton/sovri/community-bot \
-    --version 0.2.0 \
+    --version 0.3.0 \
     >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
 
   stdout=$(cat "$stdout_file" 2>/dev/null || true)
@@ -11702,8 +11702,8 @@ $(printf '%s\n' "$stdout" | sed 's/^/        /')"
     return
   fi
 
-  # And the remediation hint reads "Add a docker pull snippet pinned to v0.2.0 in README.md"
-  if ! printf '%s\n' "$stderr" | grep -Fq "Add a docker pull snippet pinned to v0.2.0 in"; then
+  # And the remediation hint reads "Add a docker pull snippet pinned to v0.3.0 in README.md"
+  if ! printf '%s\n' "$stderr" | grep -Fq "Add a docker pull snippet pinned to v0.3.0 in"; then
     FAIL=$((FAIL + 1))
     FAILURES="${FAILURES}
   ✗ readme-references-release latest-only: missing remediation hint
@@ -11725,7 +11725,7 @@ run_readme_references_release_crlf_case() {
   # Given a CRLF-encoded README where the docker pull snippet sits inside a
   # closed fenced block and the actual `## Install` heading follows after it.
   # The heading scan must still close the fence on the CRLF closing line.
-  printf '# Some Project\r\n\r\n```\r\necho "preamble"\r\n```\r\n\r\n## Install\r\n\r\n```bash\r\ndocker pull ghcr.io/mpiton/sovri/community-bot:v0.2.0\r\n```\r\n' >"$readme_path"
+  printf '# Some Project\r\n\r\n```\r\necho "preamble"\r\n```\r\n\r\n## Install\r\n\r\n```bash\r\ndocker pull ghcr.io/mpiton/sovri/community-bot:v0.3.0\r\n```\r\n' >"$readme_path"
 
   stdout_file=$(mktemp)
   stderr_file=$(mktemp)
@@ -11733,7 +11733,7 @@ run_readme_references_release_crlf_case() {
   node "$SCRIPT" readme-references-release \
     --readme "$readme_path" \
     --image ghcr.io/mpiton/sovri/community-bot \
-    --version 0.2.0 \
+    --version 0.3.0 \
     >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
 
   stdout=$(cat "$stdout_file" 2>/dev/null || true)
@@ -12204,14 +12204,14 @@ run_readme_references_release_nominal_case() {
   node "$SCRIPT" readme-references-release \
     --readme "$readme_path" \
     --image ghcr.io/mpiton/sovri/community-bot \
-    --version 0.2.0 \
+    --version 0.3.0 \
     >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
 
   stdout=$(cat "$stdout_file" 2>/dev/null || true)
   stderr=$(cat "$stderr_file" 2>/dev/null || true)
   rm -f "$stdout_file" "$stderr_file"
 
-  # Then the file contains the literal snippet `docker pull ghcr.io/mpiton/sovri/community-bot:v0.2.0`
+  # Then the file contains the literal snippet `docker pull ghcr.io/mpiton/sovri/community-bot:v0.3.0`
   # And the file contains the section heading "## Install" within the first 200 lines.
   # Both assertions are wrapped inside the readme-references-release subcommand and surface
   # as exit 0 + `readme_references_release=pass` on success.
@@ -13890,8 +13890,8 @@ YAML
 
 release_required_tags() {
   printf '%s\n' \
-    "ghcr.io/mpiton/sovri/community-bot:v0.2.0" \
-    "ghcr.io/mpiton/sovri/community-bot:v0.2" \
+    "ghcr.io/mpiton/sovri/community-bot:v0.3.0" \
+    "ghcr.io/mpiton/sovri/community-bot:v0.3" \
     "ghcr.io/mpiton/sovri/community-bot:v0" \
     "ghcr.io/mpiton/sovri/community-bot:latest"
 }
@@ -13998,7 +13998,7 @@ run_release_build_wrong_repo_case() {
   local workflow_file
 
   workflow_file=$(mktemp)
-  write_release_build_workflow "$workflow_file" "true" "linux/amd64,linux/arm64" "$(printf '%s\n' "ghcr.io/mpiton/sovri/wrong-bot:v0.2.0" "ghcr.io/mpiton/sovri/wrong-bot:v0.2" "ghcr.io/mpiton/sovri/wrong-bot:v0" "ghcr.io/mpiton/sovri/wrong-bot:latest")" "ghcr.io/mpiton/sovri/wrong-bot"
+  write_release_build_workflow "$workflow_file" "true" "linux/amd64,linux/arm64" "$(printf '%s\n' "ghcr.io/mpiton/sovri/wrong-bot:v0.3.0" "ghcr.io/mpiton/sovri/wrong-bot:v0.3" "ghcr.io/mpiton/sovri/wrong-bot:v0" "ghcr.io/mpiton/sovri/wrong-bot:latest")" "ghcr.io/mpiton/sovri/wrong-bot"
 
   run_ci_policy_failure_case "release build wrong repo" "image repository must be ghcr.io/mpiton/sovri/community-bot" \
     release-build-and-push --workflow "$workflow_file"
@@ -14027,7 +14027,7 @@ run_cosign_deferral_pass_case() {
   local root
 
   root=$(mktemp -d)
-  write_cosign_fixture "$root" "## [0.2.0]" "- Cosign signing remains deferred to v0.5." "jobs:
+  write_cosign_fixture "$root" "## [0.3.0]" "- Cosign signing remains deferred to v0.5." "jobs:
   build-and-push:
     steps:
       - run: echo unsigned"
@@ -14042,7 +14042,7 @@ run_cosign_missing_note_case() {
   local root
 
   root=$(mktemp -d)
-  write_cosign_fixture "$root" "## [0.2.0]" "- Release without signing." "jobs:
+  write_cosign_fixture "$root" "## [0.3.0]" "- Release without signing." "jobs:
   build-and-push:
     steps:
       - run: echo unsigned"
@@ -14061,7 +14061,7 @@ run_cosign_outside_section_case() {
   cat >"$root/CHANGELOG.md" <<'MARKDOWN'
 # Changelog
 
-## [0.2.0]
+## [0.3.0]
 - Release without signing.
 
 ## [Unreleased]
@@ -14069,7 +14069,7 @@ run_cosign_outside_section_case() {
 MARKDOWN
   printf 'jobs:\n  build-and-push:\n    steps:\n      - run: echo unsigned\n' >"$root/release.yml"
 
-  run_ci_policy_failure_case "cosign outside section" "deferral must be documented in ## [0.2.0]" \
+  run_ci_policy_failure_case "cosign outside section" "deferral must be documented in ## [0.3.0]" \
     cosign-deferral --workflow "$root/release.yml" --changelog "$root/CHANGELOG.md"
 
   rm -rf "$root"
@@ -14080,7 +14080,7 @@ run_cosign_usage_case() {
   local root
 
   root=$(mktemp -d)
-  write_cosign_fixture "$root" "## [0.2.0]" "- Cosign signing remains deferred to v0.5." "jobs:
+  write_cosign_fixture "$root" "## [0.3.0]" "- Cosign signing remains deferred to v0.5." "jobs:
   build-and-push:
     steps:
       - run: ${cosign_usage}"
@@ -14098,7 +14098,7 @@ run_cosign_deferred_version_boundary_case() {
   local root
 
   root=$(mktemp -d)
-  write_cosign_fixture "$root" "## [0.2.0]" "- Cosign signing remains deferred to ${deferred_version}." "jobs:
+  write_cosign_fixture "$root" "## [0.3.0]" "- Cosign signing remains deferred to ${deferred_version}." "jobs:
   build-and-push:
     steps:
       - run: echo unsigned"
@@ -14772,8 +14772,8 @@ run_release_build_platform_boundary_case "linux/amd64,linux/arm64" accepted "req
 run_release_build_platform_boundary_case "linux/amd64" rejected "arm64 platform is missing"
 run_release_build_platform_boundary_case "linux/arm64" rejected "amd64 platform is missing"
 run_release_build_platform_boundary_case "linux/amd64,linux/arm64,linux/386" rejected "extra platform is outside the v0.1 contract"
-run_release_build_missing_tag_case "v0.2.0"
-run_release_build_missing_tag_case "v0.2"
+run_release_build_missing_tag_case "v0.3.0"
+run_release_build_missing_tag_case "v0.3"
 run_release_build_missing_tag_case "v0"
 run_release_build_missing_tag_case "latest"
 run_release_build_missing_job_case
@@ -14813,7 +14813,7 @@ run_cosign_deferral_pass_case
 run_cosign_missing_note_case
 run_cosign_outside_section_case
 run_cosign_usage_case "sigstore/cosign-installer@v3"
-run_cosign_usage_case "cosign sign ghcr.io/mpiton/sovri/community-bot:v0.2.0"
+run_cosign_usage_case "cosign sign ghcr.io/mpiton/sovri/community-bot:v0.3.0"
 run_cosign_deferred_version_boundary_case "v0.5" accepted "documented target version"
 run_cosign_deferred_version_boundary_case "v1.0" rejected "target version is too late"
 run_cosign_deferred_version_boundary_case "a future release" rejected "target version is not concrete"

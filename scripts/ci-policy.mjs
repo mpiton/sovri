@@ -69,21 +69,21 @@ const DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES = [
   "LGPL-3.0-or-later",
 ];
 const RELEASE_REQUIRED_JOBS = ["verify-tag", "build-and-push", "sbom", "gh-release"];
-const RELEASE_VERSION = "0.2.0";
+const RELEASE_VERSION = "0.3.0";
 const RELEASE_IMAGE_REPOSITORY = "ghcr.io/mpiton/sovri/community-bot";
 const RELEASE_REQUIRED_IMAGE_TAGS = [
   {
-    label: "v0.2.0",
+    label: "v0.3.0",
     values: [
-      `${RELEASE_IMAGE_REPOSITORY}:v0.2.0`,
+      `${RELEASE_IMAGE_REPOSITORY}:v0.3.0`,
       `${RELEASE_IMAGE_REPOSITORY}:\${{ github.ref_name }}`,
       `${RELEASE_IMAGE_REPOSITORY}:\${{ steps.image-tags.outputs.full }}`,
     ],
   },
   {
-    label: "v0.2",
+    label: "v0.3",
     values: [
-      `${RELEASE_IMAGE_REPOSITORY}:v0.2`,
+      `${RELEASE_IMAGE_REPOSITORY}:v0.3`,
       `${RELEASE_IMAGE_REPOSITORY}:\${{ steps.image-tags.outputs.minor }}`,
     ],
   },

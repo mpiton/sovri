@@ -1,6 +1,6 @@
 {
   "name": "@sovri/llm-providers",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Sovri LLM provider adapters — BYOK. v0.1 ships Anthropic structured-output support.",
   "homepage": "https://github.com/mpiton/sovri/tree/main/packages/llm-providers#readme",

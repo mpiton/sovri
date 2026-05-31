@@ -1,6 +1,6 @@
 {
   "name": "@sovri/observability",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Sovri observability — Pino logger in v0.1, OpenTelemetry SDK added in v0.5 without API break (ADR-006).",
   "homepage": "https://github.com/mpiton/sovri/tree/main/packages/observability#readme",

@@ -41,7 +41,7 @@ const ALLOWED_TYPES = [
   "build",
 ] as const;
 
-// The v0.3 scopes that MUST all appear under [Unreleased] -> Added (R-02).
+// The v0.3 scopes that MUST all appear under [0.3.0] -> Added (R-02).
 const REQUIRED_V03_SCOPES = [
   "feat(compliance)",
   "feat(core)",
@@ -57,7 +57,7 @@ const FORBIDDEN_INTERNAL_DOCS = ["CLAUDE.md", "PRD.md", "ARCHI.md"] as const;
 // `chore(deps/ci)`) is accepted here too, not only in the whole-section check.
 const SCOPE_PREFIX = /^- `([a-z]+)\(([a-z0-9/._-]+)\)`:\s*(.*)$/;
 
-// A valid Conventional Commit lead for ANY [Unreleased] entry, in any category. The scope
+// A valid Conventional Commit lead for ANY [0.3.0] entry, in any category. The scope
 // is optional (type-only commits like `test:` are valid) and may contain "/" (e.g.
 // `chore(deps/ci)`), so this is deliberately looser than SCOPE_PREFIX, which the v0.3
 // feature entries under Added are additionally held to.
@@ -65,17 +65,23 @@ const CONVENTIONAL_PREFIX = /^- `([a-z]+)(?:\([a-z0-9/._-]+\))?`:\s/;
 
 // --- inline helpers (no shipped parser) ---
 
-/** Body of a top-level "## <heading>" section, up to the next "## " heading. */
+/**
+ * Body of a top-level "## <heading>" section, up to the next "## " heading.
+ * Matches a bare heading ("## [Unreleased]") or a released one carrying a date
+ * suffix ("## [0.3.0] - 2026-05-31"), so the section can be addressed by version
+ * alone without coupling the test to the release date.
+ */
 function sectionBody(markdown: string, heading: string): string {
   const lines = markdown.split("\n");
-  const start = lines.findIndex((l) => l === `## ${heading}`);
+  const target = `## ${heading}`;
+  const start = lines.findIndex((l) => l === target || l.startsWith(`${target} `));
   if (start === -1) return "";
   const rest = lines.slice(start + 1);
   const end = rest.findIndex((l) => l.startsWith("## "));
   return (end === -1 ? rest : rest.slice(0, end)).join("\n");
 }
 
-const unreleased = sectionBody(changelog, "[Unreleased]");
+const releaseSection = sectionBody(changelog, "[0.3.0]");
 
 /** "### " subsection headings within a section body. */
 function categoryHeadings(body: string): string[] {
@@ -108,11 +114,11 @@ function splitBullets(block: string): string[] {
   return bullets;
 }
 
-const addedBullets = splitBullets(subsection(unreleased, "Added"));
+const addedBullets = splitBullets(subsection(releaseSection, "Added"));
 const addedFirstLines = addedBullets.map((b) => b.split("\n")[0] ?? "");
 
-// First lines of every top-level bullet in [Unreleased], across all categories.
-const unreleasedFirstLines = splitBullets(unreleased).map((b) => b.split("\n")[0] ?? "");
+// First lines of every top-level bullet in [0.3.0], across all categories.
+const releaseFirstLines = splitBullets(releaseSection).map((b) => b.split("\n")[0] ?? "");
 
 /** The "`<type>(<scope>)`" tokens used by the Added entries. */
 function addedScopes(): string[] {
@@ -136,12 +142,12 @@ function isBareRef(summary: string): boolean {
   return stripped.length === 0;
 }
 
-describe("CHANGELOG [Unreleased] documents the v0.3 Compliance Trail set (#1968)", () => {
+describe("CHANGELOG [0.3.0] documents the v0.3 Compliance Trail set (#1968)", () => {
   // --- R-01: Keep a Changelog 1.1.0 format ---
 
   it("@nominal exposes exactly one ### Added subsection with only allowed categories", () => {
-    // When the category subsections of [Unreleased] are collected
-    const categories = categoryHeadings(unreleased);
+    // When the category subsections of [0.3.0] are collected
+    const categories = categoryHeadings(releaseSection);
     // Then there is exactly one "### Added" subsection
     expect(categories.filter((c) => c === "Added")).toHaveLength(1);
     // And every "### " heading is one of the Keep a Changelog categories
@@ -156,7 +162,7 @@ describe("CHANGELOG [Unreleased] documents the v0.3 Compliance Trail set (#1968)
   });
 
   it("@violation rejects a subsection under an unrecognised category", () => {
-    // Given a synthetic Unreleased section whose only subsection heading is "### Notes"
+    // Given a synthetic changelog section whose only subsection heading is "### Notes"
     const synthetic = "### Notes\n\n- `feat(core)`: a change\n";
     // When its category headings are validated against the Keep a Changelog set
     const unknown = categoryHeadings(synthetic).filter(
@@ -168,10 +174,10 @@ describe("CHANGELOG [Unreleased] documents the v0.3 Compliance Trail set (#1968)
 
   // --- R-02: Conventional Commit scopes (docs(adr) is the RED trigger) ---
 
-  it("@nominal every [Unreleased] entry, in any category, has a Conventional Commit prefix", () => {
+  it("@nominal every [0.3.0] entry, in any category, has a Conventional Commit prefix", () => {
     // Scope coverage below is asserted on Added, but the prefix contract holds for the
     // whole section — including type-only leads (`test:`) and slashed scopes (`chore(deps/ci)`).
-    for (const line of unreleasedFirstLines) {
+    for (const line of releaseFirstLines) {
       const match = CONVENTIONAL_PREFIX.exec(line);
       expect(match, `entry has no Conventional Commit prefix: ${line}`).not.toBeNull();
       expect(ALLOWED_TYPES).toContain(match?.[1]);
@@ -211,17 +217,17 @@ describe("CHANGELOG [Unreleased] documents the v0.3 Compliance Trail set (#1968)
 
   // --- R-03: no references to unversioned internal docs ---
 
-  it("@nominal no [Unreleased] entry references an internal planning file", () => {
+  it("@nominal no [0.3.0] entry references an internal planning file", () => {
     // When the section is scanned for CLAUDE.md / PRD.md / ARCHI.md
     // Then none of them appear
-    expect(forbiddenHits(unreleased)).toEqual([]);
+    expect(forbiddenHits(releaseSection)).toEqual([]);
   });
 
   it.each(FORBIDDEN_INTERNAL_DOCS)(
     "@violation rejects an entry citing the internal file %s",
     (forbidden) => {
-      // Given a synthetic Unreleased section that cites a forbidden internal file
-      const synthetic = `${unreleased}\n- \`docs(x)\`: see ${forbidden} for details\n`;
+      // Given a synthetic changelog section that cites a forbidden internal file
+      const synthetic = `${releaseSection}\n- \`docs(x)\`: see ${forbidden} for details\n`;
       // Then the scan flags that token
       expect(forbiddenHits(synthetic)).toContain(forbidden);
     },
