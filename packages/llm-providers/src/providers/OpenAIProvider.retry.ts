@@ -27,7 +27,7 @@ import {
   type OpenAIProviderErrorOptions,
 } from "./OpenAIProvider.errors.js";
 
-// Half-second base delay gives transient OpenAI failures room to clear without hiding fast failures.
+// A 500 ms base delay gives transient OpenAI failures room to clear without hiding fast failures.
 const OPENAI_RETRY_BASE_DELAY_MS = 500;
 
 export type OpenAIChatComplete = Completions["create"];

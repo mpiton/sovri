@@ -52,6 +52,7 @@ export interface OpenAIProviderOptions extends OpenAIProviderConfigOptions {
   readonly client?: OpenAIChatClient;
 }
 
+// OpenAI temperature spans 0 (more deterministic) through 2 (more exploratory).
 const MIN_OPENAI_TEMPERATURE = 0;
 const MAX_OPENAI_TEMPERATURE = 2;
 

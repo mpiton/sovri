@@ -85,7 +85,7 @@ function normalizeOpenAIObjectShape(schema: Record<string, unknown>): void {
   }
   if (hasDynamicObjectProperties(schema)) {
     throw new OpenAIProviderError(
-      "OpenAI strict JSON schemas do not support dynamic object properties",
+      "OpenAI strict JSON schemas do not support dynamic object properties.",
     );
   }
 
