@@ -50,6 +50,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `test(llm-providers)`: add OpenAI provider no-network guards for forbidden real API
   dependencies and accidental unhandled OpenAI requests in tests.
 
+- `feat(llm-providers)`: export typed OpenAI retry and timeout errors from the package
+  entrypoint alongside the provider and default constants.
+
 - `fix(llm-providers)`: normalize OpenAI strict JSON schemas before requests, reject
   unsupported dynamic record schemas, and wrap SDK transport/authentication failures in
   typed provider errors with request metadata.

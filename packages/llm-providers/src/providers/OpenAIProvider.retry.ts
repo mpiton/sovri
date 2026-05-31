@@ -22,6 +22,8 @@ import {
 import {
   OpenAIProviderAuthError,
   OpenAIProviderError,
+  OpenAIProviderRetryError,
+  OpenAIProviderTimeoutError,
   type OpenAIProviderErrorOptions,
 } from "./OpenAIProvider.errors.js";
 
@@ -73,16 +75,21 @@ function createOpenAIRequestError(
   cause: unknown,
   maxAttempts: number,
   timeoutMs: number,
-): OpenAIProviderError<"OpenAIProviderError" | "OpenAIProviderAuthError"> {
+): OpenAIProviderError<
+  | "OpenAIProviderError"
+  | "OpenAIProviderAuthError"
+  | "OpenAIProviderRetryError"
+  | "OpenAIProviderTimeoutError"
+> {
   if (cause instanceof RetryExhaustedError) {
-    return new OpenAIProviderError(
+    return new OpenAIProviderRetryError(
       `OpenAI failed after ${String(maxAttempts)} attempts`,
       openAIRequestErrorOptions(cause.cause),
     );
   }
 
   if (cause instanceof RetryTimeoutError) {
-    return new OpenAIProviderError(
+    return new OpenAIProviderTimeoutError(
       `OpenAI request timed out after ${String(timeoutMs)} ms`,
       openAIRequestErrorOptions(cause.cause),
     );

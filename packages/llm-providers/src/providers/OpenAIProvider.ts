@@ -28,6 +28,8 @@ import {
 export {
   OpenAIProviderAuthError,
   OpenAIProviderError,
+  OpenAIProviderRetryError,
+  OpenAIProviderTimeoutError,
   type OpenAIProviderErrorOptions,
 } from "./OpenAIProvider.errors.js";
 export {
