@@ -89,6 +89,10 @@ const OpenAIMockPattern = /vi\.doMock\(\s*["']openai["']/;
 const TestBlockPattern = /\bit(?:\.each)?\s*\(/g;
 const DirectCompatibleProviderConstructionPattern =
   /\bcreateOpenAICompatibleProvider\s*\(\s*\{([\s\S]*?)\}\s*\)/g;
+const NonInlineCompatibleProviderConstructionPattern =
+  /\bcreateOpenAICompatibleProvider\s*\(\s*([A-Za-z_$][\w$]*(?:\s*\([^)]*\))?)\s*\)/g;
+const IdentifierPattern = /^[A-Za-z_$][\w$]*$/;
+const HelperCallPattern = /^([A-Za-z_$][\w$]*)\s*\(/;
 const ClientOptionPattern = /\bclient\s*:/;
 
 afterEach(() => {
@@ -181,6 +185,38 @@ it("unmocked", () => {
     const violations = findForbiddenCompatibleNetworkPatterns(source);
 
     expect(violations).toContain(UnmockedCompatibleSdkConstructionLabel);
+  });
+
+  it("rejects non-inline compatible SDK options without an injected client", () => {
+    const source = `it("unmocked variable options", () => {
+  const options = { apiKey: "${CompatibleProviderFixture.apiKey}", baseUrl: "${CompatibleProviderFixture.baseUrl}" };
+  createOpenAICompatibleProvider(options);
+});`;
+
+    const violations = findForbiddenCompatibleNetworkPatterns(source);
+
+    expect(violations).toContain(UnmockedCompatibleSdkConstructionLabel);
+  });
+
+  it("allows non-inline compatible SDK options with a fake client", () => {
+    const withVariableOptions = `it("fake client options", () => {
+  const options = { apiKey: "${CompatibleProviderFixture.apiKey}", baseUrl: "${CompatibleProviderFixture.baseUrl}", client: fakeOpenAIClient() };
+  createOpenAICompatibleProvider(options);
+});`;
+    const withHelperOptions = `it("helper options", () => {
+  createOpenAICompatibleProvider(providerOptions("${CompatibleProviderFixture.baseUrl}"));
+});
+
+function providerOptions(baseUrl: string): OpenAICompatibleProviderOptions {
+  return { apiKey: "${CompatibleProviderFixture.apiKey}", baseUrl, client: fakeOpenAIClient() };
+}`;
+
+    expect(findForbiddenCompatibleNetworkPatterns(withVariableOptions)).not.toContain(
+      UnmockedCompatibleSdkConstructionLabel,
+    );
+    expect(findForbiddenCompatibleNetworkPatterns(withHelperOptions)).not.toContain(
+      UnmockedCompatibleSdkConstructionLabel,
+    );
   });
 
   it("keeps committed compatible provider tests free of real network dependencies", async () => {
@@ -356,7 +392,73 @@ function hasUnmockedCompatibleProviderConstruction(source: string): boolean {
     }
   }
 
+  for (const match of source.matchAll(NonInlineCompatibleProviderConstructionPattern)) {
+    const optionsExpression = match[1];
+    if (
+      optionsExpression !== undefined &&
+      !hasOpenAIMockInCurrentTestBlock(source, match.index) &&
+      !nonInlineOptionsIncludeClient(source, optionsExpression, match.index)
+    ) {
+      return true;
+    }
+  }
+
   return false;
+}
+
+function nonInlineOptionsIncludeClient(
+  source: string,
+  optionsExpression: string,
+  constructionIndex: number,
+): boolean {
+  const expression = optionsExpression.trim();
+  if (IdentifierPattern.test(expression)) {
+    return assignedOptionsIncludeClient(source, expression, constructionIndex);
+  }
+
+  const helperCall = HelperCallPattern.exec(expression);
+  const helperName = helperCall?.[1];
+  if (helperName === undefined) {
+    return false;
+  }
+
+  return helperOptionsIncludeClient(source, helperName);
+}
+
+function assignedOptionsIncludeClient(
+  source: string,
+  variableName: string,
+  constructionIndex: number,
+): boolean {
+  const assignmentPattern = new RegExp(
+    `\\b(?:const|let)\\s+${escapeRegExp(variableName)}\\s*=\\s*\\{([\\s\\S]*?)\\}`,
+    "g",
+  );
+  const sourceBeforeConstruction = source.slice(
+    currentTestBlockStart(source, constructionIndex),
+    constructionIndex,
+  );
+  let optionsSource: string | undefined;
+
+  for (const match of sourceBeforeConstruction.matchAll(assignmentPattern)) {
+    optionsSource = match[1];
+  }
+
+  return optionsSource !== undefined && ClientOptionPattern.test(optionsSource);
+}
+
+function helperOptionsIncludeClient(source: string, helperName: string): boolean {
+  const functionStart = source.indexOf(`function ${helperName}`);
+  if (functionStart === -1) {
+    return false;
+  }
+
+  const nextFunction = source.indexOf("\nfunction ", functionStart + 1);
+  const functionSource = source.slice(
+    functionStart,
+    nextFunction === -1 ? source.length : nextFunction,
+  );
+  return ClientOptionPattern.test(functionSource);
 }
 
 function hasOpenAIMockInCurrentTestBlock(source: string, constructionIndex: number): boolean {
@@ -373,4 +475,8 @@ function currentTestBlockStart(source: string, constructionIndex: number): numbe
   }
 
   return testBlockStart;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

@@ -99,8 +99,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   clients, reject public OpenAI host and real API-key environment lookups in compatible provider
   tests including bracketed and destructured env-key references, and prove missing compatible
   baseUrl fails before SDK construction with explicit guard scope, grouped fixture constants, and
-  same-test detection for direct compatible provider construction without a fake client or mocked
-  OpenAI SDK.
+  same-test detection for inline, variable, and helper compatible provider options without a fake
+  client or mocked OpenAI SDK.
 
 ## [0.3.0] - 2026-05-31
 
