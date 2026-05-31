@@ -1,22 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import OpenAI, { APIError, AuthenticationError, PermissionDeniedError } from "openai";
-import type {
-  ChatCompletionCreateParamsNonStreaming,
-  Completions,
-} from "openai/resources/chat/completions";
+import OpenAI from "openai";
 
 import type {
   GenerateStructuredParams,
   LLMProvider,
   StructuredGeneration,
 } from "../types/LLMProvider.js";
-import {
-  OpenAIProviderAuthError,
-  OpenAIProviderError,
-  type OpenAIProviderErrorOptions,
-} from "./OpenAIProvider.errors.js";
 import {
   createOpenAIClientOptions,
   resolveMaxTokens,
@@ -28,6 +19,11 @@ import {
   extractOpenAITokenUsage,
   parseStructuredOpenAIResponse,
 } from "./OpenAIProvider.response.js";
+import {
+  createOpenAIChatCompletionWithRetry,
+  type OpenAIChatClient,
+  type OpenAIChatRequest,
+} from "./OpenAIProvider.retry.js";
 
 export {
   OpenAIProviderAuthError,
@@ -42,17 +38,11 @@ export {
   MAX_OPENAI_MAX_TOKENS,
   MAX_OPENAI_TIMEOUT_MS,
 } from "./OpenAIProvider.options.js";
-
-export type OpenAIChatComplete = Completions["create"];
-export type OpenAIChatRequest = ChatCompletionCreateParamsNonStreaming;
-
-export interface OpenAIChatClient {
-  readonly chat: {
-    readonly completions: {
-      readonly create: OpenAIChatComplete;
-    };
-  };
-}
+export type {
+  OpenAIChatClient,
+  OpenAIChatComplete,
+  OpenAIChatRequest,
+} from "./OpenAIProvider.retry.js";
 
 export interface OpenAIProviderOptions extends OpenAIProviderConfigOptions {
   readonly client?: OpenAIChatClient;
@@ -96,15 +86,12 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   private async createChatCompletion<T>(params: GenerateStructuredParams<T>): Promise<unknown> {
-    const request = this.createRequest(params);
-
-    try {
-      return await this.client.chat.completions.create(request, {
-        maxRetries: 0,
-      });
-    } catch (cause) {
-      throw createOpenAIRequestError(cause);
-    }
+    return createOpenAIChatCompletionWithRetry({
+      client: this.client,
+      request: this.createRequest(params),
+      timeoutMs: this.timeoutMs,
+      maxAttempts: this.maxAttempts,
+    });
   }
 
   private createRequest<T>(params: GenerateStructuredParams<T>): OpenAIChatRequest {
@@ -125,41 +112,4 @@ export class OpenAIProvider implements LLMProvider {
 
     return request;
   }
-}
-
-function createOpenAIRequestError(
-  cause: unknown,
-): OpenAIProviderError<"OpenAIProviderError" | "OpenAIProviderAuthError"> {
-  const options = openAIRequestErrorOptions(cause);
-
-  if (isOpenAIAuthFailure(cause)) {
-    return new OpenAIProviderAuthError("OpenAI request failed authentication", options);
-  }
-
-  return new OpenAIProviderError(openAIRequestErrorMessage(cause), options);
-}
-
-function openAIRequestErrorOptions(cause: unknown): OpenAIProviderErrorOptions {
-  if (!(cause instanceof APIError)) {
-    return { cause };
-  }
-
-  return {
-    cause,
-    ...(cause.status !== undefined ? { status: cause.status } : {}),
-    ...(cause.requestID !== undefined ? { requestId: cause.requestID } : {}),
-    ...(cause.code !== undefined ? { code: cause.code } : {}),
-  };
-}
-
-function openAIRequestErrorMessage(cause: unknown): string {
-  if (cause instanceof APIError && cause.status !== undefined) {
-    return `OpenAI request failed with status ${String(cause.status)}`;
-  }
-
-  return "OpenAI request failed";
-}
-
-function isOpenAIAuthFailure(cause: unknown): boolean {
-  return cause instanceof AuthenticationError || cause instanceof PermissionDeniedError;
 }
