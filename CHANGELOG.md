@@ -88,7 +88,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `test(llm-providers/config)`: add OpenAI-compatible HTTPS base URL boundary coverage, proving
   config validation rejects non-HTTPS URLs before provider construction, records the current
   `openai-compatible` config gate explicitly, and proves the compatible helper passes accepted
-  HTTPS URLs unchanged to the OpenAI SDK constructor.
+  HTTPS URLs unchanged to the OpenAI SDK constructor so future compatible endpoints cannot
+  accidentally route review data over plaintext transport or through SDK default endpoints.
 
 ## [0.3.0] - 2026-05-31
 
