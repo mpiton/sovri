@@ -83,6 +83,13 @@ const ForbiddenEnvironmentLookupSamples = [
   ["const { OPENAI_COMPATIBLE_API_KEY } = process.env;", "process.env.OPENAI_COMPATIBLE_API_KEY"],
 ] satisfies ReadonlyArray<readonly [string, string]>;
 
+const UnmockedCompatibleSdkConstructionLabel =
+  "createOpenAICompatibleProvider without client or mocked OpenAI SDK";
+const OpenAIMockPattern = /vi\.doMock\(\s*["']openai["']/;
+const DirectCompatibleProviderConstructionPattern =
+  /\bcreateOpenAICompatibleProvider\s*\(\s*\{([\s\S]*?)\}\s*\)/g;
+const ClientOptionPattern = /\bclient\s*:/;
+
 afterEach(() => {
   vi.doUnmock("openai");
   vi.resetModules();
@@ -139,6 +146,26 @@ describe("OpenAI-compatible no-network test guard", () => {
       expect(violations).toContain(label);
     },
   );
+
+  it("rejects direct compatible SDK construction without an injected client", () => {
+    const source = `const provider = createOpenAICompatibleProvider({ apiKey: "${CompatibleProviderFixture.apiKey}", baseUrl: "${CompatibleProviderFixture.baseUrl}" });`;
+
+    const violations = findForbiddenCompatibleNetworkPatterns(source);
+
+    expect(violations).toContain(UnmockedCompatibleSdkConstructionLabel);
+  });
+
+  it("allows compatible provider construction with a fake client or mocked OpenAI SDK", () => {
+    const withFakeClient = `createOpenAICompatibleProvider({ apiKey: "${CompatibleProviderFixture.apiKey}", baseUrl: "${CompatibleProviderFixture.baseUrl}", client: fakeOpenAIClient() });`;
+    const withMockedSdk = `vi.doMock("openai", () => mockOpenAIModule([]));\ncreateOpenAICompatibleProvider({ apiKey: "${CompatibleProviderFixture.apiKey}", baseUrl: "${CompatibleProviderFixture.baseUrl}" });`;
+
+    expect(findForbiddenCompatibleNetworkPatterns(withFakeClient)).not.toContain(
+      UnmockedCompatibleSdkConstructionLabel,
+    );
+    expect(findForbiddenCompatibleNetworkPatterns(withMockedSdk)).not.toContain(
+      UnmockedCompatibleSdkConstructionLabel,
+    );
+  });
 
   it("keeps committed compatible provider tests free of real network dependencies", async () => {
     const sources = await readOpenAICompatibleProviderTestSources();
@@ -268,9 +295,15 @@ function committedSourceViolations(sources: ReadonlyArray<ProviderTestSource>): 
 }
 
 function findForbiddenCompatibleNetworkPatterns(source: string): string[] {
-  return ForbiddenCompatibleNetworkPatterns.filter(({ matches }) => matches(source)).map(
-    ({ label }) => label,
-  );
+  const forbiddenPatterns = ForbiddenCompatibleNetworkPatterns.filter(({ matches }) =>
+    matches(source),
+  ).map(({ label }) => label);
+
+  if (hasUnmockedCompatibleProviderConstruction(source)) {
+    return [...forbiddenPatterns, UnmockedCompatibleSdkConstructionLabel];
+  }
+
+  return forbiddenPatterns;
 }
 
 function generateStructuredWithUsage<T>(provider: LLMProvider): Promise<StructuredGeneration<T>> {
@@ -293,4 +326,19 @@ function captureError(action: () => unknown): unknown {
 
 function isErrorConstructor(value: unknown): value is ErrorConstructor {
   return typeof value === "function" && value.prototype instanceof Error;
+}
+
+function hasUnmockedCompatibleProviderConstruction(source: string): boolean {
+  if (OpenAIMockPattern.test(source)) {
+    return false;
+  }
+
+  for (const match of source.matchAll(DirectCompatibleProviderConstructionPattern)) {
+    const options = match[1];
+    if (options !== undefined && !ClientOptionPattern.test(options)) {
+      return true;
+    }
+  }
+
+  return false;
 }

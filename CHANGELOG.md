@@ -98,7 +98,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `test(llm-providers)`: add OpenAI-compatible no-network guards that require injected fake
   clients, reject public OpenAI host and real API-key environment lookups in compatible provider
   tests including bracketed and destructured env-key references, and prove missing compatible
-  baseUrl fails before SDK construction with explicit guard scope and grouped fixture constants.
+  baseUrl fails before SDK construction with explicit guard scope, grouped fixture constants, and
+  detection for direct compatible provider construction without a fake client or mocked OpenAI SDK.
 
 ## [0.3.0] - 2026-05-31
 
