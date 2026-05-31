@@ -19,6 +19,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Added
+
+- `chore(deps)`: add the official `openai@6.39.1` SDK as an exactly pinned runtime dependency
+  of `@sovri/llm-providers`, preparing the v0.5 BYOK provider slice for OpenAI and
+  OpenAI-compatible adapters while keeping this task limited to supply-chain-gated dependency metadata.
 
 ## [0.3.0] - 2026-05-31
 
