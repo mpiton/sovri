@@ -6,6 +6,9 @@ import { OpenAIProvider, type OpenAIProviderOptions } from "./OpenAIProvider.js"
 import { OpenAIProviderError } from "./OpenAIProvider.errors.js";
 
 export interface OpenAICompatibleProviderOptions extends OpenAIProviderOptions {
+  /**
+   * Absolute HTTPS endpoint for the OpenAI-compatible server.
+   */
   readonly baseUrl: string;
 }
 

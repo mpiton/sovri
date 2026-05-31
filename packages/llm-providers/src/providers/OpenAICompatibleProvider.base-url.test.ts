@@ -4,12 +4,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  openAICompatibleProviderExports,
+  type OpenAICompatibleProviderOptions,
+} from "../../test/providers/OpenAICompatibleProvider.exports-helper.js";
+import {
   captureError,
   type FakeOpenAIChatClient,
   mockOpenAIModule,
-  openAICompatibleProviderExports,
-  type OpenAICompatibleProviderOptions,
-} from "./OpenAICompatibleProvider.test-helpers.js";
+} from "../../test/providers/OpenAICompatibleProvider.mock-helper.js";
 
 const TestApiKey = "test-openai-compatible-key";
 const TestModel = "llama-3.3-70b-instruct";

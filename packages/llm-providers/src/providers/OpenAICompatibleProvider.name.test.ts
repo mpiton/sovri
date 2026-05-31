@@ -4,11 +4,9 @@
 import { z } from "@sovri/core";
 import { describe, expect, it } from "vitest";
 
+import { openAICompatibleProviderExports } from "../../test/providers/OpenAICompatibleProvider.exports-helper.js";
+import type { FakeOpenAIChatClient } from "../../test/providers/OpenAICompatibleProvider.mock-helper.js";
 import type { LLMProvider } from "../types/LLMProvider.js";
-import {
-  type FakeOpenAIChatClient,
-  openAICompatibleProviderExports,
-} from "./OpenAICompatibleProvider.test-helpers.js";
 
 const TestApiKey = "test-openai-compatible-key";
 const TestBaseUrl = "https://gateway.eu.example/v1";

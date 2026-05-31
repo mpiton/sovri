@@ -1,15 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import type { LLMProvider } from "../types/LLMProvider.js";
-
-export interface FakeOpenAIChatClient {
-  readonly chat: {
-    readonly completions: {
-      readonly create: (request: unknown, options?: unknown) => Promise<unknown>;
-    };
-  };
-}
+import type { LLMProvider } from "../../src/types/LLMProvider.js";
+import type { FakeOpenAIChatClient } from "./OpenAICompatibleProvider.mock-helper.js";
 
 export interface OpenAICompatibleProviderOptions {
   readonly apiKey: string;
@@ -26,7 +19,7 @@ export interface OpenAICompatibleProviderExports {
 }
 
 export async function openAICompatibleProviderExports(): Promise<OpenAICompatibleProviderExports> {
-  const module = await import("../index.js");
+  const module = await import("../../src/index.js");
   const createOpenAICompatibleProvider = Reflect.get(module, "createOpenAICompatibleProvider");
   const OpenAIProviderError = Reflect.get(module, "OpenAIProviderError");
 
@@ -44,48 +37,7 @@ export async function openAICompatibleProviderExports(): Promise<OpenAICompatibl
   };
 }
 
-export function mockOpenAIModule(sdkConstructorOptions: unknown[]): Record<string, unknown> {
-  class MockOpenAI {
-    readonly chat = {
-      completions: {
-        create: async () => {
-          throw new Error("Mock OpenAI-compatible client should not receive construction calls");
-        },
-      },
-    };
-
-    constructor(options: unknown) {
-      sdkConstructorOptions.push(options);
-    }
-  }
-
-  class MockAPIError extends Error {}
-  class MockAPIConnectionError extends MockAPIError {}
-  class MockAPIConnectionTimeoutError extends MockAPIError {}
-  class MockAuthenticationError extends MockAPIError {}
-  class MockPermissionDeniedError extends MockAPIError {}
-
-  return {
-    default: MockOpenAI,
-    APIConnectionError: MockAPIConnectionError,
-    APIConnectionTimeoutError: MockAPIConnectionTimeoutError,
-    APIError: MockAPIError,
-    AuthenticationError: MockAuthenticationError,
-    PermissionDeniedError: MockPermissionDeniedError,
-  };
-}
-
-export function captureError(action: () => unknown): unknown {
-  try {
-    action();
-  } catch (error) {
-    return error;
-  }
-
-  throw new Error("Expected constructor to throw");
-}
-
-export function isErrorConstructor(value: unknown): value is ErrorConstructor {
+function isErrorConstructor(value: unknown): value is ErrorConstructor {
   return typeof value === "function" && value.prototype instanceof Error;
 }
 
