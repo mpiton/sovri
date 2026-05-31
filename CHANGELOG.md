@@ -115,6 +115,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   metadata comments, preserving the missing-usage sentinel type in token-usage fixtures, and
   documenting compatible-endpoint adoption details in the changelog.
 
+- `fix(llm-providers)`: reject non-HTTPS OpenAI-compatible `baseUrl` values at the direct provider
+  helper boundary before OpenAI SDK construction, matching the config-layer HTTPS contract.
+
 ## [0.3.0] - 2026-05-31
 
 ### Changed

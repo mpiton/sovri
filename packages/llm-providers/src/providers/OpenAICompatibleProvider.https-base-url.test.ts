@@ -12,6 +12,7 @@ import {
 const TestApiKey = "test-openai-compatible-key";
 const TestModel = "qwen2.5-coder-32b";
 const TestBaseUrl = "https://inference.eu.example/v1";
+const PlaintextBaseUrl = "http://inference.eu.example/v1";
 
 describe("OpenAI-compatible HTTPS base URL contract", () => {
   afterEach(() => {
@@ -56,6 +57,33 @@ describe("OpenAI-compatible HTTPS base URL contract", () => {
     // Then OpenAIProviderError is thrown
     // And the OpenAI SDK constructor does not receive SDK default-server construction options
     expect(error).toBeInstanceOf(OpenAIProviderError);
+    expect(sdkConstructorOptions).toEqual([]);
+  });
+
+  it("rejects non-HTTPS baseUrl before SDK construction", async () => {
+    const sdkConstructorOptions: unknown[] = [];
+    vi.doMock("openai", () => mockOpenAIModule(sdkConstructorOptions));
+    const { createOpenAICompatibleProvider, OpenAIProviderError } =
+      await openAICompatibleProviderExports();
+
+    // Given baseUrl is "http://inference.eu.example/v1"
+    // When the compatible provider is constructed without an injected client
+    const error = captureError(() =>
+      createOpenAICompatibleProvider({
+        apiKey: TestApiKey,
+        model: TestModel,
+        baseUrl: PlaintextBaseUrl,
+      }),
+    );
+
+    // Then OpenAIProviderError is thrown
+    // And the OpenAI SDK constructor receives 0 calls
+    expect(error).toBeInstanceOf(OpenAIProviderError);
+    expect(error).toEqual(
+      expect.objectContaining({
+        message: expect.stringContaining("OpenAI-compatible baseUrl must use https"),
+      }),
+    );
     expect(sdkConstructorOptions).toEqual([]);
   });
 });

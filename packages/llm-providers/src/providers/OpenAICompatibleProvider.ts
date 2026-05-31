@@ -34,5 +34,21 @@ function requireOpenAICompatibleBaseUrl(baseUrl: string | undefined): string {
     throw new OpenAIProviderError("OpenAI-compatible baseUrl must be a non-empty value");
   }
 
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch (cause) {
+    throw new OpenAIProviderError("OpenAI-compatible baseUrl must be a valid absolute URL", {
+      cause,
+    });
+  }
+
+  if (parsed.protocol !== "https:") {
+    throw new OpenAIProviderError("OpenAI-compatible baseUrl must use https");
+  }
+  if (parsed.hostname.length === 0) {
+    throw new OpenAIProviderError("OpenAI-compatible baseUrl must include a hostname");
+  }
+
   return trimmed;
 }
