@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Sovri SAS
+
+import type { z } from "@sovri/core";
+
+import type { TokenUsage } from "../types/LLMProvider.js";
+
+export interface OpenAIProviderErrorOptions {
+  readonly cause?: unknown;
+  readonly issues?: ReadonlyArray<z.core.$ZodIssue>;
+  readonly tokenUsage?: TokenUsage;
+  readonly retryableWithCorrectivePrompt?: true;
+}
+
+type OpenAIProviderErrorName = "OpenAIProviderAuthError" | "OpenAIProviderError";
+
+export class OpenAIProviderError<
+  Name extends OpenAIProviderErrorName = "OpenAIProviderError",
+> extends Error {
+  readonly issues?: ReadonlyArray<z.core.$ZodIssue>;
+  readonly tokenUsage?: TokenUsage;
+  readonly retryableWithCorrectivePrompt?: true;
+
+  override get name(): Name {
+    return this.errorName;
+  }
+
+  protected get errorName(): Name {
+    return "OpenAIProviderError" as Name;
+  }
+
+  constructor(message: string, options: OpenAIProviderErrorOptions = {}) {
+    super(message, errorOptions(options.cause));
+
+    if (options.issues !== undefined) {
+      this.issues = options.issues;
+    }
+    if (options.tokenUsage !== undefined) {
+      this.tokenUsage = options.tokenUsage;
+    }
+    if (options.retryableWithCorrectivePrompt !== undefined) {
+      this.retryableWithCorrectivePrompt = options.retryableWithCorrectivePrompt;
+    }
+  }
+}
+
+export class OpenAIProviderAuthError extends OpenAIProviderError<"OpenAIProviderAuthError"> {
+  protected override get errorName(): "OpenAIProviderAuthError" {
+    return "OpenAIProviderAuthError";
+  }
+}
+
+function errorOptions(cause: unknown): ErrorOptions | undefined {
+  return cause === undefined ? undefined : { cause };
+}

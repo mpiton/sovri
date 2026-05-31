@@ -21,9 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
-- `feat(llm-providers)`: add the OpenAI provider contract slice, covering the public
-  `LLMProvider` metadata, default model, data-only generation, and token-usage generation
-  expected from the v0.5 BYOK OpenAI adapter.
+- `feat(llm-providers)`: add the OpenAI provider contract implementation slice, covering
+  the public `LLMProvider` metadata, default model, data-only generation, and token-usage
+  generation expected from the v0.5 BYOK OpenAI adapter.
 
 - `chore(deps)`: add the official `openai@6.39.1` SDK as an exactly pinned runtime dependency
   of `@sovri/llm-providers`, preparing the v0.5 BYOK provider slice for OpenAI and

@@ -48,6 +48,17 @@ export {
 } from "./providers/MistralProvider.js";
 
 export {
+  DEFAULT_OPENAI_MAX_TOKENS,
+  DEFAULT_OPENAI_MODEL,
+  MAX_OPENAI_MAX_TOKENS,
+  OpenAIProvider,
+  OpenAIProviderAuthError,
+  OpenAIProviderError,
+  type OpenAIProviderErrorOptions,
+  type OpenAIProviderOptions,
+} from "./providers/OpenAIProvider.js";
+
+export {
   LLMFindingSchema,
   LLMResponseSchema,
   type LLMFinding,
