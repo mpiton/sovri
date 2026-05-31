@@ -41,7 +41,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `fix(llm-providers)`: cap OpenAI retry attempts to keep exponential backoff bounded.
 
-- `feat(llm-providers)`: support optional OpenAI base URL overrides for EU-hosted or
+- `feat(llm-providers)`: support optional OpenAI constructor base URL overrides for EU-hosted or
   OpenAI-compatible endpoints while preserving the SDK default when omitted.
 
 - `fix(llm-providers)`: normalize OpenAI strict JSON schemas before requests, reject
