@@ -34,10 +34,12 @@ function computeAnchor(finding: Finding, diff: Diff): string {
   const source = normalizeCode(extractAnchorSource(finding, diff));
   const locator = source !== "" ? `code:${source}` : `body:${normalizeProse(finding.body)}`;
 
-  // A CWE narrows the class of issue but does not identify the site: two
-  // distinct CWE-89 sinks in the same file must not collapse to one identity,
-  // so the targeted code (or body) is always part of the anchor. The CWE only
-  // adds precedence/separation; it never replaces the source locator.
+  // A CWE narrows the class of issue but does not identify the site, so the
+  // targeted code (or body) is always part of the anchor: two CWE-89 sinks with
+  // DIFFERENT code in the same file stay distinct. Byte-identical duplicated
+  // code is the one case that intentionally shares an identity — a within-run
+  // occurrence ordinal would distinguish them but flips when the model reorders
+  // findings across runs, reintroducing the #1965 duplicate-on-re-review bug.
   if (finding.cwe !== undefined) {
     return `cwe:${finding.cwe}${UNIT_SEPARATOR}${locator}`;
   }

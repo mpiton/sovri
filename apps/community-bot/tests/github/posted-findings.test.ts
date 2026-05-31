@@ -104,6 +104,7 @@ describe("fetchPostedFindings", () => {
   });
 
   it("excludes a minimized bot marker so a reintroduced finding re-posts (R-05)", async () => {
+    // Each finding is the root of its own review thread (fetched as first: 1).
     const octokit = stubOctokit([
       {
         comments: [
@@ -113,6 +114,10 @@ describe("fetchPostedFindings", () => {
             isMinimized: true,
             author: { login: "sovri-bot[bot]" },
           },
+        ],
+      },
+      {
+        comments: [
           {
             id: "RC_new",
             body: marker(FP_B),

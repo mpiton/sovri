@@ -81,6 +81,10 @@ export async function minimizeFindingComments(
   );
 }
 
+// Only the root comment of each review thread is one the bot authored as a
+// finding and therefore carries the marker; replies (dismiss commands, human
+// responses) never do. Fetching `comments(first: 1)` is both sufficient and
+// immune to per-thread comment pagination.
 const REVIEW_THREADS_QUERY = `
   query PostedFindings($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
     repository(owner: $owner, name: $repo) {
@@ -88,7 +92,7 @@ const REVIEW_THREADS_QUERY = `
         reviewThreads(first: ${REVIEW_THREADS_PAGE_SIZE}, after: $cursor) {
           pageInfo { hasNextPage endCursor }
           nodes {
-            comments(first: ${REVIEW_THREADS_PAGE_SIZE}) {
+            comments(first: 1) {
               nodes { id body isMinimized author { login } }
             }
           }

@@ -344,8 +344,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   fingerprint (`<!-- sovri-finding-id: -->`, independent of line shifts and LLM
   title drift, yet case-sensitive on the targeted code so two same-CWE sinks in
   one file keep separate identities); on re-review the bot reads its own prior
-  comments via GitHub GraphQL review threads (bot-authored, non-minimized only)
-  and reconciles the new findings against them — skipping already-posted ones,
+  comments via GitHub GraphQL review threads (each thread's root bot comment,
+  non-minimized only; the marker is anchored to the end of the body so a
+  marker-like token elsewhere cannot be mis-read) and reconciles the new
+  findings against them — skipping already-posted ones,
   collapsing intra-run duplicates, and marking comments whose finding the
   current run no longer produces as outdated (minimized). Embedding the marker
   also activates dismissal of inline findings by id. Reconciliation logic stays

@@ -273,20 +273,11 @@ describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04)"
     expect(comments).toHaveLength(1);
     expect(comments[0]?.path).toBe("src/session.ts");
     // And the inline comment body renders the title, body and audit reference,
-    // then the hidden finding marker as the very last line
-    const body = comments[0]?.body ?? "";
-    expect(
-      body.startsWith(
-        [
-          "**Missing null guard**",
-          "",
-          "`session.user` can be undefined.",
-          "",
-          "🔍 Audit Reference: SOVRI-SC-AB12-CD34",
-        ].join("\n"),
-      ),
-    ).toBe(true);
-    expect(body).toMatch(/\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u);
+    // then the hidden finding marker as the very last line — enforced as a
+    // single start-to-end match so nothing can be inserted before the marker
+    expect(comments[0]?.body).toMatch(
+      /^\*\*Missing null guard\*\*\n\n`session\.user` can be undefined\.\n\n🔍 Audit Reference: SOVRI-SC-AB12-CD34\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u,
+    );
   });
 
   it("omits the audit reference line when the finding has no audit reference", () => {
@@ -316,14 +307,10 @@ describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04)"
     // Then the inline comment body does not contain "🔍 Audit Reference:"
     expect(comments[0]?.body).not.toContain("🔍 Audit Reference:");
     // And the inline comment body renders the title and body, then the hidden
-    // finding marker as the very last line
-    const body = comments[0]?.body ?? "";
-    expect(
-      body.startsWith(
-        ["**Missing null guard**", "", "`session.user` can be undefined."].join("\n"),
-      ),
-    ).toBe(true);
-    expect(body).toMatch(/\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u);
+    // finding marker as the very last line — single start-to-end match
+    expect(comments[0]?.body).toMatch(
+      /^\*\*Missing null guard\*\*\n\n`session\.user` can be undefined\.\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u,
+    );
   });
 
   it("carries only the audit reference, never the compliance references block", () => {
