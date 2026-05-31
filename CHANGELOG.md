@@ -33,6 +33,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   including response-format derivation, retryable Zod validation failures, and unsupported
   schema preflight rejection.
 
+- `test(llm-providers)`: add grouped acceptance coverage for OpenAI API key validation,
+  including blank-key typed errors before requests and trimmed SDK constructor options.
+
 - `fix(llm-providers)`: normalize OpenAI strict JSON schemas before requests, reject
   unsupported dynamic record schemas, and wrap SDK transport/authentication failures in
   typed provider errors with request metadata.
