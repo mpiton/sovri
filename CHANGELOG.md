@@ -91,6 +91,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   HTTPS URLs unchanged to the OpenAI SDK constructor so future compatible endpoints cannot
   accidentally route review data over plaintext transport or through SDK default endpoints.
 
+- `test(llm-providers)`: add OpenAI-compatible token-usage parity coverage for valid usage,
+  invalid usage diagnostics, and data-only generation so compatible endpoints keep the same
+  structured-output contract as the OpenAI provider.
+
 ## [0.3.0] - 2026-05-31
 
 ### Changed
