@@ -102,6 +102,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   same-test detection across `it` and `test` blocks for inline, variable, and helper compatible
   provider options without a top-level fake client or mocked OpenAI SDK.
 
+- `test(llm-providers)`: add OpenAI-compatible package export and quality acceptance coverage,
+  proving the public barrel exposes the compatible helper and options type, source files keep SPDX
+  headers and explicit ESM extensions, forbidden TypeScript escape hatches are named, and the
+  entrypoint helper constructs an `LLMProvider` with an injected fake client while remaining under
+  the compatible no-network guard.
+
 ## [0.3.0] - 2026-05-31
 
 ### Changed

@@ -15,6 +15,7 @@ import type { LLMProvider, StructuredGeneration } from "../types/LLMProvider.js"
 const ProviderTestDiscovery = {
   directory: new URL(".", import.meta.url),
   selfFileName: "OpenAICompatibleProvider.no-network.test.ts",
+  additionalFileNames: ["OpenAIProvider.compatible.exports.test.ts"],
 };
 
 const CompatibleProviderFixture = {
@@ -256,6 +257,14 @@ function providerOptions(baseUrl: string): OpenAICompatibleProviderOptions {
     expect(committedSourceViolations(sources)).toEqual([]);
   });
 
+  it("includes the compatible export acceptance test in committed no-network checks", async () => {
+    const sources = await readOpenAICompatibleProviderTestSources();
+
+    expect(sources.map((source) => source.fileName)).toContain(
+      "OpenAIProvider.compatible.exports.test.ts",
+    );
+  });
+
   it("rejects missing baseUrl before fake client or SDK construction", async () => {
     const calls: unknown[] = [];
     const sdkConstructorOptions: unknown[] = [];
@@ -350,7 +359,7 @@ async function readOpenAICompatibleProviderTestSources(): Promise<ProviderTestSo
   const fileNames = (await readdir(ProviderTestDiscovery.directory))
     .filter(
       (fileName) =>
-        fileName.startsWith("OpenAICompatibleProvider.") &&
+        isDiscoveredCompatibleProviderTestFile(fileName) &&
         fileName.endsWith(".test.ts") &&
         fileName !== ProviderTestDiscovery.selfFileName,
     )
@@ -361,6 +370,13 @@ async function readOpenAICompatibleProviderTestSources(): Promise<ProviderTestSo
       fileName,
       source: await readFile(new URL(fileName, ProviderTestDiscovery.directory), "utf8"),
     })),
+  );
+}
+
+function isDiscoveredCompatibleProviderTestFile(fileName: string): boolean {
+  return (
+    fileName.startsWith("OpenAICompatibleProvider.") ||
+    ProviderTestDiscovery.additionalFileNames.includes(fileName)
   );
 }
 
