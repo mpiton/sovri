@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(config)`: pin the `ProviderSchema` enum contract to Anthropic, Mistral,
+  OpenAI, and OpenAI-compatible provider values.
+
 - `test(config)`: cover OpenAI `apiKeySecret` values with neutral
   environment-variable names and reject non-env-var strings, preserving the BYOK
   contract that config stores secret references rather than literal credentials.
