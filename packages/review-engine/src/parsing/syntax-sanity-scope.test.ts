@@ -67,7 +67,7 @@ describe("syntax sanity validation scope", () => {
 
     // Then no new AST parser dependency is present
     for (const parserPackage of AstParserPackages) {
-      expect(declaredDependencies, parserPackage).not.toContain(parserPackage);
+      expect(declaredDependencies.has(parserPackage), parserPackage).toBe(false);
     }
 
     // And pnpm-lock.yaml has no new parser package solely for task-111
@@ -75,8 +75,11 @@ describe("syntax sanity validation scope", () => {
       readWorkspaceFile("pnpm-lock.yaml"),
       "packages/review-engine:",
     );
+    expect(reviewEngineLockImporter).toContain("dependencies:");
     for (const parserPackage of AstParserPackages) {
-      expect(reviewEngineLockImporter, parserPackage).not.toContain(`${parserPackage}:`);
+      expect(hasLockDependencyKey(reviewEngineLockImporter, parserPackage), parserPackage).toBe(
+        false,
+      );
     }
   });
 
@@ -132,6 +135,10 @@ function findChangelogEntry(section: string, requiredFragments: readonly string[
 function extractLockImporter(lockfile: string, importer: string): string {
   const lines = lockfile.split("\n");
   const start = lines.findIndex((line) => line === `  ${importer}`);
+  if (start === -1) {
+    return "";
+  }
+
   const importerLines: string[] = [];
 
   for (let index = start + 1; index < lines.length; index += 1) {
@@ -143,4 +150,17 @@ function extractLockImporter(lockfile: string, importer: string): string {
   }
 
   return importerLines.join("\n");
+}
+
+function hasLockDependencyKey(lockImporter: string, dependencyName: string): boolean {
+  const escapedDependencyName = escapeRegExp(dependencyName);
+  const dependencyKeyPattern = new RegExp(
+    `^\\s+(?:'|")?${escapedDependencyName}(?:'|")?:\\s*$`,
+    "u",
+  );
+  return lockImporter.split("\n").some((line) => dependencyKeyPattern.test(line));
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
