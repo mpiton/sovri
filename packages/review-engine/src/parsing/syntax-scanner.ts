@@ -11,6 +11,7 @@ import {
 } from "./syntax-characters.js";
 import {
   canStartRegexLiteral,
+  isCannotEndToken,
   isOperandToken,
   isPostfixUpdateOperator,
   isSupportedNumberLiteral,
@@ -159,6 +160,12 @@ function scanDelimiterOrToken(
   }
   if (char === "!" && isOperandToken(previousSignificant)) {
     return { sane: true, previousSignificant: "literal" };
+  }
+  if (char === ";") {
+    if (isCannotEndToken(previousSignificant)) {
+      return { sane: false, previousSignificant: char };
+    }
+    return { sane: true, previousSignificant: char };
   }
 
   const expectedClosingDelimiter = OpeningDelimiters.get(char);
