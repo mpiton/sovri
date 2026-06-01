@@ -12,9 +12,14 @@ export function isSyntacticallySane(code: string): boolean {
   const expectedClosings: string[] = [];
   let currentQuote: QuoteDelimiter | undefined;
   let escaped = false;
+  const characters = [...code];
 
-  for (const character of code) {
+  for (const [index, character] of characters.entries()) {
     if (currentQuote !== undefined) {
+      if (opensTemplateInterpolation(currentQuote, character, characters[index + 1], escaped)) {
+        return false;
+      }
+
       const quoteResult = readQuotedCharacter(character, currentQuote, escaped);
       currentQuote = quoteResult.currentQuote;
       escaped = quoteResult.escaped;
@@ -44,6 +49,15 @@ export function isSyntacticallySane(code: string): boolean {
 function hasTruncationMarker(trimmedCode: string): boolean {
   const codeWithoutTerminator = trimmedCode.replace(/[;\s]+$/u, "");
   return codeWithoutTerminator.endsWith("...") || codeWithoutTerminator.endsWith("…");
+}
+
+function opensTemplateInterpolation(
+  currentQuote: QuoteDelimiter,
+  character: string,
+  nextCharacter: string | undefined,
+  escaped: boolean,
+): boolean {
+  return currentQuote === "`" && !escaped && character === "$" && nextCharacter === "{";
 }
 
 function readQuotedCharacter(
