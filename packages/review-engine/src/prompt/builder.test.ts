@@ -496,7 +496,7 @@ describe("buildSystemPrompt", () => {
         "bugs-only": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Focus on correctness bugs that can change runtime behavior. Ignore style-only findings and formatting nits. Ignore performance-only findings unless they cause incorrect behavior. Return structured JSON findings that match the requested schema.",
         "full": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Return structured JSON findings that match the requested schema.",
         "minimal": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Return at most 3 findings. Include only blocker or major severity findings. Suppress nits, style-only comments, and minor findings. Return structured JSON findings that match the requested schema.",
-        "strict": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Hold the diff to a high bar. Report all valid issues, including blocker, major, minor, maintainability, style, readability, and test-quality concerns. Do not suppress nits when they materially improve code quality. Return structured JSON findings that match the requested schema.",
+        "strict": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Hold the diff to a high bar. Report all valid blocker, major, and minor issues, including maintainability, style, readability, and test-quality concerns that justify at least minor severity. Return structured JSON findings that match the requested schema.",
       }
     `);
   });
@@ -553,6 +553,8 @@ describe("buildSystemPrompt", () => {
     expect(systemPrompt).toContain("minor");
     // And the prompt contains "style".
     expect(systemPrompt).toContain("style");
+    // And the prompt does not request nitpick findings that the default severity filter removes.
+    expect(systemPrompt).not.toContain("nits");
     // And the prompt is not equal to the full-mode prompt.
     expect(systemPrompt).not.toBe(buildSystemPrompt({ mode: "full" }));
     // And the prompt is not equal to the bugs-only-mode prompt.

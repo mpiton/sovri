@@ -38,6 +38,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `buildSystemPrompt({ mode: "strict" })` to strict-mode guidance without changing
   the existing `full`, `bugs-only`, or `minimal` prompt templates.
 
+- `fix(review-engine)`: align strict prompt guidance with the configured severity
+  filter by requesting blocker, major, and minor findings instead of nitpick
+  findings that the default `minor` threshold removes.
+
 - `feat(review-engine)`: accept `strict` as a review prompt mode in the prompt
   builder schema, preparing prompt routing for the v0.5 strict review mode.
 
