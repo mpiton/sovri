@@ -149,7 +149,7 @@ function startsRejectedAsciiEllipsis(
   return (
     next === undefined ||
     !SpreadPrefixTokens.has(previousSignificant ?? "") ||
-    !isIdentifierStart(next)
+    !startsSpreadOperand(next)
   );
 }
 
@@ -177,4 +177,8 @@ function readNumberLiteral(code: string, start: number): string {
     end += 1;
   }
   return code.slice(start, end);
+}
+
+function startsSpreadOperand(char: string): boolean {
+  return isIdentifierStart(char) || char === "[" || char === "(" || char === "{";
 }
