@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { isSyntacticallySane } from "./syntax-sanity.js";
+
+const ParsingLayerDirectory = dirname(fileURLToPath(import.meta.url));
+const ForbiddenRuntimeEvaluationCalls = ["eval(", "Function(", "import("] as const;
 
 describe("isSyntacticallySane", () => {
   it("validates balanced snippets and rejects uncertain syntax conservatively", () => {
@@ -92,4 +98,70 @@ describe("isSyntacticallySane", () => {
     // Then the syntactic sanity helper result is false
     expect(uncertainResult).toBe(false);
   });
+
+  it("validates snippets with a pure language-agnostic character scan", () => {
+    const saneLanguageSnippets = [
+      "const total = amount ?? 0;",
+      'result = {"ok": True}',
+      "let total = items.len();",
+      "if err != nil { return err }",
+    ];
+
+    for (const code of saneLanguageSnippets) {
+      // Given the candidate suggestion code is <code>
+      // When the syntactic sanity helper validates the code
+      const result = isSyntacticallySane(code);
+
+      // Then the result is true
+      expect(result, code).toBe(true);
+    }
+
+    const malformedLanguageSnippets = [
+      'result = {"ok": True',
+      "let total = items.len(;",
+      "if err != nil { return err",
+    ];
+
+    for (const code of malformedLanguageSnippets) {
+      // Given the candidate suggestion code is <code>
+      // When the syntactic sanity helper validates the code
+      const result = isSyntacticallySane(code);
+
+      // Then the result is false
+      expect(result, code).toBe(false);
+    }
+
+    // Given the candidate suggestion code is "throw new Error(\"should not run\");"
+    const executableLookingSnippet = 'throw new Error("should not run");';
+    let result: boolean | undefined;
+
+    // When the syntactic sanity helper validates the code
+    const validate = () => {
+      result = isSyntacticallySane(executableLookingSnippet);
+    };
+
+    // Then the helper call does not throw "should not run"
+    expect(validate).not.toThrow("should not run");
+
+    // And the result is true
+    expect(result).toBe(true);
+
+    const parsingLayerSource = readParsingLayerSource();
+
+    // And the parsing layer source contains no "eval("
+    // And the parsing layer source contains no "Function("
+    // And the parsing layer source contains no "import("
+    for (const forbiddenCall of ForbiddenRuntimeEvaluationCalls) {
+      expect(parsingLayerSource).not.toContain(forbiddenCall);
+    }
+  });
 });
+
+function readParsingLayerSource(): string {
+  return readdirSync(ParsingLayerDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .filter((entry) => entry.name.endsWith(".ts"))
+    .filter((entry) => !entry.name.includes(".test"))
+    .map((entry) => readFileSync(join(ParsingLayerDirectory, entry.name), "utf8"))
+    .join("\n");
+}
