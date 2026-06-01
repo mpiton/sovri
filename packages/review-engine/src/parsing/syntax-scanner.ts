@@ -22,6 +22,8 @@ import {
   startsRejectedAsciiEllipsis,
 } from "./syntax-token-rules.js";
 
+const StatementTerminatorAllowedPrefixKeywords = new Set<string>(["return", "yield"]);
+
 export type QuotedScanResult = {
   readonly closed: boolean;
   readonly escaping: boolean;
@@ -156,13 +158,19 @@ function scanDelimiterOrToken(
     return { sane: true, previousSignificant: char, opensTernary: next !== "." };
   }
   if (char === ":") {
+    if (isCannotEndToken(previousSignificant)) {
+      return { sane: false, previousSignificant: char };
+    }
     return { sane: true, previousSignificant: char, closesTernary: true };
   }
   if (char === "!" && isOperandToken(previousSignificant)) {
     return { sane: true, previousSignificant: "literal" };
   }
   if (char === ";") {
-    if (isCannotEndToken(previousSignificant)) {
+    if (
+      isCannotEndToken(previousSignificant) &&
+      !StatementTerminatorAllowedPrefixKeywords.has(previousSignificant ?? "")
+    ) {
       return { sane: false, previousSignificant: char };
     }
     return { sane: true, previousSignificant: char };
