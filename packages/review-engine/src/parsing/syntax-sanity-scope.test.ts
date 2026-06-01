@@ -20,8 +20,9 @@ const ChangelogFeatureFragments: readonly string[] = [
   "`feat(review-engine)`",
   "committable suggestions",
 ];
-const LightweightValidationPhrase = "committable suggestions use lightweight syntactic validation";
-const FullAstDeferredPhrase = "full AST validation is not included";
+const LightweightValidationPattern =
+  /committable suggestions\s+use\s+lightweight syntactic validation/u;
+const FullAstDeferredPattern = /full AST validation\s+is\s+not\s+included/u;
 // Update this sentinel list when review-engine intentionally adopts a parser dependency.
 const AstParserPackages: readonly string[] = [
   "@babel/parser",
@@ -34,6 +35,13 @@ const AstParserPackages: readonly string[] = [
   "ts-morph",
 ];
 const CoveredLanguages: readonly string[] = ["TypeScript", "JavaScript", "Python", "Rust", "Go"];
+const SyntaxSanitySourcePaths: readonly string[] = [
+  "packages/review-engine/src/parsing/syntax-characters.ts",
+  "packages/review-engine/src/parsing/syntax-regex-flags.ts",
+  "packages/review-engine/src/parsing/syntax-sanity.ts",
+  "packages/review-engine/src/parsing/syntax-scanner.ts",
+  "packages/review-engine/src/parsing/syntax-token-rules.ts",
+];
 
 describe("syntax sanity validation scope", () => {
   it("documents lightweight committable suggestion validation without full AST validation", () => {
@@ -52,10 +60,10 @@ describe("syntax sanity validation scope", () => {
     expect(taskEntry).toContain("`feat(review-engine)`");
 
     // And it says committable suggestions use lightweight syntactic validation
-    expect(taskEntry).toContain(LightweightValidationPhrase);
+    expect(taskEntry).toMatch(LightweightValidationPattern);
 
     // And it says full AST validation is not included
-    expect(taskEntry).toContain(FullAstDeferredPhrase);
+    expect(taskEntry).toMatch(FullAstDeferredPattern);
   });
 
   it("keeps parser dependencies absent from the review-engine task scope", () => {
@@ -98,16 +106,10 @@ describe("syntax sanity validation scope", () => {
     // Then the result is based only on delimiter, quote, and truncation checks
     expect(result).toBe(true);
 
-    // And no assertion claims that the code is valid TypeScript, JavaScript, Python, Rust, or Go
-    const assertionLines = readWorkspaceFile(
-      "packages/review-engine/src/parsing/syntax-sanity-scope.test.ts",
-    )
-      .split("\n")
-      .filter((line) => line.includes("expect("))
-      .join("\n");
+    // And the production sanity code does not branch on concrete languages
+    const productionSanitySource = SyntaxSanitySourcePaths.map(readWorkspaceFile).join("\n");
     for (const language of CoveredLanguages) {
-      const forbiddenClaim = ["valid", language].join(" ");
-      expect(assertionLines).not.toContain(forbiddenClaim);
+      expect(productionSanitySource, language).not.toMatch(specificLanguagePattern(language));
     }
   });
 });
@@ -168,4 +170,8 @@ function hasLockDependencyKey(lockImporter: string, dependencyName: string): boo
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function specificLanguagePattern(language: string): RegExp {
+  return new RegExp(`\\b${escapeRegExp(language)}\\b`, "iu");
 }
