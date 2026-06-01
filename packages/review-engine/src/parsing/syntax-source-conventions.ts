@@ -114,11 +114,16 @@ function collectRelativeImportViolations(
 
 function hasForbiddenSpecifierImport(source: string, specifier: string): boolean {
   const escapedSpecifier = escapeRegExp(specifier);
-  const importPattern = new RegExp(
-    `^\\s*(?:import|export)\\b[^;]*["']${escapedSpecifier}(?:\\/[^"']*)?["']`,
+  const specifierPattern = `${escapedSpecifier}(?:\\/[^"']*)?`;
+  const staticImportPattern = new RegExp(
+    `^\\s*(?:import|export)\\b[^;]*["']${specifierPattern}["']`,
     "mu",
   );
-  return importPattern.test(source);
+  const dynamicImportPattern = new RegExp(
+    `\\bimport\\s*\\(\\s*["']${specifierPattern}["']\\s*\\)`,
+    "u",
+  );
+  return staticImportPattern.test(source) || dynamicImportPattern.test(source);
 }
 
 function directivePattern(name: string, prefix: DirectivePrefix): RegExp {
