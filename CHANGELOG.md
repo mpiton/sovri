@@ -206,8 +206,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `fix(review-engine)`: address syntax-sanity review feedback for line comments,
   truncated ternaries, non-null assertions before delimiters, Unicode regex flag
-  suffixes, empty ternary arms, statement terminators after incomplete
-  expressions, and scope-test false positives.
+  suffixes, adjacent quoted literals, empty ternary arms, statement terminators
+  after incomplete expressions, and scope-test false positives.
 
 - `fix(review-engine)`: align strict prompt guidance with the configured severity
   filter by requesting blocker, major, and minor findings instead of nitpick

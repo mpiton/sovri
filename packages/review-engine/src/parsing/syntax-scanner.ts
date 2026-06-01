@@ -116,6 +116,9 @@ export function scanNormalCharacter(
     return { sane: false };
   }
   if (QuoteCharacters.has(char)) {
+    if (isOperandToken(previousSignificant)) {
+      return { sane: false };
+    }
     return { sane: true, quote: char };
   }
   if (isIdentifierStart(char)) {
