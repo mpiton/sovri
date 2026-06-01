@@ -1131,6 +1131,23 @@ describe("parseLLMResponse", () => {
     }
   });
 
+  it("does not mark syntactically uncertain single-line replacements as committable", () => {
+    const findings = parseLLMResponse({
+      summary: "One finding found",
+      findings: [
+        buildRawFinding({
+          line_start: 14,
+          line_end: 14,
+          suggested_code: "return normalize(value...",
+        }),
+      ],
+    });
+
+    const [finding] = findings;
+
+    expect(finding?.suggestion?.committable).toBe(false);
+  });
+
   it("marks non-committable suggestions as false", () => {
     const examples = [
       {

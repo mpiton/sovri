@@ -5,6 +5,7 @@ import { FindingSchema, type Finding, type z } from "@sovri/core";
 import { v4 as uuidv4 } from "uuid";
 
 import { LLMResponseSchema, type LLMRawFinding } from "./schema.js";
+import { isSyntacticallySane } from "./syntax-sanity.js";
 
 export interface LLMResponseParseErrorOptions {
   readonly cause?: unknown;
@@ -92,7 +93,8 @@ function isCommittableSuggestion(finding: LLMRawFinding): boolean {
     finding.suggested_code !== null &&
     finding.suggested_code.trim().length > 0 &&
     !finding.suggested_code.includes("\n") &&
-    !finding.suggested_code.includes("\r")
+    !finding.suggested_code.includes("\r") &&
+    isSyntacticallySane(finding.suggested_code)
   );
 }
 

@@ -3,21 +3,32 @@
 
 import { describe, expect, it } from "vitest";
 
-type SyntaxSanityModule = {
-  readonly isSyntacticallySane: (code: string) => boolean;
-};
+import { isSyntacticallySane } from "./syntax-sanity.js";
 
 describe("isSyntacticallySane", () => {
-  it("validates balanced snippets and rejects uncertain syntax conservatively", async () => {
+  it("validates balanced snippets and rejects uncertain syntax conservatively", () => {
     // Given the syntactic sanity helper is invoked directly from the parsing layer
-    const { isSyntacticallySane } = await loadSyntaxSanityHelper();
-
     const saneCodes = [
       "return calculateTotal(items);",
       "const tuple = [first, { second: true }];",
       'const label = "ready";',
       "const label = `ready`;",
       "const label = 'ready';",
+      String.raw`const label = "ready \"now\"";`,
+      "const label = `total ${format(count)}`;",
+      String.raw`const pattern = /a\/[bc]+/g;`,
+      "return /ready/.test(input);",
+      "/^ready$/.test(input);",
+      "const next = [...items, ...[fallback], ...(enabled ? items : [])];",
+      "const object = { ...source };",
+      "const total = 0x2A + 1_000.5;",
+      "const ratio = 1e-3;",
+      "const value = input /* explain */ + fallback;",
+      "call(first, second); // trailing )",
+      "return values[index++];",
+      "return fn(i--);",
+      "const result = value as Result;",
+      "const less = count < /ready/.test(input);",
     ];
 
     for (const code of saneCodes) {
@@ -26,7 +37,7 @@ describe("isSyntacticallySane", () => {
       const result = isSyntacticallySane(code);
 
       // Then the result is true
-      expect(result).toBe(true);
+      expect(result, code).toBe(true);
     }
 
     const uncertainCodes = [
@@ -37,6 +48,22 @@ describe("isSyntacticallySane", () => {
       'const label = "ready;',
       "const label = `ready;",
       "return normalize(value...",
+      "const value = \u2026;",
+      "const value = input /* explain",
+      "return /ready",
+      "return /[abc/;",
+      "const copy = ...items;",
+      "const copy = [...];",
+      "call(first +);",
+      "call(first];",
+      "return total +",
+      "return total <",
+      "const pair = first,",
+      "throw",
+      "await",
+      "typeof",
+      "foo bar",
+      "const count = 1abc;",
     ];
 
     for (const code of uncertainCodes) {
@@ -45,7 +72,7 @@ describe("isSyntacticallySane", () => {
       const result = isSyntacticallySane(code);
 
       // Then the result is false
-      expect(result).toBe(false);
+      expect(result, code).toBe(false);
     }
 
     // Given the candidate suggestion code is "const message = \"Total (estimated\";"
@@ -66,22 +93,3 @@ describe("isSyntacticallySane", () => {
     expect(uncertainResult).toBe(false);
   });
 });
-
-async function loadSyntaxSanityHelper(): Promise<SyntaxSanityModule> {
-  const modulePath = ["./syntax-sanity", "js"].join(".");
-  const module: unknown = await import(modulePath);
-
-  if (!isSyntaxSanityModule(module)) {
-    throw new TypeError("Syntax sanity helper module has an invalid shape");
-  }
-
-  return module;
-}
-
-function isSyntaxSanityModule(module: unknown): module is SyntaxSanityModule {
-  if (typeof module !== "object" || module === null) {
-    return false;
-  }
-
-  return typeof Reflect.get(module, "isSyntacticallySane") === "function";
-}

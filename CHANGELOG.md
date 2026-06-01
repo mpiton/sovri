@@ -21,8 +21,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
-- `test(review-engine)`: add acceptance coverage for direct syntactic sanity
-  validation of balanced and uncertain single-line suggestions.
+- `test(review-engine)`: add expanded acceptance coverage for direct syntactic
+  sanity validation of balanced, postfix-update, and uncertain single-line
+  suggestions.
+
+- `feat(review-engine)`: add a pure syntax sanity helper and parser gate for
+  conservative single-line suggestion validation with fail-closed token rules.
 
 - `feat(config)`: accept `review.mode: strict` in `.sovri.yml` so repository
   configuration reaches the strict review-engine prompt path for regulated
