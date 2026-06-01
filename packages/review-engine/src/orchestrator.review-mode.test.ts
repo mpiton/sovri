@@ -32,23 +32,25 @@ class CapturingProvider implements LLMProvider {
 }
 
 describe("reviewPullRequest review mode plumbing", () => {
-  it.each([{ mode: "full" }, { mode: "bugs-only" }, { mode: "minimal" }] as const)(
-    "forwards review mode $mode to prompt construction",
-    async ({ mode }) => {
-      // Given the parsed review config has review mode <mode>.
-      const provider = new CapturingProvider();
+  it.each([
+    { mode: "full" },
+    { mode: "bugs-only" },
+    { mode: "strict" },
+    { mode: "minimal" },
+  ] as const)("forwards review mode $mode to prompt construction", async ({ mode }) => {
+    // Given the parsed review config has review mode <mode>.
+    const provider = new CapturingProvider();
 
-      // When the review orchestrator builds the review request.
-      await reviewPullRequest({ pullRequest, diff, config: configForMode(mode) }, { provider });
+    // When the review orchestrator builds the review request.
+    await reviewPullRequest({ pullRequest, diff, config: configForMode(mode) }, { provider });
 
-      // Then the provider receives the system prompt for mode <mode>.
-      expect(provider.systemPrompt).toBe(buildSystemPrompt({ mode }));
-      // And the provider receives the same quoted user prompt diff for mode <mode>.
-      expect(provider.userPrompt).toContain("```diff");
-      expect(provider.userPrompt).toContain("src/transfer.ts");
-      expect(provider.userPrompt).toContain("if (amountCents &gt; 1000000) return true");
-    },
-  );
+    // Then the provider receives the system prompt for mode <mode>.
+    expect(provider.systemPrompt).toBe(buildSystemPrompt({ mode }));
+    // And the provider receives the same quoted user prompt diff for mode <mode>.
+    expect(provider.userPrompt).toContain("```diff");
+    expect(provider.userPrompt).toContain("src/transfer.ts");
+    expect(provider.userPrompt).toContain("if (amountCents &gt; 1000000) return true");
+  });
 
   it("defaults omitted review mode to the full-mode system prompt", async () => {
     // Given the parsed review config omitted review mode before schema defaults were applied.
@@ -63,15 +65,15 @@ describe("reviewPullRequest review mode plumbing", () => {
     expect(provider.systemPrompt).not.toContain("at most 3 findings");
   });
 
-  it("accepts the legacy 'strict' config mode and routes it to the full-mode system prompt", async () => {
-    // Given a repository config still ships `review.mode: strict` from v0.1.
+  it("routes strict config mode to the strict-mode system prompt", async () => {
+    // Given a repository config sets `review.mode: strict`.
     const provider = new CapturingProvider();
 
     // When the orchestrator parses the input.
     await reviewPullRequest({ pullRequest, diff, config: configForMode("strict") }, { provider });
 
-    // Then the provider receives the baseline full-mode system prompt instead of throwing.
-    expect(provider.systemPrompt).toBe(buildSystemPrompt({ mode: "full" }));
+    // Then the provider receives the strict-mode system prompt.
+    expect(provider.systemPrompt).toBe(buildSystemPrompt({ mode: "strict" }));
   });
 });
 

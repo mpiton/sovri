@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(review-engine)`: route `review.mode: strict` through the review
+  orchestrator to the strict prompt template instead of silently falling back to
+  full mode.
+
 - `feat(review-engine)`: add the strict review system prompt template and route
   `buildSystemPrompt({ mode: "strict" })` to strict-mode guidance without changing
   the existing `full`, `bugs-only`, or `minimal` prompt templates.
