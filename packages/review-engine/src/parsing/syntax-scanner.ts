@@ -20,6 +20,7 @@ import {
   readIdentifier,
   readNumberLiteral,
   scanComparisonToken,
+  significantIdentifierToken,
   startsRejectedAsciiEllipsis,
 } from "./syntax-token-rules.js";
 
@@ -107,6 +108,9 @@ export function scanNormalCharacter(
   if (char === "/" && code.charAt(index + 1) === "*") {
     return { sane: true, skip: 1, inBlockComment: true };
   }
+  if (char === "<" && code.charAt(index + 1) === "/") {
+    return scanJsxClosingTag(code, index);
+  }
   if (char === "/" && canStartRegexLiteral(previousSignificant)) {
     return { sane: true, inRegex: true };
   }
@@ -127,7 +131,11 @@ export function scanNormalCharacter(
     if (isUnexpectedAdjacentOperand(previousSignificant, identifier)) {
       return { sane: false };
     }
-    return { sane: true, skip: identifier.length - 1, previousSignificant: identifier };
+    return {
+      sane: true,
+      skip: identifier.length - 1,
+      previousSignificant: significantIdentifierToken(identifier, previousSignificant),
+    };
   }
   if (isDecimalDigit(char)) {
     const literal = readNumberLiteral(code, index);
@@ -158,6 +166,9 @@ function scanDelimiterOrToken(
     const next = code.charAt(index + 1);
     if (next === "?") {
       return { sane: true, skip: 1, previousSignificant: char };
+    }
+    if (next === ".") {
+      return { sane: true, skip: 1, previousSignificant: "." };
     }
     return { sane: true, previousSignificant: char, opensTernary: next !== "." };
   }
@@ -205,4 +216,28 @@ function lineCommentSkipLength(code: string, index: number): number {
   const lineEnd = code.indexOf("\n", index + 2);
   const commentEnd = lineEnd === -1 ? code.length : lineEnd;
   return commentEnd - index - 1;
+}
+
+function scanJsxClosingTag(code: string, index: number): NormalScanResult {
+  let cursor = index + 2;
+  if (!isIdentifierStart(code.charAt(cursor))) {
+    return { sane: false };
+  }
+  cursor += 1;
+  while (cursor < code.length && isJsxTagNamePart(code.charAt(cursor))) {
+    cursor += 1;
+  }
+  while (cursor < code.length && code.charAt(cursor) === " ") {
+    cursor += 1;
+  }
+  if (code.charAt(cursor) !== ">") {
+    return { sane: false };
+  }
+  return { sane: true, skip: cursor - index, previousSignificant: "literal" };
+}
+
+function isJsxTagNamePart(char: string): boolean {
+  return (
+    isIdentifierStart(char) || isDecimalDigit(char) || char === "-" || char === "." || char === ":"
+  );
 }

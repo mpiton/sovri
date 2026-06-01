@@ -13,6 +13,8 @@ import {
   isWhitespace,
 } from "./syntax-characters.js";
 
+const AssertionAsToken = "assertion-as";
+
 const NonOperandKeywords = new Set<string>([
   "as",
   "await",
@@ -65,6 +67,7 @@ export function isCannotEndToken(token: string | undefined): boolean {
     token !== undefined &&
     (TerminalOperatorTokens.has(token) ||
       token === "," ||
+      token === AssertionAsToken ||
       RegexPrefixKeywords.has(token) ||
       NonOperandKeywords.has(token))
   );
@@ -141,6 +144,22 @@ export function readIdentifier(code: string, start: number): string {
     end += 1;
   }
   return code.slice(start, end);
+}
+
+export function significantIdentifierToken(
+  identifier: string,
+  previousSignificant: string | undefined,
+): string {
+  if (previousSignificant === ".") {
+    return "literal";
+  }
+  if (identifier === "as" && isOperandToken(previousSignificant)) {
+    return AssertionAsToken;
+  }
+  if (identifier === "const" && previousSignificant === AssertionAsToken) {
+    return "literal";
+  }
+  return identifier;
 }
 
 export function readNumberLiteral(code: string, start: number): string {
