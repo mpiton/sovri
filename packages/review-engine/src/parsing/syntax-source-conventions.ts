@@ -30,9 +30,11 @@ interface PatternRule {
   readonly violation: ParsingSourceConventionViolation;
 }
 
+type DirectivePrefix = "at-sign" | "none";
+
 const SpdxHeader = "// SPDX-License-Identifier: Apache-2.0\n";
 const RelativeImportPattern =
-  /\bfrom\s+["'](\.{1,2}\/[^"']+)["']|\bimport\s*\(\s*["'](\.{1,2}\/[^"']+)["']\s*\)/gu;
+  /\bfrom\s+["'](\.{1,2}\/[^"']+)["']|\bimport\s*\(\s*["'](\.{1,2}\/[^"']+)["']\s*\)|\bimport\s+["'](\.{1,2}\/[^"']+)["']/gu;
 const ForbiddenSpecifierRules: readonly SpecifierRule[] = [
   { specifier: "node:fs", violation: "forbidden-node:fs" },
   { specifier: "node:net", violation: "forbidden-node:net" },
@@ -43,9 +45,15 @@ const ForbiddenPatternRules: readonly PatternRule[] = [
   { pattern: /\bprocess\.env\b/u, violation: "forbidden-process-env" },
   { pattern: /\beval\s*\(/u, violation: "forbidden-eval" },
   { pattern: /(?::\s*any\b|\bas\s+any\b|<\s*any\s*>)/u, violation: "forbidden-any" },
-  { pattern: directivePattern("ts-ignore"), violation: "forbidden-ts-ignore" },
-  { pattern: directivePattern("ts-expect-error"), violation: "forbidden-ts-expect-error" },
-  { pattern: directivePattern(oxlintDisableDirective()), violation: "forbidden-oxlint-directive" },
+  { pattern: directivePattern("ts-ignore", "at-sign"), violation: "forbidden-ts-ignore" },
+  {
+    pattern: directivePattern("ts-expect-error", "at-sign"),
+    violation: "forbidden-ts-expect-error",
+  },
+  {
+    pattern: directivePattern(oxlintDisableDirective(), "none"),
+    violation: "forbidden-oxlint-directive",
+  },
 ];
 
 export function inspectParsingSourceConventions(source: string): ParsingSourceConventionInspection {
@@ -97,7 +105,7 @@ function collectRelativeImportViolations(
   violations: ParsingSourceConventionViolation[],
 ): void {
   for (const match of source.matchAll(RelativeImportPattern)) {
-    const specifier = match[1] ?? match[2];
+    const specifier = match[1] ?? match[2] ?? match[3];
     if (specifier !== undefined && !specifier.endsWith(".js")) {
       addViolation(violations, "relative-import-without-js");
     }
@@ -107,15 +115,16 @@ function collectRelativeImportViolations(
 function hasForbiddenSpecifierImport(source: string, specifier: string): boolean {
   const escapedSpecifier = escapeRegExp(specifier);
   const importPattern = new RegExp(
-    `\\b(?:import|export)\\b[^;\\n]*["']${escapedSpecifier}["']`,
-    "u",
+    `^\\s*(?:import|export)\\b[^;]*["']${escapedSpecifier}(?:\\/[^"']*)?["']`,
+    "mu",
   );
   return importPattern.test(source);
 }
 
-function directivePattern(name: string): RegExp {
+function directivePattern(name: string, prefix: DirectivePrefix): RegExp {
   const escapedName = escapeRegExp(name);
-  return new RegExp(`(?:\\/\\/|\\/\\*)\\s*@${escapedName}\\b`, "u");
+  const marker = prefix === "at-sign" ? "@" : "";
+  return new RegExp(`(?:\\/\\/|\\/\\*)\\s*${marker}${escapedName}\\b`, "u");
 }
 
 function oxlintDisableDirective(): string {

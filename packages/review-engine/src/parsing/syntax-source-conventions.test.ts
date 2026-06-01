@@ -39,8 +39,11 @@ const ConventionViolations: readonly string[] = [
 ];
 const ForbiddenSyntheticSources: ReadonlyArray<{ readonly sourceText: string }> = [
   { sourceText: "import fs from 'node:fs';" },
+  { sourceText: "import {\n  readFileSync\n} from 'node:fs';" },
+  { sourceText: 'import "./setup";' },
   { sourceText: "const value: any = code;" },
   { sourceText: "// @ts-ignore" },
+  { sourceText: "// oxlint-disable no-console" },
   { sourceText: "eval(code)" },
 ];
 
