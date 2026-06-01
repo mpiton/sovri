@@ -8,7 +8,9 @@ import {
   isDecimalDigit,
   isIdentifierStart,
   isTerminalOperatorToken,
+  isWhitespace,
 } from "./syntax-characters.js";
+import { scanRegexFlags } from "./syntax-regex-flags.js";
 import {
   canStartRegexLiteral,
   isCannotEndToken,
@@ -93,6 +95,18 @@ export type NormalScanResult = {
 export type DelimiterStackEntry = {
   readonly closing: string;
   readonly resumesTemplate: boolean;
+  readonly openedAfterOperand: boolean;
+  readonly containsTernary: boolean;
+};
+
+export type SyntaxFragmentScanResult = {
+  readonly sane: boolean;
+  readonly skip: number;
+};
+
+type SyntaxFragmentScanOptions = {
+  readonly stopAfterBalancedDelimiter?: boolean;
+  readonly rejectEmptyInitialDelimiter?: boolean;
 };
 
 export function scanNormalCharacter(
@@ -112,6 +126,12 @@ export function scanNormalCharacter(
     const jsxClosingTag = scanJsxClosingTag(code, index);
     if (jsxClosingTag !== undefined) {
       return jsxClosingTag;
+    }
+  }
+  if (char === "<" && !isOperandToken(previousSignificant)) {
+    const jsxOpeningTag = scanJsxOpeningTag(code, index);
+    if (jsxOpeningTag !== undefined) {
+      return jsxOpeningTag;
     }
   }
   if (char === "/" && canStartRegexLiteral(previousSignificant)) {
@@ -173,6 +193,7 @@ function scanDelimiterOrToken(
     if (next === ".") {
       return { sane: true, skip: 1, previousSignificant: "." };
     }
+    markTopDelimiterContainsTernary(delimiterStack);
     return { sane: true, previousSignificant: char, opensTernary: next !== "." };
   }
   if (char === ":") {
@@ -199,13 +220,18 @@ function scanDelimiterOrToken(
 
   const expectedClosingDelimiter = OpeningDelimiters.get(char);
   if (expectedClosingDelimiter !== undefined) {
-    delimiterStack.push({ closing: expectedClosingDelimiter, resumesTemplate: false });
+    delimiterStack.push({
+      closing: expectedClosingDelimiter,
+      resumesTemplate: false,
+      openedAfterOperand: isOperandToken(previousSignificant),
+      containsTernary: false,
+    });
     return { sane: true, previousSignificant: char };
   }
   if (ClosingDelimiters.has(char)) {
     if (
       isTerminalOperatorToken(previousSignificant) &&
-      !isSliceClosingDelimiter(char, previousSignificant)
+      !isSliceClosingDelimiter(char, previousSignificant, delimiterStack)
     ) {
       return { sane: false, previousSignificant: char };
     }
@@ -248,12 +274,249 @@ function scanJsxClosingTag(code: string, index: number): NormalScanResult | unde
   return { sane: true, skip: cursor - index, previousSignificant: "literal" };
 }
 
+function scanJsxOpeningTag(code: string, index: number): NormalScanResult | undefined {
+  let cursor = index + 1;
+  if (code.charAt(cursor) === ">") {
+    return { sane: true, skip: cursor - index, previousSignificant: ">" };
+  }
+  if (!isIdentifierStart(code.charAt(cursor))) {
+    return undefined;
+  }
+  cursor += 1;
+  while (cursor < code.length && isJsxTagNamePart(code.charAt(cursor))) {
+    cursor += 1;
+  }
+
+  let quote: string | undefined;
+  let escaping = false;
+  for (; cursor < code.length; cursor += 1) {
+    const char = code.charAt(cursor);
+    if (quote !== undefined) {
+      const quoted = scanQuotedCharacter(code, cursor, char, quote, escaping);
+      escaping = quoted.escaping;
+      if (quoted.closed) {
+        quote = undefined;
+      }
+      continue;
+    }
+    if (QuoteCharacters.has(char)) {
+      quote = char;
+      escaping = false;
+      continue;
+    }
+    if (char === "{") {
+      const expression = scanJsxAttributeExpression(code, cursor);
+      if (!expression.sane) {
+        return { sane: false };
+      }
+      cursor += expression.skip;
+      continue;
+    }
+    if (char === "}") {
+      return { sane: false };
+    }
+    if (char === ">") {
+      return { sane: true, skip: cursor - index, previousSignificant: ">" };
+    }
+  }
+  return { sane: false };
+}
+
 function isJsxTagNamePart(char: string): boolean {
   return (
     isIdentifierStart(char) || isDecimalDigit(char) || char === "-" || char === "." || char === ":"
   );
 }
 
-function isSliceClosingDelimiter(char: string, previousSignificant: string | undefined): boolean {
-  return char === "]" && previousSignificant === ":";
+function isSliceClosingDelimiter(
+  char: string,
+  previousSignificant: string | undefined,
+  delimiterStack: DelimiterStackEntry[],
+): boolean {
+  if (char !== "]" || previousSignificant !== ":") {
+    return false;
+  }
+  const entry = delimiterStack[delimiterStack.length - 1];
+  return entry?.closing === "]" && entry.openedAfterOperand && !entry.containsTernary;
+}
+
+function markTopDelimiterContainsTernary(delimiterStack: DelimiterStackEntry[]): void {
+  const topIndex = delimiterStack.length - 1;
+  const entry = delimiterStack[topIndex];
+  if (entry === undefined) {
+    return;
+  }
+  delimiterStack[topIndex] = { ...entry, containsTernary: true };
+}
+
+function scanJsxAttributeExpression(code: string, start: number): SyntaxFragmentScanResult {
+  return scanSyntaxFragment(code, start, {
+    stopAfterBalancedDelimiter: true,
+    rejectEmptyInitialDelimiter: true,
+  });
+}
+
+export function scanSyntaxFragment(
+  code: string,
+  start = 0,
+  options: SyntaxFragmentScanOptions = {},
+): SyntaxFragmentScanResult {
+  const stopAfterBalancedDelimiter = options.stopAfterBalancedDelimiter ?? false;
+  const rejectEmptyInitialDelimiter = options.rejectEmptyInitialDelimiter ?? false;
+  const delimiterStack: DelimiterStackEntry[] = [];
+  const pendingTernaryDepths: number[] = [];
+  let quote: string | undefined;
+  let escaping = false;
+  let inBlockComment = false;
+  let inRegex = false;
+  let inRegexClass = false;
+  let previousSignificant: string | undefined;
+
+  for (let index = start; index < code.length; index += 1) {
+    const char = code.charAt(index);
+
+    if (inBlockComment) {
+      if (char === "*" && code.charAt(index + 1) === "/") {
+        inBlockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+
+    if (quote !== undefined) {
+      const result = scanQuotedCharacter(code, index, char, quote, escaping);
+      escaping = result.escaping;
+      if (result.opensTemplateExpression) {
+        quote = undefined;
+        delimiterStack.push({
+          closing: "}",
+          resumesTemplate: true,
+          openedAfterOperand: false,
+          containsTernary: false,
+        });
+        previousSignificant = "=";
+        index += 1;
+        continue;
+      }
+      if (result.closed) {
+        quote = undefined;
+        previousSignificant = "literal";
+      }
+      continue;
+    }
+
+    if (inRegex) {
+      const result = scanRegexCharacter(char, escaping, inRegexClass);
+      escaping = result.escaping;
+      inRegexClass = result.inRegexClass;
+      if (result.closed) {
+        const flags = scanRegexFlags(code, index + 1);
+        if (!flags.sane) {
+          return { sane: false, skip: index - start };
+        }
+        index += flags.skip;
+        inRegex = false;
+        previousSignificant = "literal";
+      }
+      continue;
+    }
+
+    if (isWhitespace(char)) {
+      continue;
+    }
+
+    if (
+      rejectEmptyInitialDelimiter &&
+      index > start &&
+      char === "}" &&
+      delimiterStack.length === 1 &&
+      previousSignificant === "{"
+    ) {
+      return { sane: false, skip: index - start };
+    }
+
+    const token = scanNormalCharacter(code, index, char, previousSignificant, delimiterStack);
+    if (!token.sane) {
+      return { sane: false, skip: index - start };
+    }
+    if (token.stop) {
+      break;
+    }
+    if (token.skip !== undefined) {
+      index += token.skip;
+    }
+    if (token.quote !== undefined) {
+      quote = token.quote;
+      escaping = false;
+    }
+    if (token.inBlockComment) {
+      inBlockComment = true;
+    }
+    if (token.inRegex) {
+      inRegex = true;
+      inRegexClass = false;
+      escaping = false;
+    }
+    if (token.resumeTemplate) {
+      quote = "`";
+      escaping = false;
+    }
+    if (token.opensTernary) {
+      pendingTernaryDepths.push(delimiterStack.length);
+    }
+    if (token.closesTernary) {
+      const pendingDepth = pendingTernaryDepths[pendingTernaryDepths.length - 1];
+      if (pendingDepth === delimiterStack.length) {
+        pendingTernaryDepths.pop();
+      }
+    }
+    if (token.previousSignificant !== undefined) {
+      previousSignificant = token.previousSignificant;
+    }
+    if (stopAfterBalancedDelimiter && index > start && delimiterStack.length === 0) {
+      return {
+        sane: isCompleteSyntaxState(
+          delimiterStack,
+          pendingTernaryDepths,
+          quote,
+          inBlockComment,
+          inRegex,
+          previousSignificant,
+        ),
+        skip: index - start,
+      };
+    }
+  }
+
+  return {
+    sane:
+      !stopAfterBalancedDelimiter &&
+      isCompleteSyntaxState(
+        delimiterStack,
+        pendingTernaryDepths,
+        quote,
+        inBlockComment,
+        inRegex,
+        previousSignificant,
+      ),
+    skip: code.length - start,
+  };
+}
+
+function isCompleteSyntaxState(
+  delimiterStack: DelimiterStackEntry[],
+  pendingTernaryDepths: number[],
+  quote: string | undefined,
+  inBlockComment: boolean,
+  inRegex: boolean,
+  previousSignificant: string | undefined,
+): boolean {
+  return (
+    delimiterStack.length === 0 &&
+    pendingTernaryDepths.length === 0 &&
+    quote === undefined &&
+    !inBlockComment &&
+    !inRegex &&
+    !isCannotEndToken(previousSignificant)
+  );
 }

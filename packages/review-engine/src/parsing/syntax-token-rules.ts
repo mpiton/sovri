@@ -22,10 +22,12 @@ const NonOperandKeywords = new Set<string>([
   "catch",
   "class",
   "const",
+  "default",
   "delete",
   "do",
   "else",
   "extends",
+  "finally",
   "for",
   "from",
   "function",
@@ -42,6 +44,7 @@ const NonOperandKeywords = new Set<string>([
   "satisfies",
   "switch",
   "throw",
+  "try",
   "type",
   "typeof",
   "var",
@@ -58,6 +61,8 @@ const IdentifierOperatorKeywords = new Set<string>([
   "of",
   "satisfies",
 ]);
+
+const BlockContinuationKeywords = new Set<string>(["catch", "else", "finally"]);
 
 const NumberLiteralPattern =
   /^(?:0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0[bB][01](?:_?[01])*|0[oO][0-7](?:_?[0-7])*|(?:[0-9](?:_?[0-9])*)(?:\.(?:[0-9](?:_?[0-9])*)?)?(?:[eE][+-]?[0-9](?:_?[0-9])*)?)(?:n)?$/u;
@@ -107,6 +112,9 @@ export function isUnexpectedAdjacentOperand(
   previousSignificant: string | undefined,
   current: string,
 ): boolean {
+  if (previousSignificant === "}" && BlockContinuationKeywords.has(current)) {
+    return false;
+  }
   return isOperandToken(previousSignificant) && !IdentifierOperatorKeywords.has(current);
 }
 
