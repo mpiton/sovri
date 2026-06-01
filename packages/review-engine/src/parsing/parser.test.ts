@@ -1162,6 +1162,27 @@ describe("parseLLMResponse", () => {
     }
   });
 
+  it("keeps literal ellipses committable while rejecting unterminated regex literals", () => {
+    const examples = [
+      { suggestedCode: 'return "Loading...";', committable: true },
+      { suggestedCode: "return 'Loading…';", committable: true },
+      { suggestedCode: "const pattern = /token-\\d+;", committable: false },
+      { suggestedCode: "const pattern = /token-\\d+/;", committable: true },
+    ];
+
+    for (const { suggestedCode, committable } of examples) {
+      const findings = parseLLMResponse({
+        summary: "One finding found",
+        findings: [buildRawFinding({ suggested_code: suggestedCode })],
+      });
+
+      const [finding] = findings;
+
+      expect(finding?.suggestion?.code).toBe(suggestedCode);
+      expect(finding?.suggestion?.committable).toBe(committable);
+    }
+  });
+
   it("does not mark empty or multiline replacements as committable", () => {
     const examples = ["", "const total = amount ?? 0;\nreturn total;"];
 

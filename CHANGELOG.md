@@ -191,6 +191,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `fix(review-engine)`: reject syntactically suspect single-line suggestions from
+  the one-click committable path while preserving their suggestion text for review
+  rendering.
+
 - `fix(review-engine)`: align strict prompt guidance with the configured severity
   filter by requesting blocker, major, and minor findings instead of nitpick
   findings that the default `minor` threshold removes.
