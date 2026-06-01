@@ -7,6 +7,8 @@ import { createLogger } from "@sovri/observability";
 import { MissingApiKeyError, UnsupportedProviderError } from "./errors.js";
 import { AnthropicProvider } from "./providers/AnthropicProvider.js";
 import { MistralProvider } from "./providers/MistralProvider.js";
+import { createOpenAICompatibleProvider } from "./providers/OpenAICompatibleProvider.js";
+import { OpenAIProvider } from "./providers/OpenAIProvider.js";
 import type { LLMProvider } from "./types/LLMProvider.js";
 
 const logger = createLogger("llm-providers.factory");
@@ -27,6 +29,16 @@ export function createProviderFromConfig(
     case "mistral":
       logProviderSelection(config);
       return createMistralProvider(config, readApiKey(config.llm.apiKeySecret, env), options);
+    case "openai":
+      logProviderSelection(config);
+      return createOpenAIProvider(config, readApiKey(config.llm.apiKeySecret, env), options);
+    case "openai-compatible":
+      logProviderSelection(config);
+      return createOpenAICompatibleProviderFromConfig(
+        config,
+        readApiKey(config.llm.apiKeySecret, env),
+        options,
+      );
     default:
       throw new UnsupportedProviderError(config.llm.provider, {
         cause: new Error("Provider is not supported by the provider factory"),
@@ -74,6 +86,50 @@ function createMistralProvider(
   }
 
   return new MistralProvider(options);
+}
+
+function createOpenAIProvider(
+  config: SovriConfig,
+  apiKey: string,
+  factoryOptions: ProviderFactoryOptions,
+): OpenAIProvider {
+  const options = {
+    apiKey,
+    model: config.llm.model,
+    ...timeoutOptions(factoryOptions),
+  };
+
+  if (config.llm.baseUrl !== undefined) {
+    return new OpenAIProvider({
+      ...options,
+      baseUrl: config.llm.baseUrl,
+    });
+  }
+
+  return new OpenAIProvider(options);
+}
+
+function createOpenAICompatibleProviderFromConfig(
+  config: SovriConfig,
+  apiKey: string,
+  factoryOptions: ProviderFactoryOptions,
+): LLMProvider {
+  return createOpenAICompatibleProvider({
+    apiKey,
+    model: config.llm.model,
+    baseUrl: readOpenAICompatibleBaseUrl(config),
+    ...timeoutOptions(factoryOptions),
+  });
+}
+
+function readOpenAICompatibleBaseUrl(config: SovriConfig): string {
+  if (config.llm.baseUrl === undefined) {
+    throw new UnsupportedProviderError(config.llm.provider, {
+      cause: new Error("OpenAI-compatible provider requires llm.baseUrl"),
+    });
+  }
+
+  return config.llm.baseUrl;
 }
 
 function timeoutOptions(options: ProviderFactoryOptions): { readonly timeoutMs?: number } {

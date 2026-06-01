@@ -21,6 +21,45 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `fix(config)`: allow slash-delimited OpenAI-compatible model identifiers, such as
+  Hugging Face-style endpoint model IDs, while preserving the config model character
+  boundary against control characters.
+
+- `test(llm-providers)`: cover the provider factory error path when
+  `openai-compatible` config omits the required `llm.baseUrl`.
+
+- `test(config)`: assert OpenAI provider config keeps the existing review mode
+  contract, including the reserved `strict` mode rejection.
+
+- `test(config)`: pin the `ProviderSchema` enum contract to Anthropic, Mistral,
+  OpenAI, and OpenAI-compatible provider values.
+
+- `test(config)`: cover OpenAI `apiKeySecret` values with neutral
+  environment-variable names and reject non-env-var strings, preserving the BYOK
+  contract that config stores secret references rather than literal credentials.
+
+- `test(config)`: pin `llm.baseUrl` HTTPS validation and the 2048-character
+  boundary for OpenAI-compatible configuration.
+
+- `test(config)`: cover OpenAI base URL optionality separately from
+  OpenAI-compatible's required `llm.baseUrl` rule.
+
+- `test(config)`: assert OpenAI-compatible configs that omit `llm.baseUrl` fail on
+  `llm.baseUrl` without reviving the provider allow-list error.
+
+- `test(config)`: add acceptance coverage for the v0.5 provider allow-list so
+  `.sovri.yml` accepts Anthropic, Mistral, OpenAI, and OpenAI-compatible provider
+  values while still rejecting providers outside the declared enum.
+
+- `feat(config)`: widen `.sovri.yml` provider validation to accept `openai` and
+  `openai-compatible` alongside Anthropic and Mistral.
+
+- `feat(config)`: require `llm.baseUrl` at validation time when
+  `llm.provider` is `openai-compatible`.
+
+- `feat(llm-providers)`: wire the shared provider factory to construct OpenAI and
+  OpenAI-compatible adapters from accepted `.sovri.yml` provider configuration.
+
 - `feat(llm-providers)`: add the OpenAI provider contract implementation slice, covering
   the public `LLMProvider` metadata, default model, data-only generation, and token-usage
   generation expected from the v0.5 BYOK OpenAI adapter.

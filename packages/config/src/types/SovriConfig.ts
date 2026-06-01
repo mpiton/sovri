@@ -27,14 +27,16 @@ const EnvVarNamePattern = /^[A-Z_][A-Z0-9_]*$/;
 // Restricting the character set blocks log/prompt injection via newlines,
 // NUL bytes, control characters, and Unicode bidi overrides.
 const ModelNamePattern = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
+const OpenAICompatibleModelNamePattern = /^[A-Za-z0-9][A-Za-z0-9._:/-]*$/;
+const ModelNameMessage =
+  "model must contain only letters, digits, dot, hyphen, underscore, or colon";
+const OpenAICompatibleModelNameMessage =
+  "model must contain only letters, digits, dot, hyphen, underscore, slash, or colon";
 
 /**
- * Full list of providers Sovri intends to support eventually. The runtime
- * `.refine()` on `LlmSchema.provider` narrows acceptance to the v0.2
- * allow-list `{"anthropic", "mistral"}`; the enum itself stays wide so
- * the inferred TypeScript shape stays stable across releases and
- * downstream switch/case branches do not need to be re-typed when later
- * releases lift the refinement to cover `openai` / `openai-compatible`.
+ * Full list of providers Sovri accepts in repository configuration. The enum
+ * is the runtime allow-list and the inferred TypeScript shape, so downstream
+ * switch/case branches stay stable as provider adapters are wired in.
  */
 export const ProviderSchema = z.enum(["anthropic", "mistral", "openai", "openai-compatible"]);
 export type Provider = z.infer<typeof ProviderSchema>;
@@ -49,31 +51,46 @@ const EnabledReviewModeSchema = ReviewModeSchema.refine((mode) => mode !== "stri
 export const SeverityThresholdSchema = z.enum(["blocker", "major", "minor"]);
 export type SeverityThreshold = z.infer<typeof SeverityThresholdSchema>;
 
-const LlmSchema = z.strictObject({
-  provider: ProviderSchema.refine((value) => value === "anthropic" || value === "mistral", {
-    message: "Only 'anthropic' and 'mistral' are enabled in this release.",
-  }),
-  model: z
-    .string()
-    .min(1)
-    .max(MAX_MODEL_LEN)
-    .regex(
-      ModelNamePattern,
-      "model must contain only letters, digits, dot, hyphen, underscore, or colon",
-    ),
-  baseUrl: z
-    .url({ protocol: /^https$/ })
-    .max(MAX_BASE_URL_LEN)
-    .optional(),
-  apiKeySecret: z
-    .string()
-    .min(1)
-    .max(MAX_API_KEY_SECRET_LEN)
-    .regex(
-      EnvVarNamePattern,
-      "apiKeySecret must be the *name* of an environment variable (UPPER_SNAKE_CASE), never the secret itself",
-    ),
-});
+const LlmSchema = z
+  .strictObject({
+    provider: ProviderSchema,
+    model: z.string().min(1).max(MAX_MODEL_LEN),
+    baseUrl: z
+      .url({ protocol: /^https$/ })
+      .max(MAX_BASE_URL_LEN)
+      .optional(),
+    apiKeySecret: z
+      .string()
+      .min(1)
+      .max(MAX_API_KEY_SECRET_LEN)
+      .regex(
+        EnvVarNamePattern,
+        "apiKeySecret must be the *name* of an environment variable (UPPER_SNAKE_CASE), never the secret itself",
+      ),
+  })
+  .superRefine((llm, context) => {
+    const modelNamePattern =
+      llm.provider === "openai-compatible" ? OpenAICompatibleModelNamePattern : ModelNamePattern;
+
+    if (!modelNamePattern.test(llm.model)) {
+      context.addIssue({
+        code: "custom",
+        path: ["model"],
+        message:
+          llm.provider === "openai-compatible"
+            ? OpenAICompatibleModelNameMessage
+            : ModelNameMessage,
+      });
+    }
+
+    if (llm.provider === "openai-compatible" && llm.baseUrl === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["baseUrl"],
+        message: "llm.baseUrl is required when llm.provider is 'openai-compatible'.",
+      });
+    }
+  });
 
 // `.prefault({})` (not `.default({})`): when the block is omitted, feed
 // `{}` *into* the inner strictObject so the per-field `.default()`

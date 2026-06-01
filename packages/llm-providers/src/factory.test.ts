@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AnthropicProvider } from "./providers/AnthropicProvider.js";
 import { MistralProvider } from "./providers/MistralProvider.js";
+import { OpenAIProvider } from "./providers/OpenAIProvider.js";
 
 import {
   createProviderFromConfig,
@@ -37,10 +38,23 @@ vi.mock("./providers/MistralProvider.js", async (importOriginal) => {
   return { ...actual, MistralProvider: Spy };
 });
 
+vi.mock("./providers/OpenAIProvider.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./providers/OpenAIProvider.js")>();
+  const Real = actual.OpenAIProvider;
+  const Spy = vi.fn(function constructOpenAIProvider(
+    options: ConstructorParameters<typeof Real>[0],
+  ) {
+    return new Real(options);
+  });
+
+  return { ...actual, OpenAIProvider: Spy };
+});
+
 describe("createProviderFromConfig", () => {
   afterEach(() => {
     vi.mocked(AnthropicProvider).mockClear();
     vi.mocked(MistralProvider).mockClear();
+    vi.mocked(OpenAIProvider).mockClear();
   });
 
   it.each([
@@ -54,13 +68,24 @@ describe("createProviderFromConfig", () => {
       model: "mistral-large-latest",
       secretName: "MISTRAL_API_KEY",
     },
+    {
+      provider: "openai",
+      model: "gpt-5-mini",
+      secretName: "OPENAI_API_KEY",
+    },
+    {
+      provider: "openai-compatible",
+      model: "qwen2.5-coder-32b",
+      secretName: "OPENAI_COMPATIBLE_API_KEY",
+      baseUrl: "https://inference.eu.example/v1",
+    },
   ] as const)(
     "creates the $provider provider from Sovri config",
-    ({ model, provider, secretName }) => {
+    ({ baseUrl, model, provider, secretName }) => {
       // Given a Sovri config with llm.provider "<provider>"
       // And llm.model "<model>"
       // And llm.apiKeySecret "<secretName>"
-      const config = createConfig({ provider, model, apiKeySecret: secretName });
+      const config = createConfig({ provider, model, apiKeySecret: secretName, baseUrl });
 
       // And process env contains "<secretName>" with value "test-key"
       const env = { [secretName]: "test-key" };
@@ -91,6 +116,18 @@ describe("createProviderFromConfig", () => {
       secretName: "MISTRAL_API_KEY",
       baseUrl: "https://mistral.internal.example",
     },
+    {
+      provider: "openai",
+      model: "gpt-5-mini",
+      secretName: "OPENAI_API_KEY",
+      baseUrl: "https://openai.eu.example/v1",
+    },
+    {
+      provider: "openai-compatible",
+      model: "qwen2.5-coder-32b",
+      secretName: "OPENAI_COMPATIBLE_API_KEY",
+      baseUrl: "https://inference.eu.example/v1",
+    },
   ] as const)(
     "forwards the configured baseUrl to the $provider provider constructor",
     ({ baseUrl, model, provider, secretName }) => {
@@ -99,8 +136,7 @@ describe("createProviderFromConfig", () => {
 
       createProviderFromConfig(config, env);
 
-      const constructorSpy =
-        provider === "anthropic" ? vi.mocked(AnthropicProvider) : vi.mocked(MistralProvider);
+      const constructorSpy = constructorSpyForProvider(provider);
 
       expect(constructorSpy).toHaveBeenCalledTimes(1);
       const options = constructorSpy.mock.calls[0]?.[0];
@@ -119,16 +155,26 @@ describe("createProviderFromConfig", () => {
       model: "mistral-large-latest",
       secretName: "MISTRAL_API_KEY",
     },
+    {
+      provider: "openai",
+      model: "gpt-5-mini",
+      secretName: "OPENAI_API_KEY",
+    },
+    {
+      provider: "openai-compatible",
+      model: "qwen2.5-coder-32b",
+      secretName: "OPENAI_COMPATIBLE_API_KEY",
+      baseUrl: "https://inference.eu.example/v1",
+    },
   ] as const)(
     "forwards the configured timeout to the $provider provider",
-    ({ model, provider, secretName }) => {
-      const config = createConfig({ provider, model, apiKeySecret: secretName });
+    ({ baseUrl, model, provider, secretName }) => {
+      const config = createConfig({ provider, model, apiKeySecret: secretName, baseUrl });
       const env = { [secretName]: "test-key" };
 
       createProviderFromConfig(config, env, { timeoutMs: 300_000 });
 
-      const constructorSpy =
-        provider === "anthropic" ? vi.mocked(AnthropicProvider) : vi.mocked(MistralProvider);
+      const constructorSpy = constructorSpyForProvider(provider);
 
       expect(constructorSpy).toHaveBeenCalledTimes(1);
       expect(constructorSpy.mock.calls[0]?.[0]).toMatchObject({ timeoutMs: 300_000 });
@@ -145,19 +191,35 @@ describe("createProviderFromConfig", () => {
     expect(() => createProviderFromConfig(config, {})).toThrow(MissingApiKeyError);
   });
 
-  it("throws a typed unsupported-provider error for future provider values", () => {
+  it("throws a typed unsupported-provider error when openai-compatible omits baseUrl", () => {
     const config = createConfig({
-      provider: "openai",
-      model: "gpt-4.1",
-      apiKeySecret: "OPENAI_API_KEY",
+      provider: "openai-compatible",
+      model: "qwen2.5-coder-32b",
+      apiKeySecret: "OPENAI_COMPATIBLE_API_KEY",
     });
 
-    expect(() => createProviderFromConfig(config, {})).toThrow(UnsupportedProviderError);
+    const env = { OPENAI_COMPATIBLE_API_KEY: "test-key" };
+
+    expect(() => createProviderFromConfig(config, env)).toThrow(UnsupportedProviderError);
   });
 });
 
+type FactoryProvider = "anthropic" | "mistral" | "openai" | "openai-compatible";
+
+function constructorSpyForProvider(provider: FactoryProvider) {
+  switch (provider) {
+    case "anthropic":
+      return vi.mocked(AnthropicProvider);
+    case "mistral":
+      return vi.mocked(MistralProvider);
+    case "openai":
+    case "openai-compatible":
+      return vi.mocked(OpenAIProvider);
+  }
+}
+
 function createConfig(llm: {
-  readonly provider: "anthropic" | "mistral" | "openai" | "openai-compatible";
+  readonly provider: FactoryProvider;
   readonly model: string;
   readonly apiKeySecret: string;
   readonly baseUrl?: string;

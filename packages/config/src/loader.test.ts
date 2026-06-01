@@ -596,30 +596,20 @@ describe("loadConfig — schema violation", () => {
     }
   });
 
-  it("throws SovriConfigValidationError when llm.provider is openai (rejected by v0.2 .refine())", async () => {
-    // openai IS in the ProviderSchema enum but the v0.2 `.refine()` narrows
-    // accepted providers to {"anthropic", "mistral"}, so this exercises the
-    // refinement path rather than the enum-stage rejection.
+  it("throws SovriConfigValidationError when llm.provider is outside the enum", async () => {
     const root = path.join(FIXTURES_ROOT, "schema-violation-bad-provider");
 
     await expect(loadConfig(root)).rejects.toBeInstanceOf(SovriConfigValidationError);
   });
 
-  // Issue #1171, R-04 technical (loader surfaces the provider refine issue
-  // through SovriConfigValidationError with name, filePath, and structured
-  // issues array — the same shape PR-comment renderers walk).
+  // OpenAI-compatible requires a baseUrl once the provider allow-list is widened.
   // Scenario:
   //   Given a .sovri.yml at "/repo/.sovri.yml" with llm.provider
   //     "openai-compatible"
-  //   When loadConfig("/repo") runs and the validation step fails
-  //   Then the rejected promise carries a SovriConfigValidationError
-  //   And error.name equals "SovriConfigValidationError"
-  //   And error.filePath equals "/repo/.sovri.yml"
-  //   And error.issues has at least one entry with path
-  //     ["llm", "provider"]
-  //   And that entry.message equals
-  //     "Only 'anthropic' and 'mistral' are enabled in this release."
-  it("R-04 technical — SovriConfigValidationError surfaces the v0.2 provider refine issue (openai-compatible)", async () => {
+  //   When loadConfig("/repo") validates the file
+  //   Then SovriConfigValidationError is thrown
+  //   And the validation error includes an issue with path ["llm", "baseUrl"]
+  it("throws SovriConfigValidationError when openai-compatible omits baseUrl", async () => {
     const root = path.join(FIXTURES_ROOT, "schema-violation-openai-compatible");
 
     try {
@@ -628,19 +618,20 @@ describe("loadConfig — schema violation", () => {
     } catch (err) {
       if (!(err instanceof SovriConfigValidationError)) throw err;
 
-      expect(err.name).toBe("SovriConfigValidationError");
-      expect(err.filePath).toContain(path.join("schema-violation-openai-compatible", ".sovri.yml"));
-
+      const baseUrlIssue = err.issues.find(
+        (issue) =>
+          issue.path.length === 2 && issue.path[0] === "llm" && issue.path[1] === "baseUrl",
+      );
       const providerIssue = err.issues.find(
         (issue) =>
           issue.path.length === 2 && issue.path[0] === "llm" && issue.path[1] === "provider",
       );
 
-      expect(providerIssue).toBeDefined();
-      expect(providerIssue?.path).toEqual(["llm", "provider"]);
-      expect(providerIssue?.message).toBe(
-        "Only 'anthropic' and 'mistral' are enabled in this release.",
+      expect(baseUrlIssue).toBeDefined();
+      expect(baseUrlIssue?.message).toBe(
+        "llm.baseUrl is required when llm.provider is 'openai-compatible'.",
       );
+      expect(providerIssue).toBeUndefined();
     }
   });
 });
