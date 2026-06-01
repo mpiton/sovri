@@ -166,7 +166,7 @@ function isExponentSign(code: string, index: number): boolean {
   return (char === "+" || char === "-") && (previous === "e" || previous === "E");
 }
 
-function isOperandToken(token: string | undefined): boolean {
+export function isOperandToken(token: string | undefined): boolean {
   if (token === undefined || NonOperandKeywords.has(token)) {
     return false;
   }

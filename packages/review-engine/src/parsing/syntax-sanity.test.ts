@@ -9,7 +9,11 @@ import { describe, expect, it } from "vitest";
 import { isSyntacticallySane } from "./syntax-sanity.js";
 
 const ParsingLayerDirectory = dirname(fileURLToPath(import.meta.url));
-const ForbiddenRuntimeEvaluationCalls = ["eval(", "Function(", "import("] as const;
+const ForbiddenRuntimeEvaluationCallPatterns: readonly RegExp[] = [
+  /(?<![$0-9A-Z_a-z])eval\(/u,
+  /(?<![$0-9A-Z_a-z])Function\(/u,
+  /(?<![$0-9A-Z_a-z])import\(/u,
+];
 
 describe("isSyntacticallySane", () => {
   it("validates balanced snippets and rejects uncertain syntax conservatively", () => {
@@ -31,10 +35,14 @@ describe("isSyntacticallySane", () => {
       "const ratio = 1e-3;",
       "const value = input /* explain */ + fallback;",
       "call(first, second); // trailing )",
+      "const first = 1; // trailing )\nconst second = call();",
       "return values[index++];",
       "return fn(i--);",
+      "return normalize(value!);",
       "const result = value as Result;",
       "const less = count < /ready/.test(input);",
+      'const loaded = import("./module.js", { assert: { type: "json" } });',
+      "const fallback = enabled ? value : backup;",
     ];
 
     for (const code of saneCodes) {
@@ -64,12 +72,16 @@ describe("isSyntacticallySane", () => {
       "call(first];",
       "return total +",
       "return total <",
+      "const next = enabled ? fallback",
+      "const next = enabled ? { value: fallback }",
       "const pair = first,",
       "throw",
       "await",
       "typeof",
       "foo bar",
       "const count = 1abc;",
+      "const invalid = /ready/é;",
+      "const first = 1; // trailing )\nconst second = call(",
     ];
 
     for (const code of uncertainCodes) {
@@ -151,8 +163,8 @@ describe("isSyntacticallySane", () => {
     // And the parsing layer source contains no "eval("
     // And the parsing layer source contains no "Function("
     // And the parsing layer source contains no "import("
-    for (const forbiddenCall of ForbiddenRuntimeEvaluationCalls) {
-      expect(parsingLayerSource).not.toContain(forbiddenCall);
+    for (const forbiddenCallPattern of ForbiddenRuntimeEvaluationCallPatterns) {
+      expect(parsingLayerSource).not.toMatch(forbiddenCallPattern);
     }
   });
 });

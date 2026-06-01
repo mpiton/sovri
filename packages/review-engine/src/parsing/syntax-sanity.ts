@@ -13,6 +13,7 @@ import { isCannotEndToken } from "./syntax-token-rules.js";
 
 export function isSyntacticallySane(code: string): boolean {
   const delimiterStack: DelimiterStackEntry[] = [];
+  const pendingTernaryDepths: number[] = [];
   let quote: string | undefined;
   let escaping = false;
   let inBlockComment = false;
@@ -93,6 +94,15 @@ export function isSyntacticallySane(code: string): boolean {
       quote = "`";
       escaping = false;
     }
+    if (token.opensTernary) {
+      pendingTernaryDepths.push(delimiterStack.length);
+    }
+    if (token.closesTernary) {
+      const pendingDepth = pendingTernaryDepths[pendingTernaryDepths.length - 1];
+      if (pendingDepth === delimiterStack.length) {
+        pendingTernaryDepths.pop();
+      }
+    }
     if (token.previousSignificant !== undefined) {
       previousSignificant = token.previousSignificant;
     }
@@ -100,6 +110,7 @@ export function isSyntacticallySane(code: string): boolean {
 
   return (
     delimiterStack.length === 0 &&
+    pendingTernaryDepths.length === 0 &&
     quote === undefined &&
     !inBlockComment &&
     !inRegex &&

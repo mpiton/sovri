@@ -11,6 +11,7 @@ import {
 } from "./syntax-characters.js";
 import {
   canStartRegexLiteral,
+  isOperandToken,
   isPostfixUpdateOperator,
   isSupportedNumberLiteral,
   isUnexpectedAdjacentOperand,
@@ -80,6 +81,8 @@ export type NormalScanResult = {
   readonly inRegex?: boolean;
   readonly resumeTemplate?: boolean;
   readonly previousSignificant?: string;
+  readonly opensTernary?: boolean;
+  readonly closesTernary?: boolean;
 };
 
 export type DelimiterStackEntry = {
@@ -95,7 +98,7 @@ export function scanNormalCharacter(
   delimiterStack: DelimiterStackEntry[],
 ): NormalScanResult {
   if (char === "/" && code.charAt(index + 1) === "/") {
-    return { sane: true, stop: true };
+    return { sane: true, skip: lineCommentSkipLength(code, index) };
   }
   if (char === "/" && code.charAt(index + 1) === "*") {
     return { sane: true, skip: 1, inBlockComment: true };
@@ -144,6 +147,20 @@ function scanDelimiterOrToken(
     return { sane: true, previousSignificant: comparisonToken };
   }
 
+  if (char === "?") {
+    const next = code.charAt(index + 1);
+    if (next === "?") {
+      return { sane: true, skip: 1, previousSignificant: char };
+    }
+    return { sane: true, previousSignificant: char, opensTernary: next !== "." };
+  }
+  if (char === ":") {
+    return { sane: true, previousSignificant: char, closesTernary: true };
+  }
+  if (char === "!" && isOperandToken(previousSignificant)) {
+    return { sane: true, previousSignificant: "literal" };
+  }
+
   const expectedClosingDelimiter = OpeningDelimiters.get(char);
   if (expectedClosingDelimiter !== undefined) {
     delimiterStack.push({ closing: expectedClosingDelimiter, resumesTemplate: false });
@@ -163,4 +180,10 @@ function scanDelimiterOrToken(
     return { sane: true, skip: 2, previousSignificant: "..." };
   }
   return { sane: true, previousSignificant: char };
+}
+
+function lineCommentSkipLength(code: string, index: number): number {
+  const lineEnd = code.indexOf("\n", index + 2);
+  const commentEnd = lineEnd === -1 ? code.length : lineEnd;
+  return commentEnd - index - 1;
 }

@@ -4,6 +4,7 @@
 import { isIdentifierPart } from "./syntax-characters.js";
 
 const RegexFlags = new Set<string>(["d", "g", "i", "m", "s", "u", "v", "y"]);
+const RegexFlagCandidatePattern = /[$_\p{ID_Continue}]/u;
 
 export type RegexFlagsScanResult = {
   readonly sane: boolean;
@@ -13,7 +14,7 @@ export type RegexFlagsScanResult = {
 export function scanRegexFlags(code: string, start: number): RegexFlagsScanResult {
   const seen = new Set<string>();
   let end = start;
-  while (end < code.length && isIdentifierPart(code.charAt(end))) {
+  while (end < code.length && isRegexFlagCandidate(code.charAt(end))) {
     const flag = code.charAt(end);
     if (!RegexFlags.has(flag) || seen.has(flag)) {
       return { sane: false, skip: 0 };
@@ -22,4 +23,8 @@ export function scanRegexFlags(code: string, start: number): RegexFlagsScanResul
     end += 1;
   }
   return { sane: true, skip: end - start };
+}
+
+function isRegexFlagCandidate(char: string): boolean {
+  return isIdentifierPart(char) || RegexFlagCandidatePattern.test(char);
 }

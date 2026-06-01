@@ -173,5 +173,5 @@ function escapeRegExp(value: string): string {
 }
 
 function specificLanguagePattern(language: string): RegExp {
-  return new RegExp(`\\b${escapeRegExp(language)}\\b`, "iu");
+  return new RegExp(`\\b${escapeRegExp(language)}\\b`, "u");
 }
