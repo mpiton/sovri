@@ -13,10 +13,25 @@ export function isSyntacticallySane(code: string): boolean {
   let currentQuote: QuoteDelimiter | undefined;
   let escaped = false;
   const characters = [...code];
+  let inBlockComment = false;
 
-  for (const [index, character] of characters.entries()) {
+  for (let index = 0; index < characters.length; index += 1) {
+    const character = characters[index];
+    if (character === undefined) {
+      continue;
+    }
+
+    const nextCharacter = characters[index + 1];
+    if (inBlockComment) {
+      if (closesBlockComment(character, nextCharacter)) {
+        inBlockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+
     if (currentQuote !== undefined) {
-      if (opensTemplateInterpolation(currentQuote, character, characters[index + 1], escaped)) {
+      if (opensTemplateInterpolation(currentQuote, character, nextCharacter, escaped)) {
         return false;
       }
 
@@ -32,6 +47,16 @@ export function isSyntacticallySane(code: string): boolean {
       continue;
     }
 
+    if (startsLineComment(character, nextCharacter)) {
+      break;
+    }
+
+    if (startsBlockComment(character, nextCharacter)) {
+      inBlockComment = true;
+      index += 1;
+      continue;
+    }
+
     const expectedClosing = expectedClosingDelimiter(character);
     if (expectedClosing !== undefined) {
       expectedClosings.push(expectedClosing);
@@ -43,7 +68,7 @@ export function isSyntacticallySane(code: string): boolean {
     }
   }
 
-  return currentQuote === undefined && expectedClosings.length === 0;
+  return currentQuote === undefined && !inBlockComment && expectedClosings.length === 0;
 }
 
 function hasTruncationMarker(trimmedCode: string): boolean {
@@ -58,6 +83,18 @@ function opensTemplateInterpolation(
   escaped: boolean,
 ): boolean {
   return currentQuote === "`" && !escaped && character === "$" && nextCharacter === "{";
+}
+
+function startsLineComment(character: string, nextCharacter: string | undefined): boolean {
+  return character === "/" && nextCharacter === "/";
+}
+
+function startsBlockComment(character: string, nextCharacter: string | undefined): boolean {
+  return character === "/" && nextCharacter === "*";
+}
+
+function closesBlockComment(character: string, nextCharacter: string | undefined): boolean {
+  return character === "*" && nextCharacter === "/";
 }
 
 function readQuotedCharacter(
