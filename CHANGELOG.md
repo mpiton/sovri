@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add acceptance coverage proving syntactic sanity
+  validation stays pure and language-agnostic without runtime evaluation hooks in
+  production parsing sources.
+
 - `test(review-engine)`: add expanded acceptance coverage for direct syntactic
   sanity validation of balanced, postfix-update, and uncertain single-line
   suggestions.
