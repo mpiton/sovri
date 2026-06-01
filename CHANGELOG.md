@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add acceptance coverage proving `strict` is a first-class
+  prompt mode in the review prompt schema while unsupported prompt modes still fail
+  at the `mode` field.
+
 - `fix(config)`: allow slash-delimited OpenAI-compatible model identifiers, such as
   Hugging Face-style endpoint model IDs, while preserving the config model character
   boundary against control characters.
