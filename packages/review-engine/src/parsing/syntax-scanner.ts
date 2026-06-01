@@ -18,7 +18,7 @@ import {
 export type QuotedScanResult = {
   readonly closed: boolean;
   readonly escaping: boolean;
-  readonly reject: boolean;
+  readonly opensTemplateExpression: boolean;
 };
 
 export function scanQuotedCharacter(
@@ -29,15 +29,15 @@ export function scanQuotedCharacter(
   escaping: boolean,
 ): QuotedScanResult {
   if (escaping) {
-    return { closed: false, escaping: false, reject: false };
+    return { closed: false, escaping: false, opensTemplateExpression: false };
   }
   if (char === "\\") {
-    return { closed: false, escaping: true, reject: false };
+    return { closed: false, escaping: true, opensTemplateExpression: false };
   }
   if (quote === "`" && char === "$" && code.charAt(index + 1) === "{") {
-    return { closed: false, escaping: false, reject: true };
+    return { closed: false, escaping: false, opensTemplateExpression: true };
   }
-  return { closed: char === quote, escaping: false, reject: false };
+  return { closed: char === quote, escaping: false, opensTemplateExpression: false };
 }
 
 export type RegexScanResult = {
@@ -73,7 +73,13 @@ export type NormalScanResult = {
   readonly quote?: string;
   readonly inBlockComment?: boolean;
   readonly inRegex?: boolean;
+  readonly resumeTemplate?: boolean;
   readonly previousSignificant?: string;
+};
+
+export type DelimiterStackEntry = {
+  readonly closing: string;
+  readonly resumesTemplate: boolean;
 };
 
 export function scanNormalCharacter(
@@ -81,7 +87,7 @@ export function scanNormalCharacter(
   index: number,
   char: string,
   previousSignificant: string | undefined,
-  delimiterStack: string[],
+  delimiterStack: DelimiterStackEntry[],
 ): NormalScanResult {
   if (char === "/" && code.charAt(index + 1) === "/") {
     return { sane: true, stop: true };
@@ -113,15 +119,19 @@ function scanDelimiterOrToken(
   code: string,
   index: number,
   char: string,
-  delimiterStack: string[],
+  delimiterStack: DelimiterStackEntry[],
 ): NormalScanResult {
   const expectedClosingDelimiter = OpeningDelimiters.get(char);
   if (expectedClosingDelimiter !== undefined) {
-    delimiterStack.push(expectedClosingDelimiter);
+    delimiterStack.push({ closing: expectedClosingDelimiter, resumesTemplate: false });
     return { sane: true, previousSignificant: char };
   }
   if (ClosingDelimiters.has(char)) {
-    return { sane: delimiterStack.pop() === char, previousSignificant: char };
+    const entry = delimiterStack.pop();
+    if (entry === undefined || entry.closing !== char) {
+      return { sane: false, previousSignificant: char };
+    }
+    return { sane: true, resumeTemplate: entry.resumesTemplate, previousSignificant: char };
   }
   if (char === "." && code.slice(index, index + 3) === "...") {
     return { sane: true, skip: 2, previousSignificant: "..." };

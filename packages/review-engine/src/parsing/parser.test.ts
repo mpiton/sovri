@@ -1166,6 +1166,8 @@ describe("parseLLMResponse", () => {
     const examples = [
       { suggestedCode: 'return "Loading...";', committable: true },
       { suggestedCode: "return 'Loading…';", committable: true },
+      { suggestedCode: "const message = `Hello ${name}`;", committable: true },
+      { suggestedCode: "const message = `Hello ${name`;", committable: false },
       { suggestedCode: "return fn(...[fallback]);", committable: true },
       { suggestedCode: "return { ...(enabled ? a : b) };", committable: true },
       { suggestedCode: "const pattern = /token-\\d+;", committable: false },

@@ -2,10 +2,15 @@
 // Copyright 2026 Sovri SAS
 
 import { isWhitespace } from "./syntax-characters.js";
-import { scanNormalCharacter, scanQuotedCharacter, scanRegexCharacter } from "./syntax-scanner.js";
+import {
+  type DelimiterStackEntry,
+  scanNormalCharacter,
+  scanQuotedCharacter,
+  scanRegexCharacter,
+} from "./syntax-scanner.js";
 
 export function isSyntacticallySane(code: string): boolean {
-  const delimiterStack: string[] = [];
+  const delimiterStack: DelimiterStackEntry[] = [];
   let quote: string | undefined;
   let escaping = false;
   let inBlockComment = false;
@@ -26,10 +31,13 @@ export function isSyntacticallySane(code: string): boolean {
 
     if (quote !== undefined) {
       const result = scanQuotedCharacter(code, index, char, quote, escaping);
-      if (result.reject) {
-        return false;
-      }
       escaping = result.escaping;
+      if (result.opensTemplateExpression) {
+        quote = undefined;
+        delimiterStack.push({ closing: "}", resumesTemplate: true });
+        index += 1;
+        continue;
+      }
       if (result.closed) {
         quote = undefined;
         previousSignificant = "literal";
@@ -72,6 +80,10 @@ export function isSyntacticallySane(code: string): boolean {
     if (token.inRegex) {
       inRegex = true;
       inRegexClass = false;
+      escaping = false;
+    }
+    if (token.resumeTemplate) {
+      quote = "`";
       escaping = false;
     }
     if (token.previousSignificant !== undefined) {
