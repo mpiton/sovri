@@ -44,10 +44,6 @@ export type Provider = z.infer<typeof ProviderSchema>;
 export const ReviewModeSchema = z.enum(["full", "bugs-only", "strict", "minimal"]);
 export type ReviewMode = z.infer<typeof ReviewModeSchema>;
 
-const EnabledReviewModeSchema = ReviewModeSchema.refine((mode) => mode !== "strict", {
-  message: "Mode 'strict' is reserved for v0.5+ and is not yet enabled",
-});
-
 export const SeverityThresholdSchema = z.enum(["blocker", "major", "minor"]);
 export type SeverityThreshold = z.infer<typeof SeverityThresholdSchema>;
 
@@ -99,7 +95,7 @@ const LlmSchema = z
 // duplicate every default literally on both sides of the schema.
 const ReviewSchema = z
   .strictObject({
-    mode: EnabledReviewModeSchema.default("full"),
+    mode: ReviewModeSchema.default("full"),
     autoReviewDrafts: z.boolean().default(false),
     severityThreshold: SeverityThresholdSchema.default("minor"),
   })

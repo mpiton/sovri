@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(config)`: accept `review.mode: strict` in `.sovri.yml` so repository
+  configuration reaches the strict review-engine prompt path for regulated
+  codebase reviews that need maintainability, style, readability, and
+  test-quality findings.
+
 - `test(review-engine)`: add strict prompt acceptance coverage for the UTF-8
   byte budget, structured JSON contract, prompt-injection containment,
   prompt-module purity, and source-level Apache 2.0 / ESM conventions.
@@ -47,8 +52,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `test(llm-providers)`: cover the provider factory error path when
   `openai-compatible` config omits the required `llm.baseUrl`.
 
-- `test(config)`: assert OpenAI provider config keeps the existing review mode
-  contract, including the reserved `strict` mode rejection.
+- `test(config)`: assert OpenAI provider config accepts every supported review
+  mode, including end-to-end `.sovri.yml` parsing for `strict` mode.
 
 - `test(config)`: pin the `ProviderSchema` enum contract to Anthropic, Mistral,
   OpenAI, and OpenAI-compatible provider values.

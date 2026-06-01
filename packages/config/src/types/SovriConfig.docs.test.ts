@@ -61,7 +61,7 @@ describe(".sovri.yml public reference", () => {
     expect(reference).toContain("Environment variable name");
 
     // Then review and limits fields document defaults and allowed values
-    expect(reference).toContain("`full`, `bugs-only`, `minimal`");
+    expect(reference).toContain("`full`, `bugs-only`, `strict`, `minimal`");
     expect(reference).toContain("Default: `full`");
     expect(reference).toContain("Default: `false`");
     expect(reference).toContain("`blocker`, `major`, `minor`");

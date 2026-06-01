@@ -178,6 +178,24 @@ describe("loadConfig — valid YAML", () => {
     expect(cfg.limits.maxFilesPerReview).toBe(100);
     expect(cfg.limits.maxLinesPerReview).toBe(10000);
   });
+
+  it("parses strict review mode from YAML content", () => {
+    const cfg = parseConfigContent(
+      `
+llm:
+  provider: openai
+  model: gpt-5-mini
+  apiKeySecret: OPENAI_API_KEY
+
+review:
+  mode: strict
+`,
+      "strict-review.sovri.yml",
+    );
+
+    expect(cfg.llm.provider).toBe("openai");
+    expect(cfg.review.mode).toBe("strict");
+  });
 });
 
 describe("loadConfig — malformed YAML", () => {
