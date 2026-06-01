@@ -27,6 +27,7 @@ import {
 } from "./syntax-token-rules.js";
 
 const StatementTerminatorAllowedPrefixKeywords = new Set<string>(["return", "yield"]);
+const JsxContentToken = "jsx-content";
 
 export type QuotedScanResult = {
   readonly closed: boolean;
@@ -132,6 +133,12 @@ export function scanNormalCharacter(
     const jsxOpeningTag = scanJsxOpeningTag(code, index);
     if (jsxOpeningTag !== undefined) {
       return jsxOpeningTag;
+    }
+  }
+  if (isJsxTextContext(previousSignificant) && canStartJsxText(char)) {
+    const jsxText = scanJsxTextContent(code, index);
+    if (jsxText !== undefined) {
+      return jsxText;
     }
   }
   if (char === "/" && canStartRegexLiteral(previousSignificant)) {
@@ -277,7 +284,7 @@ function scanJsxClosingTag(code: string, index: number): NormalScanResult | unde
 function scanJsxOpeningTag(code: string, index: number): NormalScanResult | undefined {
   let cursor = index + 1;
   if (code.charAt(cursor) === ">") {
-    return { sane: true, skip: cursor - index, previousSignificant: ">" };
+    return { sane: true, skip: cursor - index, previousSignificant: JsxContentToken };
   }
   if (!isIdentifierStart(code.charAt(cursor))) {
     return undefined;
@@ -300,6 +307,9 @@ function scanJsxOpeningTag(code: string, index: number): NormalScanResult | unde
       continue;
     }
     if (QuoteCharacters.has(char)) {
+      if (char === "`") {
+        return { sane: false };
+      }
       quote = char;
       escaping = false;
       continue;
@@ -316,10 +326,40 @@ function scanJsxOpeningTag(code: string, index: number): NormalScanResult | unde
       return { sane: false };
     }
     if (char === ">") {
-      return { sane: true, skip: cursor - index, previousSignificant: ">" };
+      return { sane: true, skip: cursor - index, previousSignificant: JsxContentToken };
     }
   }
   return { sane: false };
+}
+
+function scanJsxTextContent(code: string, index: number): NormalScanResult | undefined {
+  let cursor = index;
+  let sawText = false;
+  while (cursor < code.length) {
+    const char = code.charAt(cursor);
+    if (char === "<" || char === "{") {
+      if (!sawText) {
+        return undefined;
+      }
+      return { sane: true, skip: cursor - index - 1, previousSignificant: JsxContentToken };
+    }
+    if (char === "}") {
+      return { sane: false };
+    }
+    if (!isWhitespace(char)) {
+      sawText = true;
+    }
+    cursor += 1;
+  }
+  return undefined;
+}
+
+function isJsxTextContext(previousSignificant: string | undefined): boolean {
+  return previousSignificant === JsxContentToken || previousSignificant === "}";
+}
+
+function canStartJsxText(char: string): boolean {
+  return !ClosingDelimiters.has(char) && char !== ";" && char !== ",";
 }
 
 function isJsxTagNamePart(char: string): boolean {

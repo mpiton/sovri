@@ -62,7 +62,7 @@ const IdentifierOperatorKeywords = new Set<string>([
   "satisfies",
 ]);
 
-const BlockContinuationKeywords = new Set<string>(["catch", "else", "finally"]);
+const BlockContinuationKeywords = new Set<string>(["catch", "else", "finally", "while"]);
 
 const NumberLiteralPattern =
   /^(?:0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0[bB][01](?:_?[01])*|0[oO][0-7](?:_?[0-7])*|(?:[0-9](?:_?[0-9])*)(?:\.(?:[0-9](?:_?[0-9])*)?)?(?:[eE][+-]?[0-9](?:_?[0-9])*)?)(?:n)?$/u;
