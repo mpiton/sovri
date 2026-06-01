@@ -55,13 +55,12 @@ const ZeroTokenUsage = TokenUsageSchema.parse({ prompt: 0, completion: 0 });
 const FindingBodyMaxLength = 2_000;
 const NoFilesAfterIgnoreFiltersMessage = "No files to review after ignore filters applied";
 
-// Mirrors the v0.1 config-layer review mode enum so `.sovri.yml` files
-// that still ship `mode: strict` keep parsing. The transform maps
-// `strict` to `full` because v0.1 strict had no prompt-level effect and
-// the supported prompt builder modes are full / bugs-only / minimal.
-const ReviewPullRequestConfigModeSchema = z
-  .enum(["full", "bugs-only", "strict", "minimal"])
-  .transform((mode): ReviewPromptMode => (mode === "strict" ? "full" : mode));
+const ReviewPullRequestConfigModeSchema = z.enum([
+  "full",
+  "bugs-only",
+  "strict",
+  "minimal",
+]) satisfies z.ZodType<ReviewPromptMode>;
 
 const ReviewPullRequestConfigSchema = z.object({
   review: z.object({

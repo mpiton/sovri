@@ -2,13 +2,14 @@
 // Copyright 2026 Sovri SAS
 
 import { describe, expect, it } from "vitest";
-import { ZodError } from "zod";
 
 import { buildReviewPrompt } from "./index.js";
 import {
   buildSystemPrompt,
   buildUserPrompt,
   PromptTemplateSizeError,
+  ReviewPromptModeSchema,
+  SystemPromptConfigSchema,
   validateSystemTemplateSize,
 } from "./builder.js";
 
@@ -480,16 +481,18 @@ describe("buildSystemPrompt", () => {
       full: buildReviewPrompt({ unifiedDiff: diff, pullRequest, mode: "full" }).systemPrompt,
       "bugs-only": buildReviewPrompt({ unifiedDiff: diff, pullRequest, mode: "bugs-only" })
         .systemPrompt,
+      strict: buildReviewPrompt({ unifiedDiff: diff, pullRequest, mode: "strict" }).systemPrompt,
       minimal: buildReviewPrompt({ unifiedDiff: diff, pullRequest, mode: "minimal" }).systemPrompt,
     };
 
-    // Then the three system prompts are distinct golden outputs.
-    expect(new Set(Object.values(prompts)).size).toBe(3);
+    // Then the four system prompts are distinct golden outputs.
+    expect(new Set(Object.values(prompts)).size).toBe(4);
     expect(prompts).toMatchInlineSnapshot(`
       {
         "bugs-only": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Focus on correctness bugs that can change runtime behavior. Ignore style-only findings and formatting nits. Ignore performance-only findings unless they cause incorrect behavior. Return structured JSON findings that match the requested schema.",
         "full": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Return structured JSON findings that match the requested schema.",
         "minimal": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Return at most 3 findings. Include only blocker or major severity findings. Suppress nits, style-only comments, and minor findings. Return structured JSON findings that match the requested schema.",
+        "strict": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Hold the diff to a high bar. Report all valid issues, including blocker, major, minor, maintainability, style, readability, and test-quality concerns. Do not suppress nits when they materially improve code quality. Return structured JSON findings that match the requested schema.",
       }
     `);
   });
@@ -528,6 +531,32 @@ describe("buildSystemPrompt", () => {
     expect(systemPrompt).not.toContain("Protect high-value transfers");
   });
 
+  it("emits comprehensive guidance for strict mode", () => {
+    // Given the raw prompt config is {"mode":"strict"}.
+
+    // When buildSystemPrompt builds the system prompt.
+    const systemPrompt = buildSystemPrompt({ mode: "strict" });
+
+    // Then the prompt contains "Review only the supplied pull request metadata and unified diff."
+    expect(systemPrompt).toContain(
+      "Review only the supplied pull request metadata and unified diff",
+    );
+    // And the prompt contains "Return structured JSON findings that match the requested schema."
+    expect(systemPrompt).toContain(
+      "Return structured JSON findings that match the requested schema",
+    );
+    // And the prompt contains "minor".
+    expect(systemPrompt).toContain("minor");
+    // And the prompt contains "style".
+    expect(systemPrompt).toContain("style");
+    // And the prompt is not equal to the full-mode prompt.
+    expect(systemPrompt).not.toBe(buildSystemPrompt({ mode: "full" }));
+    // And the prompt is not equal to the bugs-only-mode prompt.
+    expect(systemPrompt).not.toBe(buildSystemPrompt({ mode: "bugs-only" }));
+    // And the prompt is not equal to the minimal-mode prompt.
+    expect(systemPrompt).not.toBe(buildSystemPrompt({ mode: "minimal" }));
+  });
+
   it("names the maximum finding count boundary for minimal mode", () => {
     // Given the review mode is "minimal".
 
@@ -560,20 +589,52 @@ describe("buildSystemPrompt", () => {
     expect(systemPrompt).not.toContain("export const reviewed = true");
   });
 
-  it("rejects unsupported review modes before returning a template", () => {
-    // Given the review config selects mode "strict".
-    const unsupportedConfig: unknown = { mode: "strict" };
-    let systemPrompt: string | undefined;
+  it.each(["full", "bugs-only", "strict", "minimal"])("parses supported prompt mode %s", (mode) => {
+    // Given the raw prompt config is {"mode":"<mode>"}.
+    const rawConfig = { mode };
 
-    // When the maintainer builds the system prompt.
-    const buildPrompt = (): void => {
-      systemPrompt = buildSystemPrompt(unsupportedConfig);
-    };
+    // When SystemPromptConfigSchema.safeParse() validates the config.
+    const result = SystemPromptConfigSchema.safeParse(rawConfig);
 
-    // Then prompt construction fails with an unsupported review mode error.
-    expect(buildPrompt).toThrow(ZodError);
-    // And no fallback template is returned.
-    expect(systemPrompt).toBeUndefined();
+    // Then the result is success=true.
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error("Expected supported prompt mode to parse");
+    }
+    // And the parsed mode equals "<mode>".
+    expect(result.data.mode).toBe(mode);
+  });
+
+  it.each(["audit", "STRICT", ""])("rejects unsupported prompt mode %s", (mode) => {
+    // Given the raw prompt config is {"mode":"<mode>"}.
+    const rawConfig = { mode };
+
+    // When SystemPromptConfigSchema.safeParse() validates the config.
+    const result = SystemPromptConfigSchema.safeParse(rawConfig);
+
+    // Then the result is success=false.
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected unsupported prompt mode to fail");
+    }
+    // And exactly one issue has path ["mode"].
+    expect(result.error.issues).toHaveLength(1);
+    expect(result.error.issues[0]?.path).toEqual(["mode"]);
+    // And that issue.code is "invalid_value".
+    expect(result.error.issues[0]?.code).toBe("invalid_value");
+  });
+
+  it("keeps strict as a schema member rather than a fallback value", () => {
+    // Given ReviewPromptModeSchema is inspected for accepted enum members.
+
+    // When the schema options are read.
+    const options = ReviewPromptModeSchema.options;
+
+    // Then the members are exactly ["full", "bugs-only", "strict", "minimal"].
+    expect(options).toEqual(["full", "bugs-only", "strict", "minimal"]);
+    // And "strict" appears between "bugs-only" and "minimal".
+    expect(options.indexOf("strict")).toBeGreaterThan(options.indexOf("bugs-only"));
+    expect(options.indexOf("strict")).toBeLessThan(options.indexOf("minimal"));
   });
 
   it("returns the same template for repeated full mode calls", () => {

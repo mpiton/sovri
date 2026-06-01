@@ -21,6 +21,21 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(review-engine)`: route `review.mode: strict` through the review
+  orchestrator to the strict prompt template instead of silently falling back to
+  full mode.
+
+- `feat(review-engine)`: add the strict review system prompt template and route
+  `buildSystemPrompt({ mode: "strict" })` to strict-mode guidance without changing
+  the existing `full`, `bugs-only`, or `minimal` prompt templates.
+
+- `feat(review-engine)`: accept `strict` as a review prompt mode in the prompt
+  builder schema, preparing prompt routing for the v0.5 strict review mode.
+
+- `test(review-engine)`: add acceptance coverage proving `strict` is a first-class
+  prompt mode in the review prompt schema while unsupported prompt modes still fail
+  at the `mode` field.
+
 - `fix(config)`: allow slash-delimited OpenAI-compatible model identifiers, such as
   Hugging Face-style endpoint model IDs, while preserving the config model character
   boundary against control characters.
