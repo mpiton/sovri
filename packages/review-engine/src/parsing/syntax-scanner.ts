@@ -12,6 +12,7 @@ import {
   isIdentifierPart,
   isIdentifierStart,
   isNumberLiteralPart,
+  isTerminalOperatorToken,
   isWhitespace,
 } from "./syntax-characters.js";
 
@@ -112,13 +113,14 @@ export function scanNormalCharacter(
     const literal = readNumberLiteral(code, index);
     return { sane: true, skip: literal.length - 1, previousSignificant: "literal" };
   }
-  return scanDelimiterOrToken(code, index, char, delimiterStack);
+  return scanDelimiterOrToken(code, index, char, previousSignificant, delimiterStack);
 }
 
 function scanDelimiterOrToken(
   code: string,
   index: number,
   char: string,
+  previousSignificant: string | undefined,
   delimiterStack: DelimiterStackEntry[],
 ): NormalScanResult {
   const expectedClosingDelimiter = OpeningDelimiters.get(char);
@@ -127,6 +129,9 @@ function scanDelimiterOrToken(
     return { sane: true, previousSignificant: char };
   }
   if (ClosingDelimiters.has(char)) {
+    if (isTerminalOperatorToken(previousSignificant)) {
+      return { sane: false, previousSignificant: char };
+    }
     const entry = delimiterStack.pop();
     if (entry === undefined || entry.closing !== char) {
       return { sane: false, previousSignificant: char };

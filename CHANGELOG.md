@@ -193,7 +193,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `fix(review-engine)`: reject syntactically suspect single-line suggestions from
   the one-click committable path while preserving their suggestion text for review
-  rendering, balanced template interpolation, and valid spread operands.
+  rendering, balanced template interpolation, valid spread operands, and terminal
+  operator rejection.
 
 - `fix(review-engine)`: align strict prompt guidance with the configured severity
   filter by requesting blocker, major, and minor findings instead of nitpick

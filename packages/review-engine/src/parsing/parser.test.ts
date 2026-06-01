@@ -1168,8 +1168,12 @@ describe("parseLLMResponse", () => {
       { suggestedCode: "return 'Loading…';", committable: true },
       { suggestedCode: "const message = `Hello ${name}`;", committable: true },
       { suggestedCode: "const message = `Hello ${name`;", committable: false },
+      { suggestedCode: "return user.name ??", committable: false },
+      { suggestedCode: "const total = amount +", committable: false },
+      { suggestedCode: "return (amount +);", committable: false },
       { suggestedCode: "return fn(...[fallback]);", committable: true },
       { suggestedCode: "return { ...(enabled ? a : b) };", committable: true },
+      { suggestedCode: "const pattern = await /token-\\d+;", committable: false },
       { suggestedCode: "const pattern = /token-\\d+;", committable: false },
       { suggestedCode: "const pattern = /token-\\d+/;", committable: true },
     ];

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { isWhitespace } from "./syntax-characters.js";
+import { isTerminalOperatorToken, isWhitespace } from "./syntax-characters.js";
 import {
   type DelimiterStackEntry,
   scanNormalCharacter,
@@ -91,5 +91,11 @@ export function isSyntacticallySane(code: string): boolean {
     }
   }
 
-  return delimiterStack.length === 0 && quote === undefined && !inBlockComment && !inRegex;
+  return (
+    delimiterStack.length === 0 &&
+    quote === undefined &&
+    !inBlockComment &&
+    !inRegex &&
+    !isTerminalOperatorToken(previousSignificant)
+  );
 }

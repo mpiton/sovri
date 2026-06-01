@@ -37,8 +37,27 @@ export const RegexPrefixKeywords = new Set<string>([
   "typeof",
   "delete",
   "void",
+  "await",
 ]);
 export const SpreadPrefixTokens = new Set<string>(["(", "[", "{", ","]);
+export const TerminalOperatorTokens = new Set<string>([
+  "=",
+  ":",
+  "?",
+  "+",
+  "-",
+  "*",
+  "/",
+  "%",
+  "!",
+  "&",
+  "|",
+  "^",
+  "<",
+  ">",
+  "~",
+  ".",
+]);
 
 export function isIdentifierStart(char: string): boolean {
   return /[$A-Z_a-z]/u.test(char);
@@ -58,4 +77,8 @@ export function isNumberLiteralPart(char: string): boolean {
 
 export function isWhitespace(char: string): boolean {
   return char.trim().length === 0;
+}
+
+export function isTerminalOperatorToken(token: string | undefined): boolean {
+  return token !== undefined && TerminalOperatorTokens.has(token);
 }
