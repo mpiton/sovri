@@ -17,8 +17,8 @@ const ReviewCommentId = 501;
 const ReviewCommentNodeId = "PRRC_thread_001";
 const ThreadId = "PRRT_thread_001";
 const KnownFindingId = "finding-thread-001";
-const ResolveDispatcherSourceUrl = new URL(
-  "../../../src/github/issue-comment-dispatcher.ts",
+const ResolveHandlerSourceUrl = new URL(
+  "../../../src/commands/handlers/resolve.ts",
   import.meta.url,
 );
 const KnownInlineCommentBody = [
@@ -266,7 +266,7 @@ describe("resolve command handler", () => {
   });
 
   it("keeps resolve stateless without persistent suppression stores", () => {
-    const source = readFileSync(ResolveDispatcherSourceUrl, "utf8");
+    const source = readFileSync(ResolveHandlerSourceUrl, "utf8");
     const resolveCommandSource = extractResolveCommandSource(source);
 
     expect(resolveCommandSource).toContain("resolveReviewThread");
@@ -277,6 +277,13 @@ describe("resolve command handler", () => {
     expect(resolveCommandSource).not.toMatch(
       /database|postgres|sqlite|prisma|redis|cache|queue|persistent|scheduler|setInterval|setTimeout|suppression|timer/iu,
     );
+  });
+
+  it("keeps the resolve handler source under the Community license header", () => {
+    const source = readFileSync(ResolveHandlerSourceUrl, "utf8");
+
+    expect(source.startsWith("// Copyright 2026 Sovri contributors\n")).toBe(true);
+    expect(source).toContain("// SPDX-License-Identifier: Apache-2.0");
   });
 
   it("includes reachable arrow-function helpers in the stateless source graph", () => {
