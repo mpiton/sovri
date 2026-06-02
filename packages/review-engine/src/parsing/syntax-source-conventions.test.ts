@@ -13,8 +13,12 @@ import { inspectParsingSourceConventions } from "./syntax-source-conventions.js"
 const CurrentDirectory = dirname(fileURLToPath(import.meta.url));
 const WorkspaceRoot = join(CurrentDirectory, "../../../..");
 const SourceHeader = "// SPDX-License-Identifier: Apache-2.0\n// Copyright 2026 Sovri SAS\n\n";
-const ChangedParsingSourceFiles: readonly string[] = [
+const ProductionParsingSourceFiles: readonly string[] = [
+  "packages/review-engine/src/parsing/index.ts",
   "packages/review-engine/src/parsing/parser.ts",
+  "packages/review-engine/src/parsing/retry.ts",
+  "packages/review-engine/src/parsing/schema.ts",
+  "packages/review-engine/src/parsing/suggestion.ts",
   "packages/review-engine/src/parsing/syntax-characters.ts",
   "packages/review-engine/src/parsing/syntax-regex-flags.ts",
   "packages/review-engine/src/parsing/syntax-sanity.ts",
@@ -67,6 +71,7 @@ const ForbiddenSyntheticSources: ReadonlyArray<{
   },
   { sourceText: "const value: any = code;", expectedViolation: "forbidden-any" },
   { sourceText: "type RawFinding = any;", expectedViolation: "forbidden-any" },
+  { sourceText: "type RawFinding<T> = any;", expectedViolation: "forbidden-any" },
   { sourceText: "const value: Record<string, any> = {};", expectedViolation: "forbidden-any" },
   {
     sourceText: "const value: Map<string, any> = new Map();",
@@ -78,11 +83,11 @@ const ForbiddenSyntheticSources: ReadonlyArray<{
 ];
 
 describe("review-engine parsing source conventions", () => {
-  it("keeps the changed parsing helper sources pure and local", () => {
-    // Given the implementation changes are in packages/review-engine/src/parsing
-    const inspectedSources = inspectChangedParsingSources();
+  it("keeps the production parsing helper sources pure and local", () => {
+    // Given the production implementation lives in packages/review-engine/src/parsing
+    const inspectedSources = inspectProductionParsingSources();
 
-    // When the changed parsing source files are inspected
+    // When the production parsing source files are inspected
     for (const inspectedSource of inspectedSources) {
       const violationMessage = formatViolations(inspectedSource);
 
@@ -100,11 +105,11 @@ describe("review-engine parsing source conventions", () => {
     }
   });
 
-  it("preserves TypeScript and ESM conventions in changed parsing sources", () => {
-    // Given the implementation changes are in packages/review-engine/src/parsing
-    const inspectedSources = inspectChangedParsingSources();
+  it("preserves TypeScript and ESM conventions in production parsing sources", () => {
+    // Given the production implementation lives in packages/review-engine/src/parsing
+    const inspectedSources = inspectProductionParsingSources();
 
-    // When the changed parsing source files are inspected
+    // When the production parsing source files are inspected
     for (const inspectedSource of inspectedSources) {
       const violationMessage = formatViolations(inspectedSource);
 
@@ -178,8 +183,8 @@ type InspectedSource = ReturnType<typeof inspectParsingSourceConventions> & {
   readonly path: string;
 };
 
-function inspectChangedParsingSources(): InspectedSource[] {
-  return ChangedParsingSourceFiles.map((path) => {
+function inspectProductionParsingSources(): InspectedSource[] {
+  return ProductionParsingSourceFiles.map((path) => {
     const inspection = inspectParsingSourceConventions(readWorkspaceFile(path));
     return {
       path,

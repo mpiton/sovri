@@ -148,7 +148,7 @@ function directivePattern(name: string, prefix: DirectivePrefix): RegExp {
 function forbiddenAnyPattern(): RegExp {
   const variants = [
     `:\\s*${AnyKeyword}\\b`,
-    `\\btype\\s+\\w+\\s*=\\s*${AnyKeyword}\\b`,
+    `\\btype\\s+\\w+(?:\\s*<[^>]*>)?\\s*=\\s*${AnyKeyword}\\b`,
     `\\bas\\s+${AnyKeyword}\\b`,
     `<[^>]*\\b${AnyKeyword}\\b[^>]*>`,
   ];
