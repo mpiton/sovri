@@ -40,6 +40,7 @@ const ReviewThreadsResponseSchema = z.object({
             }),
             nodes: z.array(
               z.object({
+                isResolved: z.boolean(),
                 comments: z.object({
                   nodes: z.array(
                     z.object({
@@ -92,6 +93,7 @@ const REVIEW_THREADS_QUERY = `
         reviewThreads(first: ${REVIEW_THREADS_PAGE_SIZE}, after: $cursor) {
           pageInfo { hasNextPage endCursor }
           nodes {
+            isResolved
             comments(first: 1) {
               nodes { id body isMinimized author { login } }
             }
@@ -105,10 +107,10 @@ const REVIEW_THREADS_QUERY = `
 /**
  * Reconstruct, from the GitHub API, the bot's still-active finding comments on a
  * pull request. Only comments authored by `botLogin` that are not minimized and
- * carry a `sovri-finding-id` marker are counted, so foreign-planted markers
- * cannot suppress a real finding (R-06), minimized comments let a reintroduced
- * finding re-post (R-05), and a dismissed-but-active comment stays counted
- * (R-08). The GraphQL payload is validated with Zod before use.
+ * do not belong to resolved review threads are counted, so foreign-planted
+ * markers cannot suppress a real finding (R-06), resolved or minimized comments
+ * let a reintroduced finding re-post (R-05), and a dismissed-but-active comment
+ * stays counted (R-08). The GraphQL payload is validated with Zod before use.
  */
 export async function fetchPostedFindings(
   octokit: ReviewThreadsOctokit,
@@ -149,6 +151,12 @@ async function collectPostedComments(
 
   const entries: PostedComment[] = [];
   for (const thread of threads.nodes) {
+    // A manually resolved review thread is no longer active review state; if
+    // the issue still exists, the next review should be allowed to report it.
+    if (thread.isResolved) {
+      continue;
+    }
+
     for (const comment of thread.comments.nodes) {
       if (comment.author?.login !== botLogin || comment.isMinimized) {
         continue;
