@@ -43,6 +43,7 @@ import {
   type ProviderFinding,
   type ProviderReviewResponse,
 } from "./parsing/index.js";
+import { toFindingSuggestion } from "./parsing/suggestion.js";
 
 export const RunReviewInputSchema = ReviewPromptInputSchema;
 
@@ -746,6 +747,7 @@ function applyReviewFilters(
 }
 
 function toFinding(finding: ProviderFinding, logger?: Logger): Finding {
+  const suggestion = toFindingSuggestion(finding);
   const base: Finding = {
     id: uuidv4(),
     severity: finding.severity,
@@ -759,6 +761,7 @@ function toFinding(finding: ProviderFinding, logger?: Logger): Finding {
     confidence: finding.confidence,
     audit_reference: generateAuditReference(finding.category),
     compliance_references: [],
+    ...(suggestion === undefined ? {} : { suggestion }),
     ...(finding.cwe === undefined ? {} : { cwe: finding.cwe }),
   };
 

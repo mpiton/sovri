@@ -420,3 +420,220 @@ describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04)"
     expect(at42?.body).toMatch(/\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u);
   });
 });
+
+describe("buildInlineComments — committable suggestion blocks", () => {
+  it("renders committable suggestion code exactly inside a GitHub suggestion fence", () => {
+    // Given a finding targets "src/totals.ts" from line 14 to line 14
+    // And the finding suggestion.code is "const total = amount ?? 0;"
+    // And suggestion.committable is true
+    const findings: Finding[] = [
+      makeFinding({
+        file: "src/totals.ts",
+        lineStart: 14,
+        title: "Use an explicit fallback",
+        body: "The total can be undefined before formatting.",
+        suggestion: { code: "const total = amount ?? 0;", committable: true },
+      }),
+    ];
+    const diff = makeDiff("src/totals.ts", [14]);
+
+    // When Sovri formats the inline comment body
+    const comments = buildInlineComments(findings, diff);
+
+    // Then the inline body contains a fenced "suggestion" block
+    // And the suggestion block content is exactly "const total = amount ?? 0;"
+    expect(comments[0]?.body).toContain(
+      ["```suggestion", "const total = amount ?? 0;", "```"].join("\n"),
+    );
+  });
+
+  it("uses a longer suggestion fence when the replacement code contains backticks", () => {
+    // Given the finding suggestion.code contains a triple-backtick run
+    // And suggestion.committable is true
+    const findings: Finding[] = [
+      makeFinding({
+        file: "src/markdown.ts",
+        lineStart: 8,
+        title: "Escape markdown fence",
+        body: "The replacement code embeds a markdown fence literal.",
+        suggestion: { code: 'const fence = "```";', committable: true },
+      }),
+    ];
+    const diff = makeDiff("src/markdown.ts", [8]);
+
+    // When Sovri formats the inline comment body
+    const comments = buildInlineComments(findings, diff);
+
+    // Then the inline body uses a four-backtick suggestion fence
+    // And the replacement code stays inside the suggestion block
+    expect(comments[0]?.body).toContain(
+      ["````suggestion", 'const fence = "```";', "````"].join("\n"),
+    );
+  });
+
+  it("does not render a suggestion fence for absent or non-committable suggestions", () => {
+    // Given one finding has no suggestion
+    // And another finding has suggestion.committable false
+    const findings: Finding[] = [
+      makeFinding({
+        file: "src/user.ts",
+        lineStart: 22,
+        title: "Guard missing user name",
+        body: "The code assumes the user name is always present.",
+      }),
+      makeFinding({
+        id: "55555555-5555-4555-8555-555555555555",
+        file: "src/user.ts",
+        lineStart: 23,
+        title: "Guard missing user name",
+        body: "The code assumes the user name is always present.",
+        suggestion: { code: "return formatUser(user.name;", committable: false },
+      }),
+    ];
+    const diff = makeDiff("src/user.ts", [22, 23]);
+
+    // When Sovri formats the inline comment bodies
+    const comments = buildInlineComments(findings, diff);
+
+    // Then neither inline body contains a fenced "suggestion" block
+    expect(comments).toHaveLength(2);
+    for (const comment of comments) {
+      expect(comment.body).not.toContain("```suggestion");
+    }
+  });
+
+  it("keeps audit reference before the suggestion block and the finding marker last", () => {
+    // Given the finding audit_reference is "SOVRI-AC-AB12-CD34"
+    // And the finding suggestion.code is "const token = readSecret(\"API_TOKEN\");"
+    // And suggestion.committable is true
+    const findings: Finding[] = [
+      makeFinding({
+        file: "src/security.ts",
+        lineStart: 31,
+        title: "Avoid hardcoded credential",
+        body: "The token is embedded directly in source code.",
+        auditReference: "SOVRI-AC-AB12-CD34",
+        suggestion: { code: 'const token = readSecret("API_TOKEN");', committable: true },
+      }),
+    ];
+    const diff = makeDiff("src/security.ts", [31]);
+
+    // When Sovri formats the inline comment body
+    const comments = buildInlineComments(findings, diff);
+    const body = comments[0]?.body ?? "";
+
+    // Then the audit reference line appears before the suggestion block
+    expect(body.indexOf("🔍 Audit Reference: SOVRI-AC-AB12-CD34")).toBeLessThan(
+      body.indexOf("```suggestion"),
+    );
+    // And the suggestion block appears before the rendered marker
+    expect(body.indexOf("```suggestion")).toBeLessThan(body.indexOf("<!-- sovri-finding-id:"));
+    // And the inline body's last line is the rendered finding marker
+    expect(lastLine(body)).toMatch(/^<!-- sovri-finding-id: [0-9a-f]{16} -->$/u);
+  });
+
+  it("omits the audit reference placeholder while still rendering a committable suggestion", () => {
+    // Given the finding has no audit_reference
+    // And the finding suggestion.code is "const total = amount ?? 0;"
+    // And suggestion.committable is true
+    const findings: Finding[] = [
+      makeFinding({
+        file: "src/totals.ts",
+        lineStart: 14,
+        title: "Use an explicit fallback",
+        body: "The total can be undefined before formatting.",
+        suggestion: { code: "const total = amount ?? 0;", committable: true },
+      }),
+    ];
+    const diff = makeDiff("src/totals.ts", [14]);
+
+    // When Sovri formats the inline comment body
+    const comments = buildInlineComments(findings, diff);
+
+    // Then the inline body contains no "🔍 Audit Reference:" line
+    expect(comments[0]?.body).not.toContain("🔍 Audit Reference:");
+    // And the inline body contains a fenced "suggestion" block
+    expect(comments[0]?.body).toContain("```suggestion");
+  });
+
+  it("rejects a committable suggestion on a multi-line inline anchor", () => {
+    // Given the finding line_start is 14
+    // And the finding line_end is 15
+    // And suggestion.committable is true
+    const findings: Finding[] = [
+      makeFinding({
+        file: "src/totals.ts",
+        lineStart: 14,
+        lineEnd: 15,
+        title: "Use an explicit fallback",
+        body: "The total can be undefined before formatting.",
+        suggestion: { code: "const total = amount ?? 0;", committable: true },
+      }),
+    ];
+    const diff = makeDiff("src/totals.ts", [14, 15]);
+
+    // When Sovri builds the inline comment draft
+    const build = () => buildInlineComments(findings, diff);
+
+    // Then inline draft building fails before returning a draft
+    // And the failure mentions "committable suggestion requires a single-line inline anchor"
+    expect(build).toThrow("committable suggestion requires a single-line inline anchor");
+  });
+
+  it("keeps the existing multi-line anchor for non-committable suggestions", () => {
+    // Given the finding line_start is 14
+    // And the finding line_end is 15
+    // And suggestion.committable is false
+    const findings: Finding[] = [
+      makeFinding({
+        file: "src/totals.ts",
+        lineStart: 14,
+        lineEnd: 15,
+        title: "Use an explicit fallback",
+        body: "The total can be undefined before formatting.",
+        suggestion: { code: "const total = amount ?? 0;\nreturn total;", committable: false },
+      }),
+    ];
+    const diff = makeDiff("src/totals.ts", [14, 15]);
+
+    // When Sovri builds the inline comment draft
+    const comments = buildInlineComments(findings, diff);
+
+    // Then the inline draft start_line is 14
+    expect(comments[0]?.start_line).toBe(14);
+    // And the inline draft line is 15
+    expect(comments[0]?.line).toBe(15);
+    // And the inline body contains no fenced "suggestion" block
+    expect(comments[0]?.body).not.toContain("```suggestion");
+  });
+});
+
+function makeFinding(options: {
+  readonly id?: string;
+  readonly auditReference?: string;
+  readonly file: string;
+  readonly lineStart: number;
+  readonly lineEnd?: number;
+  readonly title: string;
+  readonly body: string;
+  readonly suggestion?: Finding["suggestion"];
+}): Finding {
+  return {
+    id: options.id ?? "44444444-4444-4444-8444-444444444444",
+    ...(options.auditReference === undefined ? {} : { audit_reference: options.auditReference }),
+    severity: "minor",
+    category: "maintainability",
+    file: options.file,
+    line_start: options.lineStart,
+    line_end: options.lineEnd ?? options.lineStart,
+    title: options.title,
+    body: options.body,
+    ...(options.suggestion === undefined ? {} : { suggestion: options.suggestion }),
+    source: "llm",
+    confidence: 0.86,
+  };
+}
+
+function lastLine(body: string): string {
+  return body.split("\n").at(-1) ?? "";
+}
