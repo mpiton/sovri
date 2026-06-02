@@ -1017,39 +1017,6 @@ describe("handlePullRequest reconciliation seam (R-07, R-01, R-04)", () => {
     expect(dependencies.postErrorComment).not.toHaveBeenCalled();
   });
 
-  it("keeps a manually resolved finding eligible for a later re-review", async () => {
-    const diff = buildDiff({ path: "src/app.ts" });
-    const review = buildReview({ commitSha: SYNCHRONIZED_HEAD_SHA });
-    const dependencies = buildReconcilingDependencies({
-      config: buildConfig({ autoReviewDrafts: false }),
-      diff,
-      review,
-    });
-    dependencies.fetchPostedFindings.mockResolvedValue({
-      fingerprints: new Set(),
-      comments: [],
-    });
-
-    await handlePullRequestSynchronize(
-      buildContext({ event: "pull_request.synchronize", headSha: SYNCHRONIZED_HEAD_SHA }),
-      dependencies,
-    );
-
-    expect(dependencies.fetchPostedFindings).toHaveBeenCalledWith(
-      expect.objectContaining({
-        commitSha: SYNCHRONIZED_HEAD_SHA,
-        number: 41,
-      }),
-    );
-    expect(dependencies.postReview).toHaveBeenCalledWith(
-      expect.objectContaining({ number: 41 }),
-      expect.objectContaining({ findings: review.findings }),
-      diff,
-    );
-    expect(dependencies.minimizeComments).not.toHaveBeenCalled();
-    expect(dependencies.postErrorComment).not.toHaveBeenCalled();
-  });
-
   it("drops already-posted findings and minimizes comments the run no longer produces", async () => {
     const diff = buildDiff();
     const review = buildReview({ commitSha: OPENED_HEAD_SHA });

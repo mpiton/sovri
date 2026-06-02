@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-// Rule: R-06 — only the bot's own non-minimized finding comments count for
-// reconciliation. Also exercises R-05 (minimized comments are excluded so a
-// reintroduced finding re-posts) and R-08 (a dismissed, still-active comment
-// stays counted).
+// Rule: R-06 — only the bot's own active finding comments count for
+// reconciliation. Also exercises R-05 (resolved or minimized comments are
+// excluded so a reintroduced finding re-posts) and R-08 (a dismissed,
+// still-active comment stays counted).
 // Mirrors specs/bug-1965-rereview-finding-dedup/r-06-only-bot-comments-count.feature
 
 import { describe, expect, it, vi } from "vitest";
@@ -31,7 +31,10 @@ type Comment = {
 };
 
 function stubOctokit(
-  threads: readonly { readonly comments: readonly Comment[] }[],
+  threads: readonly {
+    readonly comments: readonly Comment[];
+    readonly isResolved?: boolean;
+  }[],
 ): ReviewThreadsOctokit {
   return {
     graphql: () =>
@@ -40,7 +43,10 @@ function stubOctokit(
           pullRequest: {
             reviewThreads: {
               pageInfo: { hasNextPage: false, endCursor: null },
-              nodes: threads.map((thread) => ({ comments: { nodes: thread.comments } })),
+              nodes: threads.map((thread) => ({
+                comments: { nodes: thread.comments },
+                isResolved: thread.isResolved ?? false,
+              })),
             },
           },
         },
@@ -101,6 +107,37 @@ describe("fetchPostedFindings", () => {
 
     expect(result.fingerprints.size).toBe(0);
     expect(result.comments).toHaveLength(0);
+  });
+
+  it("excludes a resolved bot marker so a reintroduced finding re-posts (R-05)", async () => {
+    const octokit = stubOctokit([
+      {
+        isResolved: true,
+        comments: [
+          {
+            id: "RC_resolved",
+            body: marker(FP_A),
+            isMinimized: false,
+            author: { login: "sovri-bot[bot]" },
+          },
+        ],
+      },
+      {
+        comments: [
+          {
+            id: "RC_active",
+            body: marker(FP_B),
+            isMinimized: false,
+            author: { login: "sovri-bot[bot]" },
+          },
+        ],
+      },
+    ]);
+
+    const result = await fetchPostedFindings(octokit, REPO, 42, "sovri-bot[bot]");
+
+    expect(result.fingerprints.has(FP_A)).toBe(false);
+    expect(result.fingerprints.has(FP_B)).toBe(true);
   });
 
   it("excludes a minimized bot marker so a reintroduced finding re-posts (R-05)", async () => {

@@ -48,9 +48,6 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `test(bot)`: cover resolve-command behavior when a human-authored comment
   contains Sovri finding marker text.
 
-- `test(bot)`: cover later re-review posting behavior after a finding was
-  manually resolved.
-
 - `feat(bot)`: parse `@sovri-bot resolve <findingId>` as a distinct command
   kind using the existing finding-id validation rules.
 
@@ -249,6 +246,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   repeated compatible-provider token and default-limit test fixtures.
 
 ### Fixed
+
+- `fix(bot)`: exclude resolved GitHub review threads from active posted-finding
+  reconciliation so manually resolved findings can reappear on later re-review.
 
 - `fix(bot)`: react `confused` to parsed `@sovri-bot resolve <findingId>`
   issue comments until resolve handling exists, avoiding silent dispatcher no-ops.
