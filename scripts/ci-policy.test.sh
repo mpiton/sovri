@@ -11649,7 +11649,7 @@ run_readme_references_release_latest_only_case() {
   readme_path="$root/README.md"
 
   # Given "README.md" instructs users to run `docker pull ghcr.io/mpiton/sovri/community-bot:latest`
-  # And "README.md" does not contain the string "v0.3.0"
+  # And "README.md" does not contain the string "v0.4.0"
   cat >"$readme_path" <<'MD'
 # Some Project
 
@@ -11662,10 +11662,10 @@ docker pull ghcr.io/mpiton/sovri/community-bot:latest
 End of file.
 MD
 
-  if grep -Fq "v0.3.0" "$readme_path"; then
+  if grep -Fq "v0.4.0" "$readme_path"; then
     FAIL=$((FAIL + 1))
     FAILURES="${FAILURES}
-  ✗ readme-references-release latest-only: fixture unexpectedly contains 'v0.3.0'"
+  ✗ readme-references-release latest-only: fixture unexpectedly contains 'v0.4.0'"
     rm -rf "$root"
     return
   fi
@@ -11677,7 +11677,7 @@ MD
   node "$SCRIPT" readme-references-release \
     --readme "$readme_path" \
     --image ghcr.io/mpiton/sovri/community-bot \
-    --version 0.3.0 \
+    --version 0.4.0 \
     >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
 
   stdout=$(cat "$stdout_file" 2>/dev/null || true)
@@ -11704,8 +11704,8 @@ $(printf '%s\n' "$stdout" | sed 's/^/        /')"
     return
   fi
 
-  # And the remediation hint reads "Add a docker pull snippet pinned to v0.3.0 in README.md"
-  if ! printf '%s\n' "$stderr" | grep -Fq "Add a docker pull snippet pinned to v0.3.0 in"; then
+  # And the remediation hint reads "Add a docker pull snippet pinned to v0.4.0 in README.md"
+  if ! printf '%s\n' "$stderr" | grep -Fq "Add a docker pull snippet pinned to v0.4.0 in"; then
     FAIL=$((FAIL + 1))
     FAILURES="${FAILURES}
   ✗ readme-references-release latest-only: missing remediation hint
@@ -12206,14 +12206,14 @@ run_readme_references_release_nominal_case() {
   node "$SCRIPT" readme-references-release \
     --readme "$readme_path" \
     --image ghcr.io/mpiton/sovri/community-bot \
-    --version 0.3.0 \
+    --version 0.4.0 \
     >"$stdout_file" 2>"$stderr_file" && ec=0 || ec=$?
 
   stdout=$(cat "$stdout_file" 2>/dev/null || true)
   stderr=$(cat "$stderr_file" 2>/dev/null || true)
   rm -f "$stdout_file" "$stderr_file"
 
-  # Then the file contains the literal snippet `docker pull ghcr.io/mpiton/sovri/community-bot:v0.3.0`
+  # Then the file contains the literal snippet `docker pull ghcr.io/mpiton/sovri/community-bot:v0.4.0`
   # And the file contains the section heading "## Install" within the first 200 lines.
   # Both assertions are wrapped inside the readme-references-release subcommand and surface
   # as exit 0 + `readme_references_release=pass` on success.
