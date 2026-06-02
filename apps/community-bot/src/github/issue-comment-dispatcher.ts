@@ -46,6 +46,9 @@ export type IssueCommentDispatchOctokit = ReReviewOctokit & {
       readonly createForPullRequestReviewComment: (
         parameters: PullRequestReviewCommentReactionParameters,
       ) => Promise<{ readonly data: unknown }>;
+      readonly listForIssueComment: (
+        parameters: IssueCommentReactionListParameters,
+      ) => Promise<{ readonly data: readonly IssueCommentReaction[] }>;
       readonly listForPullRequestReviewComment: (
         parameters: PullRequestReviewCommentReactionListParameters,
       ) => Promise<{ readonly data: readonly PullRequestReviewCommentReaction[] }>;
@@ -58,6 +61,21 @@ type IssueCommentReactionParameters = {
   readonly content: "+1" | "confused";
   readonly owner: string;
   readonly repo: string;
+};
+
+type IssueCommentReactionListParameters = {
+  readonly comment_id: number;
+  readonly owner: string;
+  readonly page?: number;
+  readonly per_page?: number;
+  readonly repo: string;
+};
+
+type IssueCommentReaction = {
+  readonly content?: string;
+  readonly user?: {
+    readonly login?: string;
+  } | null;
 };
 
 type PullRequestReviewCommentReactionParameters = {
@@ -395,7 +413,7 @@ async function handleResolveCommand(
       await resolveReviewThread(context, thread.id);
     }
 
-    await createAcceptedIssueReaction(context, repo, command.commentId);
+    await createAcceptedIssueReaction(context, repo, command.commentId, botLogin);
     dispatchLogger.info({ ...logContext, result: "success" }, "Resolve command completed");
   } catch (error) {
     dispatchLogger.error(buildDismissErrorLogContext(logContext, error), "Resolve command failed");
@@ -473,7 +491,12 @@ async function createAcceptedIssueReaction(
   context: IssueCommentDispatchContext,
   repo: RepoRef,
   commentId: number,
+  botLogin: string,
 ): Promise<void> {
+  if (await hasAcceptedIssueReaction(context, repo, commentId, botLogin)) {
+    return;
+  }
+
   try {
     await context.octokit.rest.reactions.createForIssueComment({
       comment_id: commentId,
@@ -488,6 +511,44 @@ async function createAcceptedIssueReaction(
 
     throw error;
   }
+}
+
+async function hasAcceptedIssueReaction(
+  context: IssueCommentDispatchContext,
+  repo: RepoRef,
+  commentId: number,
+  botLogin: string,
+): Promise<boolean> {
+  return hasAcceptedIssueReactionPage(context, repo, commentId, botLogin, 1);
+}
+
+async function hasAcceptedIssueReactionPage(
+  context: IssueCommentDispatchContext,
+  repo: RepoRef,
+  commentId: number,
+  botLogin: string,
+  page: number,
+): Promise<boolean> {
+  const reactions = await context.octokit.rest.reactions.listForIssueComment({
+    comment_id: commentId,
+    owner: repo.owner,
+    page,
+    per_page: REACTION_PAGE_SIZE,
+    repo: repo.repo,
+  });
+
+  const accepted = reactions.data.some(
+    (reaction) => reaction.content === "+1" && reaction.user?.login === botLogin,
+  );
+  if (accepted) {
+    return true;
+  }
+
+  if (reactions.data.length < REACTION_PAGE_SIZE) {
+    return false;
+  }
+
+  return hasAcceptedIssueReactionPage(context, repo, commentId, botLogin, page + 1);
 }
 
 async function findResolveReviewThread(

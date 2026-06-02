@@ -52,6 +52,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   helper graph, including arrow-function helpers, so manual resolution cannot
   introduce database, cache, queue, or dismissed-finding suppression stores.
 
+- `test(bot)`: cover resolve acknowledgement idempotency when the bot already
+  reacted to the issue-comment command.
+
 - `feat(bot)`: parse `@sovri-bot resolve <findingId>` as a distinct command
   kind using the existing finding-id validation rules.
 
@@ -250,6 +253,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   repeated compatible-provider token and default-limit test fixtures.
 
 ### Fixed
+
+- `fix(bot)`: avoid duplicate resolve acknowledgement reactions by checking
+  existing issue-comment `+1` reactions before creating one.
 
 - `fix(bot)`: exclude resolved GitHub review threads from active posted-finding
   reconciliation, with adapter rationale documented, so manually resolved
