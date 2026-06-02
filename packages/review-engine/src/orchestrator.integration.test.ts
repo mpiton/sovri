@@ -53,6 +53,7 @@ describe("reviewPullRequest MSW integration paths", () => {
                 line_end: 42,
                 title: "Missing error guard",
                 body: "Guard this path before returning the review.",
+                suggested_code: "const review = await runReview(input, options);",
                 confidence: 0.91,
               },
             ],
@@ -91,6 +92,11 @@ describe("reviewPullRequest MSW integration paths", () => {
     expect(review.status).toBe("success");
     // And the returned Review contains 1 finding
     expect(review.findings).toHaveLength(1);
+    // And the returned finding carries a deterministic committable suggestion
+    expect(review.findings[0]?.suggestion).toEqual({
+      code: "const review = await runReview(input, options);",
+      committable: true,
+    });
     // And the returned Review has non-empty `walkthrough_markdown`
     expect(review.walkthrough_markdown.length).toBeGreaterThan(0);
 
@@ -105,6 +111,10 @@ describe("reviewPullRequest MSW integration paths", () => {
         line: 42,
       }),
     ]);
+    // And the inline body renders the provider suggested_code as a GitHub suggestion block
+    expect(inlineComments[0]?.body).toContain(
+      ["```suggestion", "const review = await runReview(input, options);", "```"].join("\n"),
+    );
   });
 
   it("retries a schema-invalid first response and returns a partial Review", async () => {

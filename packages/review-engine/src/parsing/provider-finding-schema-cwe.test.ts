@@ -54,6 +54,24 @@ describe("ProviderFindingSchema CWE support", () => {
     }
   });
 
+  it("accepts provider suggested code as parser-only input", () => {
+    // Given a provider finding includes suggested_code as one line of replacement code
+    const finding = {
+      ...baseFinding,
+      suggested_code: "return guardedReview;",
+    };
+
+    // When the ProviderFindingSchema parses it
+    const result = ProviderFindingSchema.safeParse(finding);
+
+    // Then parsing succeeds
+    expect(result.success).toBe(true);
+    // And the parsed suggested_code is preserved exactly for deterministic post-processing
+    if (result.success) {
+      expect(result.data.suggested_code).toBe("return guardedReview;");
+    }
+  });
+
   // Rule: R-01 (boundary — well-formed CWE values)
   it.each(["CWE-0", "CWE-79", "CWE-1004"])("accepts the well-formed CWE identifier %s", (cwe) => {
     // Given a provider finding for category "security" with cwe "<cwe>"
@@ -109,6 +127,27 @@ describe("ProviderFindingSchema CWE support", () => {
       );
       expect(hasUnrecognizedKeys).toBe(true);
       expect(JSON.stringify(result.error.issues)).toContain("compliance_references");
+    }
+  });
+
+  it("rejects a payload that smuggles a deterministic suggestion through the schema", () => {
+    // Given a provider finding includes the public Finding.suggestion shape directly
+    const finding = {
+      ...baseFinding,
+      suggestion: { code: "return guardedReview;", committable: true },
+    };
+
+    // When the strict ProviderFindingSchema parses it
+    const result = ProviderFindingSchema.safeParse(finding);
+
+    // Then parsing fails with an unrecognized-key error for "suggestion"
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const hasUnrecognizedKeys = result.error.issues.some(
+        (issue) => issue.code === "unrecognized_keys",
+      );
+      expect(hasUnrecognizedKeys).toBe(true);
+      expect(JSON.stringify(result.error.issues)).toContain("suggestion");
     }
   });
 });
