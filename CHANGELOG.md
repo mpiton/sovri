@@ -70,6 +70,23 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `refactor(bot)`: extract resolve-command handling into a dedicated Community
   source file with the required Apache 2.0 license header.
 
+- `feat(review-engine)`: add a pure parsing source convention inspector for
+  review-engine purity, TypeScript, and ESM boundary checks.
+
+- `test(review-engine)`: add acceptance coverage for parsing source purity,
+  TypeScript conventions, forbidden implementation pattern checks, multiline
+  import, dynamic import and import-attribute edge cases, directive edge cases,
+  and stable committable suggestion contracts.
+
+- `test(review-engine)`: add acceptance coverage proving syntactically suspect
+  suggestions keep their display text while the one-click committable gate rejects
+  them.
+
+- `feat(review-engine)`: committable suggestions use lightweight syntactic validation
+  for balanced delimiters, quotes, and truncation markers without adding parser
+  dependencies; template-literal interpolations, standalone ellipses, and
+  unterminated block comments fail closed, and full AST validation is not included.
+
 - `feat(bot)`: parse `@sovri-bot resolve <findingId>` as a distinct command
   kind using the existing finding-id validation rules.
 
@@ -269,12 +286,26 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `fix(bot)`: resolve `@sovri-bot resolve <findingId>` against the matching
+  review comment node so stale resolved threads cannot receive the acknowledgement
+  while the active finding remains open.
+
 - `fix(bot)`: avoid duplicate resolve acknowledgement reactions by checking
   existing issue-comment `+1` reactions before creating one.
 
 - `fix(bot)`: exclude resolved GitHub review threads from active posted-finding
   reconciliation, with adapter rationale documented, so manually resolved
   findings can reappear on later re-review.
+
+- `fix(review-engine)`: detect CommonJS loads and bare specifiers for forbidden
+  Node.js modules, dynamic relative imports with options, generic `any` type
+  arguments, direct `any` type aliases, and generic `any` type aliases in parsing
+  source convention checks.
+
+- `fix(review-engine)`: reject syntactically suspect single-line suggestions from
+  the one-click committable path while preserving their suggestion text for review
+  rendering, balanced template interpolation, valid spread operands, and terminal
+  operator rejection.
 
 - `fix(bot)`: react `confused` to parsed `@sovri-bot resolve <findingId>`
   issue comments until resolve handling exists, avoiding silent dispatcher no-ops.

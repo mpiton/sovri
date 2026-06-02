@@ -1110,6 +1110,87 @@ describe("parseLLMResponse", () => {
     expect(finding?.suggestion?.committable).toBe(true);
   });
 
+  it("preserves syntactically suspect suggestions while marking them non-committable", () => {
+    const suspectSuggestedCodes = [
+      "return formatUser(user.name;",
+      "return [user.name, user.email;",
+      "return { name: user.name;",
+      'return "missing name;',
+      "return `missing name;",
+      "return user.name ?? ...",
+      "return user.name ?? fallback...",
+    ];
+
+    for (const suggestedCode of suspectSuggestedCodes) {
+      // Given the raw finding has severity "major"
+      // And the raw finding has category "bug"
+      // And the raw finding has file "src/user.ts"
+      // And the raw finding has line_start 22
+      // And the raw finding has line_end 22
+      // And the raw finding has title "Guard missing user name"
+      // And the raw finding has body "The code assumes the user name is always present."
+      // And the raw finding has confidence 0.91
+      // Given the raw finding suggested_code is <suggested_code>
+      const findings = parseLLMResponse({
+        summary: "One finding found",
+        findings: [
+          buildRawFinding({
+            severity: "major",
+            category: "bug",
+            file: "src/user.ts",
+            line_start: 22,
+            line_end: 22,
+            title: "Guard missing user name",
+            body: "The code assumes the user name is always present.",
+            suggested_code: suggestedCode,
+            confidence: 0.91,
+          }),
+        ],
+      });
+
+      // When the raw finding is converted to a public Finding
+      const [finding] = findings;
+
+      // Then the returned finding has suggestion.code <suggested_code>
+      expect(finding?.suggestion?.code).toBe(suggestedCode);
+
+      // And suggestion.committable is false
+      expect(finding?.suggestion?.committable).toBe(false);
+
+      // And the returned finding still validates against FindingSchema
+      expect(FindingSchema.parse(finding)).toEqual(finding);
+    }
+  });
+
+  it("keeps literal ellipses committable while rejecting unterminated regex literals", () => {
+    const examples = [
+      { suggestedCode: 'return "Loading...";', committable: true },
+      { suggestedCode: "return 'Loading…';", committable: true },
+      { suggestedCode: "const message = `Hello ${name}`;", committable: true },
+      { suggestedCode: "const message = `Hello ${name`;", committable: false },
+      { suggestedCode: "return user.name ??", committable: false },
+      { suggestedCode: "const total = amount +", committable: false },
+      { suggestedCode: "return (amount +);", committable: false },
+      { suggestedCode: "return fn(...[fallback]);", committable: true },
+      { suggestedCode: "return { ...(enabled ? a : b) };", committable: true },
+      { suggestedCode: "const pattern = await /token-\\d+;", committable: false },
+      { suggestedCode: "const pattern = /token-\\d+;", committable: false },
+      { suggestedCode: "const pattern = /token-\\d+/;", committable: true },
+    ];
+
+    for (const { suggestedCode, committable } of examples) {
+      const findings = parseLLMResponse({
+        summary: "One finding found",
+        findings: [buildRawFinding({ suggested_code: suggestedCode })],
+      });
+
+      const [finding] = findings;
+
+      expect(finding?.suggestion?.code).toBe(suggestedCode);
+      expect(finding?.suggestion?.committable).toBe(committable);
+    }
+  });
+
   it("does not mark empty or multiline replacements as committable", () => {
     const examples = ["", "const total = amount ?? 0;\nreturn total;"];
 
@@ -1160,6 +1241,48 @@ describe("parseLLMResponse", () => {
         line_start: 14,
         line_end: 14,
         suggested_code: "const total = amount ?? 0;\nreturn total;",
+        requiresSuggestion: true,
+      },
+      {
+        line_start: 14,
+        line_end: 14,
+        suggested_code: "const total = amount ?? 0;\rreturn total;",
+        requiresSuggestion: true,
+      },
+      {
+        line_start: 14,
+        line_end: 14,
+        suggested_code: "const total = format(amount;",
+        requiresSuggestion: true,
+      },
+      {
+        line_start: 14,
+        line_end: 14,
+        suggested_code: "const total = amount ?? ...",
+        requiresSuggestion: true,
+      },
+      {
+        line_start: 14,
+        line_end: 14,
+        suggested_code: "if (...) return total;",
+        requiresSuggestion: true,
+      },
+      {
+        line_start: 14,
+        line_end: 14,
+        suggested_code: "const value = someCall(\u2026);",
+        requiresSuggestion: true,
+      },
+      {
+        line_start: 14,
+        line_end: 14,
+        suggested_code: "const message = `Hello ${name`;",
+        requiresSuggestion: true,
+      },
+      {
+        line_start: 14,
+        line_end: 14,
+        suggested_code: "const total = amount; /* truncated comment",
         requiresSuggestion: true,
       },
       {

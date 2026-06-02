@@ -38,6 +38,7 @@ const ResolveReviewThreadsResponseSchema = z.object({
                     z.object({
                       author: z.object({ login: z.string() }).nullable(),
                       body: z.string(),
+                      id: z.string(),
                     }),
                   ),
                 }),
@@ -63,7 +64,7 @@ const RESOLVE_REVIEW_THREADS_QUERY = `
             id
             isResolved
             comments(first: 1) {
-              nodes { body author { login } }
+              nodes { id body author { login } }
             }
           }
         }
@@ -182,6 +183,20 @@ type ResolveReviewThread = {
   readonly isResolved: boolean;
 };
 
+type ResolveReviewThreadNode = {
+  readonly comments: {
+    readonly nodes: readonly {
+      readonly author: {
+        readonly login: string;
+      } | null;
+      readonly body: string;
+      readonly id: string;
+    }[];
+  };
+  readonly id: string;
+  readonly isResolved: boolean;
+};
+
 export async function handleResolveCommand(
   context: ResolveCommandContext,
   command: IssueCommentDismissCommandContext,
@@ -220,7 +235,15 @@ export async function handleResolveCommand(
       return;
     }
 
-    const thread = await findResolveReviewThread(context, command, repo, botLogin, null);
+    const thread = await findResolveReviewThread(
+      context,
+      command,
+      repo,
+      botLogin,
+      findingComment.node_id,
+      null,
+      undefined,
+    );
     if (thread === undefined) {
       await minimizeResolvedComment(context, repo, findingComment);
     } else if (!thread.isResolved) {
@@ -318,7 +341,9 @@ async function findResolveReviewThread(
   command: IssueCommentDismissCommandContext,
   repo: RepoRef,
   botLogin: string,
+  targetRootCommentNodeId: string | undefined,
   cursor: string | null,
+  fallbackThread: ResolveReviewThread | undefined,
 ): Promise<ResolveReviewThread | undefined> {
   const raw = await context.octokit.graphql(RESOLVE_REVIEW_THREADS_QUERY, {
     cursor,
@@ -332,21 +357,60 @@ async function findResolveReviewThread(
     return undefined;
   }
 
-  for (const thread of threads.nodes) {
-    const rootComment = thread.comments.nodes[0];
-    if (
-      rootComment?.author?.login === botLogin &&
-      extractFindingId(rootComment.body) === command.findingId
-    ) {
-      return { id: thread.id, isResolved: thread.isResolved };
-    }
+  const pageMatch = findResolveReviewThreadOnPage(
+    threads.nodes,
+    botLogin,
+    command.findingId,
+    targetRootCommentNodeId,
+  );
+  if (pageMatch.exact !== undefined) {
+    return pageMatch.exact;
   }
+
+  const nextFallbackThread = fallbackThread ?? pageMatch.fallback;
 
   if (!threads.pageInfo.hasNextPage) {
-    return undefined;
+    return targetRootCommentNodeId === undefined ? nextFallbackThread : undefined;
   }
 
-  return findResolveReviewThread(context, command, repo, botLogin, threads.pageInfo.endCursor);
+  return findResolveReviewThread(
+    context,
+    command,
+    repo,
+    botLogin,
+    targetRootCommentNodeId,
+    threads.pageInfo.endCursor,
+    nextFallbackThread,
+  );
+}
+
+function findResolveReviewThreadOnPage(
+  threads: readonly ResolveReviewThreadNode[],
+  botLogin: string,
+  findingId: string,
+  targetRootCommentNodeId: string | undefined,
+): { readonly exact?: ResolveReviewThread; readonly fallback?: ResolveReviewThread } {
+  let fallback: ResolveReviewThread | undefined;
+  for (const thread of threads) {
+    const rootComment = thread.comments.nodes[0];
+    if (
+      rootComment?.author?.login !== botLogin ||
+      extractFindingId(rootComment.body) !== findingId
+    ) {
+      continue;
+    }
+
+    const candidate = { id: thread.id, isResolved: thread.isResolved };
+    if (
+      rootComment.id === targetRootCommentNodeId ||
+      (targetRootCommentNodeId === undefined && !thread.isResolved)
+    ) {
+      return { exact: candidate };
+    }
+    fallback ??= candidate;
+  }
+
+  return fallback === undefined ? {} : { fallback };
 }
 
 async function resolveReviewThread(

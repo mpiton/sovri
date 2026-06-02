@@ -75,6 +75,34 @@ describe("resolve command handler", () => {
     expect(runtime.octokit.rest.issues.updateComment).not.toHaveBeenCalled();
   });
 
+  it("resolves the current finding comment when an older resolved thread shares the finding id", async () => {
+    const runtime = buildRuntime({ thread: "stale-and-current" });
+    const context = buildIssueCommentContext(runtime.octokit);
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(runtime.graphqlCalls).toContainEqual(
+      expect.objectContaining({
+        variables: expect.objectContaining({ threadId: ThreadId }),
+      }),
+    );
+    expect(runtime.graphqlCalls).not.toContainEqual(
+      expect.objectContaining({
+        variables: expect.objectContaining({ threadId: "PRRT_thread_old" }),
+      }),
+    );
+    expect(runtime.graphqlCalls.some((call) => call.query.includes("minimizeComment"))).toBe(false);
+    expect(runtime.octokit.rest.reactions.createForIssueComment).toHaveBeenCalledWith({
+      comment_id: CommentId,
+      content: "+1",
+      owner: "octo-org",
+      repo: "sovri-target",
+    });
+  });
+
   it("logs successful resolve without emitting a failure", async () => {
     const runtime = buildRuntime();
     const logger = buildLogger();
@@ -478,7 +506,7 @@ describe("resolve command handler", () => {
   });
 });
 
-type ReviewThreadMode = "missing" | "open" | "resolved";
+type ReviewThreadMode = "missing" | "open" | "resolved" | "stale-and-current";
 
 type RuntimeOptions = {
   readonly acceptedIssueReactionError?: unknown;
@@ -667,8 +695,12 @@ function extractFunctionSourceAt(
 }
 
 function callsLocalFunction(source: string, functionName: string): boolean {
-  const callPattern = new RegExp(`\\b${functionName}\\s*\\(`, "u");
+  const callPattern = new RegExp(`\\b${escapeRegExpLiteral(functionName)}\\s*\\(`, "u");
   return callPattern.test(source);
+}
+
+function escapeRegExpLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
 function readAsyncFunctionStart(source: string, functionStart: number): number {
@@ -682,23 +714,7 @@ function readAsyncFunctionStart(source: string, functionStart: number): number {
 }
 
 function resolveReviewThreadsResponse(mode: ReviewThreadMode): unknown {
-  const nodes =
-    mode === "missing"
-      ? []
-      : [
-          {
-            comments: {
-              nodes: [
-                {
-                  author: { login: "sovri-bot" },
-                  body: KnownInlineCommentBody,
-                },
-              ],
-            },
-            id: ThreadId,
-            isResolved: mode === "resolved",
-          },
-        ];
+  const nodes = resolveReviewThreadNodes(mode);
   return {
     repository: {
       pullRequest: {
@@ -711,6 +727,40 @@ function resolveReviewThreadsResponse(mode: ReviewThreadMode): unknown {
         },
       },
     },
+  };
+}
+
+function resolveReviewThreadNodes(mode: ReviewThreadMode): readonly unknown[] {
+  if (mode === "missing") {
+    return [];
+  }
+  if (mode === "stale-and-current") {
+    return [
+      resolveReviewThreadNode("PRRT_thread_old", "PRRC_thread_old", true),
+      resolveReviewThreadNode(ThreadId, ReviewCommentNodeId, false),
+    ];
+  }
+
+  return [resolveReviewThreadNode(ThreadId, ReviewCommentNodeId, mode === "resolved")];
+}
+
+function resolveReviewThreadNode(
+  threadId: string,
+  commentNodeId: string,
+  isResolved: boolean,
+): unknown {
+  return {
+    comments: {
+      nodes: [
+        {
+          author: { login: "sovri-bot" },
+          body: KnownInlineCommentBody,
+          id: commentNodeId,
+        },
+      ],
+    },
+    id: threadId,
+    isResolved,
   };
 }
 
