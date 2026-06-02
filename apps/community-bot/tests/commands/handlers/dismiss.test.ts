@@ -1216,6 +1216,19 @@ function buildRuntime(
       ? "<!-- sovri:walkthrough -->\n## Sovri review"
       : options.walkthroughReviewBody;
   const octokit = {
+    graphql: vi.fn(async () => ({
+      repository: {
+        pullRequest: {
+          reviewThreads: {
+            nodes: [],
+            pageInfo: {
+              endCursor: null,
+              hasNextPage: false,
+            },
+          },
+        },
+      },
+    })),
     rest: {
       issues: {
         addLabels: vi.fn(async () => ({ data: {} })),
