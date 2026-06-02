@@ -253,6 +253,29 @@ describe("resolve command handler", () => {
     });
   });
 
+  it("does not duplicate an existing accepted issue-comment reaction", async () => {
+    const runtime = buildRuntime({
+      issueCommentReactions: [{ content: "+1", user: { login: "sovri-bot" } }],
+      thread: "resolved",
+    });
+    const context = buildIssueCommentContext(runtime.octokit);
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(runtime.octokit.rest.reactions.listForIssueComment).toHaveBeenCalledWith({
+      comment_id: CommentId,
+      owner: "octo-org",
+      page: 1,
+      per_page: 100,
+      repo: "sovri-target",
+    });
+    expect(runtime.octokit.rest.reactions.createForIssueComment).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.issues.createComment).not.toHaveBeenCalled();
+  });
+
   it("logs and surfaces hard resolve failures without crashing the webhook", async () => {
     const runtime = buildRuntime({
       resolveError: Object.assign(new Error("GitHub 503"), { status: 503 }),
@@ -292,8 +315,16 @@ type ReviewThreadMode = "missing" | "open" | "resolved";
 
 type RuntimeOptions = {
   readonly authorLookupError?: unknown;
+  readonly issueCommentReactions?: readonly IssueCommentReactionFixture[];
   readonly resolveError?: unknown;
   readonly thread?: ReviewThreadMode;
+};
+
+type IssueCommentReactionFixture = {
+  readonly content: "+1" | "confused";
+  readonly user?: {
+    readonly login?: string;
+  } | null;
 };
 
 type GraphqlCall = {
@@ -350,6 +381,7 @@ function buildRuntime(options: RuntimeOptions = {}) {
       reactions: {
         createForIssueComment: vi.fn(async () => ({ data: {} })),
         createForPullRequestReviewComment: vi.fn(async () => ({ data: {} })),
+        listForIssueComment: vi.fn(async () => ({ data: options.issueCommentReactions ?? [] })),
         listForPullRequestReviewComment: vi.fn(async () => ({ data: [] })),
       },
     },
