@@ -61,6 +61,7 @@ describe("resolve command handler", () => {
       owner: "octo-org",
       repo: "sovri-target",
     });
+    expect(runtime.octokit.rest.issues.createComment).not.toHaveBeenCalled();
     expect(runtime.octokit.rest.issues.addLabels).not.toHaveBeenCalled();
     expect(runtime.octokit.rest.pulls.updateReview).not.toHaveBeenCalled();
     expect(runtime.octokit.rest.issues.updateComment).not.toHaveBeenCalled();
