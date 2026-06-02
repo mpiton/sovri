@@ -39,6 +39,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `test(bot)`: document the resolve-command handler test strategy for author
   gating, thread resolution, fallback, idempotency, and GitHub failure coverage.
 
+- `test(bot)`: cover resolve-command retry handling when GitHub fails during pull
+  request author lookup.
+
 - `feat(bot)`: parse `@sovri-bot resolve <findingId>` as a distinct command
   kind using the existing finding-id validation rules.
 

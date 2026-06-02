@@ -7,6 +7,7 @@ import { createIssueCommentHandlerDependencies } from "../../../src/github/issue
 import { handleIssueCommentCreated } from "../../../src/handlers/issue-comment.js";
 
 const DeliveryId = "delivery-resolve-thread-001";
+const AuthzFailureDeliveryId = "delivery-resolve-authz-001";
 const FailureDeliveryId = "delivery-resolve-failure-001";
 const RepoFullName = "octo-org/sovri-target";
 const PullRequestNumber = 42;
@@ -82,6 +83,43 @@ describe("resolve command handler", () => {
       owner: "octo-org",
       repo: "sovri-target",
     });
+    expect(runtime.octokit.graphql).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.reactions.createForIssueComment).not.toHaveBeenCalled();
+  });
+
+  it("logs and surfaces pull request author lookup failures without crashing", async () => {
+    const runtime = buildRuntime({
+      authorLookupError: Object.assign(new Error("GitHub 500"), { status: 500 }),
+    });
+    const logger = buildLogger();
+    const context = buildIssueCommentContext(runtime.octokit, {
+      deliveryId: AuthzFailureDeliveryId,
+      findingId: "finding-authz-001",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(
+      context,
+      { SOVRI_BOT_LOGIN: "sovri-bot" },
+      logger,
+    );
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        delivery_id: AuthzFailureDeliveryId,
+        github_status: 500,
+        pr_number: PullRequestNumber,
+        repo: RepoFullName,
+      }),
+      "Resolve command failed",
+    );
+    expect(runtime.octokit.rest.issues.createComment).toHaveBeenCalledWith({
+      body: "Resolve command could not be completed. Please retry later.",
+      issue_number: PullRequestNumber,
+      owner: "octo-org",
+      repo: "sovri-target",
+    });
+    expect(runtime.octokit.rest.pulls.listReviewComments).not.toHaveBeenCalled();
     expect(runtime.octokit.graphql).not.toHaveBeenCalled();
     expect(runtime.octokit.rest.reactions.createForIssueComment).not.toHaveBeenCalled();
   });
@@ -189,6 +227,7 @@ describe("resolve command handler", () => {
 type ReviewThreadMode = "missing" | "open" | "resolved";
 
 type RuntimeOptions = {
+  readonly authorLookupError?: unknown;
   readonly resolveError?: unknown;
   readonly thread?: ReviewThreadMode;
 };
@@ -225,7 +264,12 @@ function buildRuntime(options: RuntimeOptions = {}) {
       pulls: {
         createReview: vi.fn(async () => ({ data: { id: 6000 } })),
         createReviewComment: vi.fn(async () => ({ data: { id: 8000 } })),
-        get: vi.fn(async () => ({ data: { user: { login: "alice" } } })),
+        get: vi.fn(async () => {
+          if (options.authorLookupError !== undefined) {
+            throw options.authorLookupError;
+          }
+          return { data: { user: { login: "alice" } } };
+        }),
         listReviewComments: vi.fn(async () => ({
           data: [
             {
