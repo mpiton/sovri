@@ -9,6 +9,7 @@ import {
   handleReReviewCommand,
   type ReReviewOctokit,
 } from "../commands/handlers/re-review.js";
+import { handleResolveCommand } from "../commands/handlers/resolve.js";
 import { parseCommand } from "../commands/parser.js";
 import type {
   IssueCommentDismissCommandContext,
@@ -156,10 +157,8 @@ const WALKTHROUGH_PAGE_SIZE = 100;
 const REACTION_PAGE_SIZE = 100;
 const DISMISSED_FINDING_LABEL = "sovri:dismissed-finding";
 const DISMISS_FAILURE_BODY = "Dismiss command could not be completed. Please retry later.";
-const RESOLVE_FAILURE_BODY = "Resolve command could not be completed. Please retry later.";
 const NO_FINDINGS_LINE = "No findings.";
 const UNAUTHORIZED_DISMISS_BODY = "Only the pull request author can dismiss findings.";
-const UNAUTHORIZED_RESOLVE_BODY = "Only the pull request author can resolve findings.";
 const FindingMarkerPattern = /<!--\s*sovri-finding-id:\s*([A-Za-z0-9-]{1,64})\s*-->/u;
 const AlreadyExistsMessagePattern = /already(?:_| )exists/iu;
 const GitHubErrorStatusSchema = z.object({ status: z.number().int() }).passthrough();
@@ -173,78 +172,6 @@ const PullRequestAuthorSchema = z
       .nullable(),
   })
   .passthrough();
-
-const ResolveReviewThreadsResponseSchema = z.object({
-  repository: z
-    .object({
-      pullRequest: z
-        .object({
-          reviewThreads: z.object({
-            pageInfo: z.object({
-              endCursor: z.string().nullable(),
-              hasNextPage: z.boolean(),
-            }),
-            nodes: z.array(
-              z.object({
-                comments: z.object({
-                  nodes: z.array(
-                    z.object({
-                      author: z.object({ login: z.string() }).nullable(),
-                      body: z.string(),
-                    }),
-                  ),
-                }),
-                id: z.string(),
-                isResolved: z.boolean(),
-              }),
-            ),
-          }),
-        })
-        .nullable(),
-    })
-    .nullable(),
-});
-
-type ResolveReviewThread = {
-  readonly id: string;
-  readonly isResolved: boolean;
-};
-
-const RESOLVE_REVIEW_THREADS_PAGE_SIZE = 100;
-const RESOLVE_REVIEW_THREADS_QUERY = `
-  query ResolveReviewThreads($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
-    repository(owner: $owner, name: $repo) {
-      pullRequest(number: $number) {
-        reviewThreads(first: ${RESOLVE_REVIEW_THREADS_PAGE_SIZE}, after: $cursor) {
-          pageInfo { hasNextPage endCursor }
-          nodes {
-            id
-            isResolved
-            comments(first: 1) {
-              nodes { body author { login } }
-            }
-          }
-        }
-      }
-    }
-  }
-`;
-
-const RESOLVE_REVIEW_THREAD_MUTATION = `
-  mutation ResolveReviewThread($threadId: ID!) {
-    resolveReviewThread(input: { threadId: $threadId }) {
-      thread { isResolved }
-    }
-  }
-`;
-
-const MINIMIZE_RESOLVED_COMMENT_MUTATION = `
-  mutation MinimizeResolvedComment($subjectId: ID!) {
-    minimizeComment(input: { subjectId: $subjectId, classifier: RESOLVED }) {
-      minimizedComment { isMinimized }
-    }
-  }
-`;
 
 export type IssueCommentDispatchContext = {
   readonly id: string;
@@ -368,74 +295,6 @@ async function handleDismissCommand(
   }
 }
 
-async function handleResolveCommand(
-  context: IssueCommentDispatchContext,
-  command: IssueCommentDismissCommandContext,
-  botLogin: string,
-  dispatchLogger: IssueCommentDispatchLogger,
-): Promise<void> {
-  const logContext = buildResolveLogContext(command);
-  dispatchLogger.info(logContext, "Resolve command started");
-  const repo = splitRepoFullName(command.repoFullName);
-  try {
-    const pullRequestAuthorLogin = await resolvePullRequestAuthorLogin(context, command, repo);
-
-    if (command.commentAuthorLogin !== pullRequestAuthorLogin) {
-      await context.octokit.rest.issues.createComment({
-        body: UNAUTHORIZED_RESOLVE_BODY,
-        issue_number: command.pullRequestNumber,
-        owner: repo.owner,
-        repo: repo.repo,
-      });
-      return;
-    }
-
-    const reviewComments = await listReviewCommentsOnAllPages(context, command, repo);
-    const botReviewComments = reviewComments.filter((comment) => comment.user?.login === botLogin);
-    const findingComment = botReviewComments.find((comment) =>
-      hasFindingMarker(comment, command.findingId),
-    );
-
-    if (findingComment === undefined) {
-      await context.octokit.rest.issues.createComment({
-        body: `Finding ${command.findingId} was not found, so nothing changed.`,
-        issue_number: command.pullRequestNumber,
-        owner: repo.owner,
-        repo: repo.repo,
-      });
-      return;
-    }
-
-    const thread = await findResolveReviewThread(context, command, repo, botLogin, null);
-    if (thread === undefined) {
-      await minimizeResolvedComment(context, repo, findingComment);
-    } else if (!thread.isResolved) {
-      await resolveReviewThread(context, thread.id);
-    }
-
-    await createAcceptedIssueReaction(context, repo, command.commentId, botLogin);
-    dispatchLogger.info({ ...logContext, result: "success" }, "Resolve command completed");
-  } catch (error) {
-    dispatchLogger.error(buildDismissErrorLogContext(logContext, error), "Resolve command failed");
-    await context.octokit.rest.issues.createComment({
-      body: RESOLVE_FAILURE_BODY,
-      issue_number: command.pullRequestNumber,
-      owner: repo.owner,
-      repo: repo.repo,
-    });
-  }
-}
-
-function buildResolveLogContext(
-  command: IssueCommentDismissCommandContext,
-): Readonly<Record<string, unknown>> {
-  return {
-    delivery_id: command.correlationId,
-    pr_number: command.pullRequestNumber,
-    repo: command.repoFullName,
-  };
-}
-
 function buildDismissLogContext(
   command: IssueCommentDismissCommandContext,
 ): Readonly<Record<string, unknown>> {
@@ -485,137 +344,6 @@ async function createDismissReaction(
 
     throw error;
   }
-}
-
-async function createAcceptedIssueReaction(
-  context: IssueCommentDispatchContext,
-  repo: RepoRef,
-  commentId: number,
-  botLogin: string,
-): Promise<void> {
-  if (await hasAcceptedIssueReaction(context, repo, commentId, botLogin)) {
-    return;
-  }
-
-  try {
-    await context.octokit.rest.reactions.createForIssueComment({
-      comment_id: commentId,
-      content: "+1",
-      owner: repo.owner,
-      repo: repo.repo,
-    });
-  } catch (error) {
-    if (isGithubAlreadyExistsError(error)) {
-      return;
-    }
-
-    throw error;
-  }
-}
-
-async function hasAcceptedIssueReaction(
-  context: IssueCommentDispatchContext,
-  repo: RepoRef,
-  commentId: number,
-  botLogin: string,
-): Promise<boolean> {
-  return hasAcceptedIssueReactionPage(context, repo, commentId, botLogin, 1);
-}
-
-async function hasAcceptedIssueReactionPage(
-  context: IssueCommentDispatchContext,
-  repo: RepoRef,
-  commentId: number,
-  botLogin: string,
-  page: number,
-): Promise<boolean> {
-  const reactions = await context.octokit.rest.reactions.listForIssueComment({
-    comment_id: commentId,
-    owner: repo.owner,
-    page,
-    per_page: REACTION_PAGE_SIZE,
-    repo: repo.repo,
-  });
-
-  const accepted = reactions.data.some(
-    (reaction) => reaction.content === "+1" && reaction.user?.login === botLogin,
-  );
-  if (accepted) {
-    return true;
-  }
-
-  if (reactions.data.length < REACTION_PAGE_SIZE) {
-    return false;
-  }
-
-  return hasAcceptedIssueReactionPage(context, repo, commentId, botLogin, page + 1);
-}
-
-async function findResolveReviewThread(
-  context: IssueCommentDispatchContext,
-  command: IssueCommentDismissCommandContext,
-  repo: RepoRef,
-  botLogin: string,
-  cursor: string | null,
-): Promise<ResolveReviewThread | undefined> {
-  const raw = await context.octokit.graphql(RESOLVE_REVIEW_THREADS_QUERY, {
-    cursor,
-    number: command.pullRequestNumber,
-    owner: repo.owner,
-    repo: repo.repo,
-  });
-  const threads =
-    ResolveReviewThreadsResponseSchema.parse(raw).repository?.pullRequest?.reviewThreads;
-  if (threads === undefined) {
-    return undefined;
-  }
-
-  for (const thread of threads.nodes) {
-    const rootComment = thread.comments.nodes[0];
-    if (
-      rootComment?.author?.login === botLogin &&
-      extractFindingId(rootComment.body) === command.findingId
-    ) {
-      return { id: thread.id, isResolved: thread.isResolved };
-    }
-  }
-
-  if (!threads.pageInfo.hasNextPage) {
-    return undefined;
-  }
-
-  return findResolveReviewThread(context, command, repo, botLogin, threads.pageInfo.endCursor);
-}
-
-async function resolveReviewThread(
-  context: IssueCommentDispatchContext,
-  threadId: string,
-): Promise<void> {
-  try {
-    await context.octokit.graphql(RESOLVE_REVIEW_THREAD_MUTATION, { threadId });
-  } catch (error) {
-    if (isGithubAlreadyExistsError(error)) {
-      return;
-    }
-
-    throw error;
-  }
-}
-
-async function minimizeResolvedComment(
-  context: IssueCommentDispatchContext,
-  repo: RepoRef,
-  comment: PullRequestReviewComment,
-): Promise<void> {
-  if (comment.node_id === undefined) {
-    throw new IssueCommentDispatcherAdapterError("Review comment node id is missing");
-  }
-
-  await context.octokit.graphql(MINIMIZE_RESOLVED_COMMENT_MUTATION, {
-    owner: repo.owner,
-    repo: repo.repo,
-    subjectId: comment.node_id,
-  });
 }
 
 function isGithubAlreadyExistsError(error: unknown): boolean {

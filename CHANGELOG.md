@@ -64,6 +64,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `test(bot)`: cover resolve-command thread-resolution failure statelessness so
   failures post the retry message without scheduling retry timers.
 
+- `refactor(bot)`: extract resolve-command handling into a dedicated Community
+  source file with the required Apache 2.0 license header.
+
 - `feat(bot)`: parse `@sovri-bot resolve <findingId>` as a distinct command
   kind using the existing finding-id validation rules.
 
