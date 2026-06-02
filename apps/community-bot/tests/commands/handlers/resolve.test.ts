@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import { createIssueCommentHandlerDependencies } from "../../../src/github/issue-comment-dispatcher.js";
@@ -16,6 +17,10 @@ const ReviewCommentId = 501;
 const ReviewCommentNodeId = "PRRC_thread_001";
 const ThreadId = "PRRT_thread_001";
 const KnownFindingId = "finding-thread-001";
+const ResolveDispatcherSourceUrl = new URL(
+  "../../../src/github/issue-comment-dispatcher.ts",
+  import.meta.url,
+);
 const KnownInlineCommentBody = [
   "**Missing null guard**",
   "",
@@ -178,6 +183,33 @@ describe("resolve command handler", () => {
     expect(runtime.octokit.rest.reactions.createForIssueComment).not.toHaveBeenCalled();
   });
 
+  it("keeps resolve stateless without persistent suppression stores", () => {
+    const source = readFileSync(ResolveDispatcherSourceUrl, "utf8");
+    const resolveCommandSource = extractResolveCommandSource(source);
+
+    expect(resolveCommandSource).toContain("resolveReviewThread");
+    expect(resolveCommandSource).toContain("minimizeResolvedComment");
+    expect(resolveCommandSource).not.toMatch(
+      /addLabels|updateComment|updateReview|listComments|DISMISSED_FINDING_LABEL/u,
+    );
+    expect(resolveCommandSource).not.toMatch(
+      /database|postgres|sqlite|prisma|redis|cache|queue|persistent|suppression/iu,
+    );
+  });
+
+  it("includes reachable arrow-function helpers in the stateless source graph", () => {
+    const source = [
+      "async function handleResolveCommand() {",
+      "  await markResolved();",
+      "}",
+      "const markResolved = async (): Promise<void> => {",
+      "  await prisma.suppression.create();",
+      "};",
+    ].join("\n");
+
+    expect(extractResolveCommandSource(source)).toContain("prisma.suppression.create");
+  });
+
   it("falls back to minimizing the review comment when no thread id is available", async () => {
     const runtime = buildRuntime({ thread: "missing" });
     const context = buildIssueCommentContext(runtime.octokit);
@@ -324,6 +356,116 @@ function buildRuntime(options: RuntimeOptions = {}) {
   };
 
   return { graphqlCalls, octokit };
+}
+
+function extractResolveCommandSource(source: string): string {
+  return extractReachableFunctionSources(source, "handleResolveCommand").join("\n");
+}
+
+function extractReachableFunctionSources(
+  source: string,
+  entryFunctionName: string,
+): readonly string[] {
+  const functionsByName = collectLocalFunctionSources(source);
+  const queue = [entryFunctionName];
+  const visited = new Set<string>();
+  const reachableSources: string[] = [];
+
+  for (let queueIndex = 0; queueIndex < queue.length; queueIndex += 1) {
+    const functionName = queue[queueIndex];
+    if (functionName === undefined || visited.has(functionName)) {
+      continue;
+    }
+
+    const functionSource = functionsByName.get(functionName);
+    if (functionSource === undefined) {
+      if (functionName === entryFunctionName) {
+        throw new Error(`resolve command entry ${entryFunctionName} source could not be located`);
+      }
+      continue;
+    }
+
+    visited.add(functionName);
+    reachableSources.push(functionSource);
+
+    for (const candidateName of functionsByName.keys()) {
+      if (!visited.has(candidateName) && callsLocalFunction(functionSource, candidateName)) {
+        queue.push(candidateName);
+      }
+    }
+  }
+
+  return reachableSources;
+}
+
+function collectLocalFunctionSources(source: string): ReadonlyMap<string, string> {
+  const functionsByName = new Map<string, string>();
+  const functionDeclarationPattern = /\bfunction\s+([A-Za-z][A-Za-z0-9_]*)\s*\(/gu;
+  const arrowFunctionPattern =
+    /\bconst\s+([A-Za-z][A-Za-z0-9_]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*(?::\s*[^=]+)?=>\s*\{/gu;
+
+  for (const match of source.matchAll(functionDeclarationPattern)) {
+    const functionName = match[1];
+    if (functionName === undefined || match.index === undefined) {
+      continue;
+    }
+
+    functionsByName.set(functionName, extractFunctionSourceAt(source, functionName, match.index));
+  }
+
+  for (const match of source.matchAll(arrowFunctionPattern)) {
+    const functionName = match[1];
+    if (functionName === undefined || match.index === undefined) {
+      continue;
+    }
+
+    functionsByName.set(functionName, extractFunctionSourceAt(source, functionName, match.index));
+  }
+
+  return functionsByName;
+}
+
+function extractFunctionSourceAt(
+  source: string,
+  functionName: string,
+  functionStart: number,
+): string {
+  const start = readAsyncFunctionStart(source, functionStart);
+  const openingBrace = source.indexOf("{", functionStart);
+  if (openingBrace === -1) {
+    throw new Error(`resolve command helper ${functionName} body could not be located`);
+  }
+
+  let depth = 0;
+  for (let index = openingBrace; index < source.length; index += 1) {
+    const character = source.charAt(index);
+    if (character === "{") {
+      depth += 1;
+    }
+    if (character === "}") {
+      depth -= 1;
+    }
+    if (depth === 0) {
+      return source.slice(start, index + 1);
+    }
+  }
+
+  throw new Error(`resolve command helper ${functionName} body end could not be located`);
+}
+
+function callsLocalFunction(source: string, functionName: string): boolean {
+  const callPattern = new RegExp(`\\b${functionName}\\s*\\(`, "u");
+  return callPattern.test(source);
+}
+
+function readAsyncFunctionStart(source: string, functionStart: number): number {
+  const asyncPrefix = "async ";
+  const asyncStart = functionStart - asyncPrefix.length;
+  if (asyncStart >= 0 && source.slice(asyncStart, functionStart) === asyncPrefix) {
+    return asyncStart;
+  }
+
+  return functionStart;
 }
 
 function resolveReviewThreadsResponse(mode: ReviewThreadMode): unknown {
