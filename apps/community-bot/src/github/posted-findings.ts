@@ -151,6 +151,8 @@ async function collectPostedComments(
 
   const entries: PostedComment[] = [];
   for (const thread of threads.nodes) {
+    // A manually resolved review thread is no longer active review state; if
+    // the issue still exists, the next review should be allowed to report it.
     if (thread.isResolved) {
       continue;
     }

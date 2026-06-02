@@ -248,7 +248,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Fixed
 
 - `fix(bot)`: exclude resolved GitHub review threads from active posted-finding
-  reconciliation so manually resolved findings can reappear on later re-review.
+  reconciliation, with adapter rationale documented, so manually resolved
+  findings can reappear on later re-review.
 
 - `fix(bot)`: react `confused` to parsed `@sovri-bot resolve <findingId>`
   issue comments until resolve handling exists, avoiding silent dispatcher no-ops.
