@@ -19,7 +19,18 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+
+## [0.4.0] - 2026-06-02
 ### Added
+
+- `test(review-engine)`: allow the syntax-sanity scope acceptance test to read
+  release-promoted changelog entries after `[Unreleased]` has been cut for a
+  version tag, keeping the v0.4.0 release gate compatible with the documentation
+  contract.
+
+- `ci(deps)`: allow `Python-2.0` and `CC-BY-4.0` in the local license gate and
+  Dependency Review workflow for existing transitive dev dependencies with
+  permissive or metadata-only licensing.
 
 - `feat(bot)`: route parsed `@sovri-bot resolve <findingId>` commands toward a
   dedicated resolve handler so PR authors can acknowledge handled findings
@@ -286,6 +297,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `fix(bot)`: add safe structured pull-request review failure diagnostics with
+  failure-stage, error-type, provider, token, and review metadata while keeping
+  public failure comments generic and avoiding raw failed-review content in logs.
+
 - `fix(bot)`: resolve `@sovri-bot resolve <findingId>` against the matching
   review comment node so stale resolved threads cannot receive the acknowledgement
   while the active finding remains open.
@@ -308,7 +323,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   operator rejection.
 
 - `fix(bot)`: react `confused` to parsed `@sovri-bot resolve <findingId>`
-  issue comments until resolve handling exists, avoiding silent dispatcher no-ops.
+  issue comments in the pre-handler phase, avoiding silent dispatcher no-ops.
+
+- `refactor(bot)`: share GitHub command helper utilities between dismiss and
+  resolve command handlers so repository parsing, duplicate-reaction detection,
+  marker extraction, and typed GitHub status handling stay consistent.
 
 - `fix(review-engine)`: wire provider `suggested_code` through review findings
   before inline comments are posted, and size GitHub suggestion fences around

@@ -49,6 +49,8 @@ const DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES = [
   "ISC",
   "MPL-2.0",
   "CC0-1.0",
+  "CC-BY-4.0",
+  "Python-2.0",
   "Unlicense",
   "BlueOak-1.0.0",
 ];

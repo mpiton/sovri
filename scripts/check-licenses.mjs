@@ -3,8 +3,8 @@
 //
 // Reads `pnpm licenses list --json`, classifies every direct and
 // transitive dependency against the allowlist (Apache-2.0, MIT,
-// BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC0-1.0, Unlicense,
-// BlueOak-1.0.0) and the deny-list (every AGPL/GPL/LGPL `*-only` /
+// BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC0-1.0, CC-BY-4.0,
+// Python-2.0, Unlicense, BlueOak-1.0.0) and the deny-list (every AGPL/GPL/LGPL `*-only` /
 // `*-or-later` variant declared by the dependency-review action
 // allowlist), and exits non-zero on the first deny match.
 // Non-SPDX strings (`Unknown`, `UNLICENSED`, `SEE LICENSE IN ...`,
@@ -54,6 +54,8 @@ const ALLOWED_LICENSES = new Set([
   "ISC",
   "MPL-2.0",
   "CC0-1.0",
+  "CC-BY-4.0",
+  "Python-2.0",
   "Unlicense",
   "BlueOak-1.0.0",
 ]);

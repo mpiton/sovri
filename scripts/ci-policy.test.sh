@@ -9893,7 +9893,7 @@ $(printf '%s\n' "$combined" | sed 's/^/      /')"
 CODEQL_TEST_CHECKOUT_SHA="1234567890123456789012345678901234567890"
 CODEQL_TEST_ACTION_SHA="abcdefabcdefabcdefabcdefabcdefabcdefabcd"
 DEPENDENCY_REVIEW_TEST_ACTION_SHA="a1d282b36b6f3519aa1f3fc636f609c47dddb294"
-DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES="Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC0-1.0, Unlicense, BlueOak-1.0.0"
+DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES="Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC0-1.0, CC-BY-4.0, Python-2.0, Unlicense, BlueOak-1.0.0"
 DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES="AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later, GPL-2.0-only, GPL-2.0-or-later, GPL-3.0-only, GPL-3.0-or-later, LGPL-2.0-only, LGPL-2.0-or-later, LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only, LGPL-3.0-or-later"
 
 codeql_standard_trigger_body() {
@@ -10613,6 +10613,8 @@ run_dependency_review_multiline_license_inputs_case() {
             ISC,
             MPL-2.0,
             CC0-1.0,
+            CC-BY-4.0,
+            Python-2.0,
             Unlicense,
             BlueOak-1.0.0
       - name: Dependency Review denied licenses
@@ -14608,16 +14610,16 @@ run_dependency_review_severity_case "critical" "high severity advisories must fa
 run_dependency_review_missing_severity_input_case
 run_dependency_review_wrong_step_severity_case
 run_dependency_review_missing_action_step_case
-run_dependency_review_license_failure_case "missing MIT allow" "Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC0-1.0, Unlicense, BlueOak-1.0.0" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "missing allowed license MIT"
+run_dependency_review_license_failure_case "missing MIT allow" "Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC0-1.0, CC-BY-4.0, Python-2.0, Unlicense, BlueOak-1.0.0" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "missing allowed license MIT"
 run_dependency_review_license_failure_case "MIT denied" "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" "${DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES}, MIT" "unexpected denied license MIT"
 run_dependency_review_license_failure_case "GPL allowed" "${DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES}, GPL-3.0-only" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "unexpected allowed license GPL-3.0-only"
 run_dependency_review_license_failure_case "missing GPL deny" "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" "AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later, GPL-2.0-only, GPL-2.0-or-later, GPL-3.0-or-later, LGPL-2.0-only, LGPL-2.0-or-later, LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only, LGPL-3.0-or-later" "missing denied license GPL-3.0-only"
-run_dependency_review_allow_whitespace_case "Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC,MPL-2.0,CC0-1.0,Unlicense,BlueOak-1.0.0"
-run_dependency_review_allow_whitespace_case "Apache-2.0 ,  MIT , BSD-2-Clause , BSD-3-Clause , ISC , MPL-2.0 , CC0-1.0 , Unlicense , BlueOak-1.0.0"
+run_dependency_review_allow_whitespace_case "Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC,MPL-2.0,CC0-1.0,CC-BY-4.0,Python-2.0,Unlicense,BlueOak-1.0.0"
+run_dependency_review_allow_whitespace_case "Apache-2.0 ,  MIT , BSD-2-Clause , BSD-3-Clause , ISC , MPL-2.0 , CC0-1.0 , CC-BY-4.0 , Python-2.0 , Unlicense , BlueOak-1.0.0"
 run_dependency_review_deny_whitespace_case "AGPL-1.0-only,AGPL-1.0-or-later,AGPL-3.0-only,AGPL-3.0-or-later,GPL-2.0-only,GPL-2.0-or-later,GPL-3.0-only,GPL-3.0-or-later,LGPL-2.0-only,LGPL-2.0-or-later,LGPL-2.1-only,LGPL-2.1-or-later,LGPL-3.0-only,LGPL-3.0-or-later"
 run_dependency_review_deny_whitespace_case "AGPL-1.0-only , AGPL-1.0-or-later , AGPL-3.0-only , AGPL-3.0-or-later , GPL-2.0-only , GPL-2.0-or-later , GPL-3.0-only , GPL-3.0-or-later , LGPL-2.0-only , LGPL-2.0-or-later , LGPL-2.1-only , LGPL-2.1-or-later , LGPL-3.0-only , LGPL-3.0-or-later"
-run_dependency_review_license_failure_case "duplicate allow" "Apache-2.0, MIT, MIT, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC0-1.0, Unlicense, BlueOak-1.0.0" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "duplicate allowed license MIT"
-run_dependency_review_license_failure_case "reordered allow" "MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC0-1.0, Unlicense, BlueOak-1.0.0" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "allowed licenses must follow the required order"
+run_dependency_review_license_failure_case "duplicate allow" "Apache-2.0, MIT, MIT, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC0-1.0, CC-BY-4.0, Python-2.0, Unlicense, BlueOak-1.0.0" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "duplicate allowed license MIT"
+run_dependency_review_license_failure_case "reordered allow" "MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, CC0-1.0, CC-BY-4.0, Python-2.0, Unlicense, BlueOak-1.0.0" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "allowed licenses must follow the required order"
 run_dependency_review_license_failure_case "duplicate deny" "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" "AGPL-1.0-only, AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later, GPL-2.0-only, GPL-2.0-or-later, GPL-3.0-only, GPL-3.0-or-later, LGPL-2.0-only, LGPL-2.0-or-later, LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only, LGPL-3.0-or-later" "duplicate denied license AGPL-1.0-only"
 run_dependency_review_license_failure_case "reordered deny" "$DEPENDENCY_REVIEW_REQUIRED_ALLOW_LICENSES" "GPL-3.0-only, AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later, GPL-2.0-only, GPL-2.0-or-later, GPL-3.0-or-later, LGPL-2.0-only, LGPL-2.0-or-later, LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only, LGPL-3.0-or-later" "denied licenses must follow the required order"
 run_dependency_review_license_failure_case "missing allow input" "" "$DEPENDENCY_REVIEW_REQUIRED_DENY_LICENSES" "allow-licenses is required"

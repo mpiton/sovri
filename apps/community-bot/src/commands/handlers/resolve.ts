@@ -4,14 +4,18 @@
 import { z } from "@sovri/core";
 
 import type { IssueCommentDismissCommandContext } from "../../handlers/issue-comment.js";
+import {
+  FindingMarkerPattern,
+  githubStatusFrom,
+  isGithubAlreadyExistsError,
+  splitRepoFullName,
+  type RepoRef,
+} from "../shared-utilities.js";
 
 const REVIEW_COMMENT_PAGE_SIZE = 100;
 const REACTION_PAGE_SIZE = 100;
 const RESOLVE_FAILURE_BODY = "Resolve command could not be completed. Please retry later.";
 const UNAUTHORIZED_RESOLVE_BODY = "Only the pull request author can resolve findings.";
-const FindingMarkerPattern = /<!--\s*sovri-finding-id:\s*([A-Za-z0-9-]{1,64})\s*-->/u;
-const AlreadyExistsMessagePattern = /already(?:_| )exists/iu;
-const GitHubErrorStatusSchema = z.object({ status: z.number().int() }).passthrough();
 const PullRequestAuthorSchema = z
   .object({
     user: z
@@ -173,11 +177,6 @@ type PullRequestReviewComment = {
   } | null;
 };
 
-type RepoRef = {
-  readonly owner: string;
-  readonly repo: string;
-};
-
 type ResolveReviewThread = {
   readonly id: string;
   readonly isResolved: boolean;
@@ -205,7 +204,7 @@ export async function handleResolveCommand(
 ): Promise<void> {
   const logContext = buildResolveLogContext(command);
   dispatchLogger.info(logContext, "Resolve command started");
-  const repo = splitRepoFullName(command.repoFullName);
+  const repo = splitRepoFullName(command.repoFullName, createResolveCommandAdapterError);
   try {
     const pullRequestAuthorLogin = await resolvePullRequestAuthorLogin(context, command, repo);
 
@@ -279,11 +278,6 @@ function buildResolveErrorLogContext(
 ): Readonly<Record<string, unknown>> {
   const status = githubStatusFrom(error);
   return status === undefined ? logContext : { ...logContext, github_status: status };
-}
-
-function githubStatusFrom(error: unknown): number | undefined {
-  const result = GitHubErrorStatusSchema.safeParse(error);
-  return result.success ? result.data.status : undefined;
 }
 
 async function resolvePullRequestAuthorLogin(
@@ -506,21 +500,6 @@ async function hasAcceptedIssueReactionPage(
   return hasAcceptedIssueReactionPage(context, repo, commentId, botLogin, page + 1);
 }
 
-function isGithubAlreadyExistsError(error: unknown): boolean {
-  if (!isRecord(error)) {
-    return false;
-  }
-
-  const status = readNumberProperty(error, "status");
-  if (status !== 409 && status !== 422) {
-    return false;
-  }
-
-  const message =
-    error instanceof Error ? error.message : (readStringProperty(error, "message") ?? "");
-  return AlreadyExistsMessagePattern.test(message);
-}
-
 function extractFindingId(value: string | null | undefined): string | undefined {
   if (value === null || value === undefined) {
     return undefined;
@@ -529,43 +508,10 @@ function extractFindingId(value: string | null | undefined): string | undefined 
   return FindingMarkerPattern.exec(value)?.[1];
 }
 
-function splitRepoFullName(repoFullName: string): RepoRef {
-  const parts = repoFullName.split("/");
-  const owner = parts[0];
-  const repo = parts[1];
-  if (
-    parts.length !== 2 ||
-    owner === undefined ||
-    repo === undefined ||
-    owner.length === 0 ||
-    repo.length === 0
-  ) {
-    throw new ResolveCommandAdapterError("Repository full name is invalid");
-  }
-
-  return { owner, repo };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function readNumberProperty(
-  record: Readonly<Record<string, unknown>>,
-  property: string,
-): number | undefined {
-  const value = record[property];
-  return typeof value === "number" ? value : undefined;
-}
-
-function readStringProperty(
-  record: Readonly<Record<string, unknown>>,
-  property: string,
-): string | undefined {
-  const value = record[property];
-  return typeof value === "string" ? value : undefined;
-}
-
 class ResolveCommandAdapterError extends Error {
   public override readonly name = "ResolveCommandAdapterError";
+}
+
+function createResolveCommandAdapterError(message: string): ResolveCommandAdapterError {
+  return new ResolveCommandAdapterError(message);
 }

@@ -175,6 +175,7 @@ async function reportReReviewResolutionFailure(
     },
     dependencies: dependencies.createPullRequestDependencies(context),
     error,
+    failureStage: "review_engine",
     logContext: {
       delivery_id: command.correlationId,
       event: context.name,

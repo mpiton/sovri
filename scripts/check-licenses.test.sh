@@ -181,8 +181,10 @@ fx_all_allowed_singletons() {
   "ISC":           [{"name":"e","versions":["1"],"paths":["/e"],"license":"ISC"}],
   "MPL-2.0":       [{"name":"f","versions":["1"],"paths":["/f"],"license":"MPL-2.0"}],
   "CC0-1.0":       [{"name":"g","versions":["1"],"paths":["/g"],"license":"CC0-1.0"}],
-  "Unlicense":     [{"name":"h","versions":["1"],"paths":["/h"],"license":"Unlicense"}],
-  "BlueOak-1.0.0": [{"name":"i","versions":["1"],"paths":["/i"],"license":"BlueOak-1.0.0"}]
+  "CC-BY-4.0":     [{"name":"h","versions":["1"],"paths":["/h"],"license":"CC-BY-4.0"}],
+  "Python-2.0":    [{"name":"i","versions":["1"],"paths":["/i"],"license":"Python-2.0"}],
+  "Unlicense":     [{"name":"j","versions":["1"],"paths":["/j"],"license":"Unlicense"}],
+  "BlueOak-1.0.0": [{"name":"k","versions":["1"],"paths":["/k"],"license":"BlueOak-1.0.0"}]
 }
 JSON
   echo "--input licenses.json"
@@ -573,7 +575,7 @@ JSON
 # PASS scenarios (exit 0).
 run_case "PASS-1  single MIT bucket"                       fx_single_allowed_mit         "" 0 "OK:"
 run_case "PASS-2  multiple allowed buckets"                fx_multi_bucket_allowed       "" 0 "OK: 4 package(s)"
-run_case "PASS-3  every allowlist licence singleton"       fx_all_allowed_singletons     "" 0 "9 license bucket(s)"
+run_case "PASS-3  every allowlist licence singleton"       fx_all_allowed_singletons     "" 0 "11 license bucket(s)"
 run_case "PASS-4  dual licence (MIT OR Apache-2.0)"        fx_or_dual_allowed            "" 0 "OK:"
 run_case "PASS-5  OR picks allowed when other is GPL"      fx_or_picks_allowed_branch    "" 0 "OK:"
 run_case "PASS-6  AND with two allowed atoms"              fx_and_all_allowed            "" 0 "OK:"

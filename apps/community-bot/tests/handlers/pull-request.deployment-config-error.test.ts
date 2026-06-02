@@ -45,6 +45,7 @@ async function postFailure(error: unknown): Promise<string[]> {
       },
     },
     error,
+    failureStage: "config_load",
     logContext: {},
   });
   return posted;

@@ -11,6 +11,13 @@ import {
 } from "../commands/handlers/re-review.js";
 import { handleResolveCommand } from "../commands/handlers/resolve.js";
 import { parseCommand } from "../commands/parser.js";
+import {
+  FindingMarkerPattern,
+  githubStatusFrom,
+  isGithubAlreadyExistsError,
+  splitRepoFullName,
+  type RepoRef,
+} from "../commands/shared-utilities.js";
 import type {
   IssueCommentDismissCommandContext,
   IssueCommentHandlerDependencies,
@@ -142,11 +149,6 @@ type PullRequestReview = {
 
 type IssueComment = PullRequestReview;
 
-type RepoRef = {
-  readonly owner: string;
-  readonly repo: string;
-};
-
 type IssueCommentDispatchLogger = {
   error(bindings: Readonly<Record<string, unknown>>, message: string): void;
   info(bindings: Readonly<Record<string, unknown>>, message: string): void;
@@ -159,9 +161,6 @@ const DISMISSED_FINDING_LABEL = "sovri:dismissed-finding";
 const DISMISS_FAILURE_BODY = "Dismiss command could not be completed. Please retry later.";
 const NO_FINDINGS_LINE = "No findings.";
 const UNAUTHORIZED_DISMISS_BODY = "Only the pull request author can dismiss findings.";
-const FindingMarkerPattern = /<!--\s*sovri-finding-id:\s*([A-Za-z0-9-]{1,64})\s*-->/u;
-const AlreadyExistsMessagePattern = /already(?:_| )exists/iu;
-const GitHubErrorStatusSchema = z.object({ status: z.number().int() }).passthrough();
 
 const PullRequestAuthorSchema = z
   .object({
@@ -213,7 +212,10 @@ async function reactConfused(
   context: IssueCommentDispatchContext,
   reaction: IssueCommentUnknownReaction,
 ): Promise<void> {
-  const repo = splitRepoFullName(context.payload.repository.full_name);
+  const repo = splitRepoFullName(
+    context.payload.repository.full_name,
+    createIssueCommentDispatcherAdapterError,
+  );
   await context.octokit.rest.reactions.createForIssueComment({
     comment_id: reaction.commentId,
     content: reaction.content,
@@ -230,7 +232,7 @@ async function handleDismissCommand(
 ): Promise<void> {
   const logContext = buildDismissLogContext(command);
   dispatchLogger.info(logContext, "Dismiss command started");
-  const repo = splitRepoFullName(command.repoFullName);
+  const repo = splitRepoFullName(command.repoFullName, createIssueCommentDispatcherAdapterError);
   try {
     const pullRequestAuthorLogin = await resolvePullRequestAuthorLogin(context, command, repo);
 
@@ -320,11 +322,6 @@ function buildDismissErrorLogContext(
   };
 }
 
-function githubStatusFrom(error: unknown): number | undefined {
-  const result = GitHubErrorStatusSchema.safeParse(error);
-  return result.success ? result.data.status : undefined;
-}
-
 async function createDismissReaction(
   context: IssueCommentDispatchContext,
   repo: RepoRef,
@@ -344,21 +341,6 @@ async function createDismissReaction(
 
     throw error;
   }
-}
-
-function isGithubAlreadyExistsError(error: unknown): boolean {
-  if (!isRecord(error)) {
-    return false;
-  }
-
-  const status = readNumberProperty(error, "status");
-  if (status !== 409 && status !== 422) {
-    return false;
-  }
-
-  const message =
-    error instanceof Error ? error.message : (readStringProperty(error, "message") ?? "");
-  return AlreadyExistsMessagePattern.test(message);
 }
 
 async function resolvePullRequestAuthorLogin(
@@ -675,51 +657,12 @@ function insertNoFindingsLine(lines: readonly string[]): string[] {
   return [...lines.slice(0, insertionIndex), NO_FINDINGS_LINE, "", ...lines.slice(insertionIndex)];
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function readNumberProperty(
-  record: Readonly<Record<string, unknown>>,
-  property: string,
-): number | undefined {
-  const value = record[property];
-  return typeof value === "number" ? value : undefined;
-}
-
-function readStringProperty(
-  record: Readonly<Record<string, unknown>>,
-  property: string,
-): string | undefined {
-  const value = record[property];
-  return typeof value === "string" ? value : undefined;
-}
-
-function splitRepoFullName(repoFullName: string | undefined): {
-  readonly owner: string;
-  readonly repo: string;
-} {
-  if (repoFullName === undefined) {
-    throw new IssueCommentDispatcherAdapterError("Repository full name is missing");
-  }
-
-  const parts = repoFullName.split("/");
-  const owner = parts[0];
-  const repo = parts[1];
-
-  if (
-    parts.length !== 2 ||
-    owner === undefined ||
-    repo === undefined ||
-    owner.length === 0 ||
-    repo.length === 0
-  ) {
-    throw new IssueCommentDispatcherAdapterError("Repository full name is invalid");
-  }
-
-  return { owner, repo };
-}
-
 class IssueCommentDispatcherAdapterError extends Error {
   public override readonly name = "IssueCommentDispatcherAdapterError";
+}
+
+function createIssueCommentDispatcherAdapterError(
+  message: string,
+): IssueCommentDispatcherAdapterError {
+  return new IssueCommentDispatcherAdapterError(message);
 }

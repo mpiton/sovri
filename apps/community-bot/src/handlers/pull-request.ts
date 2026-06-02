@@ -124,6 +124,30 @@ type PullRequestPayload = {
   } | null;
 };
 
+export type PullRequestReviewFailureStage =
+  | "target_validation"
+  | "config_load"
+  | "diff_fetch"
+  | "pull_request_input_validation"
+  | "review_engine"
+  | "review_result"
+  | "review_post";
+
+type FailedReviewDiagnostics = {
+  readonly completion_tokens: number;
+  readonly finding_count: number;
+  readonly llm_model: string;
+  readonly llm_provider: string;
+  readonly prompt_tokens: number;
+  readonly review_id: string;
+  readonly review_status: "failed";
+  readonly token_usage_reported: boolean | undefined;
+};
+
+const MaxLoggedErrorMessageLength = 240;
+const SecretLikeErrorFragmentPattern =
+  /\b(?:gh[opsru]_[A-Za-z0-9_]{8,}|sk-[A-Za-z0-9_-]{8,}|(?:api[_-]?key|secret|token)[A-Za-z0-9_.:-]*)\b/giu;
+
 const DefaultReviewOptions: ReviewPullRequestOptions = {
   provider: {
     maxTokens: 1,
@@ -141,6 +165,13 @@ class PullRequestHandlerDependencyError extends Error {
 
 class PullRequestReviewFailedError extends Error {
   public override readonly name = "PullRequestReviewFailedError";
+
+  public readonly diagnostics: FailedReviewDiagnostics;
+
+  public constructor(review: Review) {
+    super("Review engine returned failed status");
+    this.diagnostics = buildFailedReviewDiagnostics(review);
+  }
 }
 
 export async function handlePullRequestOpened(
@@ -166,9 +197,11 @@ async function handlePullRequest(
   dependencies.logger.info(initialLogContext, "Pull request review started");
 
   let target: ReviewPostTarget | undefined;
+  let failureStage: PullRequestReviewFailureStage = "target_validation";
   try {
     target = buildTarget(context);
     const logContext = buildLogContext(context, target);
+    failureStage = "config_load";
     const config = await dependencies.loadConfig(target);
     if ((context.payload.pull_request.draft ?? false) && !config.review.autoReviewDrafts) {
       dependencies.logger.info(
@@ -181,20 +214,26 @@ async function handlePullRequest(
       return;
     }
 
+    failureStage = "diff_fetch";
     const diff = await dependencies.fetchDiff(target);
     const reviewOptions =
       dependencies.buildReviewOptions?.(config) ??
       dependencies.reviewOptions ??
       DefaultReviewOptions;
+    failureStage = "pull_request_input_validation";
+    const pullRequest = buildPullRequest(context);
+    failureStage = "review_engine";
     const review = await dependencies.reviewPullRequest(
       {
         config,
         diff,
-        pullRequest: buildPullRequest(context),
+        pullRequest,
       },
       reviewOptions,
     );
+    failureStage = "review_result";
     requireSuccessfulReview(review);
+    failureStage = "review_post";
     await postReconciledReview(dependencies, target, review, diff);
     dependencies.logger.info(
       {
@@ -208,6 +247,7 @@ async function handlePullRequest(
       commentTarget: target ?? commentTarget,
       dependencies,
       error,
+      failureStage,
       logContext: target === undefined ? initialLogContext : buildLogContext(context, target),
     });
   }
@@ -313,7 +353,20 @@ function requireSuccessfulReview(review: Review): void {
     return;
   }
 
-  throw new PullRequestReviewFailedError(review.error ?? review.summary);
+  throw new PullRequestReviewFailedError(review);
+}
+
+function buildFailedReviewDiagnostics(review: Review): FailedReviewDiagnostics {
+  return {
+    completion_tokens: review.tokens_used.completion,
+    finding_count: review.findings.length,
+    llm_model: review.llm_model,
+    llm_provider: review.llm_provider,
+    prompt_tokens: review.tokens_used.prompt,
+    review_id: review.id,
+    review_status: "failed",
+    token_usage_reported: review.token_usage_reported,
+  };
 }
 
 function buildInitialLogContext(
@@ -358,6 +411,7 @@ async function reportReviewFailure(values: {
   readonly commentTarget: ReviewCommentTarget | undefined;
   readonly dependencies: PullRequestFailureReporterDependencies;
   readonly error: unknown;
+  readonly failureStage: PullRequestReviewFailureStage;
   readonly logContext: Readonly<Record<string, unknown>>;
 }): Promise<void> {
   const failure = describeReviewFailure(values.error);
@@ -374,6 +428,7 @@ async function reportReviewFailure(values: {
     {
       ...values.logContext,
       comment_error_message: commentErrorMessage,
+      failure_stage: values.failureStage,
       ...failure.logFields,
     },
     "Pull request review failed",
@@ -384,6 +439,7 @@ export async function reportPullRequestReviewFailure(values: {
   readonly commentTarget: ReviewCommentTarget | undefined;
   readonly dependencies: PullRequestFailureReporterDependencies;
   readonly error: unknown;
+  readonly failureStage: PullRequestReviewFailureStage;
   readonly logContext: Readonly<Record<string, unknown>>;
 }): Promise<void> {
   await reportReviewFailure(values);
@@ -429,12 +485,44 @@ function describeReviewFailure(error: unknown): {
     };
   }
 
+  if (error instanceof PullRequestReviewFailedError) {
+    return {
+      commentMessage: "review failed",
+      logFields: {
+        error_type: error.name,
+        ...error.diagnostics,
+      },
+    };
+  }
+
   return {
     commentMessage: "review failed",
     logFields: {
-      error_message: errorMessageFrom(error),
+      error_message: safeErrorMessageFrom(error),
+      error_type: errorTypeFrom(error),
     },
   };
+}
+
+function safeErrorMessageFrom(error: unknown): string {
+  return sanitizeErrorMessage(errorMessageFrom(error));
+}
+
+function sanitizeErrorMessage(message: string): string {
+  const redacted = message.replace(SecretLikeErrorFragmentPattern, "[Redacted]");
+  if (redacted.length <= MaxLoggedErrorMessageLength) {
+    return redacted;
+  }
+
+  return `${redacted.slice(0, MaxLoggedErrorMessageLength)}...`;
+}
+
+function errorTypeFrom(error: unknown): string {
+  if (error instanceof Error) {
+    return error.name;
+  }
+
+  return "NonErrorThrow";
 }
 
 function errorMessageFrom(error: unknown): string {

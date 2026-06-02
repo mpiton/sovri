@@ -45,13 +45,19 @@ const SyntaxSanitySourcePaths: readonly string[] = [
 
 describe("syntax sanity validation scope", () => {
   it("documents lightweight committable suggestion validation without full AST validation", () => {
-    // Given CHANGELOG.md has an [Unreleased] section
+    // Given CHANGELOG.md has active release notes
     const changelog = readWorkspaceFile("CHANGELOG.md");
-    const unreleasedSection = extractMarkdownSection(changelog, "## [Unreleased]", "##");
 
     // When the task-111 changelog entry is inspected
-    const addedSection = extractMarkdownSection(unreleasedSection, "### Added", "###");
-    const taskEntry = findChangelogEntry(addedSection, ChangelogFeatureFragments);
+    const documentedEntry = extractReleaseCandidateSections(changelog)
+      .map((section) => {
+        const addedSection = extractMarkdownSection(section, "### Added", "###");
+        const taskEntry = findChangelogEntry(addedSection, ChangelogFeatureFragments);
+        return { addedSection, taskEntry };
+      })
+      .find(({ taskEntry }) => taskEntry.length > 0);
+    expect(documentedEntry).toBeDefined();
+    const { addedSection, taskEntry } = documentedEntry ?? { addedSection: "", taskEntry: "" };
 
     // Then it is under "Added"
     expect(addedSection).toContain(taskEntry);
@@ -128,6 +134,20 @@ function extractMarkdownSection(source: string, heading: string, nextHeading: st
   const body = source.slice(bodyStart);
   const nextStart = body.search(new RegExp(`\\n${nextHeading} `, "u"));
   return nextStart === -1 ? body : body.slice(0, nextStart);
+}
+
+function extractReleaseCandidateSections(changelog: string): string[] {
+  const unreleasedSection = extractMarkdownSection(changelog, "## [Unreleased]", "##");
+  const latestReleaseHeading = findLatestReleaseHeading(changelog);
+  if (latestReleaseHeading === undefined) {
+    return [unreleasedSection];
+  }
+
+  return [unreleasedSection, extractMarkdownSection(changelog, latestReleaseHeading, "##")];
+}
+
+function findLatestReleaseHeading(changelog: string): string | undefined {
+  return /^## \[\d+\.\d+\.\d+\] - \d{4}-\d{2}-\d{2}$/mu.exec(changelog)?.[0];
 }
 
 function findChangelogEntry(section: string, requiredFragments: readonly string[]): string {

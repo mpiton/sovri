@@ -695,6 +695,8 @@ function extractFunctionSourceAt(
 }
 
 function callsLocalFunction(source: string, functionName: string): boolean {
+  // Safe: functionName comes from the local helper extractor, escapeRegExpLiteral
+  // removes regex metacharacters, and callsLocalFunction uses a bounded pattern.
   const callPattern = new RegExp(`\\b${escapeRegExpLiteral(functionName)}\\s*\\(`, "u");
   return callPattern.test(source);
 }

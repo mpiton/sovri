@@ -615,19 +615,21 @@ describe("pull request handlers - remaining ATDD scenarios", () => {
   });
 
   it("posts one PR error comment when the review engine returns failed status", async () => {
+    const secretReviewText = "secret-review-content-41";
     const dependencies = buildDependencies({
       config: buildConfig({ autoReviewDrafts: false }),
       diff: buildDiff(),
       review: buildReview({
         commitSha: OPENED_HEAD_SHA,
-        error: "provider timeout",
+        error: secretReviewText,
         findings: 0,
         status: "failed",
-        walkthrough: "provider timeout",
+        tokenUsageReported: true,
+        walkthrough: secretReviewText,
       }),
     });
 
-    // Given the review engine returns status "failed" with message "provider timeout"
+    // Given the review engine returns status "failed" with sensitive provider output
     // When the opened pull request handler receives the failed review
     await handlePullRequestOpened(
       buildContext({ event: "pull_request.opened", headSha: OPENED_HEAD_SHA }),
@@ -639,8 +641,20 @@ describe("pull request handlers - remaining ATDD scenarios", () => {
     expect(commentOutput(dependencies)).toContain("review failed");
     // And no walkthrough review is posted
     expect(dependencies.postReview).not.toHaveBeenCalled();
-    // And the failed review reason is preserved in logs
-    expect(logOutput(dependencies)).toContain("provider timeout");
+    // And the failed review metadata is preserved in logs
+    expect(logOutput(dependencies)).toContain('"failure_stage":"review_result"');
+    expect(logOutput(dependencies)).toContain('"error_type":"PullRequestReviewFailedError"');
+    expect(logOutput(dependencies)).toContain('"review_status":"failed"');
+    expect(logOutput(dependencies)).toContain('"review_id":"123e4567-e89b-42d3-a456-426614174001"');
+    expect(logOutput(dependencies)).toContain('"llm_provider":"test-provider"');
+    expect(logOutput(dependencies)).toContain('"llm_model":"test-model"');
+    expect(logOutput(dependencies)).toContain('"finding_count":0');
+    expect(logOutput(dependencies)).toContain('"prompt_tokens":100');
+    expect(logOutput(dependencies)).toContain('"completion_tokens":20');
+    expect(logOutput(dependencies)).toContain('"token_usage_reported":true');
+    // And sensitive review text is never copied into logs or comments
+    expect(logOutput(dependencies)).not.toContain(secretReviewText);
+    expect(commentOutput(dependencies)).not.toContain(secretReviewText);
   });
 
   it("does not call the engine when diff fetch fails", async () => {
@@ -666,6 +680,9 @@ describe("pull request handlers - remaining ATDD scenarios", () => {
     expect(commentOutput(dependencies)).toContain("review failed");
     // And every error log line includes delivery ID "8f1b9c2d-3e4f-45a6-91b2-123456789abc"
     expect(errorLogsIncludeDeliveryId(dependencies)).toBe(true);
+    // And the error log identifies the failed stage and typed error
+    expect(logOutput(dependencies)).toContain('"failure_stage":"diff_fetch"');
+    expect(logOutput(dependencies)).toContain('"error_type":"Error"');
   });
 
   it("logs error comment posting failure without duplicate comments", async () => {
@@ -1094,6 +1111,7 @@ function buildReview(values: {
   readonly error?: string;
   readonly findings?: number;
   readonly status?: Review["status"];
+  readonly tokenUsageReported?: boolean;
   readonly walkthrough?: string;
 }): Review {
   const errorFields = values.error === undefined ? {} : { error: values.error };
@@ -1126,6 +1144,7 @@ function buildReview(values: {
     started_at: new Date("2026-05-18T10:00:00.000Z"),
     status: values.status ?? "success",
     summary: values.walkthrough ?? "Review complete",
+    token_usage_reported: values.tokenUsageReported,
     tokens_used: {
       completion: 20,
       prompt: 100,
