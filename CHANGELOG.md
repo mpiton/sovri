@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(bot)`: add command parser acceptance coverage for `@sovri-bot resolve
+  <findingId>`, malformed resolve inputs, mention anchoring, and resolve/dismiss
+  command distinctness.
+
 - `feat(review-engine)`: render parser-approved inline fixes as GitHub
   `suggestion` fenced blocks on single-line inline anchors while keeping
   non-committable alternatives off the one-click surface and preserving
