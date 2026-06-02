@@ -48,6 +48,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `test(bot)`: cover resolve-command behavior when a human-authored comment
   contains Sovri finding marker text.
 
+- `test(bot)`: cover resolve-command statelessness across the reachable handler
+  helper graph, including arrow-function helpers, so manual resolution cannot
+  introduce database, cache, queue, or dismissed-finding suppression stores.
+
 - `feat(bot)`: parse `@sovri-bot resolve <findingId>` as a distinct command
   kind using the existing finding-id validation rules.
 
