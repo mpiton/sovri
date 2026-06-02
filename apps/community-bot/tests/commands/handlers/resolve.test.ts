@@ -10,6 +10,7 @@ import { handleIssueCommentCreated } from "../../../src/handlers/issue-comment.j
 const DeliveryId = "delivery-resolve-thread-001";
 const AuthzFailureDeliveryId = "delivery-resolve-authz-001";
 const FailureDeliveryId = "delivery-resolve-failure-001";
+const SafetyDeliveryId = "delivery-resolve-safety-001";
 const RepoFullName = "octo-org/sovri-target";
 const PullRequestNumber = 42;
 const CommentId = 98_765;
@@ -17,6 +18,8 @@ const ReviewCommentId = 501;
 const ReviewCommentNodeId = "PRRC_thread_001";
 const ThreadId = "PRRT_thread_001";
 const KnownFindingId = "finding-thread-001";
+const SecretGitHubToken = "github-token-placeholder-for-log-safety";
+const SecretLlmApiKey = "llm-api-key-placeholder-for-log-safety";
 const ResolveHandlerSourceUrl = new URL(
   "../../../src/commands/handlers/resolve.ts",
   import.meta.url,
@@ -397,6 +400,46 @@ describe("resolve command handler", () => {
       repo: "sovri-target",
     });
     expect(runtime.octokit.rest.reactions.createForIssueComment).not.toHaveBeenCalled();
+  });
+
+  it("logs resolve failures without raw payloads or secrets", async () => {
+    const runtime = buildRuntime({
+      resolveError: hardGitHubError(503),
+    });
+    const logger = buildLogger();
+    const context = buildIssueCommentContext(runtime.octokit, {
+      deliveryId: SafetyDeliveryId,
+    });
+    const dependencies = createIssueCommentHandlerDependencies(
+      context,
+      {
+        ANTHROPIC_API_KEY: SecretLlmApiKey,
+        GITHUB_TOKEN: SecretGitHubToken,
+        SOVRI_BOT_LOGIN: "sovri-bot",
+      },
+      logger,
+    );
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(logger.error).toHaveBeenCalledTimes(1);
+    const errorCall = logger.error.mock.calls.at(0);
+    if (errorCall === undefined) {
+      throw new Error("Resolve failure log was not emitted");
+    }
+    const [bindings, message] = errorCall;
+    expect(message).toBe("Resolve command failed");
+    expect(bindings).toStrictEqual({
+      delivery_id: SafetyDeliveryId,
+      github_status: 503,
+      pr_number: PullRequestNumber,
+      repo: RepoFullName,
+    });
+    const serializedBindings = JSON.stringify(bindings);
+    expect(serializedBindings).not.toContain("payload");
+    expect(serializedBindings).not.toContain("comment");
+    expect(serializedBindings).not.toContain(SecretGitHubToken);
+    expect(serializedBindings).not.toContain(SecretLlmApiKey);
   });
 
   it("keeps thread-resolution failures stateless inside the webhook request", async () => {
