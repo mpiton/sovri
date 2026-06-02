@@ -105,12 +105,15 @@ The first install runs `--ignore-scripts` by policy (see [`.npmrc`](.npmrc)); no
 
 ## Run the Community bot
 
-Not yet available. The first runnable release is targeted for the v0.1 milestone. Once published the bot will be distributed as:
+The `v0.4.0` image is published for pre-alpha validation. It is not yet the
+complete self-host Community product; the `v0.5.0` sprint is focused on
+hardening BYOK configuration, command coverage, and external setup
+documentation. The bot is distributed as:
 
 - a multi-architecture container image on GitHub Container Registry (`ghcr.io/mpiton/sovri/community-bot`),
-- a standalone Node.js process for users who prefer to deploy without Docker.
+- a standalone Node.js process built from source for users who prefer to deploy without Docker.
 
-Configuration will be provided through a `.sovri.yml` file in each repository and environment variables for the GitHub App credentials and the LLM API key. The bot is **stateless** in v0.1: its only persistent state is the configuration file and the GitHub API itself.
+Configuration is provided through a `.sovri.yml` file in each repository and environment variables for the GitHub App credentials and LLM API keys. The bot remains **stateless** in pre-alpha: its only persistent state is the configuration file and the GitHub API itself.
 
 ### Configuration
 
@@ -137,12 +140,12 @@ supported field, default, and example.
 
 Each release publishes the same image digest under four tags on `ghcr.io/mpiton/sovri/community-bot`:
 
-- `vX.Y.Z` — pinned to the exact SemVer release (e.g. `v0.1.0`).
-- `vX.Y` — moving alias for the latest patch of a minor (e.g. `v0.1`).
+- `vX.Y.Z` — pinned to the exact SemVer release (e.g. `v0.4.0`).
+- `vX.Y` — moving alias for the latest patch of a minor (e.g. `v0.4`).
 - `vX` — moving alias for the latest minor of a major (e.g. `v0`).
-- `latest` — always points at the most recent stable release.
+- `latest` — always points at the most recent published release.
 
-Production deployments should pin to `vX.Y.Z`. The moving aliases (`vX.Y`, `vX`, `latest`) are convenient for local trials but receive new digests on every release.
+Deployments that need reproducibility should pin to `vX.Y.Z`. The moving aliases (`vX.Y`, `vX`, `latest`) are convenient for local trials but receive new digests on every release.
 
 ---
 
