@@ -45,6 +45,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `test(bot)`: assert successful resolve of an existing finding does not post a
   not-found or retry comment.
 
+- `test(bot)`: cover resolve-command behavior when a human-authored comment
+  contains Sovri finding marker text.
+
 - `feat(bot)`: parse `@sovri-bot resolve <findingId>` as a distinct command
   kind using the existing finding-id validation rules.
 

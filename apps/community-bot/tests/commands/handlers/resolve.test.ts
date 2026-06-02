@@ -147,6 +147,37 @@ describe("resolve command handler", () => {
     expect(runtime.octokit.rest.reactions.createForIssueComment).not.toHaveBeenCalled();
   });
 
+  it("ignores human-authored comments with matching finding marker text", async () => {
+    const runtime = buildRuntime();
+    runtime.octokit.rest.pulls.listReviewComments.mockResolvedValueOnce({
+      data: [
+        {
+          body: ["Human note", "", "<!-- sovri-finding-id: missing-finding-001 -->"].join("\n"),
+          id: ReviewCommentId,
+          node_id: ReviewCommentNodeId,
+          user: { login: "alice" },
+        },
+      ],
+    });
+    const context = buildIssueCommentContext(runtime.octokit, {
+      findingId: "missing-finding-001",
+    });
+    const dependencies = createIssueCommentHandlerDependencies(context, {
+      SOVRI_BOT_LOGIN: "sovri-bot",
+    });
+
+    await handleIssueCommentCreated(context, dependencies);
+
+    expect(runtime.octokit.rest.issues.createComment).toHaveBeenCalledWith({
+      body: "Finding missing-finding-001 was not found, so nothing changed.",
+      issue_number: PullRequestNumber,
+      owner: "octo-org",
+      repo: "sovri-target",
+    });
+    expect(runtime.octokit.graphql).not.toHaveBeenCalled();
+    expect(runtime.octokit.rest.reactions.createForIssueComment).not.toHaveBeenCalled();
+  });
+
   it("falls back to minimizing the review comment when no thread id is available", async () => {
     const runtime = buildRuntime({ thread: "missing" });
     const context = buildIssueCommentContext(runtime.octokit);
