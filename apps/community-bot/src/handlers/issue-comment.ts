@@ -71,10 +71,12 @@ export async function handleIssueCommentCreated(
   }
 
   if (command.kind === "unknown") {
-    await dependencies.reactToUnknown({
-      commentId: requireNumber(context.payload.comment.id, "comment.id"),
-      content: "confused",
-    });
+    await reactConfusedToUnsupportedCommand(context, dependencies);
+    return;
+  }
+
+  if (command.kind === "resolve") {
+    await reactConfusedToUnsupportedCommand(context, dependencies);
     return;
   }
 
@@ -92,6 +94,16 @@ export async function handleIssueCommentCreated(
       findingId: command.findingId,
     });
   }
+}
+
+async function reactConfusedToUnsupportedCommand(
+  context: IssueCommentWebhookContext,
+  dependencies: IssueCommentHandlerDependencies,
+): Promise<void> {
+  await dependencies.reactToUnknown({
+    commentId: requireNumber(context.payload.comment.id, "comment.id"),
+    content: "confused",
+  });
 }
 
 function buildCommandContext(context: IssueCommentWebhookContext): IssueCommentCommandContext {

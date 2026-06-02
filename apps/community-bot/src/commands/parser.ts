@@ -4,6 +4,7 @@
 export type ParsedCommand =
   | { readonly kind: "re-review" }
   | { readonly kind: "dismiss"; readonly findingId: string }
+  | { readonly kind: "resolve"; readonly findingId: string }
   | { readonly kind: "unknown"; readonly raw: string }
   | { readonly kind: "no-mention" };
 
@@ -27,13 +28,10 @@ export function parseCommand(body: string): ParsedCommand {
     const tokens = rawCommand.split(/\s+/u);
     const command = tokens[0];
     const findingId = tokens[1];
-    if (
-      tokens.length === 2 &&
-      command === "dismiss" &&
-      findingId !== undefined &&
-      FindingIdPattern.test(findingId)
-    ) {
-      return { kind: "dismiss", findingId };
+    if (tokens.length === 2 && findingId !== undefined && FindingIdPattern.test(findingId)) {
+      if (command === "dismiss" || command === "resolve") {
+        return { kind: command, findingId };
+      }
     }
 
     firstUnknown ??= { kind: "unknown", raw: rawCommand };

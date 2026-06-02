@@ -20,6 +20,7 @@ const DismissFormatDeliveryId = "delivery-dismiss-format-001";
 const MalformedDismissFormatDeliveryId = "delivery-dismiss-format-002";
 const ExtraDismissTokensDeliveryId = "delivery-dismiss-format-003";
 const ReReviewDispatcherBoundaryDeliveryId = "delivery-re-review-003";
+const ResolveUnsupportedDeliveryId = "delivery-resolve-unsupported-001";
 const RepoFullName = "octo-org/sovri-target";
 const PullRequestNumber = 42;
 const PlainIssueNumber = 41;
@@ -343,6 +344,48 @@ describe("issue comment dispatcher - ATDD task 76", () => {
     expect(dependencies.handleDismiss.mock.calls[0]?.[0]?.findingId).toBe(FindingId);
     // And the re-review handler is not called
     expect(dependencies.handleReReview).not.toHaveBeenCalled();
+    // And the dispatcher does not fetch a pull request diff
+    expect(dependencies.fetchPullRequestDiff).not.toHaveBeenCalled();
+    // And the dispatcher does not post a review result
+    expect(dependencies.postReviewResult).not.toHaveBeenCalled();
+  });
+
+  it("reacts confused to parsed resolve commands until resolve handling exists", async () => {
+    const dependencies = buildDependencies({ kind: "resolve", findingId: FindingId });
+    const context = buildIssueCommentContext({
+      author: "alice",
+      body: "@sovri-bot resolve finding-abc-123",
+      deliveryId: ResolveUnsupportedDeliveryId,
+      pullRequestNumber: PullRequestNumber,
+      repoFullName: RepoFullName,
+    });
+
+    // Given Probot has accepted delivery "delivery-resolve-unsupported-001" for event "issue_comment.created"
+    expect(context.id).toBe(ResolveUnsupportedDeliveryId);
+    expect(context.name).toBe("issue_comment.created");
+    // And the repository is "octo-org/sovri-target"
+    expect(context.payload.repository.full_name).toBe(RepoFullName);
+    // And issue 42 is pull request 42
+    expect(context.payload.issue.number).toBe(PullRequestNumber);
+    expect(context.payload.issue.pull_request).toEqual({});
+    // And comment 98765 was authored by "alice"
+    expect(context.payload.comment.id).toBe(CommentId);
+    expect(context.payload.comment.user.login).toBe("alice");
+    // And the comment body is "@sovri-bot resolve finding-abc-123"
+    expect(context.payload.comment.body).toBe("@sovri-bot resolve finding-abc-123");
+
+    // When Sovri dispatches the issue comment webhook context
+    await handleIssueCommentCreated(context, dependencies);
+
+    // Then GitHub receives one reaction request for comment 98765 with content "confused"
+    expect(dependencies.reactToUnknown).toHaveBeenCalledTimes(1);
+    expect(dependencies.reactToUnknown).toHaveBeenCalledWith({
+      commentId: CommentId,
+      content: "confused",
+    });
+    // And no command handler is called
+    expect(dependencies.handleReReview).not.toHaveBeenCalled();
+    expect(dependencies.handleDismiss).not.toHaveBeenCalled();
     // And the dispatcher does not fetch a pull request diff
     expect(dependencies.fetchPullRequestDiff).not.toHaveBeenCalled();
     // And the dispatcher does not post a review result
