@@ -60,14 +60,25 @@ describe("walkthrough output safety (R-09)", () => {
     expect(markdown).not.toContain("<");
   });
 
-  it("emits no credential in the rendered walkthrough", () => {
-    // Given a review composed from validated input
-    // When the walkthrough is composed
-    const markdown = composeWalkthrough(baseReview as unknown as WalkthroughInput);
+  it("sources no credential of its own — an out-of-band secret never reaches the output", () => {
+    // composeWalkthrough is a pure function of its Review: it has no token/key/webhook parameter
+    // and reads no environment, so a secret that lives only outside the Review cannot leak.
+    // (Secrets embedded in user-controlled Review fields are the bot's responsibility upstream;
+    //  the composer escapes and renders those fields, it does not introduce credentials itself.)
+    const outOfBandSecret = `ghp_${"a".repeat(36)}`;
+    process.env["SOVRI_OUTPUT_SAFETY_FIXTURE"] = outOfBandSecret;
 
-    // Then the output contains no GitHub token, LLM API key, or raw webhook signature
-    expect(markdown).not.toMatch(/ghp_[A-Za-z0-9]{36}/u);
-    expect(markdown).not.toMatch(/sk-[A-Za-z0-9]{20,}/u);
-    expect(markdown).not.toContain("X-Hub-Signature");
+    try {
+      // When the walkthrough is composed from a Review carrying no secret
+      const markdown = composeWalkthrough(baseReview as unknown as WalkthroughInput);
+
+      // Then the out-of-band secret never appears, nor any GitHub-token / LLM-key / webhook marker
+      expect(markdown).not.toContain(outOfBandSecret);
+      expect(markdown).not.toMatch(/ghp_[A-Za-z0-9]{36}/u);
+      expect(markdown).not.toMatch(/sk-[A-Za-z0-9]{20,}/u);
+      expect(markdown).not.toContain("X-Hub-Signature");
+    } finally {
+      delete process.env["SOVRI_OUTPUT_SAFETY_FIXTURE"];
+    }
   });
 });
