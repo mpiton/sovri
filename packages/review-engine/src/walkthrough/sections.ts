@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { computeSeverityRank, type Finding, type Severity } from "@sovri/core";
+import { computeSeverityRank, type Finding } from "@sovri/core";
 
+import { severityBadge } from "./badge.js";
 import { formatTableCell } from "./markdown.js";
 import { formatTable } from "./table.js";
 
@@ -15,21 +16,17 @@ export function renderFindings(findings: readonly Finding[]): string[] {
     return ["No findings."];
   }
 
-  const sections: string[] = [];
-
-  for (const group of groupBySeverity(findings)) {
-    if (sections.length > 0) {
-      sections.push("");
-    }
-
-    sections.push(
-      `#### ${formatSeverity(group.severity)}`,
-      "",
-      ...formatFindingsTable(group.findings),
-    );
-  }
-
-  return sections;
+  // A single severity-badged table: the brand glyph in the Severity column, one row per finding,
+  // in the order `findings` already carries (composeWalkthrough sorts by rank then file/line).
+  return formatTable(
+    ["Severity", "Location", "Title", "Details"],
+    findings.map((finding) => [
+      severityBadge(finding.severity),
+      formatLocation(finding),
+      formatCell(finding.title),
+      formatCell(finding.body),
+    ]),
+  );
 }
 
 export function renderFiles(findings: readonly Finding[]): string[] {
@@ -55,38 +52,6 @@ export function renderFiles(findings: readonly Finding[]): string[] {
   }
 
   return sections;
-}
-
-function formatFindingsTable(findings: readonly Finding[]): string[] {
-  return formatTable(
-    ["Severity", "Location", "Title", "Details"],
-    findings.map((finding) => [
-      formatSeverity(finding.severity),
-      formatLocation(finding),
-      formatCell(finding.title),
-      formatCell(finding.body),
-    ]),
-  );
-}
-
-type SeverityGroup = {
-  readonly severity: Severity;
-  readonly findings: readonly Finding[];
-};
-
-function groupBySeverity(findings: readonly Finding[]): SeverityGroup[] {
-  const groups = new Map<Severity, Finding[]>();
-
-  for (const finding of findings) {
-    const group = groups.get(finding.severity) ?? [];
-    group.push(finding);
-    groups.set(finding.severity, group);
-  }
-
-  return [...groups.entries()].map(([severity, groupFindings]) => ({
-    severity,
-    findings: groupFindings,
-  }));
 }
 
 type FileGroup = {
@@ -137,10 +102,6 @@ function compareCodePoints(left: string, right: string): number {
     return 1;
   }
   return 0;
-}
-
-function formatSeverity(severity: Severity): string {
-  return `${severity[0]?.toUpperCase() ?? ""}${severity.slice(1)}`;
 }
 
 function formatLocation(finding: Finding): string {

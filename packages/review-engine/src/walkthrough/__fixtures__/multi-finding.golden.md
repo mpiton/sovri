@@ -8,23 +8,11 @@ Three review findings need attention.
 
 ### Findings
 
-#### Blocker
-
-| Severity | Location                  | Title                     | Details                                                   |
-| -------- | ------------------------- | ------------------------- | --------------------------------------------------------- |
-| Blocker  | src/auth/session.ts:42-45 | Unvalidated session token | The handler accepts a token without signature validation. |
-
-#### Major
-
-| Severity | Location             | Title                      | Details                                       |
-| -------- | -------------------- | -------------------------- | --------------------------------------------- |
-| Major    | src/api/review.ts:18 | Missing payload null guard | The review payload is read before validation. |
-
-#### Minor
-
-| Severity | Location             | Title             | Details                                   |
-| -------- | -------------------- | ----------------- | ----------------------------------------- |
-| Minor    | src/api/review.ts:31 | Duplicated branch | The branch repeats an existing condition. |
+| Severity | Location                  | Title                      | Details                                                   |
+| -------- | ------------------------- | -------------------------- | --------------------------------------------------------- |
+| ⛔        | src/auth/session.ts:42-45 | Unvalidated session token  | The handler accepts a token without signature validation. |
+| 🔴       | src/api/review.ts:18      | Missing payload null guard | The review payload is read before validation.             |
+| 🟡       | src/api/review.ts:31      | Duplicated branch          | The branch repeats an existing condition.                 |
 
 ### File-by-file
 

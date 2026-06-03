@@ -130,7 +130,7 @@ describe("composeWalkthrough finding details", () => {
     // And the finding table row for "Missing payload null guard" contains no raw newline inside a table cell
     const row = markdown
       .split("\n")
-      .find((line) => line.includes("Missing payload null guard") && line.includes("Major"));
+      .find((line) => line.includes("Missing payload null guard") && line.includes("🔴"));
     expect(row).toBeDefined();
     expect(row).not.toContain("\n");
     // And the markdown does not contain "<br>"
