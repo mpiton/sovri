@@ -74,8 +74,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   An optional pipeline-flow diagram (`diff → prompt → LLM → findings`) renders
   under the verdict header as a single ```mermaid fence when enabled via the
   `pipelineFlow` option, and is off by default so existing snapshots stay
-  byte-stable. The banner is GitHub-safe (an emoji heading, no CSS).
-  (task-118, mockup §01)
+  byte-stable. The canonical section order (verdict header → TL;DR → Findings →
+  File-by-file → compliance → cost footer) is preserved, and the banner/flow are
+  GitHub-safe (headings, emoji, and ```mermaid fences only — no CSS class/style
+  attributes, no `gh-chrome.css`). (task-118, mockup §01)
 
 
 ## [0.4.0] - 2026-06-02
