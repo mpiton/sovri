@@ -67,7 +67,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   cost), `WalkthroughInputSchema` validation, and table-cell escaping are
   preserved; the banner/flow stay GitHub-safe (headings, emoji, hosted `<img>`,
   mermaid fences — no CSS). (task-118, mockup §01)
-  <!-- task-118 atdd progress (internal marker, removed before release): R-01(red) -->
+  <!-- task-118 atdd progress (internal marker, removed before release): R-01 -->
 
 
 ## [0.4.0] - 2026-06-02

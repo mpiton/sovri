@@ -7,6 +7,7 @@ import { renderComplianceSection } from "./compliance.js";
 import { renderCostFooter } from "./cost.js";
 import { formatMarkdownText } from "./markdown.js";
 import { renderFiles, renderFindings, sortFindings } from "./sections.js";
+import { computeVerdict, renderVerdictHeader } from "./verdict.js";
 
 const ZeroTokenUsage = { prompt: 0, completion: 0 };
 
@@ -50,6 +51,8 @@ type WalkthroughInputWithoutUsage = Omit<Review, "tokens_used"> & {
 export type WalkthroughInput = Review | WalkthroughInputWithoutUsage;
 
 export { categoryBadge, renderAuditReference, severityBadge } from "./badge.js";
+export { computeVerdict, renderVerdictHeader } from "./verdict.js";
+export type { Verdict } from "./verdict.js";
 export { buildInlineComments, InlineCommentDraftSchema } from "./inline.js";
 export type { InlineCommentDraft } from "./inline.js";
 export { estimateCostUsd, PROVIDER_PRICING, renderCostFooter } from "./cost.js";
@@ -65,8 +68,10 @@ export function composeWalkthrough(input: unknown): string {
       : undefined;
   const costFooter = renderCostFooter(tokenUsage, review.llm_provider, review.llm_model);
 
+  const verdict = computeVerdict(findings);
+
   const sections = [
-    "## Sovri review",
+    ...renderVerdictHeader(verdict, findings),
     "",
     "### TL;DR",
     "",
