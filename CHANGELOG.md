@@ -22,10 +22,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Added
 
 - `feat(review-engine)`: add GitHub-safe badge helpers in
-  `walkthrough/badge.ts` — `severityBadge` (brand glyph alone), `categoryBadge`
-  (`glyph + label`), and `renderAuditReference` (mirrors the inline
-  `🔍 Audit Reference` line). Glyphs/labels read only from `@sovri/brand`; pure,
-  deterministic, no CSS (ADR-016). Re-exported from `walkthrough/index.ts`.
+  `walkthrough/badge.ts` — `severityBadge` (brand glyph alone) and
+  `categoryBadge` (`glyph + label`). Glyphs/labels read only from `@sovri/brand`;
+  pure, deterministic, no CSS (ADR-016). Re-exported from `walkthrough/index.ts`
+  and the package root.
 - `feat(brand)`: extend `categoryPalette` / `CategoryEntrySchema` with a
   per-category `glyph` emoji (🐛 bug, 🔒 security, ⚡ performance, 🔧
   maintainability, 🎨 style, 📝 documentation, 🧪 test-coverage), symmetric with

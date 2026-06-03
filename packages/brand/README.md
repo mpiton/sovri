@@ -11,7 +11,7 @@ so the bot output and the public identity can never drift.
 - `typeScale` / `TypeScaleSchema` — fixed + fluid type steps (`clamp(...)` kept verbatim).
 - `colors` (`light` + `dark`) / `ColorTokensSchema` — the colour ramp, identical key sets per theme.
 - `severityPalette` / `SeverityPaletteSchema` — one `{ color, glyph }` per `Severity`.
-- `categoryPalette` / `CategoryPaletteSchema` — one `{ color, label }` per `Category`.
+- `categoryPalette` / `CategoryPaletteSchema` — one `{ color, glyph, label }` per `Category`.
 
 Every exported token object is frozen and validated against its schema at module load, so a
 malformed token fails fast at import. GitHub strips CSS in PR comments, so the palettes carry

@@ -40,11 +40,13 @@ export type {
 
 export {
   buildInlineComments,
+  categoryBadge,
   composeWalkthrough,
   estimateCostUsd,
   InlineCommentDraftSchema,
   PROVIDER_PRICING,
   renderCostFooter,
+  severityBadge,
   WalkthroughInputSchema,
 } from "./walkthrough/index.js";
 export type {
