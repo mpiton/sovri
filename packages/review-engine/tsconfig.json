@@ -11,6 +11,7 @@
   "include": ["src/**/*"],
   "exclude": ["dist", ".tsbuild", "node_modules", "**/*.test.ts", "**/*.spec.ts"],
   "references": [
+    { "path": "../brand" },
     { "path": "../compliance" },
     { "path": "../core" },
     { "path": "../llm-providers" },

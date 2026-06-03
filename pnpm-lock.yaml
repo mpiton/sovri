@@ -222,6 +222,9 @@ importers:
 
   packages/review-engine:
     dependencies:
+      '@sovri/brand':
+        specifier: workspace:*
+        version: link:../brand
       '@sovri/compliance':
         specifier: workspace:*
         version: link:../compliance

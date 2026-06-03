@@ -84,6 +84,7 @@ export type SeverityPalette = z.infer<typeof SeverityPaletteSchema>;
 
 const CategoryEntrySchema = z.strictObject({
   color: z.string().min(1),
+  glyph: z.string().min(1),
   label: z.string().min(1),
 });
 export const CategoryPaletteSchema = z.strictObject({
@@ -163,13 +164,13 @@ export const severityPalette: SeverityPalette = deepFreeze({
 });
 
 export const categoryPalette: CategoryPalette = deepFreeze({
-  bug: { color: "#d1242f", label: "Bug" },
-  security: { color: "#9a6700", label: "Security" },
-  performance: { color: "#0969da", label: "Performance" },
-  maintainability: { color: "#8250df", label: "Maintainability" },
-  style: { color: "#1a7f37", label: "Style" },
-  documentation: { color: "#59636e", label: "Documentation" },
-  "test-coverage": { color: "#1f883d", label: "Test coverage" },
+  bug: { color: "#d1242f", glyph: "🐛", label: "Bug" },
+  security: { color: "#9a6700", glyph: "🔒", label: "Security" },
+  performance: { color: "#0969da", glyph: "⚡", label: "Performance" },
+  maintainability: { color: "#8250df", glyph: "🔧", label: "Maintainability" },
+  style: { color: "#1a7f37", glyph: "🎨", label: "Style" },
+  documentation: { color: "#59636e", glyph: "📝", label: "Documentation" },
+  "test-coverage": { color: "#1f883d", glyph: "🧪", label: "Test coverage" },
 });
 
 // Validate every frozen export once, at module load, so a malformed token fails fast
