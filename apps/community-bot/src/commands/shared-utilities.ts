@@ -8,9 +8,11 @@ export type RepoRef = {
   readonly repo: string;
 };
 
+const DEFAULT_BOT_LOGIN = "sovri-bot[bot]";
+
 export const FindingMarkerPattern = /<!--\s*sovri-finding-id:\s*([A-Za-z0-9-]{1,64})\s*-->/u;
-export const AlreadyExistsMessagePattern = /already(?:_| )exists/iu;
-export const GitHubErrorStatusSchema = z.object({ status: z.number().int() }).passthrough();
+const AlreadyExistsMessagePattern = /already(?:_| )exists/iu;
+const GitHubErrorStatusSchema = z.object({ status: z.number().int() }).passthrough();
 
 export function githubStatusFrom(error: unknown): number | undefined {
   const result = GitHubErrorStatusSchema.safeParse(error);
@@ -56,11 +58,20 @@ export function splitRepoFullName(
   return { owner, repo };
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
+export function readBotLogin(env: NodeJS.ProcessEnv): string {
+  const value = env.SOVRI_BOT_LOGIN?.trim();
+  if (value === undefined || value.length === 0) {
+    return DEFAULT_BOT_LOGIN;
+  }
+
+  return value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-export function readNumberProperty(
+function readNumberProperty(
   record: Readonly<Record<string, unknown>>,
   property: string,
 ): number | undefined {
@@ -68,7 +79,7 @@ export function readNumberProperty(
   return typeof value === "number" ? value : undefined;
 }
 
-export function readStringProperty(
+function readStringProperty(
   record: Readonly<Record<string, unknown>>,
   property: string,
 ): string | undefined {

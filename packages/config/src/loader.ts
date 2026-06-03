@@ -70,6 +70,31 @@ function assertValidRepoRoot(repoRoot: string): void {
   }
 }
 
+function resolveConfigFilePath(repoRoot: string): string {
+  const normalizedRoot = stripTrailingPathSeparators(repoRoot);
+  const filePath =
+    normalizedRoot === path.parse(normalizedRoot).root
+      ? `${normalizedRoot}${CONFIG_FILENAME}`
+      : `${normalizedRoot}${path.sep}${CONFIG_FILENAME}`;
+
+  if (path.dirname(filePath) !== normalizedRoot || path.basename(filePath) !== CONFIG_FILENAME) {
+    throw new TypeError(
+      `loadConfig: resolved config path must stay inside repoRoot (got ${JSON.stringify(filePath)})`,
+    );
+  }
+
+  return filePath;
+}
+
+function stripTrailingPathSeparators(value: string): string {
+  const root = path.parse(value).root;
+  let end = value.length;
+  while (end > root.length && value.charAt(end - 1) === path.sep) {
+    end -= 1;
+  }
+  return value.slice(0, end);
+}
+
 /**
  * Pre-open file-type check. Returns `true` when `.sovri.yml` is a verified
  * regular file, `false` when it is absent (caller falls back to defaults).
@@ -165,8 +190,9 @@ export const DEFAULT_CONFIG: SovriConfig = deepFreeze(
  *   Relative paths are rejected to eliminate any ambiguity about the
  *   resolved file location; non-normalized absolute paths (containing `.`
  *   or `..` segments, e.g. `"/repo/../../etc"`) are rejected because
- *   `path.join` would silently collapse them and read outside the intended
- *   directory. Callers must also ensure no ancestor of `repoRoot` is itself
+ *   Node path resolution would silently collapse them. The final config path
+ *   is also checked to remain exactly `.sovri.yml` inside `repoRoot` before
+ *   any filesystem read. Callers must also ensure no ancestor of `repoRoot` is itself
  *   a symbolic link if the caller does not control the filesystem layout —
  *   `lstat` only inspects the final path component, so an attacker-controlled
  *   intermediate symlink would not be caught here. The bot infrastructure
@@ -207,7 +233,7 @@ export const DEFAULT_CONFIG: SovriConfig = deepFreeze(
  */
 export async function loadConfig(repoRoot: string): Promise<SovriConfig> {
   assertValidRepoRoot(repoRoot);
-  const filePath = path.join(repoRoot, CONFIG_FILENAME);
+  const filePath = resolveConfigFilePath(repoRoot);
 
   const readable = await assertReadableConfigFile(filePath);
   if (!readable) return DEFAULT_CONFIG;

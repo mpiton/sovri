@@ -12,8 +12,8 @@ import {
   type ReviewPullRequestOptions,
 } from "@sovri/review-engine";
 
+import { readBotLogin, splitRepoFullName } from "../commands/shared-utilities.js";
 import { postReview as postPullRequestReview } from "./comment-poster.js";
-import { readBotLogin } from "./issue-comment-dispatcher.js";
 import { fetchPostedFindings, minimizeFindingComments } from "./posted-findings.js";
 import type {
   PullRequestHandlerDependencies,
@@ -35,11 +35,15 @@ export function createPullRequestHandlerDependencies(
   return {
     buildReviewOptions: (config) => buildReviewOptions(config, env),
     fetchDiff: (target) =>
-      fetchPullRequestDiff(context.octokit, splitRepoFullName(target.repoFullName), target.number),
+      fetchPullRequestDiff(
+        context.octokit,
+        splitRepoFullName(target.repoFullName, createPullRequestReviewAdapterError),
+        target.number,
+      ),
     fetchPostedFindings: (target) =>
       fetchPostedFindings(
         context.octokit,
-        splitRepoFullName(target.repoFullName),
+        splitRepoFullName(target.repoFullName, createPullRequestReviewAdapterError),
         target.number,
         botLogin,
       ),
@@ -57,7 +61,7 @@ async function loadRepositoryConfig(
   target: ReviewPostTarget,
   env: NodeJS.ProcessEnv,
 ): Promise<SovriConfig> {
-  const repo = splitRepoFullName(target.repoFullName);
+  const repo = splitRepoFullName(target.repoFullName, createPullRequestReviewAdapterError);
   try {
     const response = await context.octokit.rest.repos.getContent({
       mediaType: {
@@ -95,7 +99,7 @@ async function postReview(
   review: Review,
   diff: Diff,
 ): Promise<void> {
-  const repo = splitRepoFullName(target.repoFullName);
+  const repo = splitRepoFullName(target.repoFullName, createPullRequestReviewAdapterError);
   await postPullRequestReview(
     context.octokit,
     repo,
@@ -116,7 +120,7 @@ async function postErrorComment(
   target: ReviewCommentTarget,
   message: string,
 ): Promise<void> {
-  const repo = splitRepoFullName(target.repoFullName);
+  const repo = splitRepoFullName(target.repoFullName, createPullRequestReviewAdapterError);
   await context.octokit.rest.issues.createComment({
     body: message,
     issue_number: target.number,
@@ -132,27 +136,6 @@ function buildReviewOptions(config: SovriConfig, env: NodeJS.ProcessEnv): Review
   };
 }
 
-function splitRepoFullName(repoFullName: string): {
-  readonly owner: string;
-  readonly repo: string;
-} {
-  const parts = repoFullName.split("/");
-  const owner = parts[0];
-  const repo = parts[1];
-
-  if (
-    parts.length !== 2 ||
-    owner === undefined ||
-    repo === undefined ||
-    owner.length === 0 ||
-    repo.length === 0
-  ) {
-    throw new PullRequestReviewAdapterError("Repository full name is invalid");
-  }
-
-  return { owner, repo };
-}
-
 function isMissingRepositoryConfig(error: unknown): boolean {
   if (error === null || typeof error !== "object") {
     return false;
@@ -163,4 +146,8 @@ function isMissingRepositoryConfig(error: unknown): boolean {
 
 class PullRequestReviewAdapterError extends Error {
   public override readonly name = "PullRequestReviewAdapterError";
+}
+
+function createPullRequestReviewAdapterError(message: string): PullRequestReviewAdapterError {
+  return new PullRequestReviewAdapterError(message);
 }

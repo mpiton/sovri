@@ -74,7 +74,7 @@ describe("loadConfig — invalid repoRoot", () => {
   });
 
   it("throws TypeError when repoRoot is absolute but contains parent-traversal segments", async () => {
-    // /a/../etc passes path.isAbsolute but path.join normalizes it to /etc,
+    // /a/../etc passes path.isAbsolute but Node path resolution normalizes it to /etc,
     // letting the loader read outside the caller's intended directory.
     await expect(loadConfig("/a/../etc")).rejects.toBeInstanceOf(TypeError);
 

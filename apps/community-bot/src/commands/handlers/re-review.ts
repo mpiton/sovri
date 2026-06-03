@@ -12,6 +12,7 @@ import {
   type PullRequestWebhookContext,
 } from "../../handlers/pull-request.js";
 import { createPullRequestHandlerDependencies } from "../../github/pull-request-review.js";
+import { splitRepoFullName } from "../shared-utilities.js";
 
 export type ReReviewOctokit = PullRequestOctokit & {
   readonly rest: PullRequestOctokit["rest"] & {
@@ -108,7 +109,7 @@ async function reactAccepted(
   octokit: ReReviewOctokit,
   reaction: ReReviewAcceptedReaction,
 ): Promise<void> {
-  const repo = splitRepoFullName(reaction.repoFullName);
+  const repo = splitRepoFullName(reaction.repoFullName, createReReviewCommandError);
   await octokit.rest.reactions.createForIssueComment({
     comment_id: reaction.commentId,
     content: reaction.content,
@@ -146,7 +147,7 @@ async function resolvePullRequest(
   dependencies: ReReviewCommandDependencies,
 ): Promise<z.infer<typeof PullRequestGetSchema> | undefined> {
   try {
-    const repo = splitRepoFullName(command.repoFullName);
+    const repo = splitRepoFullName(command.repoFullName, createReReviewCommandError);
     const response = await dependencies.octokit.rest.pulls.get({
       owner: repo.owner,
       pull_number: command.pullRequestNumber,
@@ -204,27 +205,6 @@ function buildPullRequestContext(
   };
 }
 
-function splitRepoFullName(repoFullName: string): {
-  readonly owner: string;
-  readonly repo: string;
-} {
-  const parts = repoFullName.split("/");
-  const owner = parts[0];
-  const repo = parts[1];
-
-  if (
-    parts.length !== 2 ||
-    owner === undefined ||
-    repo === undefined ||
-    owner.length === 0 ||
-    repo.length === 0
-  ) {
-    throw new ReReviewCommandError("Repository full name is invalid");
-  }
-
-  return { owner, repo };
-}
-
 function errorMessageFrom(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -235,4 +215,8 @@ function errorMessageFrom(error: unknown): string {
 
 class ReReviewCommandError extends Error {
   public override readonly name = "ReReviewCommandError";
+}
+
+function createReReviewCommandError(message: string): ReReviewCommandError {
+  return new ReReviewCommandError(message);
 }

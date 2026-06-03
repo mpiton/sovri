@@ -84,6 +84,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `fix(bot)`: break the re-review issue-comment import cycle by moving the
+  shared bot-login resolver into `commands/shared-utilities`, reusing the
+  shared repository-name parser, and keeping helper-only utilities internal.
+
+- `fix(config)`: resolve `.sovri.yml` through an explicit in-repo path builder
+  and containment check before any filesystem read, removing the path-traversal
+  security candidate surfaced by Fallow.
+
 - `fix(review-engine)`: post deterministic composed walkthrough markdown from the
   orchestrator success path instead of provider-supplied legacy markdown,
   recompose markdown and reset stale summaries after community-bot finding
