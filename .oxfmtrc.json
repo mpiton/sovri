@@ -10,6 +10,7 @@
     "**/.cache/**",
     "**/.worktrees/**",
     "**/test-fixtures/**",
+    "**/*.golden.md",
     "pnpm-lock.yaml",
     "CHANGELOG.md"
   ]

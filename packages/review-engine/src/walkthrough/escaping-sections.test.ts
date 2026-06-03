@@ -77,7 +77,7 @@ describe("composeWalkthrough escaped sections", () => {
       "Title",
       "Details",
     ]);
-    expect(findTableRowCells(findingsSection, "| Major ")).toHaveLength(4);
+    expect(findTableRowCells(findingsSection, "| 🔴 ")).toHaveLength(4);
   });
 });
 

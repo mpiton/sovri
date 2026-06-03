@@ -89,42 +89,35 @@ describe("composeWalkthrough required sections", () => {
   });
 
   it.each([
-    { firstGroup: "Blocker", secondGroup: "Major" },
-    { firstGroup: "Major", secondGroup: "Minor" },
-    { firstGroup: "Minor", secondGroup: "Info" },
-    { firstGroup: "Info", secondGroup: "Nitpick" },
+    { first: "⛔", second: "🔴" },
+    { first: "🔴", second: "🟡" },
+    { first: "🟡", second: "ℹ️" },
+    { first: "ℹ️", second: "💬" },
   ] satisfies ReadonlyArray<{
-    readonly firstGroup: string;
-    readonly secondGroup: string;
-  }>)(
-    "groups present severities with $firstGroup before $secondGroup",
-    ({ firstGroup, secondGroup }) => {
-      // Given the review contains findings with severities "blocker, major, minor, info, nitpick"
-      const review: Review = {
-        ...baseReview,
-        findings: [
-          findingWithSeverity("minor", "22222222-2222-4222-8222-222222222222", 20),
-          findingWithSeverity("nitpick", "33333333-3333-4333-8333-333333333333", 30),
-          findingWithSeverity("blocker", "44444444-4444-4444-8444-444444444444", 40),
-          findingWithSeverity("info", "55555555-5555-4555-8555-555555555555", 50),
-          findingWithSeverity("major", "66666666-6666-4666-8666-666666666666", 60),
-        ],
-      };
+    readonly first: string;
+    readonly second: string;
+  }>)("orders the single badged table with $first before $second", ({ first, second }) => {
+    // Given the review contains findings with severities "blocker, major, minor, info, nitpick"
+    const review: Review = {
+      ...baseReview,
+      findings: [
+        findingWithSeverity("minor", "22222222-2222-4222-8222-222222222222", 20),
+        findingWithSeverity("nitpick", "33333333-3333-4333-8333-333333333333", 30),
+        findingWithSeverity("blocker", "44444444-4444-4444-8444-444444444444", 40),
+        findingWithSeverity("info", "55555555-5555-4555-8555-555555555555", 50),
+        findingWithSeverity("major", "66666666-6666-4666-8666-666666666666", 60),
+      ],
+    };
 
-      // When the maintainer calls `composeWalkthrough(review)`
-      const markdown = composeWalkthrough(review);
-      const findingsSection = extractSection(markdown, "### Findings");
+    // When the maintainer calls `composeWalkthrough(review)`
+    const markdown = composeWalkthrough(review);
+    const findingsSection = extractSection(markdown, "### Findings");
 
-      // Then the Findings section contains severity group <firstGroup>
-      expect(findingsSection).toContain(`#### ${firstGroup}`);
-      // And the Findings section contains severity group <secondGroup>
-      expect(findingsSection).toContain(`#### ${secondGroup}`);
-      // And <firstGroup> appears before <secondGroup>
-      expect(sectionIndex(findingsSection, `#### ${firstGroup}`)).toBeLessThan(
-        sectionIndex(findingsSection, `#### ${secondGroup}`),
-      );
-    },
-  );
+    // Then the Findings section is a single badged table (no per-severity subheadings)
+    expect(findingsSection).not.toContain("#### ");
+    // And the badged row for <first> appears before the badged row for <second>
+    expect(findingsSection.indexOf(first)).toBeLessThan(findingsSection.indexOf(second));
+  });
 
   it("keeps the same section structure for a no-finding review", () => {
     // Given the review contains 0 findings

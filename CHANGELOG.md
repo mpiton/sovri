@@ -66,9 +66,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   that breaks the total down per occurring severity, in descending rank order.
   Replaces the static `## Sovri review`
   title. The `### Findings` section now renders as a single severity-badged
-  table — one row per finding, the brand severity glyph in the Severity column —
-  in place of the per-severity grouped tables, keeping the existing
-  rank-then-file ordering. The
+  table — one row per finding, the task-117 brand severity glyph
+  (`severityBadge`) in the Severity column — in place of the per-severity
+  grouped `#### ` tables, keeping the existing rank-then-file ordering. The
   banner is GitHub-safe (an emoji heading, no CSS). (task-118, mockup §01)
 
 
