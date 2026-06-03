@@ -49,7 +49,7 @@ type WalkthroughInputWithoutUsage = Omit<Review, "tokens_used"> & {
 
 export type WalkthroughInput = Review | WalkthroughInputWithoutUsage;
 
-export { categoryBadge, severityBadge } from "./badge.js";
+export { categoryBadge, renderAuditReference, severityBadge } from "./badge.js";
 export { buildInlineComments, InlineCommentDraftSchema } from "./inline.js";
 export type { InlineCommentDraft } from "./inline.js";
 export { estimateCostUsd, PROVIDER_PRICING, renderCostFooter } from "./cost.js";

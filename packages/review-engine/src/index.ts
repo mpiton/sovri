@@ -45,6 +45,7 @@ export {
   estimateCostUsd,
   InlineCommentDraftSchema,
   PROVIDER_PRICING,
+  renderAuditReference,
   renderCostFooter,
   severityBadge,
   WalkthroughInputSchema,
