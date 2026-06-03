@@ -21,6 +21,15 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(review-engine)`: add GitHub-safe badge helpers in
+  `walkthrough/badge.ts` — `severityBadge` (brand glyph alone), `categoryBadge`
+  (`glyph + label`), and `renderAuditReference` (mirrors the inline
+  `🔍 Audit Reference` line). Glyphs/labels read only from `@sovri/brand`; pure,
+  deterministic, no CSS (ADR-016). Re-exported from `walkthrough/index.ts`.
+- `feat(brand)`: extend `categoryPalette` / `CategoryEntrySchema` with a
+  per-category `glyph` emoji (symmetric with the existing severity `glyph`), so
+  `categoryBadge` sources both glyph and label from the brand single source.
+
 - `feat(brand)`: add the `@sovri/brand` leaf package — the typed, Zod-validated
   design system (`spacing`, `typeScale`, light/dark `colors`, `severityPalette`,
   `categoryPalette`) ported from the mockup tokens. Every export is deeply frozen
