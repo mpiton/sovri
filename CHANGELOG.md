@@ -82,6 +82,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   composer sources no credential of its own — it reads no token, key, or
   environment, so it cannot leak one it was never given. (task-118, mockup §01)
 
+### Removed
+
+- `chore(deps)`: drop the redundant direct `zod` declaration from `@sovri/config`
+  and `@sovri/llm-providers`. Neither package imports `zod` directly — both consume
+  `z` through `@sovri/core` (which re-exports it), so the direct dependency was an
+  unused declaration flagged by Fallow. Removed via `pnpm remove`, lockfile updated.
+
 ### Fixed
 
 - `fix(bot)`: break the re-review issue-comment import cycle by moving the
