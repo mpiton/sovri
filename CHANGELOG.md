@@ -77,7 +77,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   byte-stable. The canonical section order (verdict header → TL;DR → Findings →
   File-by-file → compliance → cost footer) is preserved, and the banner/flow are
   GitHub-safe (headings, emoji, and ```mermaid fences only — no CSS class/style
-  attributes, no `gh-chrome.css`). (task-118, mockup §01)
+  attributes, no `gh-chrome.css`). Adversarial finding content (e.g. an embedded
+  `<style>`/`<script>`) is escaped to inert text rather than activated, and the
+  rendered output carries no credential. (task-118, mockup §01)
 
 
 ## [0.4.0] - 2026-06-02
