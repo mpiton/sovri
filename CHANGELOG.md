@@ -72,8 +72,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `WalkthroughInputSchema` validation at the boundary and the table-cell /
   markdown escaping of summary, titles, bodies, and file paths are preserved.
   An optional pipeline-flow diagram (`diff → prompt → LLM → findings`) renders
-  under the verdict header as a single ```mermaid fence when enabled, and is off
-  by default. The banner is GitHub-safe (an emoji heading, no CSS).
+  under the verdict header as a single ```mermaid fence when enabled via the
+  `pipelineFlow` option, and is off by default so existing snapshots stay
+  byte-stable. The banner is GitHub-safe (an emoji heading, no CSS).
   (task-118, mockup §01)
 
 
