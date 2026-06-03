@@ -70,8 +70,8 @@ describe("composeWalkthrough required sections", () => {
     // When the maintainer calls `composeWalkthrough(review)`
     const markdown = composeWalkthrough(review);
 
-    // Then the markdown contains "## Sovri review"
-    expect(markdown).toContain("## Sovri review");
+    // Then the markdown contains the verdict banner heading (blocker present → request changes)
+    expect(markdown).toContain("## ❌ Request changes");
     // And the markdown contains "### TL;DR"
     expect(markdown).toContain("### TL;DR");
     // And the markdown contains "### Findings"

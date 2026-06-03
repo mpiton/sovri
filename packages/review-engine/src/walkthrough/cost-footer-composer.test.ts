@@ -51,8 +51,8 @@ describe("composeWalkthrough cost footer", () => {
     // When the walkthrough Markdown is composed
     const markdown = composeWalkthrough(reviewWithoutUsage);
 
-    // Then the Markdown contains "## Sovri review"
-    expect(markdown).toContain("## Sovri review");
+    // Then the Markdown contains the verdict banner heading (major finding → request changes)
+    expect(markdown).toContain("## ❌ Request changes");
     // And the Markdown contains "### TL;DR"
     expect(markdown).toContain("### TL;DR");
     // And the Markdown contains "### Findings"

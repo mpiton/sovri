@@ -71,8 +71,9 @@ describe("composeWalkthrough markdown return value", () => {
 
       // Then the returned value is a string
       expect(typeof markdown).toBe("string");
-      // And the markdown starts with "## Sovri review"
-      expect(markdown.startsWith("## Sovri review")).toBe(true);
+      // And the markdown starts with the verdict banner heading
+      const expectedBanner = findingCount === 0 ? "## ✅ Approve" : "## ❌ Request changes";
+      expect(markdown.startsWith(expectedBanner)).toBe(true);
       // And the TL;DR section contains <expectedSummary>
       expect(extractSection(markdown, "### TL;DR")).toContain(expectedSummary);
       // And the markdown does not contain "[object Object]"

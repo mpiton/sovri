@@ -42,11 +42,13 @@ export {
   buildInlineComments,
   categoryBadge,
   composeWalkthrough,
+  computeVerdict,
   estimateCostUsd,
   InlineCommentDraftSchema,
   PROVIDER_PRICING,
   renderAuditReference,
   renderCostFooter,
+  renderVerdictHeader,
   severityBadge,
   WalkthroughInputSchema,
 } from "./walkthrough/index.js";
@@ -54,6 +56,7 @@ export type {
   InlineCommentDraft,
   ModelPricing,
   PricingProvider,
+  Verdict,
   WalkthroughInput,
 } from "./walkthrough/index.js";
 
