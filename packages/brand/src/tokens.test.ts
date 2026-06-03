@@ -196,6 +196,16 @@ describe("R-07 frozen token objects", () => {
     expect(spacing["s-1"]).toBe(4);
     expect(Reflect.deleteProperty(spacing, "s-1")).toBe(false);
   });
+
+  it("freezes nested palette and colour entries (deep, not shallow)", () => {
+    expect(Object.isFrozen(severityPalette.blocker)).toBe(true);
+    expect(Object.isFrozen(categoryPalette.bug)).toBe(true);
+    expect(Object.isFrozen(colors.light)).toBe(true);
+    expect(Reflect.set(severityPalette.blocker, "color", "#000000")).toBe(false);
+    expect(severityPalette.blocker.color).toBe("#d1242f");
+    expect(Reflect.set(categoryPalette.bug, "label", "Mutated")).toBe(false);
+    expect(categoryPalette.bug.label).toBe("Bug");
+  });
 });
 
 // ── R-08 — leaf purity ────────────────────────────────────────────────────

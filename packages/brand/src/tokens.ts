@@ -3,6 +3,19 @@
 
 import { z } from "zod";
 
+// Recursively freeze an object and every nested object so a consumer cannot mutate a
+// nested token entry (e.g. `severityPalette.blocker.color = "x"`). `Object.freeze` alone
+// is shallow, which would leave the palette entries writable. The cast narrows the generic
+// to an indexable record purely to iterate its values; nothing escapes the function.
+const deepFreeze = <T>(value: T): T => {
+  if (value !== null && typeof value === "object") {
+    for (const inner of Object.values(value as Record<string, unknown>)) {
+      deepFreeze(inner);
+    }
+  }
+  return Object.freeze(value);
+};
+
 // ── Spacing scale ─────────────────────────────────────────────────────────
 // Ported verbatim from mockup `:root` (--s-1..--s-9 = 4/8/12/16/24/32/48/64/96).
 export const SpacingScaleSchema = z.strictObject({
@@ -85,7 +98,7 @@ export const CategoryPaletteSchema = z.strictObject({
 export type CategoryPalette = z.infer<typeof CategoryPaletteSchema>;
 
 // ── Frozen token values ───────────────────────────────────────────────────
-export const spacing: SpacingScale = Object.freeze({
+export const spacing: SpacingScale = deepFreeze({
   "s-1": 4,
   "s-2": 8,
   "s-3": 12,
@@ -97,7 +110,7 @@ export const spacing: SpacingScale = Object.freeze({
   "s-9": 96,
 });
 
-export const typeScale: TypeScale = Object.freeze({
+export const typeScale: TypeScale = deepFreeze({
   "t-xs": "12px",
   "t-sm": "14px",
   "t-base": "16px",
@@ -109,7 +122,7 @@ export const typeScale: TypeScale = Object.freeze({
   "t-display": "clamp(96px, 19vw, 260px)",
 });
 
-const light: ColorTokens = Object.freeze({
+const light: ColorTokens = {
   ink: "#111827",
   "ink-soft": "#374151",
   "ink-muted": "#6b7280",
@@ -122,9 +135,9 @@ const light: ColorTokens = Object.freeze({
   gold: "#8b6f2a",
   "gold-soft": "rgba(139, 111, 42, 0.18)",
   "eu-star": "#b89a5e",
-});
+};
 
-const dark: ColorTokens = Object.freeze({
+const dark: ColorTokens = {
   ink: "#f3f4f6",
   "ink-soft": "#d1d5db",
   "ink-muted": "#9ca3af",
@@ -137,11 +150,11 @@ const dark: ColorTokens = Object.freeze({
   gold: "#d8b87a",
   "gold-soft": "rgba(216, 184, 122, 0.22)",
   "eu-star": "#d8b87a",
-});
+};
 
-export const colors = Object.freeze({ light, dark });
+export const colors = deepFreeze({ light, dark });
 
-export const severityPalette: SeverityPalette = Object.freeze({
+export const severityPalette: SeverityPalette = deepFreeze({
   blocker: { color: "#d1242f", glyph: "⛔" },
   major: { color: "#9a6700", glyph: "🔴" },
   minor: { color: "#0969da", glyph: "🟡" },
@@ -149,7 +162,7 @@ export const severityPalette: SeverityPalette = Object.freeze({
   nitpick: { color: "#59636e", glyph: "💬" },
 });
 
-export const categoryPalette: CategoryPalette = Object.freeze({
+export const categoryPalette: CategoryPalette = deepFreeze({
   bug: { color: "#d1242f", label: "Bug" },
   security: { color: "#9a6700", label: "Security" },
   performance: { color: "#0969da", label: "Performance" },
