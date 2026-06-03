@@ -15,6 +15,7 @@ import {
   FindingMarkerPattern,
   githubStatusFrom,
   isGithubAlreadyExistsError,
+  readBotLogin,
   splitRepoFullName,
   type RepoRef,
 } from "../commands/shared-utilities.js";
@@ -25,7 +26,6 @@ import type {
 } from "../handlers/issue-comment.js";
 import { WALKTHROUGH_MARKER } from "./comment-poster.js";
 
-const DEFAULT_BOT_LOGIN = "sovri-bot[bot]";
 const logger = createLogger("community-bot.issue-comment");
 
 export type IssueCommentDispatchOctokit = ReReviewOctokit & {
@@ -197,15 +197,6 @@ export function createIssueCommentHandlerDependencies(
     parseCommand,
     reactToUnknown: (reaction) => reactConfused(context, reaction),
   };
-}
-
-export function readBotLogin(env: NodeJS.ProcessEnv): string {
-  const value = env.SOVRI_BOT_LOGIN?.trim();
-  if (value === undefined || value.length === 0) {
-    return DEFAULT_BOT_LOGIN;
-  }
-
-  return value;
 }
 
 async function reactConfused(
