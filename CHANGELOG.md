@@ -59,8 +59,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `feat(review-engine)`: the walkthrough summary now leads with a deterministic
   verdict header — `## ✅ Approve` / `## ❌ Request changes`, computed once by
-  `computeVerdict` (request-changes iff any finding is ranked at or above
-  `major`) — placed above `### TL;DR` in front of the existing sections, with a
+  `computeVerdict` (request-changes when any finding is ranked at or above
+  `major` — i.e. a `blocker` or `major` — otherwise approve) — placed above
+  `### TL;DR` in front of the existing sections, with a
   one-line finding count. Replaces the static `## Sovri review` title. The
   banner is GitHub-safe (an emoji heading, no CSS). (task-118, mockup §01)
 
