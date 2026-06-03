@@ -71,7 +71,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   grouped `#### ` tables, keeping the existing rank-then-file ordering.
   `WalkthroughInputSchema` validation at the boundary and the table-cell /
   markdown escaping of summary, titles, bodies, and file paths are preserved.
-  The banner is GitHub-safe (an emoji heading, no CSS). (task-118, mockup §01)
+  An optional pipeline-flow diagram (`diff → prompt → LLM → findings`) renders
+  under the verdict header as a single ```mermaid fence when enabled, and is off
+  by default. The banner is GitHub-safe (an emoji heading, no CSS).
+  (task-118, mockup §01)
 
 
 ## [0.4.0] - 2026-06-02
