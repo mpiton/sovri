@@ -68,8 +68,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   title. The `### Findings` section now renders as a single severity-badged
   table — one row per finding, the task-117 brand severity glyph
   (`severityBadge`) in the Severity column — in place of the per-severity
-  grouped `#### ` tables, keeping the existing rank-then-file ordering. The
-  banner is GitHub-safe (an emoji heading, no CSS). (task-118, mockup §01)
+  grouped `#### ` tables, keeping the existing rank-then-file ordering.
+  `WalkthroughInputSchema` validation at the boundary and the table-cell /
+  markdown escaping of summary, titles, bodies, and file paths are preserved.
+  The banner is GitHub-safe (an emoji heading, no CSS). (task-118, mockup §01)
 
 
 ## [0.4.0] - 2026-06-02
