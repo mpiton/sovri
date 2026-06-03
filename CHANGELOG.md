@@ -27,8 +27,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `🔍 Audit Reference` line). Glyphs/labels read only from `@sovri/brand`; pure,
   deterministic, no CSS (ADR-016). Re-exported from `walkthrough/index.ts`.
 - `feat(brand)`: extend `categoryPalette` / `CategoryEntrySchema` with a
-  per-category `glyph` emoji (symmetric with the existing severity `glyph`), so
-  `categoryBadge` sources both glyph and label from the brand single source.
+  per-category `glyph` emoji (🐛 bug, 🔒 security, ⚡ performance, 🔧
+  maintainability, 🎨 style, 📝 documentation, 🧪 test-coverage), symmetric with
+  the existing severity `glyph`, so `categoryBadge` sources both glyph and label
+  from the brand single source.
 
 - `feat(brand)`: add the `@sovri/brand` leaf package — the typed, Zod-validated
   design system (`spacing`, `typeScale`, light/dark `colors`, `severityPalette`,

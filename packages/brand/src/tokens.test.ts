@@ -165,17 +165,29 @@ describe("R-06 category palette", () => {
     expect(Object.keys(categoryPalette).toSorted()).toEqual([...CategorySchema.options].toSorted());
   });
 
-  it("each entry has a non-empty label and colour", () => {
+  it("each entry has a non-empty label, colour, and glyph", () => {
     for (const entry of Object.values(categoryPalette)) {
       expect(entry.label.length).toBeGreaterThan(0);
       expect(entry.color.length).toBeGreaterThan(0);
+      expect(entry.glyph.length).toBeGreaterThan(0);
     }
   });
 
   it("rejects a candidate missing a category key", () => {
-    const candidate: Record<string, { color: string; label: string }> = { ...categoryPalette };
+    const candidate: Record<string, { color: string; glyph: string; label: string }> = {
+      ...categoryPalette,
+    };
     delete candidate["test-coverage"];
     expect(() => CategoryPaletteSchema.parse(candidate)).toThrow();
+  });
+
+  it("rejects a category entry missing its glyph", () => {
+    expect(() =>
+      CategoryPaletteSchema.parse({
+        ...categoryPalette,
+        bug: { color: "#d1242f", label: "Bug" },
+      }),
+    ).toThrow();
   });
 });
 
