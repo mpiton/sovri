@@ -189,4 +189,20 @@ describe("assessment effort score heuristic and clamp (R-02)", () => {
     // Then the score includes the confidence bonus
     expect(result).toBe(3);
   });
+
+  it("preserves the inclusive confidence boundary for mixed confidences averaging 0.85", () => {
+    // Given four nitpick findings whose mathematical average confidence is 0.85
+    const findings = [
+      makeFinding("nitpick", 0.43, "src/a.ts"),
+      makeFinding("nitpick", 1, "src/b.ts"),
+      makeFinding("nitpick", 1, "src/c.ts"),
+      makeFinding("nitpick", 0.97, "src/d.ts"),
+    ];
+
+    // When computeEffortScore is called
+    const result = computeEffortScore()(findings);
+
+    // Then the score includes both the volume and confidence bonuses
+    expect(result).toBe(3);
+  });
 });

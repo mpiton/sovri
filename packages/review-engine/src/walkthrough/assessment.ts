@@ -7,6 +7,7 @@ export type EffortScore = 1 | 2 | 3 | 4 | 5;
 
 const VOLUME_BONUS_THRESHOLD = 4;
 const CONFIDENCE_BONUS_THRESHOLD = 0.85;
+const CONFIDENCE_BOUNDARY_EPSILON = Number.EPSILON * 10;
 
 /**
  * Computes a deterministic review effort score from findings only.
@@ -34,9 +35,13 @@ export function computeEffortScore(findings: readonly Finding[]): EffortScore {
 
   const volumeBonus = findings.length >= VOLUME_BONUS_THRESHOLD ? 1 : 0;
   const averageConfidence = confidenceTotal / findings.length;
-  const confidenceBonus = averageConfidence >= CONFIDENCE_BONUS_THRESHOLD ? 1 : 0;
+  const confidenceBonus = meetsConfidenceThreshold(averageConfidence) ? 1 : 0;
 
   return toEffortScore(highestSeverityRank + volumeBonus + confidenceBonus);
+}
+
+function meetsConfidenceThreshold(averageConfidence: number): boolean {
+  return averageConfidence + CONFIDENCE_BOUNDARY_EPSILON >= CONFIDENCE_BONUS_THRESHOLD;
 }
 
 function toEffortScore(rawScore: number): EffortScore {
