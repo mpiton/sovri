@@ -21,7 +21,12 @@ export function renderComplianceSection(findings: readonly Finding[]): string[] 
     return [];
   }
 
-  const lines: string[] = ["### Compliance & audit"];
+  const lines: string[] = [
+    "<details>",
+    "<summary>Compliance &amp; provenance</summary>",
+    "",
+    "### Compliance & audit",
+  ];
 
   for (const finding of findings) {
     lines.push("", `#### ${formatMarkdownText(finding.title)} — ${formatLocation(finding)}`, "");
@@ -35,6 +40,8 @@ export function renderComplianceSection(findings: readonly Finding[]): string[] 
 
     lines.push(`🔍 Audit Reference: ${finding.audit_reference ?? "n/a"}`);
   }
+
+  lines.push("", "</details>");
 
   return lines;
 }
