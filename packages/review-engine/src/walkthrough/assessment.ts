@@ -5,6 +5,9 @@ import { computeSeverityRank, type Finding } from "@sovri/core";
 
 export type EffortScore = 1 | 2 | 3 | 4 | 5;
 
+const FILLED_DOT = "●";
+const EMPTY_DOT = "○";
+const EFFORT_METER_DOTS = 5;
 const VOLUME_BONUS_THRESHOLD = 4;
 const CONFIDENCE_BONUS_THRESHOLD = 0.85;
 const CONFIDENCE_BOUNDARY_EPSILON = Number.EPSILON * 10;
@@ -38,6 +41,10 @@ export function computeEffortScore(findings: readonly Finding[]): EffortScore {
   const confidenceBonus = meetsConfidenceThreshold(averageConfidence) ? 1 : 0;
 
   return toEffortScore(highestSeverityRank + volumeBonus + confidenceBonus);
+}
+
+export function renderEffortMeter(score: EffortScore): string {
+  return FILLED_DOT.repeat(score) + EMPTY_DOT.repeat(EFFORT_METER_DOTS - score);
 }
 
 function meetsConfidenceThreshold(averageConfidence: number): boolean {

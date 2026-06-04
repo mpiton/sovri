@@ -23,7 +23,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `feat(review-engine)`: add ATDD coverage for the GitHub-safe effort meter
   renderer that maps effort scores `1..5` to exactly five text dot glyphs
-  (`●`/`○`) without HTML or CSS (#2257).
+  (`●`/`○`) without HTML or CSS, exported from the walkthrough barrel and
+  package root (#2257).
 
 - `test(review-engine)`: add ATDD endpoint-case coverage for the review
   assessment effort score: zero findings stay at score `1`, and any blocker
