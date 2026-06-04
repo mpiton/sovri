@@ -25,7 +25,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   markdown, including canonical walkthrough placement after the verdict header
   and guards against CSS, stripped attributes, external stylesheets, and local
   preview vocabulary, with a regression guard for multi-character HTML tags
-  (#2261).
+  (R-08, #2261).
 
 - `feat(review-engine)`: add ATDD coverage for the review assessment block,
   including severity legend filtering and ordering plus an explicit empty-state

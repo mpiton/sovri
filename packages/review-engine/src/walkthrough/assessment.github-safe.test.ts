@@ -112,7 +112,6 @@ describe("assessment GitHub-safe markdown (R-08)", () => {
 });
 
 function blockIndex(output: string, block: string): number {
-  const index = output.indexOf(block);
-  expect(index).toBeGreaterThanOrEqual(0);
-  return index;
+  expect(output, `Expected walkthrough markdown to contain block: ${block}`).toContain(block);
+  return output.indexOf(block);
 }
