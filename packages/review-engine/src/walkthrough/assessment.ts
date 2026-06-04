@@ -47,8 +47,36 @@ export function renderEffortMeter(score: EffortScore): string {
   return FILLED_DOT.repeat(score) + EMPTY_DOT.repeat(EFFORT_METER_DOTS - score);
 }
 
+export function renderMetricChips(findings: readonly Finding[]): string {
+  const touchedFiles = new Set(findings.map((finding) => finding.file));
+  const highImpactFindings = findings.filter(
+    (finding) => computeSeverityRank(finding.severity) >= 4,
+  );
+
+  return [
+    renderMetricChip(formatCount(findings.length, "finding", "findings")),
+    renderMetricChip(formatCount(touchedFiles.size, "file touched", "files touched")),
+    renderMetricChip(
+      formatCount(
+        highImpactFindings.length,
+        "blocker plus major finding",
+        "blocker plus major findings",
+      ),
+    ),
+  ].join(" · ");
+}
+
 function meetsConfidenceThreshold(averageConfidence: number): boolean {
   return averageConfidence + CONFIDENCE_BOUNDARY_EPSILON >= CONFIDENCE_BONUS_THRESHOLD;
+}
+
+function renderMetricChip(label: string): string {
+  return `\`${label}\``;
+}
+
+function formatCount(count: number, singular: string, plural: string): string {
+  const label = count === 1 ? singular : plural;
+  return `${count} ${label}`;
 }
 
 function toEffortScore(rawScore: number): EffortScore {

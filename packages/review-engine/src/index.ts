@@ -50,6 +50,7 @@ export {
   renderAuditReference,
   renderCostFooter,
   renderEffortMeter,
+  renderMetricChips,
   renderVerdictHeader,
   severityBadge,
   WalkthroughInputSchema,
