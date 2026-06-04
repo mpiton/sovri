@@ -42,6 +42,7 @@ export {
   buildInlineComments,
   categoryBadge,
   composeWalkthrough,
+  computeEffortScore,
   computeVerdict,
   estimateCostUsd,
   InlineCommentDraftSchema,
@@ -54,6 +55,7 @@ export {
 } from "./walkthrough/index.js";
 export type {
   InlineCommentDraft,
+  EffortScore,
   ModelPricing,
   PricingProvider,
   Verdict,
