@@ -13,6 +13,24 @@ import { computeVerdict, renderVerdictHeader } from "./verdict.js";
 
 const ZeroTokenUsage = { prompt: 0, completion: 0 };
 
+const PromptSha256Pattern = /^[a-f0-9]{64}$/u;
+
+export const WalkthroughProvenanceSchema = z
+  .object({
+    prompt_sha256: z.string().regex(PromptSha256Pattern),
+    hosting_region: z.string().min(1),
+    data_residency: z.string().min(1),
+    signed_audit_entry: z.string().min(1).optional(),
+  })
+  .strict();
+
+type WalkthroughProvenance = z.infer<typeof WalkthroughProvenanceSchema>;
+
+interface ParsedProvenanceResult {
+  readonly ok: boolean;
+  readonly provenance?: WalkthroughProvenance;
+}
+
 const WalkthroughInputWithoutUsageSchema = z.unknown().transform((input, context) => {
   if (!isJsonRecord(input) || Reflect.get(input, "tokens_used") !== undefined) {
     context.addIssue({
@@ -36,11 +54,50 @@ const WalkthroughInputWithoutUsageSchema = z.unknown().transform((input, context
     return z.NEVER;
   }
 
+  const provenance = parseWalkthroughProvenance(input, context);
+  if (!provenance.ok) {
+    return z.NEVER;
+  }
+
   const { tokens_used: _tokensUsed, ...reviewWithoutUsage } = parsed.data;
+  if (provenance.provenance !== undefined) {
+    return { ...reviewWithoutUsage, provenance: provenance.provenance };
+  }
+
   return reviewWithoutUsage;
 });
 
-export const WalkthroughInputSchema = z.union([ReviewSchema, WalkthroughInputWithoutUsageSchema]);
+const WalkthroughInputWithUsageSchema = z.unknown().transform((input, context) => {
+  if (!isJsonRecord(input)) {
+    context.addIssue({
+      code: "custom",
+      message: "walkthrough input must be a review object",
+    });
+    return z.NEVER;
+  }
+
+  const parsed = ReviewSchema.safeParse(input);
+  if (!parsed.success) {
+    context.addIssue({ code: "custom", message: parsed.error.message });
+    return z.NEVER;
+  }
+
+  const provenance = parseWalkthroughProvenance(input, context);
+  if (!provenance.ok) {
+    return z.NEVER;
+  }
+
+  if (provenance.provenance !== undefined) {
+    return { ...parsed.data, provenance: provenance.provenance };
+  }
+
+  return parsed.data;
+});
+
+export const WalkthroughInputSchema = z.union([
+  WalkthroughInputWithUsageSchema,
+  WalkthroughInputWithoutUsageSchema,
+]);
 
 function isJsonRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -50,7 +107,13 @@ type WalkthroughInputWithoutUsage = Omit<Review, "tokens_used"> & {
   readonly tokens_used?: undefined;
 };
 
-export type WalkthroughInput = Review | WalkthroughInputWithoutUsage;
+type WithWalkthroughProvenance<T> = T & {
+  readonly provenance?: WalkthroughProvenance;
+};
+
+export type WalkthroughInput =
+  | WithWalkthroughProvenance<Review>
+  | WithWalkthroughProvenance<WalkthroughInputWithoutUsage>;
 
 export { categoryBadge, renderAuditReference, severityBadge } from "./badge.js";
 export { computeVerdict, renderVerdictHeader } from "./verdict.js";
@@ -72,7 +135,7 @@ export function composeWalkthrough(
   input: unknown,
   options: { readonly pipelineFlow?: boolean } = {},
 ): string {
-  const review = WalkthroughInputSchema.parse(input);
+  const review: WalkthroughInput = WalkthroughInputSchema.parse(input);
   const findings = sortFindings(review.findings);
   const summary = review.summary.trim();
   const tokenUsage =
@@ -106,10 +169,14 @@ export function composeWalkthrough(
     ...renderFiles(findings),
   );
 
-  const complianceSection = renderComplianceSection(findings, {
+  const complianceProvenance = {
     llmProvider: review.llm_provider,
     llmModel: review.llm_model,
-  });
+    ...(review.provenance?.prompt_sha256 === undefined
+      ? {}
+      : { promptSha256: review.provenance.prompt_sha256 }),
+  };
+  const complianceSection = renderComplianceSection(findings, complianceProvenance);
   if (complianceSection.length > 0) {
     sections.push("", ...complianceSection);
   }
@@ -119,4 +186,29 @@ export function composeWalkthrough(
   }
 
   return sections.join("\n");
+}
+
+function parseWalkthroughProvenance(
+  input: Record<string, unknown>,
+  context: z.RefinementCtx,
+): ParsedProvenanceResult {
+  const rawProvenance = Reflect.get(input, "provenance");
+  if (rawProvenance === undefined) {
+    return { ok: true };
+  }
+
+  const parsed = WalkthroughProvenanceSchema.safeParse(rawProvenance);
+  if (!parsed.success) {
+    for (const issue of parsed.error.issues) {
+      context.addIssue({
+        code: "custom",
+        path: ["provenance", ...issue.path],
+        message: issue.message,
+      });
+    }
+
+    return { ok: false };
+  }
+
+  return { ok: true, provenance: parsed.data };
 }

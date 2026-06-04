@@ -8,6 +8,7 @@ import { formatMarkdownText } from "./markdown.js";
 interface ComplianceProvenance {
   readonly llmProvider: string;
   readonly llmModel: string;
+  readonly promptSha256?: string;
 }
 
 const FRAMEWORK_LABELS: Record<ComplianceFramework, string> = {
@@ -41,6 +42,12 @@ export function renderComplianceSection(
       "",
       `Model: ${formatMarkdownText(provenance.llmProvider)} / ${formatMarkdownText(provenance.llmModel)}`,
     );
+
+    if (provenance.promptSha256 !== undefined) {
+      lines.push(`Prompt sha256: ${formatMarkdownText(provenance.promptSha256)}`);
+    }
+
+    lines.push("No signed audit trail is attached");
   }
 
   for (const finding of findings) {
