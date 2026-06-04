@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(review-engine)`: render non-empty compliance output inside a
+  default-collapsed GitHub `<details>` block while preserving the existing
+  compliance content order (R-01, #2294).
+
 - `test(review-engine)`: add ATDD coverage for rendering the compliance and
   provenance block as default-collapsed GitHub `<details>` markup without styled
   container attributes (R-01, #2294).
