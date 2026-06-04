@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add ATDD coverage and the initial helper surface for
+  the three stable Sovri GitHub Checks status rows (R-01, #2319).
+
 - `test(review-engine)`: add ATDD coverage for the compliance provenance
   implementation quality contract, including Apache headers, explicit ESM
   imports, forbidden TypeScript escape-hatch and type-assertion guards,
