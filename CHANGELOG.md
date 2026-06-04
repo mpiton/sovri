@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add ATDD coverage for secret-safe compliance
+  provenance output, ensuring non-provenance secret-shaped fields are ignored
+  while signed audit-entry identifiers still render (R-09, #2302).
+
 - `test(review-engine)`: add ATDD coverage for GitHub-safe compliance and
   provenance markdown, including provenance-present rendering without CSS hooks
   and escaping of user-influenced compliance strings (R-08, #2301).
