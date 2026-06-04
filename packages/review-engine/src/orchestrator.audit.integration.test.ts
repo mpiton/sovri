@@ -720,11 +720,21 @@ describe("reviewPullRequest audit-trail sink wiring", () => {
       const sink = new MemoryAuditTrailSink();
 
       // When reviewPullRequest runs (a response WAS received on the first attempt)
-      await reviewPullRequest({ pullRequest, diff, config }, { provider, auditTrailSink: sink });
+      const review = await reviewPullRequest(
+        { pullRequest, diff, config },
+        { provider, auditTrailSink: sink },
+      );
 
       // Then llm.called is recorded even though the review fails as a provider error
       expect(eventTypes(sink)).toEqual(["review.started", "llm.called", "review.failed"]);
       expect(findEvent(sink, "review.failed")?.["error_code"]).toBe("provider_error");
+      const promptHash = findEvent(sink, "llm.called")?.["prompt_hash"];
+      expect(typeof promptHash).toBe("string");
+      expect(review.walkthrough_markdown).toContain("provider transport failure on retry");
+      expect(review.walkthrough_markdown).toContain(
+        `Prompt sha256: ${String(promptHash).replace("sha256:", "")}`,
+      );
+      expect(review.walkthrough_markdown).not.toContain("## ✅ Approve");
     });
 
     it("a token-bearing retryable schema error still records llm.called", async () => {

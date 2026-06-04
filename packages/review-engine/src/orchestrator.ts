@@ -45,6 +45,7 @@ import {
   type ProviderReviewResponse,
 } from "./parsing/index.js";
 import { toFindingSuggestion } from "./parsing/suggestion.js";
+import { renderComplianceSection } from "./walkthrough/compliance.js";
 import { composeWalkthrough } from "./walkthrough/index.js";
 
 const RunReviewInputSchema = ReviewPromptInputSchema;
@@ -743,7 +744,24 @@ function buildFailedReview(
     return review;
   }
 
-  return withComposedWalkthrough(review, { promptSha256: options.promptSha256 });
+  return withFailedReviewProvenance(review, options.promptSha256);
+}
+
+function withFailedReviewProvenance(review: Review, promptSha256: string): Review {
+  if (review.findings.length > 0) {
+    return withComposedWalkthrough(review, { promptSha256 });
+  }
+
+  const complianceSection = renderComplianceSection([], {
+    llmProvider: review.llm_provider,
+    llmModel: review.llm_model,
+    promptSha256,
+  });
+
+  return {
+    ...review,
+    walkthrough_markdown: [review.walkthrough_markdown, "", ...complianceSection].join("\n"),
+  };
 }
 
 function buildReviewFailedFinding(diff: Diff, error: string): Finding {

@@ -219,6 +219,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   review walkthroughs when provider responses are audited but still fail parsing
   after retry (#2316).
 
+- `fix(review-engine)`: keep prompt-bearing failed provider walkthroughs on
+  failure copy instead of rendering an approve verdict for empty failed reviews
+  (#2316).
+
 ### Changed
 
 - `feat(review-engine)`: refresh inline finding comment headers so the body
