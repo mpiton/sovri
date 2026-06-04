@@ -66,6 +66,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Changed
 
+- `refactor(llm-providers)`: extract the duplicated `isJsonObject` /
+  `isStringArray` / `stringArray` JSON-value guards (byte-identical across
+  `OpenAIProvider.schema-{matching,normalization,stripping}.ts`) into a shared
+  internal `OpenAIProvider.schema-guards.ts` module, imported as runtime values
+  (`verbatimModuleSyntax`). Scoped to the OpenAI schema triple (#2247).
+
 - `refactor(review-engine)`: extract the duplicated `splitFilePatches` helper
   (byte-identical in `diff/filter.ts` and `diff/parser.ts`) into a shared
   internal `diff/split-file-patches.ts` module, imported relatively and kept out

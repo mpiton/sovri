@@ -9,6 +9,7 @@ import {
   matchesJsonSchemaValue,
   matchesOpenAIResponseJsonSchemaValue,
 } from "./OpenAIProvider.schema-matching.js";
+import { isJsonObject, stringArray } from "./OpenAIProvider.schema-guards.js";
 
 export function stripOpenAIOptionalNulls(value: unknown, schema: z.ZodType): unknown {
   return stripOptionalNullsFromValue(value, zodToProviderJsonSchema(schema));
@@ -91,16 +92,4 @@ function countNullValues(value: unknown): number {
   }
 
   return count;
-}
-
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isStringArray(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
-}
-
-function stringArray(value: unknown): readonly string[] {
-  return isStringArray(value) ? value : [];
 }

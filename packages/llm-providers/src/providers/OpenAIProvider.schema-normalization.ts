@@ -5,6 +5,7 @@ import { z } from "@sovri/core";
 
 import { zodToProviderJsonSchema } from "../helpers/provider-json-schema.js";
 import { OpenAIProviderError } from "./OpenAIProvider.errors.js";
+import { isJsonObject, isStringArray, stringArray } from "./OpenAIProvider.schema-guards.js";
 
 export function createOpenAIStrictJsonSchema(schema: z.ZodType): Record<string, unknown> {
   try {
@@ -138,18 +139,6 @@ function hasDynamicObjectProperties(schema: Record<string, unknown>): boolean {
     schema["propertyNames"] !== undefined ||
     (additionalProperties !== undefined && additionalProperties !== false)
   );
-}
-
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isStringArray(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
-}
-
-function stringArray(value: unknown): readonly string[] {
-  return isStringArray(value) ? value : [];
 }
 
 function isNullSchema(value: unknown): boolean {

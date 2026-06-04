@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+import { isJsonObject, isStringArray, stringArray } from "./OpenAIProvider.schema-guards.js";
+
 type JsonSchemaMatchMode = "strict" | "openai-response";
 
 export function matchesJsonSchemaValue(value: unknown, schema: unknown): boolean {
@@ -180,16 +182,4 @@ function isOpenAIOptionalNullSentinel(
     schema !== undefined &&
     !allowsNullJsonSchemaValue(schema)
   );
-}
-
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isStringArray(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
-}
-
-function stringArray(value: unknown): readonly string[] {
-  return isStringArray(value) ? value : [];
 }
