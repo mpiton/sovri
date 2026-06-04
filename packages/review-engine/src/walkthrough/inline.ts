@@ -6,6 +6,7 @@ import { DiffSchema, FindingSchema, z, type Diff, type Finding } from "@sovri/co
 import { iterateRightSideLines } from "../diff/right-side-lines.js";
 import { computeFindingFingerprint } from "../reconcile/fingerprint.js";
 import { renderFindingMarker } from "../reconcile/marker.js";
+import { categoryBadge, renderAuditReference, severityBadge } from "./badge.js";
 
 const MinimumMarkdownFenceLength = 3;
 const BacktickRunPattern = /`+/gu;
@@ -87,10 +88,13 @@ function buildInlineCommentDraft(finding: Finding, diff: Diff): InlineCommentDra
 }
 
 function formatInlineBody(finding: Finding, fingerprint: string): string {
-  const body = [`**${finding.title}**`, "", finding.body].join("\n");
-  const auditLine = finding.audit_reference
-    ? `\n\n🔍 Audit Reference: ${finding.audit_reference}`
-    : "";
+  const body = [
+    `${severityBadge(finding.severity)} ${categoryBadge(finding.category)}`,
+    `**${finding.title}**`,
+    "",
+    finding.body,
+  ].join("\n");
+  const auditLine = renderAuditReference(finding);
   const suggestionBlock = renderCommittableSuggestionBlock(finding);
   return `${body}${auditLine}${suggestionBlock}\n\n${renderFindingMarker(fingerprint)}`;
 }
