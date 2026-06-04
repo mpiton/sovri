@@ -21,6 +21,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add ATDD coverage for the review assessment module
+  quality contract, including public header and ESM import checks, forbidden
+  TypeScript escape-hatch guards, no I/O/log/env or secret-bearing helper output,
+  and rejection of invalid external review input before assessment rendering
+  (R-09, #2262).
+
 - `test(review-engine)`: add ATDD coverage for GitHub-safe review assessment
   markdown, including canonical walkthrough placement after the verdict header
   and guards against CSS, stripped attributes, external stylesheets, and local
