@@ -66,6 +66,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Changed
 
+- `refactor(scripts)`: consolidate the duration-budget guard and result emitter
+  in `ci-policy.mjs` — `guardNonNegativeElapsed` (the identical
+  `--job-end-ms >= --job-start-ms` check across the four budget commands) and
+  `emitDurationBudgetResult(statusKey, outcome, elapsedMs, format)` (the
+  `measured_duration_ms / <statusKey> / reported_duration` pass/fail lines),
+  clearing `dup:f1db16ab`. The special-case emissions (cache-miss, unsupported,
+  build-docker cache-fail) keep their distinct field shapes inline. The broader
+  ci-policy report-builder clones are left for a later pass. Verified by
+  `scripts/ci-policy.test.sh` (414 cases) (#2247).
+
 - `refactor(scripts)`: fold the qualifying-row scan shared by
   `findInvalidFindingCountPr`, `findInvalidLatencyPr` and
   `evaluateSoakLogQualityRatings` in `validate-v0-1-soak.mjs` into an

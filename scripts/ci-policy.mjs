@@ -277,6 +277,18 @@ const formatBuildDockerDuration = (elapsedMs) => {
   return `${minutes} min ${formatDuration(remainingMs)}`;
 };
 
+const guardNonNegativeElapsed = (elapsedMs) => {
+  if (elapsedMs < 0) {
+    fail("ERROR: --job-end-ms must be greater than or equal to --job-start-ms.", 2);
+  }
+};
+
+const emitDurationBudgetResult = (statusKey, outcome, elapsedMs, format) => {
+  writeStdout(
+    `measured_duration_ms=${elapsedMs}\n${statusKey}=${outcome}\nreported_duration=${format(elapsedMs)}\n`,
+  );
+};
+
 const runDurationBudget = (args) => {
   const options = parseOptions(args);
   const startMs = readInteger(options, "job-start-ms");
@@ -285,9 +297,7 @@ const runDurationBudget = (args) => {
   const turboCache = readCacheState(options, "turbo-cache");
   const elapsedMs = endMs - startMs;
 
-  if (elapsedMs < 0) {
-    fail("ERROR: --job-end-ms must be greater than or equal to --job-start-ms.", 2);
-  }
+  guardNonNegativeElapsed(elapsedMs);
 
   if (pnpmCache !== "hit" || turboCache !== "hit") {
     writeStdout(
@@ -297,16 +307,12 @@ const runDurationBudget = (args) => {
   }
 
   if (pnpmCache === "hit" && turboCache === "hit" && elapsedMs < DURATION_BUDGET_MS) {
-    writeStdout(
-      `measured_duration_ms=${elapsedMs}\nduration_budget=pass\nreported_duration=${formatDuration(elapsedMs)}\n`,
-    );
+    emitDurationBudgetResult("duration_budget", "pass", elapsedMs, formatDuration);
     return;
   }
 
   if (pnpmCache === "hit" && turboCache === "hit") {
-    writeStdout(
-      `measured_duration_ms=${elapsedMs}\nduration_budget=fail\nreported_duration=${formatDuration(elapsedMs)}\n`,
-    );
+    emitDurationBudgetResult("duration_budget", "fail", elapsedMs, formatDuration);
     fail("backend-checks must finish in under 5 minutes on cache hit", 1);
   }
 
@@ -322,20 +328,14 @@ const runSecretsDurationBudget = (args) => {
   const endMs = readInteger(options, "job-end-ms");
   const elapsedMs = endMs - startMs;
 
-  if (elapsedMs < 0) {
-    fail("ERROR: --job-end-ms must be greater than or equal to --job-start-ms.", 2);
-  }
+  guardNonNegativeElapsed(elapsedMs);
 
   if (elapsedMs < SECRETS_SCAN_DURATION_BUDGET_MS) {
-    writeStdout(
-      `measured_duration_ms=${elapsedMs}\nduration_budget=pass\nreported_duration=${formatDuration(elapsedMs)}\n`,
-    );
+    emitDurationBudgetResult("duration_budget", "pass", elapsedMs, formatDuration);
     return;
   }
 
-  writeStdout(
-    `measured_duration_ms=${elapsedMs}\nduration_budget=fail\nreported_duration=${formatDuration(elapsedMs)}\n`,
-  );
+  emitDurationBudgetResult("duration_budget", "fail", elapsedMs, formatDuration);
   fail("secrets-scan must finish in under 1 minute", 1);
 };
 
@@ -718,9 +718,7 @@ const runBuildDockerDurationBudget = (args) => {
   const cacheState = readBuildDockerCacheState(options);
   const elapsedMs = endMs - startMs;
 
-  if (elapsedMs < 0) {
-    fail("ERROR: --job-end-ms must be greater than or equal to --job-start-ms.", 2);
-  }
+  guardNonNegativeElapsed(elapsedMs);
 
   if (cacheState !== "enabled") {
     writeStdout(`duration_budget=fail\nmeasured_duration_ms=${elapsedMs}\n`);
@@ -728,15 +726,11 @@ const runBuildDockerDurationBudget = (args) => {
   }
 
   if (elapsedMs < BUILD_DOCKER_DURATION_BUDGET_MS) {
-    writeStdout(
-      `measured_duration_ms=${elapsedMs}\nduration_budget=pass\nreported_duration=${formatBuildDockerDuration(elapsedMs)}\n`,
-    );
+    emitDurationBudgetResult("duration_budget", "pass", elapsedMs, formatBuildDockerDuration);
     return;
   }
 
-  writeStdout(
-    `measured_duration_ms=${elapsedMs}\nduration_budget=fail\nreported_duration=${formatBuildDockerDuration(elapsedMs)}\n`,
-  );
+  emitDurationBudgetResult("duration_budget", "fail", elapsedMs, formatBuildDockerDuration);
   fail("build-docker must finish in under 10 minutes", 1);
 };
 
@@ -746,20 +740,14 @@ const runCodeqlDurationBudget = (args) => {
   const endMs = readInteger(options, "job-end-ms");
   const elapsedMs = endMs - startMs;
 
-  if (elapsedMs < 0) {
-    fail("ERROR: --job-end-ms must be greater than or equal to --job-start-ms.", 2);
-  }
+  guardNonNegativeElapsed(elapsedMs);
 
   if (elapsedMs < CODEQL_DURATION_BUDGET_MS) {
-    writeStdout(
-      `measured_duration_ms=${elapsedMs}\ncodeql_duration_budget=pass\nreported_duration=${formatDuration(elapsedMs)}\n`,
-    );
+    emitDurationBudgetResult("codeql_duration_budget", "pass", elapsedMs, formatDuration);
     return;
   }
 
-  writeStdout(
-    `measured_duration_ms=${elapsedMs}\ncodeql_duration_budget=fail\nreported_duration=${formatDuration(elapsedMs)}\n`,
-  );
+  emitDurationBudgetResult("codeql_duration_budget", "fail", elapsedMs, formatDuration);
   fail("CodeQL must finish in under 8 minutes", 1);
 };
 
