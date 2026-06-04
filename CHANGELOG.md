@@ -21,8 +21,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
-- `test(review-engine)`: add ATDD coverage for the deterministic review
-  assessment effort score, including repeated-call purity, independence from
+- `feat(review-engine)`: add the deterministic review assessment effort-score
+  helper with ATDD coverage for repeated-call purity, independence from
   clock/env/random changes, and the closed `1..5` score range (#2254).
 
 - `chore(tooling)`: add `.fallowrc.jsonc` resolving the remaining Fallow false
