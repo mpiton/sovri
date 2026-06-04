@@ -23,8 +23,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `test(review-engine)`: add ATDD coverage for the compliance provenance
   implementation quality contract, including Apache headers, explicit ESM
-  imports, forbidden TypeScript escape-hatch guards, Zod-derived provenance
-  typing, and Community package-boundary checks (R-11, #2304).
+  imports, forbidden TypeScript escape-hatch and type-assertion guards,
+  Zod-derived provenance typing, and Community package-boundary checks (R-11,
+  #2304).
 
 - `test(review-engine)`: add ATDD coverage for empty-review compliance block
   behavior, including omission without provenance and provenance evidence

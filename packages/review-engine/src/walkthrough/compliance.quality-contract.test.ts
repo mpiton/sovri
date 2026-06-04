@@ -18,6 +18,7 @@ const INTERNAL_IMPORT_PATTERN = /from\s+"(?<specifier>\.[^"]+)"/gu;
 const CLOUD_IMPORT_PATTERN =
   /(?:from\s+"[^"]*apps\/cloud-api|import\s*\(\s*"[^"]*apps\/cloud-api)/u;
 const TOP_TYPE_PATTERN = new RegExp(`\\b${["a", "ny"].join("")}\\b`, "u");
+const TYPE_ASSERTION_PATTERN = new RegExp(`\\s${["a", "s"].join("")}\\s`, "u");
 const TS_IGNORE_DIRECTIVE = ["@ts", "-ignore"].join("");
 const TS_EXPECT_ERROR_DIRECTIVE = ["@ts", "-expect-error"].join("");
 const OXLINT_DISABLE_DIRECTIVE = ["oxlint", "-disable"].join("");
@@ -50,6 +51,7 @@ describe("compliance provenance implementation quality contract (R-11)", () => {
     for (const source of sources) {
       // Then the implementation contains no forbidden escape hatches
       expect(source.text, source.label).not.toMatch(TOP_TYPE_PATTERN);
+      expect(source.text, source.label).not.toMatch(TYPE_ASSERTION_PATTERN);
       expect(source.text, source.label).not.toContain(TS_IGNORE_DIRECTIVE);
       expect(source.text, source.label).not.toContain(TS_EXPECT_ERROR_DIRECTIVE);
       expect(source.text, source.label).not.toContain(OXLINT_DISABLE_DIRECTIVE);
