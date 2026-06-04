@@ -46,7 +46,7 @@ import {
 } from "./parsing/index.js";
 import { toFindingSuggestion } from "./parsing/suggestion.js";
 import { renderComplianceSection } from "./walkthrough/compliance.js";
-import { composeWalkthrough } from "./walkthrough/index.js";
+import { composeWalkthrough, type WalkthroughInput } from "./walkthrough/index.js";
 
 const RunReviewInputSchema = ReviewPromptInputSchema;
 
@@ -209,6 +209,8 @@ export interface ReviewPullRequestOptions {
 interface ComposedWalkthroughProvenance {
   readonly promptSha256?: string;
 }
+
+type ReviewWithWalkthroughProvenance = Review & Pick<WalkthroughInput, "provenance">;
 
 export async function runReview(
   input: RunReviewInput,
@@ -409,12 +411,20 @@ function withComposedWalkthrough(
   const input =
     provenance.promptSha256 === undefined
       ? review
-      : { ...review, provenance: { prompt_sha256: provenance.promptSha256 } };
+      : withPromptProvenance(review, provenance.promptSha256);
 
   return {
     ...review,
+    ...input,
     walkthrough_markdown: composeWalkthrough(input),
   };
+}
+
+function withPromptProvenance(
+  review: Review,
+  promptSha256: string,
+): ReviewWithWalkthroughProvenance {
+  return { ...review, provenance: { prompt_sha256: promptSha256 } };
 }
 
 function parseInjectedProvider(provider: unknown): LLMProvider {
@@ -770,6 +780,7 @@ function withFailedReviewProvenance(review: Review, promptSha256: string): Revie
     return withComposedWalkthrough(review, { promptSha256 });
   }
 
+  const reviewWithProvenance = withPromptProvenance(review, promptSha256);
   const complianceSection = renderComplianceSection([], {
     llmProvider: review.llm_provider,
     llmModel: review.llm_model,
@@ -777,7 +788,7 @@ function withFailedReviewProvenance(review: Review, promptSha256: string): Revie
   });
 
   return {
-    ...review,
+    ...reviewWithProvenance,
     walkthrough_markdown: [review.walkthrough_markdown, "", ...complianceSection].join("\n"),
   };
 }

@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { computePromptSha256 } from "./audit-events.js";
 import { reviewPullRequest } from "./orchestrator.js";
+import { WalkthroughInputSchema } from "./walkthrough/index.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -440,6 +441,9 @@ describe("reviewPullRequest audit-trail sink wiring", () => {
       expect(called?.["tokens_out"]).toBe(144);
       expect(review.walkthrough_markdown).toContain(
         `Prompt sha256: ${String(promptHash).replace("sha256:", "")}`,
+      );
+      expect(WalkthroughInputSchema.parse(review).provenance?.prompt_sha256).toBe(
+        String(promptHash).replace("sha256:", ""),
       );
 
       // And each finding.created carries the finding's audit_reference, severity, references

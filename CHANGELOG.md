@@ -230,6 +230,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   digest helpers and replace nested retry prompt digest selection with a named
   selector (#2316).
 
+- `fix(review-engine, bot)`: keep prompt SHA-256 walkthrough provenance attached
+  to generated reviews so reconciliation recomposition preserves the audited
+  digest in posted walkthroughs (#2316).
+
 ### Changed
 
 - `feat(review-engine)`: refresh inline finding comment headers so the body
