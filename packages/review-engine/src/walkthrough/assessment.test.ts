@@ -7,6 +7,8 @@ import { describe, expect, it, vi } from "vitest";
 import * as walkthrough from "./index.js";
 
 type ComputeEffortScore = (findings: readonly Finding[]) => 1 | 2 | 3 | 4 | 5;
+type EffortScore = ReturnType<ComputeEffortScore>;
+type RenderEffortMeter = (score: EffortScore) => string;
 
 let findingSeq = 0;
 
@@ -42,6 +44,18 @@ function computeEffortScore(): ComputeEffortScore {
 }
 
 function isComputeEffortScore(value: unknown): value is ComputeEffortScore {
+  return typeof value === "function";
+}
+
+function renderEffortMeter(): RenderEffortMeter {
+  const helper = Reflect.get(walkthrough, "renderEffortMeter");
+  if (!isRenderEffortMeter(helper)) {
+    throw new TypeError("renderEffortMeter export is missing");
+  }
+  return helper;
+}
+
+function isRenderEffortMeter(value: unknown): value is RenderEffortMeter {
   return typeof value === "function";
 }
 
@@ -255,3 +269,52 @@ describe("assessment effort score endpoint cases (R-03)", () => {
     expect(result).toBe(5);
   });
 });
+
+describe("assessment effort meter dots (R-04)", () => {
+  it.each([
+    [1, "●○○○○"],
+    [2, "●●○○○"],
+    [3, "●●●○○"],
+    [4, "●●●●○"],
+    [5, "●●●●●"],
+  ] satisfies ReadonlyArray<readonly [EffortScore, string]>)(
+    "renders score %i as %s",
+    (score, expectedMeter) => {
+      // Given the effort score is <score>
+      // When renderEffortMeter is called
+      const meter = renderEffortMeter()(score);
+
+      // Then the returned meter is exactly "<meter>"
+      expect(meter).toBe(expectedMeter);
+      // And the returned meter contains exactly 5 dot glyphs
+      expect(countDotGlyphs(meter)).toBe(5);
+    },
+  );
+
+  it("uses only GitHub-safe unicode text", () => {
+    // Given the effort score is 3
+    const score: EffortScore = 3;
+
+    // When renderEffortMeter is called
+    const meter = renderEffortMeter()(score);
+
+    // Then the returned meter is exactly "●●●○○"
+    expect(meter).toBe("●●●○○");
+    // And every character is either "●" or "○"
+    expect([...meter].every(isDotGlyph)).toBe(true);
+    // And the returned meter contains no HTML element
+    expect(meter).not.toContain("<");
+    expect(meter).not.toContain(">");
+    // And the returned meter contains no CSS class or style attribute
+    expect(meter).not.toContain("class=");
+    expect(meter).not.toContain("style=");
+  });
+});
+
+function countDotGlyphs(value: string): number {
+  return [...value].filter(isDotGlyph).length;
+}
+
+function isDotGlyph(character: string): boolean {
+  return character === "●" || character === "○";
+}
