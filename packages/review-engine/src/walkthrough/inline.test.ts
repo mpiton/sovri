@@ -4,6 +4,7 @@
 import type { Diff, Finding } from "@sovri/core";
 import { describe, expect, it } from "vitest";
 
+import { categoryBadge, severityBadge } from "./badge.js";
 import { buildInlineComments } from "./inline.js";
 
 const sha = "1".repeat(40);
@@ -240,6 +241,42 @@ describe("buildInlineComments", () => {
     expect(comments).toHaveLength(0);
     // And no error is raised
     expect(comments).toEqual([]);
+  });
+});
+
+describe("buildInlineComments — refreshed inline finding header", () => {
+  it("starts every inline finding with the shared severity and category badges", () => {
+    // Given the finding targets "src/session.ts" at line 18
+    // And the finding title is "Missing null guard"
+    // And the finding body is "`session.user` can be undefined."
+    // And the finding severity is "major"
+    // And the finding category is "bug"
+    const findings: Finding[] = [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        severity: "major",
+        category: "bug",
+        file: "src/session.ts",
+        line_start: 18,
+        line_end: 18,
+        title: "Missing null guard",
+        body: "`session.user` can be undefined.",
+        source: "llm",
+        confidence: 0.87,
+      },
+    ];
+    const diff = makeDiff("src/session.ts", [18]);
+
+    // When Sovri formats the inline comment body
+    const comments = buildInlineComments(findings, diff);
+    const lines = comments[0]?.body.split("\n") ?? [];
+
+    // Then line 1 is exactly the shared severity badge followed by the shared category badge
+    expect(lines[0]).toBe(`${severityBadge("major")} ${categoryBadge("bug")}`);
+    // And the old title-first shape is no longer used
+    expect(lines[0]).not.toBe("**Missing null guard**");
+    // And the bold title appears after the badge prefix
+    expect(lines[1]).toBe("**Missing null guard**");
   });
 });
 

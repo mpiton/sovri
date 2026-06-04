@@ -121,6 +121,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Changed
 
+- `feat(review-engine)`: refresh inline finding comment headers so the body
+  starts with the shared severity and category badge prefix before the standalone
+  bold title, preserving the existing body, audit reference, suggestion, and
+  reconcile-marker contracts (#2275).
+
 - `refactor(review-engine,bot,scripts)`: reduce Fallow health hotspots by
   splitting syntax scanning, CI policy checks, soak evidence parsing,
   compliance mapping validation, provider error shaping, and GitHub bot review
