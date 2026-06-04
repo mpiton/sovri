@@ -39,6 +39,26 @@ const ReviewConclusionByVerdictKind: Record<MapChecksInput["verdict"]["kind"], C
     "request-changes": "failure",
   };
 
+function mapProvenanceDescriptor(hasSignedAuditEntry: boolean): CheckRunDescriptor {
+  if (hasSignedAuditEntry) {
+    return {
+      name: "Sovri / provenance",
+      status: "completed",
+      conclusion: "success",
+      title: "Sovri provenance verified",
+      summary: "A signed audit entry is attached.",
+    };
+  }
+
+  return {
+    name: "Sovri / provenance",
+    status: "completed",
+    conclusion: "neutral",
+    title: "Sovri provenance unavailable",
+    summary: "No signed audit trail is attached.",
+  };
+}
+
 export function mapChecks(input: unknown): readonly CheckRunDescriptor[] {
   const parsedInput = MapChecksInputSchema.parse(input);
   return [
@@ -49,13 +69,7 @@ export function mapChecks(input: unknown): readonly CheckRunDescriptor[] {
       title: "Sovri review completed",
       summary: `${String(parsedInput.findingCount)} findings found.`,
     },
-    {
-      name: "Sovri / provenance",
-      status: "completed",
-      conclusion: "neutral",
-      title: "Sovri provenance unavailable",
-      summary: "No signed audit trail is attached.",
-    },
+    mapProvenanceDescriptor(parsedInput.hasSignedAuditEntry),
     {
       name: "Sovri / license-scan",
       status: "completed",
