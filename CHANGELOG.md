@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add ATDD coverage for rendering the compliance and
+  provenance block as default-collapsed GitHub `<details>` markup without styled
+  container attributes (R-01, #2294).
+
 - `test(review-engine)`: add ATDD coverage for the inline renderer quality
   contract, including shared helper imports, package headers, TypeScript escape
   hatch guards, Zod validation boundaries, and no I/O/log/env expansion (R-08,
