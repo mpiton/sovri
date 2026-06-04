@@ -32,13 +32,20 @@ export const MapChecksInputSchema = z
 
 export type MapChecksInput = z.infer<typeof MapChecksInputSchema>;
 
+const ReviewConclusionByVerdictKind: Record<MapChecksInput["verdict"]["kind"], CheckRunConclusion> =
+  {
+    approve: "success",
+    comment: "neutral",
+    "request-changes": "failure",
+  };
+
 export function mapChecks(input: unknown): readonly CheckRunDescriptor[] {
   const parsedInput = MapChecksInputSchema.parse(input);
   return [
     {
       name: "Sovri / review",
       status: "completed",
-      conclusion: "neutral",
+      conclusion: ReviewConclusionByVerdictKind[parsedInput.verdict.kind],
       title: "Sovri review completed",
       summary: `${String(parsedInput.findingCount)} findings found.`,
     },

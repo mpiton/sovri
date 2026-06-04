@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(review-engine)`: map the `Sovri / review` GitHub Check conclusion
+  from the validated review verdict (`approve`, `comment`,
+  `request-changes`) (R-02, #2320).
+
 - `test(review-engine)`: add ATDD coverage for GitHub Checks review
   conclusion mapping and unknown-verdict validation (R-02, #2320).
 
