@@ -4,7 +4,7 @@
 import type { Diff, Finding } from "@sovri/core";
 import { describe, expect, it } from "vitest";
 
-import { categoryBadge, severityBadge } from "./badge.js";
+import { categoryBadge, renderAuditReference, severityBadge } from "./badge.js";
 import { buildInlineComments } from "./inline.js";
 
 const sha = "1".repeat(40);
@@ -306,6 +306,27 @@ describe("buildInlineComments — refreshed inline finding header", () => {
 });
 
 describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04)", () => {
+  it("uses the shared audit-reference helper exactly once when present", () => {
+    // Given a finding has audit reference "SOVRI-AC-AB12-CD34"
+    const finding = makeFinding({
+      file: "src/security.ts",
+      lineStart: 31,
+      title: "Avoid hardcoded credential",
+      body: "The token is embedded directly in source code.",
+      auditReference: "SOVRI-AC-AB12-CD34",
+    });
+    const diff = makeDiff("src/security.ts", [31]);
+
+    // When the inline comments are built
+    const comments = buildInlineComments([finding], diff);
+    const body = comments[0]?.body ?? "";
+    const expectedAuditLine = renderAuditReference(finding).trim();
+
+    // Then the audit reference line matches the shared helper output exactly once
+    expect(countOccurrences(body, expectedAuditLine)).toBe(1);
+    expect(body).toContain(`\n\n${expectedAuditLine}\n\n<!-- sovri-finding-id:`);
+  });
+
   it("renders the audit reference line just before the hidden finding marker", () => {
     // Given a finding "Missing null guard" in "src/session.ts" at line 18
     // And the finding body is "`session.user` can be undefined."
@@ -699,4 +720,8 @@ function makeFinding(options: {
 
 function lastLine(body: string): string {
   return body.split("\n").at(-1) ?? "";
+}
+
+function countOccurrences(value: string, needle: string): number {
+  return value.split(needle).length - 1;
 }

@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add ATDD coverage proving refreshed inline findings
+  render a present audit reference exactly once through the shared helper and
+  keep it immediately before the reconcile marker (R-03, #2277).
+
 - `test(review-engine)`: add ATDD coverage proving refreshed inline finding
   comments keep the bold title on its own line after the badge prefix, followed
   by a blank separator and the verbatim finding body (R-02, #2276).
