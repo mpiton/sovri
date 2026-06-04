@@ -4,6 +4,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LLMProvider } from "../types/LLMProvider.js";
+import {
+  captureError,
+  mockOpenAIModule,
+} from "../../test/providers/OpenAICompatibleProvider.mock-helper.js";
 
 const TestApiKey = "test-openai-key";
 const TestModel = "gpt-5.5";
@@ -141,47 +145,6 @@ function isOpenAIProviderConstructor(value: unknown): value is OpenAIProviderCon
 
 function isErrorConstructor(value: unknown): value is ErrorConstructor {
   return typeof value === "function" && value.prototype instanceof Error;
-}
-
-function mockOpenAIModule(sdkConstructorOptions: unknown[]): Record<string, unknown> {
-  class MockOpenAI {
-    readonly chat = {
-      completions: {
-        create: async () => {
-          throw new Error("Mock OpenAI client should not receive requests during construction");
-        },
-      },
-    };
-
-    constructor(options: unknown) {
-      sdkConstructorOptions.push(options);
-    }
-  }
-
-  class MockAPIError extends Error {}
-  class MockAPIConnectionError extends MockAPIError {}
-  class MockAPIConnectionTimeoutError extends MockAPIError {}
-  class MockAuthenticationError extends MockAPIError {}
-  class MockPermissionDeniedError extends MockAPIError {}
-
-  return {
-    default: MockOpenAI,
-    APIConnectionError: MockAPIConnectionError,
-    APIConnectionTimeoutError: MockAPIConnectionTimeoutError,
-    APIError: MockAPIError,
-    AuthenticationError: MockAuthenticationError,
-    PermissionDeniedError: MockPermissionDeniedError,
-  };
-}
-
-function captureError(action: () => unknown): unknown {
-  try {
-    action();
-  } catch (error) {
-    return error;
-  }
-
-  throw new Error("Expected constructor to throw");
 }
 
 function firstItem(items: ReadonlyArray<unknown>): unknown {

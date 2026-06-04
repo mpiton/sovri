@@ -66,6 +66,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Changed
 
+- `test(llm-providers)`: reuse the shared `mockOpenAIModule` / `captureError`
+  test helpers (and the `FakeOpenAIChatClient` type) from
+  `test/providers/OpenAICompatibleProvider.mock-helper.ts` in the OpenAI
+  api-key-validation and base-url acceptance tests, dropping the inlined copies
+  (`dup:b98789d1`). The provider-specific `fakeOpenAIClient` stub stays local.
+
 - `refactor(bot)`: extract the review-comment helpers shared by the resolve
   handler and the issue-comment dispatcher into
   `apps/community-bot/src/github/review-comments.ts` —

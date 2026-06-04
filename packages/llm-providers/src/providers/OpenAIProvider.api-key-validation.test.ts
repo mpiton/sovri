@@ -4,16 +4,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LLMProvider } from "../types/LLMProvider.js";
+import {
+  captureError,
+  type FakeOpenAIChatClient,
+  mockOpenAIModule,
+} from "../../test/providers/OpenAICompatibleProvider.mock-helper.js";
 
 const TestApiKey = "test-openai-key";
-
-interface FakeOpenAIChatClient {
-  readonly chat: {
-    readonly completions: {
-      readonly create: (request: unknown, options?: unknown) => Promise<unknown>;
-    };
-  };
-}
 
 interface OpenAIProviderConstructor {
   new (options: { readonly apiKey: string; readonly client?: FakeOpenAIChatClient }): LLMProvider;
@@ -131,47 +128,6 @@ function fakeOpenAIClient(requests: unknown[]): FakeOpenAIChatClient {
       },
     },
   };
-}
-
-function mockOpenAIModule(sdkConstructorOptions: unknown[]): Record<string, unknown> {
-  class MockOpenAI {
-    readonly chat = {
-      completions: {
-        create: async () => {
-          throw new Error("Mock OpenAI client should not receive requests during construction");
-        },
-      },
-    };
-
-    constructor(options: unknown) {
-      sdkConstructorOptions.push(options);
-    }
-  }
-
-  class MockAPIError extends Error {}
-  class MockAPIConnectionError extends MockAPIError {}
-  class MockAPIConnectionTimeoutError extends MockAPIError {}
-  class MockAuthenticationError extends MockAPIError {}
-  class MockPermissionDeniedError extends MockAPIError {}
-
-  return {
-    default: MockOpenAI,
-    APIConnectionError: MockAPIConnectionError,
-    APIConnectionTimeoutError: MockAPIConnectionTimeoutError,
-    APIError: MockAPIError,
-    AuthenticationError: MockAuthenticationError,
-    PermissionDeniedError: MockPermissionDeniedError,
-  };
-}
-
-function captureError(action: () => unknown): unknown {
-  try {
-    action();
-  } catch (error) {
-    return error;
-  }
-
-  throw new Error("Expected constructor to throw");
 }
 
 function firstItem(items: ReadonlyArray<unknown>): unknown {
