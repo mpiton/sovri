@@ -21,6 +21,67 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add ATDD coverage for the compliance provenance
+  implementation quality contract, including Apache headers, explicit ESM
+  imports, forbidden TypeScript escape-hatch and type-assertion guards,
+  Zod-derived provenance typing, and Community package-boundary checks (R-11,
+  #2304).
+
+- `test(review-engine)`: add ATDD coverage for empty-review compliance block
+  behavior, including omission without provenance and provenance evidence
+  rendering for clean reviews that include provenance, with the composer now
+  preserving provenance-only evidence blocks (R-10, #2303).
+
+- `test(review-engine)`: add ATDD coverage for secret-safe compliance
+  provenance output, ensuring non-provenance secret-shaped fields are ignored
+  while signed audit-entry identifiers still render (R-09, #2302).
+
+- `test(review-engine)`: add ATDD coverage for GitHub-safe compliance and
+  provenance markdown, including provenance-present rendering without CSS hooks
+  and escaping of user-influenced compliance strings (R-08, #2301).
+
+- `test(review-engine)`: add ATDD coverage for walkthrough provenance payload
+  validation, including malformed prompt digests, empty hosting/residency values,
+  a complete valid payload, and field-specific failure paths preserved at the
+  walkthrough boundary (R-07, #2300).
+
+- `test(review-engine)`: add ATDD coverage for signed audit-entry provenance
+  rendering and the Community default when no signed trail is attached (R-06,
+  #2299).
+
+- `test(review-engine)`: add ATDD coverage for hosting and data-residency
+  provenance lines, including omission when provenance is absent (R-05, #2298).
+
+- `feat(review-engine)`: validate optional walkthrough provenance, thread
+  orchestrated prompt SHA-256 digests into composed walkthroughs, select the
+  response-producing retry prompt digest for partial reviews, and render supplied
+  hosting, residency, and signed audit-entry provenance with the
+  no-signed-audit-trail default (R-04, #2297).
+
+- `test(review-engine)`: add ATDD and integration coverage for prompt SHA-256
+  provenance rendering, audit-backed prompt digest threading, supplied
+  provenance fields, corrective retry prompt digest selection, and the
+  no-signed-audit-trail default when provenance is absent (R-04, #2297).
+
+- `feat(review-engine)`: render the review provider and model in the compliance
+  provenance block with markdown escaping (R-03, #2296).
+
+- `test(review-engine)`: add ATDD coverage for the compliance provenance model
+  line, including escaped provider and model values (R-03, #2296).
+
+- `test(review-engine)`: add ATDD coverage for compliance reference lines
+  rendering framework labels, identifiers, descriptions, applicability
+  conditions, and no-fabrication behavior when references are absent (R-02,
+  #2295).
+
+- `feat(review-engine)`: render non-empty compliance output inside a
+  default-collapsed GitHub `<details>` block while preserving the existing
+  compliance content order (R-01, #2294).
+
+- `test(review-engine)`: add ATDD coverage for rendering the compliance and
+  provenance block as default-collapsed GitHub `<details>` markup without styled
+  container attributes (R-01, #2294).
+
 - `test(review-engine)`: add ATDD coverage for the inline renderer quality
   contract, including shared helper imports, package headers, TypeScript escape
   hatch guards, Zod validation boundaries, and no I/O/log/env expansion (R-08,
@@ -147,6 +208,37 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   (optional walkthrough provenance field), ADR-018 (GitHub Checks API as a bot
   output surface), and ADR-019 (OpenTelemetry deferred to v0.6, revising
   ADR-006).
+
+### Fixed
+
+- `fix(review-engine)`: trim optional free-text provenance fields before
+  rendering and compute prompt SHA-256 digests from an unambiguous
+  length-delimited prompt pair encoding (#2316).
+
+- `fix(review-engine)`: include computed prompt SHA-256 provenance in failed
+  review walkthroughs when provider responses are audited but still fail parsing
+  after retry (#2316).
+
+- `fix(review-engine)`: keep prompt-bearing failed provider walkthroughs on
+  failure copy instead of rendering an approve verdict for empty failed reviews
+  (#2316).
+
+- `test(review-engine)`: assert token-bearing retryable schema failures render
+  the audited prompt SHA-256 in failed walkthrough provenance (#2316).
+
+- `fix(review-engine)`: remove the explicit crypto `Hash` import from prompt
+  digest helpers and replace nested retry prompt digest selection with a named
+  selector (#2316).
+
+- `fix(review-engine, bot)`: keep prompt SHA-256 walkthrough provenance attached
+  to generated reviews so reconciliation recomposition preserves the audited
+  digest in posted walkthroughs (#2316).
+
+- `fix(review-engine)`: document the prompt SHA-256 domain separator used by
+  prompt digest provenance hashing (#2316).
+
+- `test(review-engine)`: align compliance provenance test string construction
+  style and remove redundant inferred finding annotation (#2316).
 
 ### Changed
 

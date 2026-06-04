@@ -5,6 +5,15 @@ import type { ComplianceFramework, ComplianceReference, Finding } from "@sovri/c
 
 import { formatMarkdownText } from "./markdown.js";
 
+interface ComplianceProvenance {
+  readonly llmProvider: string;
+  readonly llmModel: string;
+  readonly promptSha256?: string;
+  readonly hostingRegion?: string;
+  readonly dataResidency?: string;
+  readonly signedAuditEntry?: string;
+}
+
 const FRAMEWORK_LABELS: Record<ComplianceFramework, string> = {
   CWE: "CWE",
   "OWASP-TOP10-2021": "OWASP Top 10",
@@ -16,12 +25,45 @@ const FRAMEWORK_LABELS: Record<ComplianceFramework, string> = {
   CRA: "CRA",
 };
 
-export function renderComplianceSection(findings: readonly Finding[]): string[] {
-  if (findings.length === 0) {
+export function renderComplianceSection(
+  findings: readonly Finding[],
+  provenance?: ComplianceProvenance,
+): string[] {
+  if (findings.length === 0 && provenance === undefined) {
     return [];
   }
 
-  const lines: string[] = ["### Compliance & audit"];
+  const lines: string[] = [
+    "<details>",
+    "<summary>Compliance &amp; provenance</summary>",
+    "",
+    "### Compliance & audit",
+  ];
+
+  if (provenance !== undefined) {
+    lines.push(
+      "",
+      `Model: ${formatMarkdownText(provenance.llmProvider)} / ${formatMarkdownText(provenance.llmModel)}`,
+    );
+
+    if (provenance.promptSha256 !== undefined) {
+      lines.push(`Prompt sha256: ${formatMarkdownText(provenance.promptSha256)}`);
+    }
+
+    if (provenance.hostingRegion !== undefined) {
+      lines.push(`Hosting: ${formatMarkdownText(provenance.hostingRegion)}`);
+    }
+
+    if (provenance.dataResidency !== undefined) {
+      lines.push(`Data residency: ${formatMarkdownText(provenance.dataResidency)}`);
+    }
+
+    if (provenance.signedAuditEntry === undefined) {
+      lines.push("No signed audit trail is attached");
+    } else {
+      lines.push(`Signed audit entry: ${formatMarkdownText(provenance.signedAuditEntry)}`);
+    }
+  }
 
   for (const finding of findings) {
     lines.push("", `#### ${formatMarkdownText(finding.title)} — ${formatLocation(finding)}`, "");
@@ -35,6 +77,8 @@ export function renderComplianceSection(findings: readonly Finding[]): string[] 
 
     lines.push(`🔍 Audit Reference: ${finding.audit_reference ?? "n/a"}`);
   }
+
+  lines.push("", "</details>");
 
   return lines;
 }

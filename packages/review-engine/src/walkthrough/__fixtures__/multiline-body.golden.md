@@ -30,11 +30,19 @@ The PR has actionable review findings.
 
 - src/api/review.ts:18 Missing payload null guard
 
+<details>
+<summary>Compliance &amp; provenance</summary>
+
 ### Compliance & audit
+
+Model: test-provider / test-model
+No signed audit trail is attached
 
 #### Missing payload null guard — src/api/review.ts:18
 
 🔍 Audit Reference: n/a
+
+</details>
 
 ---
 

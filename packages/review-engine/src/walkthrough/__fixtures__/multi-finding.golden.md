@@ -41,7 +41,13 @@ Three review findings need attention.
 
 - src/auth/session.ts:42-45 Unvalidated session token
 
+<details>
+<summary>Compliance &amp; provenance</summary>
+
 ### Compliance & audit
+
+Model: test-provider / test-model
+No signed audit trail is attached
 
 #### Unvalidated session token — src/auth/session.ts:42-45
 
@@ -54,6 +60,8 @@ Three review findings need attention.
 #### Duplicated branch — src/api/review.ts:31
 
 🔍 Audit Reference: n/a
+
+</details>
 
 ---
 

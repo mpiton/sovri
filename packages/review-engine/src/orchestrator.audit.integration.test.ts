@@ -11,7 +11,9 @@ import type {
 import { createLogger } from "@sovri/observability";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { computePromptSha256 } from "./audit-events.js";
 import { reviewPullRequest } from "./orchestrator.js";
+import { WalkthroughInputSchema } from "./walkthrough/index.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -151,6 +153,8 @@ class MalformedThenValidProvider implements LLMProvider {
   public readonly model = "claude-sonnet-4-6";
   public readonly maxTokens = 2048;
   public calls = 0;
+  public readonly systemPrompts: string[] = [];
+  public readonly userPrompts: string[] = [];
 
   async generateStructured<T>(params: GenerateStructuredParams<T>): Promise<T> {
     return (await this.generateStructuredWithUsage(params)).data;
@@ -160,6 +164,9 @@ class MalformedThenValidProvider implements LLMProvider {
     params: GenerateStructuredParams<T>,
   ): Promise<StructuredGeneration<T>> {
     this.calls += 1;
+    this.systemPrompts.push(params.systemPrompt);
+    this.userPrompts.push(params.userPrompt);
+
     if (this.calls === 1) {
       // Cast: malformed first response that triggers the corrective retry.
       const malformed = { summary: "", findings: [] } as unknown as T;
@@ -404,7 +411,10 @@ describe("reviewPullRequest audit-trail sink wiring", () => {
       const sink = new MemoryAuditTrailSink();
 
       // When reviewPullRequest runs
-      await reviewPullRequest({ pullRequest, diff, config }, { provider, auditTrailSink: sink });
+      const review = await reviewPullRequest(
+        { pullRequest, diff, config },
+        { provider, auditTrailSink: sink },
+      );
 
       // Then the recorded event types are exactly the nominal sequence
       expect(eventTypes(sink)).toEqual([
@@ -429,6 +439,12 @@ describe("reviewPullRequest audit-trail sink wiring", () => {
       expect(String(promptHash)).not.toHaveLength(0);
       expect(called?.["tokens_in"]).toBe(812);
       expect(called?.["tokens_out"]).toBe(144);
+      expect(review.walkthrough_markdown).toContain(
+        `Prompt sha256: ${String(promptHash).replace("sha256:", "")}`,
+      );
+      expect(WalkthroughInputSchema.parse(review).provenance?.prompt_sha256).toBe(
+        String(promptHash).replace("sha256:", ""),
+      );
 
       // And each finding.created carries the finding's audit_reference, severity, references
       const findings = sink.getEvents().filter((event) => event.event === "finding.created");
@@ -466,7 +482,10 @@ describe("reviewPullRequest audit-trail sink wiring", () => {
       const sink = new MemoryAuditTrailSink();
 
       // When reviewPullRequest runs
-      await reviewPullRequest({ pullRequest, diff, config }, { provider, auditTrailSink: sink });
+      const review = await reviewPullRequest(
+        { pullRequest, diff, config },
+        { provider, auditTrailSink: sink },
+      );
 
       // Then the sequence has exactly one llm.called with aggregated tokens
       expect(eventTypes(sink)).toEqual([
@@ -478,6 +497,16 @@ describe("reviewPullRequest audit-trail sink wiring", () => {
       const called = findEvent(sink, "llm.called");
       expect(called?.["tokens_in"]).toBe(900);
       expect(called?.["tokens_out"]).toBe(80);
+
+      expect(provider.systemPrompts).toHaveLength(2);
+      const retrySystemPrompt = provider.systemPrompts[1] ?? "";
+      expect(retrySystemPrompt).toContain("Correct the previous provider response.");
+      const retryPromptSha256 = computePromptSha256(
+        retrySystemPrompt,
+        provider.userPrompts[1] ?? "",
+      );
+      expect(called?.["prompt_hash"]).toBe(`sha256:${retryPromptSha256}`);
+      expect(review.walkthrough_markdown).toContain(`Prompt sha256: ${retryPromptSha256}`);
     });
 
     it("finding.created carries cwe only when the finding has one", async () => {
@@ -675,11 +704,19 @@ describe("reviewPullRequest audit-trail sink wiring", () => {
       const sink = new MemoryAuditTrailSink();
 
       // When reviewPullRequest runs
-      await reviewPullRequest({ pullRequest, diff, config }, { provider, auditTrailSink: sink });
+      const review = await reviewPullRequest(
+        { pullRequest, diff, config },
+        { provider, auditTrailSink: sink },
+      );
 
       // Then llm.called fired (a response came back) and the terminal is parse_error
       expect(eventTypes(sink)).toEqual(["review.started", "llm.called", "review.failed"]);
       expect(findEvent(sink, "review.failed")?.["error_code"]).toBe("parse_error");
+      const promptHash = findEvent(sink, "llm.called")?.["prompt_hash"];
+      expect(typeof promptHash).toBe("string");
+      expect(review.walkthrough_markdown).toContain(
+        `Prompt sha256: ${String(promptHash).replace("sha256:", "")}`,
+      );
     });
 
     it("a malformed first response then a retry transport error still records llm.called", async () => {
@@ -687,11 +724,21 @@ describe("reviewPullRequest audit-trail sink wiring", () => {
       const sink = new MemoryAuditTrailSink();
 
       // When reviewPullRequest runs (a response WAS received on the first attempt)
-      await reviewPullRequest({ pullRequest, diff, config }, { provider, auditTrailSink: sink });
+      const review = await reviewPullRequest(
+        { pullRequest, diff, config },
+        { provider, auditTrailSink: sink },
+      );
 
       // Then llm.called is recorded even though the review fails as a provider error
       expect(eventTypes(sink)).toEqual(["review.started", "llm.called", "review.failed"]);
       expect(findEvent(sink, "review.failed")?.["error_code"]).toBe("provider_error");
+      const promptHash = findEvent(sink, "llm.called")?.["prompt_hash"];
+      expect(typeof promptHash).toBe("string");
+      expect(review.walkthrough_markdown).toContain("provider transport failure on retry");
+      expect(review.walkthrough_markdown).toContain(
+        `Prompt sha256: ${String(promptHash).replace("sha256:", "")}`,
+      );
+      expect(review.walkthrough_markdown).not.toContain("## ✅ Approve");
     });
 
     it("a token-bearing retryable schema error still records llm.called", async () => {
@@ -699,11 +746,19 @@ describe("reviewPullRequest audit-trail sink wiring", () => {
       const sink = new MemoryAuditTrailSink();
 
       // When the provider throws a retryable schema error carrying token usage on both attempts
-      await reviewPullRequest({ pullRequest, diff, config }, { provider, auditTrailSink: sink });
+      const review = await reviewPullRequest(
+        { pullRequest, diff, config },
+        { provider, auditTrailSink: sink },
+      );
 
       // Then llm.called is recorded (the model responded and was charged) before parse_error
       expect(eventTypes(sink)).toEqual(["review.started", "llm.called", "review.failed"]);
       expect(findEvent(sink, "review.failed")?.["error_code"]).toBe("parse_error");
+      const promptHash = findEvent(sink, "llm.called")?.["prompt_hash"];
+      expect(typeof promptHash).toBe("string");
+      expect(review.walkthrough_markdown).toContain(
+        `Prompt sha256: ${String(promptHash).replace("sha256:", "")}`,
+      );
     });
 
     it("a propagated exception records review.failed then re-throws", async () => {

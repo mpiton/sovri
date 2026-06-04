@@ -30,11 +30,19 @@ Found &lt;script&gt;alert(1)&lt;/script&gt; &amp; comments
 
 - src/render.ts:12 Avoid &lt;b&gt;trusted&lt;/b&gt; HTML
 
+<details>
+<summary>Compliance &amp; provenance</summary>
+
 ### Compliance & audit
+
+Model: test-provider / test-model
+No signed audit trail is attached
 
 #### Avoid &lt;b&gt;trusted&lt;/b&gt; HTML — src/render.ts:12
 
 🔍 Audit Reference: n/a
+
+</details>
 
 ---
 

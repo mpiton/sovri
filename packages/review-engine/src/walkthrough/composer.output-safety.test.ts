@@ -55,9 +55,15 @@ describe("walkthrough output safety (R-09)", () => {
     // And no active style/script element from finding content survives
     expect(markdown).not.toContain("<style");
     expect(markdown).not.toContain("<script");
-    // And the output emits no raw "<" — every angle bracket from content is escaped,
-    // so the "class=evil" text cannot be an active HTML attribute
-    expect(markdown).not.toContain("<");
+    // And the only raw tags are the GitHub-safe provenance details wrapper,
+    // so the "class=evil" text cannot become an active HTML attribute
+    expect(markdown.match(/<\/?[A-Za-z][^>]*>/gu) ?? []).toEqual([
+      "<details>",
+      "<summary>",
+      "</summary>",
+      "</details>",
+    ]);
+    expect(markdown).not.toMatch(/<[^>]*(?:class|style)=/u);
   });
 
   it("sources no credential of its own — an out-of-band secret never reaches the output", () => {

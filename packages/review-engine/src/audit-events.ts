@@ -26,6 +26,12 @@ const AuditFailureMessages: Record<AuditFailureCode, string> = {
 };
 
 /**
+ * Domain separator for prompt digests so this SHA-256 namespace cannot collide
+ * with other length-delimited hashes that may use the same prompt bytes.
+ */
+const PromptHashDomain = "sovri.review-engine.prompt-sha256.v1";
+
+/**
  * Append one unsigned logical event to an injected sink. An audit failure is logged
  * and swallowed: the trail is best-effort observability and must never break the
  * business review.
@@ -61,15 +67,14 @@ export function reviewStartedEvent(
 }
 
 export function llmCalledEvent(
-  systemPrompt: string,
-  userPrompt: string,
+  promptSha256: string,
   tokensIn: number,
   tokensOut: number,
 ): AuditTrailLogicalEvent {
   return {
     ts: new Date().toISOString(),
     event: "llm.called",
-    prompt_hash: hashPrompt(systemPrompt, userPrompt),
+    prompt_hash: `sha256:${promptSha256}`,
     tokens_in: tokensIn,
     tokens_out: tokensOut,
   };
@@ -111,6 +116,17 @@ export function reviewFailedEvent(code: AuditFailureCode): AuditTrailLogicalEven
   };
 }
 
-function hashPrompt(systemPrompt: string, userPrompt: string): string {
-  return `sha256:${createHash("sha256").update(`${systemPrompt}\n${userPrompt}`).digest("hex")}`;
+export function computePromptSha256(systemPrompt: string, userPrompt: string): string {
+  const hash = createHash("sha256");
+  updateLengthDelimitedHashPart(hash, PromptHashDomain);
+  updateLengthDelimitedHashPart(hash, systemPrompt);
+  updateLengthDelimitedHashPart(hash, userPrompt);
+
+  return hash.digest("hex");
+}
+
+function updateLengthDelimitedHashPart(hash: ReturnType<typeof createHash>, value: string): void {
+  hash.update(`${Buffer.byteLength(value, "utf8")}:`, "utf8");
+  hash.update(value, "utf8");
+  hash.update(";", "utf8");
 }
