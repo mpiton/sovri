@@ -66,6 +66,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Changed
 
+- `refactor(review-engine)`: extract the duplicated `splitFilePatches` helper
+  (byte-identical in `diff/filter.ts` and `diff/parser.ts`) into a shared
+  internal `diff/split-file-patches.ts` module, imported relatively and kept out
+  of the package barrel (mirrors the `right-side-lines.ts` sibling convention).
+  First production clone removed from the Fallow duplication baseline (#2247).
+
 - `docs(roadmap)`: realign the public roadmap so the BYOK productization sits in
   the v0.4 line, v0.5 becomes the public design sprint (design system + bot
   review-output rendering), and v0.6 covers observability and supply-chain

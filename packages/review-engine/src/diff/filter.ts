@@ -3,6 +3,7 @@
 
 import type { Diff } from "@sovri/core";
 import { posix } from "node:path";
+import { splitFilePatches } from "./split-file-patches.js";
 
 export function filterDiffByIgnores(diff: Diff, patterns: readonly string[]): Diff {
   if (patterns.length === 0) {
@@ -44,26 +45,4 @@ function matchesAny(filePath: string, patterns: readonly string[]): boolean {
   }
 
   return false;
-}
-
-function splitFilePatches(unifiedDiff: string): string[] {
-  const patches: string[] = [];
-  let currentPatch: string[] | undefined;
-
-  for (const line of unifiedDiff.split("\n")) {
-    if (line.startsWith("diff --git ")) {
-      if (currentPatch !== undefined) {
-        patches.push(currentPatch.join("\n"));
-      }
-      currentPatch = [line];
-    } else {
-      currentPatch?.push(line);
-    }
-  }
-
-  if (currentPatch !== undefined) {
-    patches.push(currentPatch.join("\n"));
-  }
-
-  return patches;
 }

@@ -3,6 +3,7 @@
 
 import { DiffSchema, z, type Diff, type FileChange, type FileChangeStatus } from "@sovri/core";
 import parseDiff from "parse-diff";
+import { splitFilePatches } from "./split-file-patches.js";
 
 const UnknownFileSha = "0000000000000000000000000000000000000000";
 const FullShaPattern = /^[a-f0-9]{40}$/;
@@ -167,28 +168,6 @@ function normalizeGitPath(path: string | undefined): string | undefined {
     return undefined;
   }
   return path;
-}
-
-function splitFilePatches(unifiedDiff: string): string[] {
-  const patches: string[] = [];
-  let currentPatch: string[] | undefined;
-
-  for (const line of unifiedDiff.split("\n")) {
-    if (line.startsWith("diff --git ")) {
-      if (currentPatch !== undefined) {
-        patches.push(currentPatch.join("\n"));
-      }
-      currentPatch = [line];
-    } else {
-      currentPatch?.push(line);
-    }
-  }
-
-  if (currentPatch !== undefined) {
-    patches.push(currentPatch.join("\n"));
-  }
-
-  return patches;
 }
 
 function isBinaryPatch(patch: string): boolean {
