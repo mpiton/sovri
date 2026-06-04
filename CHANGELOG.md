@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add ATDD coverage proving the inline refresh preserves
+  existing draft schema validation, anchoring filters, and the committable
+  single-line suggestion guard (R-07, #2281).
+
 - `test(review-engine)`: add ATDD coverage proving refreshed inline finding
   comments stay GitHub-safe markdown with plain emoji badge labels, no local CSS
   vocabulary, and committable suggestions as markdown fences (R-06, #2280).

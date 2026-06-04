@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { computeFindingFingerprint } from "../reconcile/fingerprint.js";
 import { extractFindingFingerprint } from "../reconcile/marker.js";
 import { categoryBadge, renderAuditReference, severityBadge } from "./badge.js";
-import { buildInlineComments } from "./inline.js";
+import { buildInlineComments, InlineCommentDraftSchema } from "./inline.js";
 
 const sha = "1".repeat(40);
 
@@ -580,6 +580,58 @@ describe("buildInlineComments — GitHub-safe markdown (R-06)", () => {
     for (const forbiddenFragment of [".diff", ".suggestion", ".pill", "gh-chrome"]) {
       expect(body).not.toContain(forbiddenFragment);
     }
+  });
+});
+
+describe("buildInlineComments — inline draft scope (R-07)", () => {
+  it("keeps refreshed bodies inside existing anchoring and schema contracts", () => {
+    // Given the diff contains "src/auth.ts" with RIGHT-side line 42
+    const finding = makeFinding({
+      file: "src/auth.ts",
+      lineStart: 42,
+      title: "Missing authorization check",
+      body: "This path can be reached without verifying the session.",
+      severity: "major",
+      category: "security",
+    });
+    const diff = makeDiff("src/auth.ts", [42]);
+
+    // When buildInlineComments formats the finding
+    const comments = buildInlineComments([finding], diff);
+
+    // Then the refreshed inline body still validates inside the existing draft schema
+    expect(comments).toHaveLength(1);
+    const draft = InlineCommentDraftSchema.parse(comments[0]);
+    expect(draft.path).toBe("src/auth.ts");
+    expect(draft.line).toBe(42);
+    expect(draft.side).toBe("RIGHT");
+    expect(draft.body.split("\n")[0]).toBe("🔴 🔒 Security");
+
+    // And an unanchorable finding is still filtered before body shape matters
+    const unanchorable = makeFinding({
+      file: "src/auth.ts",
+      lineStart: 99,
+      title: "Missing authorization check",
+      body: "This path can be reached without verifying the session.",
+      severity: "major",
+      category: "security",
+    });
+    expect(buildInlineComments([unanchorable], diff)).toEqual([]);
+
+    // And the existing committable single-line anchor guard still rejects multi-line suggestions
+    const multiLineSuggestion = makeFinding({
+      file: "src/auth.ts",
+      lineStart: 42,
+      lineEnd: 43,
+      title: "Missing authorization check",
+      body: "This path can be reached without verifying the session.",
+      severity: "major",
+      category: "security",
+      suggestion: { code: "return authorize(request);", committable: true },
+    });
+    const multiLineDiff = makeDiff("src/auth.ts", [42, 43]);
+    const build = () => buildInlineComments([multiLineSuggestion], multiLineDiff);
+    expect(build).toThrow("committable suggestion requires a single-line inline anchor");
   });
 });
 
