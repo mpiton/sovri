@@ -6,7 +6,10 @@ import { createProviderFromConfig } from "@sovri/llm-providers";
 import { createLogger } from "@sovri/observability";
 import {
   buildInlineComments,
+  computeVerdict,
+  mapChecks,
   reviewPullRequest,
+  type CheckRunDescriptor,
   type Diff,
   type Review,
   type ReviewPullRequestOptions,
@@ -14,6 +17,7 @@ import {
 
 import { readBotLogin, splitRepoFullName } from "../commands/shared-utilities.js";
 import { postReview as postPullRequestReview } from "./comment-poster.js";
+import { getHttpStatus } from "./diff-fetcher-contract.js";
 import { fetchPostedFindings, minimizeFindingComments } from "./posted-findings.js";
 import type {
   PullRequestHandlerDependencies,
@@ -113,6 +117,63 @@ async function postReview(
       logger,
     },
   );
+  await postCheckRuns(context, target, review);
+}
+
+async function postCheckRuns(
+  context: PullRequestWebhookContext,
+  target: ReviewPostTarget,
+  review: Review,
+): Promise<void> {
+  const repo = splitRepoFullName(target.repoFullName, createPullRequestReviewAdapterError);
+  const descriptors = mapChecks({
+    verdict: computeVerdict(review.findings),
+    findingCount: review.findings.length,
+    hasSignedAuditEntry: false,
+  });
+
+  await Promise.all(
+    descriptors.map((descriptor) => postCheckRun(context, target, repo, descriptor)),
+  );
+}
+
+async function postCheckRun(
+  context: PullRequestWebhookContext,
+  target: ReviewPostTarget,
+  repo: { readonly owner: string; readonly repo: string },
+  descriptor: CheckRunDescriptor,
+): Promise<void> {
+  const checks = context.octokit.rest.checks;
+  if (checks === undefined) {
+    return;
+  }
+
+  try {
+    await checks.create({
+      conclusion: descriptor.conclusion,
+      head_sha: target.commitSha,
+      name: descriptor.name,
+      output: {
+        summary: descriptor.summary,
+        title: descriptor.title,
+      },
+      owner: repo.owner,
+      repo: repo.repo,
+      status: descriptor.status,
+    });
+  } catch (error) {
+    logger.error(
+      {
+        check_name: descriptor.name,
+        delivery_id: context.id,
+        error_type: errorTypeFrom(error),
+        pr_number: target.number,
+        repo: target.repoFullName,
+        status: getHttpStatus(error),
+      },
+      "Sovri check run posting failed",
+    );
+  }
 }
 
 async function postErrorComment(
@@ -134,6 +195,14 @@ function buildReviewOptions(config: SovriConfig, env: NodeJS.ProcessEnv): Review
     logger,
     provider: createProviderFromConfig(config, env, { timeoutMs: ReviewTimeoutMs }),
   };
+}
+
+function errorTypeFrom(error: unknown): string {
+  if (error instanceof Error) {
+    return error.name;
+  }
+
+  return "NonErrorThrow";
 }
 
 function isMissingRepositoryConfig(error: unknown): boolean {

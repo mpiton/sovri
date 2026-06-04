@@ -38,6 +38,11 @@ export type PullRequestOctokit = CommentPosterOctokit &
       variables: Readonly<Record<string, unknown>>,
     ) => Promise<unknown>;
     readonly rest: {
+      readonly checks?: {
+        readonly create: (
+          parameters: CheckRunCreateParameters,
+        ) => Promise<{ readonly data: unknown }>;
+      };
       readonly repos: {
         readonly getContent: (
           parameters: RepositoryContentParameters,
@@ -45,6 +50,19 @@ export type PullRequestOctokit = CommentPosterOctokit &
       };
     };
   };
+
+type CheckRunCreateParameters = {
+  readonly conclusion: "failure" | "neutral" | "success";
+  readonly head_sha: string;
+  readonly name: string;
+  readonly output: {
+    readonly summary: string;
+    readonly title: string;
+  };
+  readonly owner: string;
+  readonly repo: string;
+  readonly status: "completed";
+};
 
 type RepositoryContentParameters = {
   readonly mediaType: {

@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(bot)`: post Sovri GitHub Check runs after review posting on a
+  best-effort basis, logging `checks.create` failures without failing the
+  webhook flow (R-06, #2324).
+
 - `test(bot)`: add ATDD coverage for best-effort GitHub Checks posting when
   `checks.create` rejects, including delivery, repository, and pull request log
   context (R-06, #2324).

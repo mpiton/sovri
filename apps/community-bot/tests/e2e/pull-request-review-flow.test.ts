@@ -75,8 +75,28 @@ const PullRequestReviewRouteSchema = z.object({
   pull_number: z.string().regex(/^\d+$/),
   repo: z.string().min(1),
 });
+const CheckRunBodySchema = z
+  .object({
+    conclusion: z.enum(["failure", "neutral", "success"]),
+    head_sha: z.string().regex(/^[a-f0-9]{40}$/u),
+    name: z.enum(["Sovri / review", "Sovri / provenance", "Sovri / license-scan"]),
+    output: z.object({
+      summary: z.string(),
+      title: z.string(),
+    }),
+    status: z.literal("completed"),
+  })
+  .passthrough();
+const CheckRunRouteSchema = z.object({
+  owner: z.string().min(1),
+  repo: z.string().min(1),
+});
 
 type ReviewRequest = ReturnType<typeof validatePullRequestReviewRequest>;
+type CheckRunRequest = z.infer<typeof CheckRunBodySchema> & {
+  readonly owner: string;
+  readonly repo: string;
+};
 
 type ReviewFlowFailureStep = "diff fetcher" | "review engine" | "review poster";
 
@@ -90,6 +110,7 @@ type ReactionRequest = {
 type ObservedRuntime = {
   readonly anthropicApiKeys: string[];
   readonly anthropicRequests: unknown[];
+  readonly checkRunRequests: CheckRunRequest[];
   readonly collaboratorCalls: string[];
   readonly eventLog: string[];
   readonly issueCommentBodies: string[];
@@ -548,6 +569,7 @@ describe("community bot pull request review E2E ATDD", () => {
         true,
       );
     },
+    15_000,
   );
 
   it("rejects stale synchronize head SHA posting", () => {
@@ -1073,6 +1095,7 @@ async function runReviewFlow(values: {
   const runtime: ObservedRuntime = {
     anthropicApiKeys: [],
     anthropicRequests: [],
+    checkRunRequests: [],
     collaboratorCalls: [],
     eventLog: [],
     issueCommentBodies: [],
@@ -1118,6 +1141,7 @@ async function runReReviewFlow(values: {
   const runtime: ObservedRuntime = {
     anthropicApiKeys: [],
     anthropicRequests: [],
+    checkRunRequests: [],
     collaboratorCalls: [],
     eventLog: [],
     issueCommentBodies: [],
@@ -1251,6 +1275,16 @@ function installReviewFlowHandlers(
         return HttpResponse.json({ body: reviewRequest.body, id: 98765 });
       },
     ),
+    http.post(`${GitHubBaseUrl}/repos/:owner/:repo/check-runs`, async ({ params, request }) => {
+      const route = CheckRunRouteSchema.parse(params);
+      const body = CheckRunBodySchema.parse(await request.json());
+      runtime.checkRunRequests.push({
+        ...body,
+        owner: route.owner,
+        repo: route.repo,
+      });
+      return HttpResponse.json({ id: runtime.checkRunRequests.length }, { status: 201 });
+    }),
     http.post(
       `${GitHubBaseUrl}/repos/:owner/:repo/issues/:issue_number/comments`,
       async ({ request }) => {
