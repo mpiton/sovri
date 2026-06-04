@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 
 import { composeWalkthrough, renderAssessmentBlock } from "./index.js";
 
+const HTML_TAG_PATTERN = /<\/?[a-z][a-z0-9:-]*(?:\s[^>]*)?\/?>/iu;
+
 let findingSeq = 0;
 
 function makeFinding(severity: Severity, file: string): Finding {
@@ -85,7 +87,9 @@ describe("assessment GitHub-safe markdown (R-08)", () => {
     expect(output.toLowerCase()).not.toContain("<style");
     expect(output.toLowerCase()).not.toContain("stylesheet");
     expect(output).not.toMatch(/https?:\/\//u);
-    expect(output).not.toMatch(/<\/?[a-z][\s/>]/iu);
+    expect(output).not.toMatch(HTML_TAG_PATTERN);
+    expect("<div>").toMatch(HTML_TAG_PATTERN);
+    expect('<span class="metric">').toMatch(HTML_TAG_PATTERN);
   });
 
   it("does not emit local preview vocabulary as markup", () => {
