@@ -64,7 +64,7 @@ describe("assessment metric chips (R-05)", () => {
     // And the output reports 3 files touched
     expect(output).toContain("3 files touched");
     // And the output reports 2 blocker plus major findings
-    expect(output).toContain("2 blocker/major findings");
+    expect(output).toContain("2 blocker plus major findings");
   });
 
   it("counts duplicate file paths as one touched file", () => {
@@ -83,7 +83,7 @@ describe("assessment metric chips (R-05)", () => {
     // And the output reports 1 file touched
     expect(output).toContain("1 file touched");
     // And the output reports 0 blocker plus major findings
-    expect(output).toContain("0 blocker/major findings");
+    expect(output).toContain("0 blocker plus major findings");
   });
 
   it("renders zero-valued metrics for empty findings", () => {
@@ -98,6 +98,6 @@ describe("assessment metric chips (R-05)", () => {
     // And the output reports 0 files touched
     expect(output).toContain("0 files touched");
     // And the output reports 0 blocker plus major findings
-    expect(output).toContain("0 blocker/major findings");
+    expect(output).toContain("0 blocker plus major findings");
   });
 });

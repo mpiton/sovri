@@ -22,8 +22,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Added
 
 - `feat(review-engine)`: add ATDD coverage for assessment metric chips that
-  summarize finding count, distinct touched files, and blocker/major findings
-  without rereading the findings table (#2258).
+  summarize finding count, distinct touched files, and blocker plus major findings
+  without rereading the findings table, exported from the walkthrough barrel and
+  package root (#2258).
 
 - `feat(review-engine)`: add ATDD coverage for the GitHub-safe effort meter
   renderer that maps effort scores `1..5` to exactly five text dot glyphs

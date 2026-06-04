@@ -58,7 +58,7 @@ export { buildInlineComments, InlineCommentDraftSchema } from "./inline.js";
 export type { InlineCommentDraft } from "./inline.js";
 export { estimateCostUsd, PROVIDER_PRICING, renderCostFooter } from "./cost.js";
 export type { ModelPricing, PricingProvider } from "./cost.js";
-export { computeEffortScore, renderEffortMeter } from "./assessment.js";
+export { computeEffortScore, renderEffortMeter, renderMetricChips } from "./assessment.js";
 export type { EffortScore } from "./assessment.js";
 
 export function composeWalkthrough(
