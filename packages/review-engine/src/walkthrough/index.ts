@@ -167,22 +167,25 @@ export function composeWalkthrough(
     ...renderFiles(findings),
   );
 
-  const complianceProvenance = {
-    llmProvider: review.llm_provider,
-    llmModel: review.llm_model,
-    ...(review.provenance?.prompt_sha256 === undefined
-      ? {}
-      : { promptSha256: review.provenance.prompt_sha256 }),
-    ...(review.provenance?.hosting_region === undefined
-      ? {}
-      : { hostingRegion: review.provenance.hosting_region }),
-    ...(review.provenance?.data_residency === undefined
-      ? {}
-      : { dataResidency: review.provenance.data_residency }),
-    ...(review.provenance?.signed_audit_entry === undefined
-      ? {}
-      : { signedAuditEntry: review.provenance.signed_audit_entry }),
-  };
+  const complianceProvenance =
+    findings.length === 0 && review.provenance === undefined
+      ? undefined
+      : {
+          llmProvider: review.llm_provider,
+          llmModel: review.llm_model,
+          ...(review.provenance?.prompt_sha256 === undefined
+            ? {}
+            : { promptSha256: review.provenance.prompt_sha256 }),
+          ...(review.provenance?.hosting_region === undefined
+            ? {}
+            : { hostingRegion: review.provenance.hosting_region }),
+          ...(review.provenance?.data_residency === undefined
+            ? {}
+            : { dataResidency: review.provenance.data_residency }),
+          ...(review.provenance?.signed_audit_entry === undefined
+            ? {}
+            : { signedAuditEntry: review.provenance.signed_audit_entry }),
+        };
   const complianceSection = renderComplianceSection(findings, complianceProvenance);
   if (complianceSection.length > 0) {
     sections.push("", ...complianceSection);

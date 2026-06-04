@@ -29,7 +29,7 @@ export function renderComplianceSection(
   findings: readonly Finding[],
   provenance?: ComplianceProvenance,
 ): string[] {
-  if (findings.length === 0) {
+  if (findings.length === 0 && provenance === undefined) {
     return [];
   }
 
