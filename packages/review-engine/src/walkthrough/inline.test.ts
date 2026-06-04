@@ -278,6 +278,31 @@ describe("buildInlineComments — refreshed inline finding header", () => {
     // And the bold title appears after the badge prefix
     expect(lines[1]).toBe("**Missing null guard**");
   });
+
+  it("keeps the title standalone before a blank line and the verbatim body", () => {
+    // Given the finding title is "Preserve body markdown"
+    // And the finding body has two markdown lines
+    const body = "`value` should stay untouched.\nSecond line keeps **markdown**.";
+    const findings: Finding[] = [
+      makeFinding({
+        file: "src/format.ts",
+        lineStart: 12,
+        title: "Preserve body markdown",
+        body,
+      }),
+    ];
+    const diff = makeDiff("src/format.ts", [12]);
+
+    // When Sovri formats the inline comment body
+    const comments = buildInlineComments(findings, diff);
+    const lines = comments[0]?.body.split("\n") ?? [];
+
+    // Then the badge prefix, bold title, blank separator, and body order is exact
+    expect(lines[0]).toBe(`${severityBadge("minor")} ${categoryBadge("maintainability")}`);
+    expect(lines[1]).toBe("**Preserve body markdown**");
+    expect(lines[2]).toBe("");
+    expect(lines.slice(3, 5).join("\n")).toBe(body);
+  });
 });
 
 describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04)", () => {

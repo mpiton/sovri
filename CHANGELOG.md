@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add ATDD coverage proving refreshed inline finding
+  comments keep the bold title on its own line after the badge prefix, followed
+  by a blank separator and the verbatim finding body (R-02, #2276).
+
 - `fix(review-engine)`: clarify assessment effort-score heuristic thresholds in
   public documentation and keep walkthrough type exports alphabetized after PR
   review feedback (#2272).
