@@ -29,6 +29,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `checks.create` rejects, including delivery, repository, and pull request log
   context (R-06, #2324).
 
+- `test(bot, review-engine)`: add ATDD coverage that GitHub Check descriptor
+  titles, summaries, and posted output omit GitHub tokens, LLM keys, and raw
+  webhook payloads (R-07, #2325).
+
 - `test(review-engine)`: add ATDD coverage proving the GitHub Checks
   license-scan row stays a neutral v1.0 placeholder and does not wire a SARIF
   reader or license scanner command (R-05, #2323).

@@ -69,6 +69,9 @@ const RepoFullName = "mpiton/sovri";
 const BaseSha = "dddddddddddddddddddddddddddddddddddddddd";
 const ReviewedHeadSha = "0123456789abcdef0123456789abcdef01234567";
 const PullNumber = 42;
+const GitHubToken = ["ghp", "_", "0123456789abcdef0123456789abcdef0123"].join("");
+const LlmKey = ["sk", "-", "llm-provider-test-key", "-", "0123456789abcdef"].join("");
+const RawWebhookPayload = '{"action":"opened","pull_request":{"id":7}}';
 
 type CheckRunCreateParameters = {
   readonly conclusion: string;
@@ -109,6 +112,43 @@ beforeEach(() => {
 });
 
 describe("pull request GitHub checks adapter (R-06)", () => {
+  it("posts only descriptor text in GitHub Checks output", async () => {
+    // Given the mapped "Sovri / review" descriptor title is "Sovri review completed"
+    // And the mapped "Sovri / review" descriptor summary is "1 finding found."
+    const runtime = buildRuntime({
+      deliveryId: "delivery-125",
+      failingCheckStatuses: new Map(),
+      pullRequestBody: RawWebhookPayload,
+    });
+    const dependencies = createPullRequestHandlerDependencies(runtime.context);
+    const review = buildReview({
+      findings: [
+        buildFinding({
+          body: `Do not leak ${GitHubToken}, ${LlmKey}, or ${RawWebhookPayload}.`,
+        }),
+      ],
+    });
+
+    // When the bot posts the descriptor to GitHub Checks
+    await dependencies.postReview(buildTarget(), review, buildDiff());
+
+    const reviewCheck = checkRequest("Sovri / review", runtime.checkRequests);
+    // Then the Checks API payload output title is "Sovri review completed"
+    // And the Checks API payload output summary is "1 finding found."
+    expect(reviewCheck.output).toEqual({
+      summary: "1 finding found.",
+      title: "Sovri review completed",
+    });
+
+    const postedPayload = JSON.stringify(runtime.checkRequests);
+    // And the payload does not include a GitHub token
+    expect(postedPayload).not.toContain(GitHubToken);
+    // And the payload does not include an LLM key
+    expect(postedPayload).not.toContain(LlmKey);
+    // And the payload does not include a raw webhook payload
+    expect(postedPayload).not.toContain(RawWebhookPayload);
+  });
+
   it("derives the review check conclusion from the unreconciled source review", async () => {
     // Given reconciliation removed an already-posted major finding from the PR review body
     // And the original review still contains that major finding
@@ -203,9 +243,22 @@ function checkFailureLogs(): readonly LoggerCall[] {
   );
 }
 
+function checkRequest(
+  name: string,
+  requests: readonly CheckRunCreateParameters[],
+): CheckRunCreateParameters {
+  const request = requests.find((candidate) => candidate.name === name);
+  if (request === undefined) {
+    throw new Error(`Check request ${name} was not posted`);
+  }
+
+  return request;
+}
+
 function buildRuntime(values: {
   readonly deliveryId: string;
   readonly failingCheckStatuses: ReadonlyMap<string, number>;
+  readonly pullRequestBody?: string | null;
 }): ChecksRuntime {
   const checkRequests: CheckRunCreateParameters[] = [];
   const reviewRequests: unknown[] = [];
@@ -278,7 +331,7 @@ function buildRuntime(values: {
             ref: "main",
             sha: BaseSha,
           },
-          body: null,
+          body: values.pullRequestBody ?? null,
           changed_files: 0,
           deletions: 0,
           draft: false,
@@ -338,10 +391,14 @@ function buildDiff(): Diff {
   };
 }
 
-function buildFinding(): Review["findings"][number] {
+function buildFinding(
+  values: {
+    readonly body?: string;
+  } = {},
+): Review["findings"][number] {
   return {
-    body: "A reconciled blocking finding still exists in the source review.",
-    category: "correctness",
+    body: values.body ?? "A reconciled blocking finding still exists in the source review.",
+    category: "bug",
     confidence: 0.91,
     file: "apps/community-bot/src/handlers/pull-request.ts",
     id: "123e4567-e89b-42d3-a456-426614174099",
