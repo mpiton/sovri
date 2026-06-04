@@ -155,11 +155,66 @@ describe("MistralProvider errors and redaction", () => {
       schema: z.strictObject({ summary: z.string() }),
     });
 
-    // Then MistralProviderError is thrown
-    await expect(result).rejects.toMatchObject({
-      name: "MistralProviderError",
-      message: expect.stringContaining("schema validation"),
+    // Then MistralProviderError is thrown carrying the fields forwarded by the
+    // response.ts schema-validation path (not just manual construction)
+    const error = await captureProviderError(result);
+    expect(error).toBeInstanceOf(MistralProviderError);
+    if (!(error instanceof MistralProviderError)) {
+      throw new Error("Expected a MistralProviderError");
+    }
+    expect(error.message).toContain("schema validation");
+    expect(error.issues ?? []).not.toHaveLength(0);
+    expect(error.retryableWithCorrectivePrompt).toBe(true);
+    expect(error.tokenUsage).toEqual({ prompt: 123, completion: 45 });
+  });
+});
+
+describe("MistralProvider structured error contract", () => {
+  it("exposes the full structured field contract on MistralProviderError", () => {
+    // Given a schema-validation failure produces real Zod issues (the response.ts path)
+    const parsed = z.strictObject({ summary: z.string() }).safeParse({ summary: 123 });
+    if (parsed.success) {
+      throw new Error("Expected the fixture parse to fail");
+    }
+    const issues = parsed.error.issues;
+    const tokenUsage = { prompt: 11, completion: 7 };
+
+    // When a MistralProviderError carries the full structured options
+    const error = new MistralProviderError("Mistral response failed schema validation", {
+      status: 422,
+      requestId: "req-mistral-contract",
+      attemptDurationsMs: [12, 34],
+      issues,
+      tokenUsage,
+      retryableWithCorrectivePrompt: true,
     });
+
+    // Then every structured field is readable by consumers
+    expect(error.status).toBe(422);
+    expect(error.requestId).toBe("req-mistral-contract");
+    expect(error.attemptDurationsMs).toEqual([12, 34]);
+    expect(error.issues).toEqual(issues);
+    expect(error.tokenUsage).toEqual(tokenUsage);
+    expect(error.retryableWithCorrectivePrompt).toBe(true);
+  });
+
+  it("exposes retry diagnostics on retry and timeout errors", () => {
+    // Given retry-budget and deadline failures share the diagnostic option shape
+    const options = { status: 503, requestId: "req-mistral-retry", attemptDurationsMs: [5, 9, 14] };
+
+    // When the retry and timeout errors are constructed
+    const retry = new MistralProviderRetryError("Mistral retry budget exhausted", options);
+    const timeout = new MistralProviderTimeoutError("Mistral request timed out", options);
+
+    // Then the retry error exposes the HTTP status, request id, and per-attempt durations
+    expect(retry.status).toBe(503);
+    expect(retry.requestId).toBe("req-mistral-retry");
+    expect(retry.attemptDurationsMs).toEqual([5, 9, 14]);
+
+    // And the timeout error exposes the same diagnostic contract
+    expect(timeout.status).toBe(503);
+    expect(timeout.requestId).toBe("req-mistral-retry");
+    expect(timeout.attemptDurationsMs).toEqual([5, 9, 14]);
   });
 });
 

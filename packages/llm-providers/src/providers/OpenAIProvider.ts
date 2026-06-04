@@ -42,11 +42,7 @@ export {
   MAX_OPENAI_MAX_TOKENS,
   MAX_OPENAI_TIMEOUT_MS,
 } from "./OpenAIProvider.options.js";
-export type {
-  OpenAIChatClient,
-  OpenAIChatComplete,
-  OpenAIChatRequest,
-} from "./OpenAIProvider.retry.js";
+export type { OpenAIChatClient } from "./OpenAIProvider.retry.js";
 
 export interface OpenAIProviderOptions extends OpenAIProviderConfigOptions {
   readonly client?: OpenAIChatClient;

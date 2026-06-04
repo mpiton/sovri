@@ -10,7 +10,7 @@ import {
   ReviewPromptModeSchema,
 } from "./builder.js";
 
-export { ReviewPromptModeSchema, type ReviewPromptMode } from "./builder.js";
+export { type ReviewPromptMode } from "./builder.js";
 
 export const ReviewPromptInputSchema = z.strictObject({
   unifiedDiff: z.string(),

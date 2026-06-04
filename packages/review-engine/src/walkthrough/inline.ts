@@ -44,7 +44,7 @@ export const InlineCommentDraftSchema = z
 
 export type InlineCommentDraft = z.infer<typeof InlineCommentDraftSchema>;
 
-export class InlineSuggestionAnchorError extends Error {
+class InlineSuggestionAnchorError extends Error {
   public override readonly name = "InlineSuggestionAnchorError";
 }
 

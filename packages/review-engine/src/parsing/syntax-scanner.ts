@@ -29,13 +29,13 @@ import {
 const StatementTerminatorAllowedPrefixKeywords = new Set<string>(["return", "yield"]);
 const JsxContentToken = "jsx-content";
 
-export type QuotedScanResult = {
+type QuotedScanResult = {
   readonly closed: boolean;
   readonly escaping: boolean;
   readonly opensTemplateExpression: boolean;
 };
 
-export function scanQuotedCharacter(
+function scanQuotedCharacter(
   code: string,
   index: number,
   char: string,
@@ -54,13 +54,13 @@ export function scanQuotedCharacter(
   return { closed: char === quote, escaping: false, opensTemplateExpression: false };
 }
 
-export type RegexScanResult = {
+type RegexScanResult = {
   readonly closed: boolean;
   readonly escaping: boolean;
   readonly inRegexClass: boolean;
 };
 
-export function scanRegexCharacter(
+function scanRegexCharacter(
   char: string,
   escaping: boolean,
   inRegexClass: boolean,
@@ -80,7 +80,7 @@ export function scanRegexCharacter(
   return { closed: char === "/" && !inRegexClass, escaping: false, inRegexClass };
 }
 
-export type NormalScanResult = {
+type NormalScanResult = {
   readonly sane: boolean;
   readonly stop?: boolean;
   readonly skip?: number;
@@ -93,7 +93,7 @@ export type NormalScanResult = {
   readonly closesTernary?: boolean;
 };
 
-export type DelimiterStackEntry = {
+type DelimiterStackEntry = {
   readonly closing: string;
   readonly resumesTemplate: boolean;
   readonly openedAfterOperand: boolean;
@@ -111,7 +111,7 @@ type SyntaxFragmentScanOptions = {
   readonly rejectEmptyInitialDelimiter?: boolean;
 };
 
-export function scanNormalCharacter(
+function scanNormalCharacter(
   code: string,
   index: number,
   char: string,

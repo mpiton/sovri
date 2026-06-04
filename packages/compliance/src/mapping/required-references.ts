@@ -53,7 +53,7 @@ export function findMissingRequiredReference(
   return required.find((candidate) => !hasReference(references, candidate));
 }
 
-export const FLAGSHIP_CREDENTIALS_CWE_ID = "CWE-798";
+const FLAGSHIP_CREDENTIALS_CWE_ID = "CWE-798";
 
 const flagshipRequiredReferences: readonly RequiredReference[] = [
   { framework: "OWASP-TOP10-2021", identifier: "A07:2021" },

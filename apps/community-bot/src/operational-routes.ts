@@ -21,7 +21,7 @@ export type VersionResponse = {
   readonly version: string;
 };
 
-export class OperationalRouteError extends Error {
+class OperationalRouteError extends Error {
   public override readonly name = "OperationalRouteError";
 }
 

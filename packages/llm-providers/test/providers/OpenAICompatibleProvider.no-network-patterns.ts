@@ -7,7 +7,7 @@ export const CompatibleProviderFixture = {
   publicOpenAIHost: ["api", "openai", "com"].join("."),
 };
 
-export interface ForbiddenCompatibleNetworkPattern {
+interface ForbiddenCompatibleNetworkPattern {
   readonly label: string;
   readonly matches: (source: string) => boolean;
   readonly sample: string;

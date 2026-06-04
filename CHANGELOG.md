@@ -21,6 +21,23 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `chore(tooling)`: add `.fallowrc.jsonc` resolving the remaining Fallow false
+  positives (#2246) — declare the two CLI entry-point scripts
+  (`scripts/check-licenses.mjs`, `scripts/validate-v0-1-soak.mjs`), which are run
+  via `node`/subprocess and never imported, and ignore the string-referenced
+  `pino-pretty` Pino transport dependency. Fallow now reports zero issues.
+
+- `test(llm-providers)`: lock the Mistral structured error contract. The
+  `status`, `requestId`, `attemptDurationsMs`, `issues`, `tokenUsage`, and
+  `retryableWithCorrectivePrompt` fields are populated dynamically (the
+  `response.ts` schema-validation path, parity with the OpenAI/Anthropic
+  providers) but had no reader, so Fallow flagged them as unused class members.
+  Rather than delete live contract fields, assert them directly on
+  `MistralProviderError` and the retry/timeout errors, and extend the
+  schema-invalid provider test to assert the `issues` /
+  `retryableWithCorrectivePrompt` / `tokenUsage` fields the `response.ts` path
+  forwards into the thrown error, so the wiring itself is guarded (#2246).
+
 - `feat(review-engine)`: add GitHub-safe badge helpers in
   `walkthrough/badge.ts` — `severityBadge` (brand glyph alone), `categoryBadge`
   (`glyph + label`), and `renderAuditReference` (the
@@ -81,6 +98,37 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `<style>`/`<script>`) is escaped to inert text rather than activated, and the
   composer sources no credential of its own — it reads no token, key, or
   environment, so it cannot leak one it was never given. (task-118, mockup §01)
+
+### Removed
+
+- `refactor`: tighten the public export surface by un-exporting internal-only
+  symbols flagged dead by Fallow (#2246), with no behavior change. Dropped the
+  `export` keyword on module-private helpers — `scanQuotedCharacter` /
+  `scanRegexCharacter` / `scanNormalCharacter` (review-engine syntax scanner),
+  `FLAGSHIP_CREDENTIALS_CWE_ID` (compliance), `MistralChatOptions` /
+  `OpenAIChatOptions` (llm-providers retry), the `ForbiddenCompatibleNetworkPattern`
+  test type, and `OperationalRouteError` (community-bot). Pruned redundant barrel
+  re-exports that had no importer: `mapParsedDiffFiles` / `iterateRightSideLines`
+  from `review-engine/diff/index.ts`, `ReviewPromptModeSchema` from
+  `review-engine/prompt/index.ts`, and the `comment-poster` re-export block from
+  `community-bot/github/index.ts`. All symbols remain available to their internal
+  callers and tests via their defining module.
+
+- `refactor`: un-export a second wave of internal-only symbols surfaced after
+  re-running Fallow (#2246) — `RunReviewInputSchema` (orchestrator; the public
+  `RunReviewInput` type still derives from it), `InlineSuggestionAnchorError`
+  (review-engine, thrown internally), the `QuotedScanResult` / `RegexScanResult` /
+  `NormalScanResult` / `DelimiterStackEntry` scanner result types (now that their
+  scan helpers are internal), and `OpenAIChatComplete`. Pruned dead re-exports of
+  `DiffFetchError` / `DiffFetchTimeoutError` (community-bot `diff-fetcher.ts`,
+  classes still live in `diff-fetcher-contract.ts`) and of `OpenAIChatComplete` /
+  `OpenAIChatRequest` (`OpenAIProvider.ts`). After this pass Fallow reports zero
+  unused exports, types, class members, and dependencies.
+
+- `chore(deps)`: drop the redundant direct `zod` declaration from `@sovri/config`
+  and `@sovri/llm-providers`. Neither package imports `zod` directly — both consume
+  `z` through `@sovri/core` (which re-exports it), so the direct dependency was an
+  unused declaration flagged by Fallow. Removed via `pnpm remove`, lockfile updated.
 
 ### Fixed
 

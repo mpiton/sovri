@@ -1,0 +1,17 @@
+{
+  // CLI entry-point scripts: executed via `node` (or spawned by tests), never
+  // imported, so static reachability analysis cannot see them as reached.
+  // Declaring them as entry points stops Fallow reporting them as unused files.
+  //   - check-licenses.mjs: license-allowlist gate, exercised by
+  //     check-licenses.test.sh and mistral-sdk-policy.test.sh and run as the
+  //     local license gate; it becomes a wired CI job in the supply-chain sprint.
+  //   - validate-v0-1-soak.mjs: v0.1 soak-evidence validator, run as a subprocess
+  //     by tests/e2e/v0-1-soak-validation.test.ts under CI.
+  "entry": ["scripts/check-licenses.mjs", "scripts/validate-v0-1-soak.mjs"],
+
+  // pino-pretty is loaded by Pino at runtime through a string transport target
+  // ("pino-pretty", see packages/observability/src/logger.ts) and resolved with
+  // require.resolve; it is never imported, so it reads as unused to static
+  // analysis even though the dev pretty-print path depends on it.
+  "ignoreDependencies": ["pino-pretty"],
+}

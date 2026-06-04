@@ -23,7 +23,7 @@ const MISTRAL_RETRY_BASE_DELAY_MS = 500;
 
 export type MistralChatComplete = Mistral["chat"]["complete"];
 export type MistralChatRequest = Parameters<MistralChatComplete>[0];
-export type MistralChatOptions = Parameters<MistralChatComplete>[1];
+type MistralChatOptions = Parameters<MistralChatComplete>[1];
 
 export interface MistralChatClient {
   readonly chat: {

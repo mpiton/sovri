@@ -15,12 +15,7 @@ import {
 } from "./diff-fetcher-contract.js";
 import { fetchDiffFromFiles } from "./diff-fetcher-files.js";
 
-export {
-  DiffFetchError,
-  DiffFetchTimeoutError,
-  type DiffFetcherOctokit,
-  type GitHubRepositoryRef,
-} from "./diff-fetcher-contract.js";
+export { type DiffFetcherOctokit, type GitHubRepositoryRef } from "./diff-fetcher-contract.js";
 
 export async function fetchDiff(
   octokit: DiffFetcherOctokit,

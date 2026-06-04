@@ -46,7 +46,7 @@ import {
 import { toFindingSuggestion } from "./parsing/suggestion.js";
 import { composeWalkthrough } from "./walkthrough/index.js";
 
-export const RunReviewInputSchema = ReviewPromptInputSchema;
+const RunReviewInputSchema = ReviewPromptInputSchema;
 
 const TokenUsageSchema = z.object({
   prompt: z.number().int().nonnegative(),
