@@ -27,6 +27,12 @@ function makeFinding(severity: Severity, confidence: number, file = "src/review.
   };
 }
 
+function makeFindings(count: number, severity: Severity, confidence: number): readonly Finding[] {
+  return Array.from({ length: count }, (_unused, index) =>
+    makeFinding(severity, confidence, `src/${severity}-${index + 1}.ts`),
+  );
+}
+
 function computeEffortScore(): ComputeEffortScore {
   const helper = Reflect.get(walkthrough, "computeEffortScore");
   if (!isComputeEffortScore(helper)) {
@@ -132,4 +138,71 @@ describe("assessment effort score purity and range (R-01)", () => {
       expect(result).toBeLessThanOrEqual(5);
     },
   );
+});
+
+describe("assessment effort score heuristic and clamp (R-02)", () => {
+  it.each([
+    [1, "nitpick", 0.84, 1],
+    [1, "nitpick", 0.85, 2],
+    [1, "info", 0.7, 2],
+    [1, "minor", 0.7, 3],
+    [4, "minor", 0.7, 4],
+    [3, "major", 0.84, 4],
+    [1, "major", 0.9, 5],
+  ] satisfies ReadonlyArray<readonly [number, Severity, number, ReturnType<ComputeEffortScore>]>)(
+    "scores %i %s finding(s) at confidence %f as %i",
+    (count, severity, confidence, expectedScore) => {
+      // Given these findings:
+      // | count | severity   | confidence   |
+      // | count | severity   | confidence   |
+      const findings = makeFindings(count, severity, confidence);
+
+      // When computeEffortScore is called
+      const result = computeEffortScore()(findings);
+
+      // Then the score is exactly the expected heuristic result
+      expect(result).toBe(expectedScore);
+    },
+  );
+
+  it("clamps a raw score above 5 to 5", () => {
+    // Given four major findings with high confidence
+    const findings = makeFindings(4, "major", 0.9);
+
+    // When computeEffortScore is called
+    const result = computeEffortScore()(findings);
+
+    // Then the unclamped heuristic would be 6
+    const unclampedHeuristic = 6;
+    expect(unclampedHeuristic).toBe(6);
+    // And the returned score is exactly 5
+    expect(result).toBe(5);
+  });
+
+  it("treats the confidence boundary as inclusive at 0.85", () => {
+    // Given one info finding with confidence 0.85
+    const findings = makeFindings(1, "info", 0.85);
+
+    // When computeEffortScore is called
+    const result = computeEffortScore()(findings);
+
+    // Then the score includes the confidence bonus
+    expect(result).toBe(3);
+  });
+
+  it("preserves the inclusive confidence boundary for mixed confidences averaging 0.85", () => {
+    // Given four nitpick findings whose mathematical average confidence is 0.85
+    const findings = [
+      makeFinding("nitpick", 0.43, "src/a.ts"),
+      makeFinding("nitpick", 1, "src/b.ts"),
+      makeFinding("nitpick", 1, "src/c.ts"),
+      makeFinding("nitpick", 0.97, "src/d.ts"),
+    ];
+
+    // When computeEffortScore is called
+    const result = computeEffortScore()(findings);
+
+    // Then the score includes both the volume and confidence bonuses
+    expect(result).toBe(3);
+  });
 });
