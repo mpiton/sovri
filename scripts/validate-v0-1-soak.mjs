@@ -1021,10 +1021,10 @@ function findMissingSoakEvidencePr(content, expected) {
   return expected.qualifyingPrs.find((prNumber) => !evidencePrs.has(prNumber));
 }
 
-function findInvalidFindingCountPr(content, expected) {
+function* iterateQualifyingSoakLogRows(content, expected) {
   const table = readSoakLogEvidenceTable(content, expected.repoFullName);
   if (table === undefined) {
-    return undefined;
+    return;
   }
 
   const fieldIndexes = readSoakLogFieldIndexes(table.header);
@@ -1035,6 +1035,12 @@ function findInvalidFindingCountPr(content, expected) {
       continue;
     }
 
+    yield { fieldIndexes, prNumber, row };
+  }
+}
+
+function findInvalidFindingCountPr(content, expected) {
+  for (const { fieldIndexes, prNumber, row } of iterateQualifyingSoakLogRows(content, expected)) {
     const findingCountCell = readRequiredSoakLogCell(row, fieldIndexes, "finding count");
     if (findingCountCell === undefined || !isDecimalInteger(findingCountCell)) {
       return prNumber;
@@ -1045,19 +1051,7 @@ function findInvalidFindingCountPr(content, expected) {
 }
 
 function findInvalidLatencyPr(content, expected) {
-  const table = readSoakLogEvidenceTable(content, expected.repoFullName);
-  if (table === undefined) {
-    return undefined;
-  }
-
-  const fieldIndexes = readSoakLogFieldIndexes(table.header);
-  for (const row of table.rows) {
-    const prUrlCell = readRequiredSoakLogCell(row, fieldIndexes, "PR URL");
-    const prNumber = readGitHubPullUrlPrNumber(prUrlCell, expected.repoFullName);
-    if (prNumber === undefined || !expected.qualifyingPrs.includes(prNumber)) {
-      continue;
-    }
-
+  for (const { fieldIndexes, prNumber, row } of iterateQualifyingSoakLogRows(content, expected)) {
     const latencyCell = readRequiredSoakLogCell(row, fieldIndexes, "latency");
     if (latencyCell === undefined || !SOAK_LOG_LATENCY_DURATION_PATTERN.test(latencyCell)) {
       return prNumber;
@@ -1068,22 +1062,13 @@ function findInvalidLatencyPr(content, expected) {
 }
 
 function evaluateSoakLogQualityRatings(content, expected) {
-  const table = readSoakLogEvidenceTable(content, expected.repoFullName);
-  if (table === undefined) {
-    return [];
+  const ratings = [];
+  for (const { fieldIndexes, row } of iterateQualifyingSoakLogRows(content, expected)) {
+    const ratingCell = readRequiredSoakLogCell(row, fieldIndexes, "manual quality rating");
+    ratings.push(classifyQualityRating(ratingCell ?? ""));
   }
 
-  const fieldIndexes = readSoakLogFieldIndexes(table.header);
-  return table.rows.flatMap((row) => {
-    const prUrlCell = readRequiredSoakLogCell(row, fieldIndexes, "PR URL");
-    const prNumber = readGitHubPullUrlPrNumber(prUrlCell, expected.repoFullName);
-    if (prNumber === undefined || !expected.qualifyingPrs.includes(prNumber)) {
-      return [];
-    }
-
-    const ratingCell = readRequiredSoakLogCell(row, fieldIndexes, "manual quality rating");
-    return [classifyQualityRating(ratingCell ?? "")];
-  });
+  return ratings;
 }
 
 function classifyQualityRating(value) {

@@ -66,6 +66,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Changed
 
+- `refactor(scripts)`: fold the qualifying-row scan shared by
+  `findInvalidFindingCountPr`, `findInvalidLatencyPr` and
+  `evaluateSoakLogQualityRatings` in `validate-v0-1-soak.mjs` into an
+  `iterateQualifyingSoakLogRows` generator (`dup:ed29aaa7` / `5357d940`). The
+  pre-filtered scanners (`findMissingRequiredSoakLogField`,
+  `readSoakEvidenceRowPrNumbers`) keep their own row guards and are untouched.
+
 - `test(review-engine)`: export the existing `extractVitestImports` helper from
   `test/vitest-api-style-policy.ts` and import it in `vitest-root-config.test.ts`,
   dropping the test-local copy (`dup:7c648746`). The return type widens to
