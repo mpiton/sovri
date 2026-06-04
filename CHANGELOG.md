@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add ATDD coverage for GitHub-safe compliance and
+  provenance markdown, including provenance-present rendering without CSS hooks
+  and escaping of user-influenced compliance strings (R-08, #2301).
+
 - `test(review-engine)`: add ATDD coverage for walkthrough provenance payload
   validation, including malformed prompt digests, empty hosting/residency values,
   a complete valid payload, and field-specific failure paths preserved at the
