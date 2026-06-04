@@ -35,6 +35,8 @@ The PR has actionable review findings.
 
 ### Compliance & audit
 
+Model: test-provider / test-model
+
 #### Missing payload null guard — src/api/review.ts:18
 
 🔍 Audit Reference: n/a

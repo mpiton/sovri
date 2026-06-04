@@ -106,7 +106,10 @@ export function composeWalkthrough(
     ...renderFiles(findings),
   );
 
-  const complianceSection = renderComplianceSection(findings);
+  const complianceSection = renderComplianceSection(findings, {
+    llmProvider: review.llm_provider,
+    llmModel: review.llm_model,
+  });
   if (complianceSection.length > 0) {
     sections.push("", ...complianceSection);
   }

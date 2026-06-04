@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(review-engine)`: render the review provider and model in the compliance
+  provenance block with markdown escaping (R-03, #2296).
+
 - `test(review-engine)`: add ATDD coverage for the compliance provenance model
   line, including escaped provider and model values (R-03, #2296).
 

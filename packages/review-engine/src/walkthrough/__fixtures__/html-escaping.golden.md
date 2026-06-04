@@ -35,6 +35,8 @@ Found &lt;script&gt;alert(1)&lt;/script&gt; &amp; comments
 
 ### Compliance & audit
 
+Model: test-provider / test-model
+
 #### Avoid &lt;b&gt;trusted&lt;/b&gt; HTML — src/render.ts:12
 
 🔍 Audit Reference: n/a

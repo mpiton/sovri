@@ -5,6 +5,11 @@ import type { ComplianceFramework, ComplianceReference, Finding } from "@sovri/c
 
 import { formatMarkdownText } from "./markdown.js";
 
+interface ComplianceProvenance {
+  readonly llmProvider: string;
+  readonly llmModel: string;
+}
+
 const FRAMEWORK_LABELS: Record<ComplianceFramework, string> = {
   CWE: "CWE",
   "OWASP-TOP10-2021": "OWASP Top 10",
@@ -16,7 +21,10 @@ const FRAMEWORK_LABELS: Record<ComplianceFramework, string> = {
   CRA: "CRA",
 };
 
-export function renderComplianceSection(findings: readonly Finding[]): string[] {
+export function renderComplianceSection(
+  findings: readonly Finding[],
+  provenance?: ComplianceProvenance,
+): string[] {
   if (findings.length === 0) {
     return [];
   }
@@ -27,6 +35,13 @@ export function renderComplianceSection(findings: readonly Finding[]): string[] 
     "",
     "### Compliance & audit",
   ];
+
+  if (provenance !== undefined) {
+    lines.push(
+      "",
+      `Model: ${formatMarkdownText(provenance.llmProvider)} / ${formatMarkdownText(provenance.llmModel)}`,
+    );
+  }
 
   for (const finding of findings) {
     lines.push("", `#### ${formatMarkdownText(finding.title)} — ${formatLocation(finding)}`, "");

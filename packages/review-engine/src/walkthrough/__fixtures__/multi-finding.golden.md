@@ -46,6 +46,8 @@ Three review findings need attention.
 
 ### Compliance & audit
 
+Model: test-provider / test-model
+
 #### Unvalidated session token — src/auth/session.ts:42-45
 
 🔍 Audit Reference: n/a
