@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add ATDD coverage for GitHub-safe review assessment
+  markdown, including canonical walkthrough placement after the verdict header
+  and guards against CSS, stripped attributes, external stylesheets, and local
+  preview vocabulary (#2261).
+
 - `feat(review-engine)`: add ATDD coverage for the review assessment block,
   including severity legend filtering and ordering plus an explicit empty-state
   line without distribution markup, exported from the walkthrough barrel and
