@@ -271,7 +271,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `test(review-engine)`: harden R-04 inline suggestion-block coverage by asserting
   the body text, GitHub suggestion fence, and reconcile marker are all present
-  before comparing their order (#2286).
+  before comparing their order, with named fixtures for the single-line suggestion
+  case (#2286).
 
 - `fix(bot)`: break the re-review issue-comment import cycle by moving the
   shared bot-login resolver into `commands/shared-utilities`, reusing the

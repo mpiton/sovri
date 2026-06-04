@@ -506,17 +506,20 @@ describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04)"
 });
 
 describe("buildInlineComments — committable suggestion blocks", () => {
-  it("keeps the exact committable suggestion block after the refreshed header", () => {
+  it("keeps the exact single-line committable suggestion block after the refreshed header", () => {
     // Given the finding suggestion.code is "const total = amount ?? 0;"
     // And suggestion.committable is true
-    const suggestionBlock = ["```suggestion", "const total = amount ?? 0;", "```"].join("\n");
+    const findingBody = "The total can be undefined before formatting.";
+    const suggestionCode = "const total = amount ?? 0;";
+    const markerPrefix = "<!-- sovri-finding-id:";
+    const suggestionBlock = ["```suggestion", suggestionCode, "```"].join("\n");
     const findings: Finding[] = [
       makeFinding({
         file: "src/totals.ts",
         lineStart: 14,
         title: "Use an explicit fallback",
-        body: "The total can be undefined before formatting.",
-        suggestion: { code: "const total = amount ?? 0;", committable: true },
+        body: findingBody,
+        suggestion: { code: suggestionCode, committable: true },
       }),
     ];
     const diff = makeDiff("src/totals.ts", [14]);
@@ -526,9 +529,9 @@ describe("buildInlineComments — committable suggestion blocks", () => {
     const body = comments[0]?.body ?? "";
 
     // Then the suggestion block is byte-identical and follows the body text
-    const bodyTextIndex = body.indexOf("The total can be undefined before formatting.");
+    const bodyTextIndex = body.indexOf(findingBody);
     const suggestionIndex = body.indexOf(suggestionBlock);
-    const markerIndex = body.indexOf("<!-- sovri-finding-id:");
+    const markerIndex = body.indexOf(markerPrefix);
 
     expect(suggestionIndex).not.toBe(-1);
     expect(bodyTextIndex).not.toBe(-1);
