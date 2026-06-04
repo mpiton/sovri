@@ -21,6 +21,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add ATDD coverage proving the GitHub Checks
+  license-scan row stays a neutral v1.0 placeholder and does not wire a SARIF
+  reader or license scanner command (R-05, #2323).
+
 - `feat(review-engine)`: map the `Sovri / provenance` GitHub Check
   conclusion to `success` when a signed audit entry is attached while keeping
   missing audit evidence neutral (R-04, #2322).
