@@ -24,7 +24,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `feat(review-engine)`: add ATDD coverage for the assessment severity
   distribution renderer, including total count, per-severity counts, and a
   GitHub-safe unicode block bar whose legend keeps raw integer counts visible
-  (#2259).
+  while exporting the helper from the walkthrough barrel and package root (#2259).
 
 - `feat(review-engine)`: add ATDD coverage for assessment metric chips that
   summarize finding count, distinct touched files, and blocker plus major findings

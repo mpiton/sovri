@@ -1,16 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { computeSeverityRank, type Finding } from "@sovri/core";
+import { computeSeverityRank, type Finding, type Severity } from "@sovri/core";
+
+import { severityBadge } from "./badge.js";
 
 export type EffortScore = 1 | 2 | 3 | 4 | 5;
 
 const FILLED_DOT = "●";
 const EMPTY_DOT = "○";
+const BLOCK_BAR_GLYPH = "█";
 const EFFORT_METER_DOTS = 5;
 const VOLUME_BONUS_THRESHOLD = 4;
 const CONFIDENCE_BONUS_THRESHOLD = 0.85;
 const CONFIDENCE_BOUNDARY_EPSILON = Number.EPSILON * 10;
+const SEVERITY_ORDER: readonly Severity[] = ["blocker", "major", "minor", "info", "nitpick"];
+
+type SeverityCount = {
+  readonly severity: Severity;
+  readonly count: number;
+};
 
 /**
  * Computes a deterministic review effort score from findings only.
@@ -66,8 +75,61 @@ export function renderMetricChips(findings: readonly Finding[]): string {
   ].join(" · ");
 }
 
+export function renderSeverityDistribution(findings: readonly Finding[]): readonly string[] {
+  if (findings.length === 0) {
+    return [];
+  }
+
+  const severityRows = collectSeverityRows(countSeverities(findings));
+
+  return [
+    `Total: ${formatCount(findings.length, "finding", "findings")}`,
+    `Bar: ${renderSeverityBar(severityRows)}`,
+    ...severityRows.map(renderSeverityLegendRow),
+  ];
+}
+
 function meetsConfidenceThreshold(averageConfidence: number): boolean {
   return averageConfidence + CONFIDENCE_BOUNDARY_EPSILON >= CONFIDENCE_BONUS_THRESHOLD;
+}
+
+function countSeverities(findings: readonly Finding[]): Map<Severity, number> {
+  const counts = new Map<Severity, number>();
+
+  for (const severity of SEVERITY_ORDER) {
+    counts.set(severity, 0);
+  }
+
+  for (const finding of findings) {
+    counts.set(finding.severity, (counts.get(finding.severity) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+function collectSeverityRows(counts: ReadonlyMap<Severity, number>): SeverityCount[] {
+  const rows: SeverityCount[] = [];
+
+  for (const severity of SEVERITY_ORDER) {
+    const count = counts.get(severity) ?? 0;
+    if (count > 0) {
+      rows.push({ severity, count });
+    }
+  }
+
+  return rows;
+}
+
+function renderSeverityBar(rows: readonly SeverityCount[]): string {
+  return rows.map((row) => BLOCK_BAR_GLYPH.repeat(row.count)).join("");
+}
+
+function renderSeverityLegendRow(row: SeverityCount): string {
+  return `- ${severityBadge(row.severity)} ${row.severity}: ${formatCount(
+    row.count,
+    "finding",
+    "findings",
+  )}`;
 }
 
 function renderMetricChip(label: string): string {

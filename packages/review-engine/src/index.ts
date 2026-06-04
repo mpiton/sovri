@@ -51,6 +51,7 @@ export {
   renderCostFooter,
   renderEffortMeter,
   renderMetricChips,
+  renderSeverityDistribution,
   renderVerdictHeader,
   severityBadge,
   WalkthroughInputSchema,
