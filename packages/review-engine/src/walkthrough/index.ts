@@ -31,15 +31,32 @@ interface ParsedProvenanceResult {
   readonly provenance?: WalkthroughProvenance;
 }
 
-const WalkthroughInputWithoutUsageSchema = z.unknown().transform((input, context) => {
-  if (!isJsonRecord(input) || Reflect.get(input, "tokens_used") !== undefined) {
+export const WalkthroughInputSchema = z.unknown().transform((input, context) => {
+  if (!isJsonRecord(input)) {
     context.addIssue({
       code: "custom",
-      message: "walkthrough input must be a review with valid or omitted token usage",
+      message: "walkthrough input must be a review object",
     });
     return z.NEVER;
   }
 
+  const parsedProvenance = parseWalkthroughProvenance(input, context);
+  if (!parsedProvenance.ok) {
+    return z.NEVER;
+  }
+
+  if (Reflect.get(input, "tokens_used") === undefined) {
+    return parseWalkthroughInputWithoutUsage(input, parsedProvenance.provenance, context);
+  }
+
+  return parseWalkthroughInputWithUsage(input, parsedProvenance.provenance, context);
+});
+
+function parseWalkthroughInputWithoutUsage(
+  input: Record<string, unknown>,
+  provenance: WalkthroughProvenance | undefined,
+  context: z.RefinementCtx,
+): WithWalkthroughProvenance<WalkthroughInputWithoutUsage> {
   if (Reflect.get(input, "token_usage_reported") === true) {
     context.addIssue({
       code: "custom",
@@ -54,50 +71,31 @@ const WalkthroughInputWithoutUsageSchema = z.unknown().transform((input, context
     return z.NEVER;
   }
 
-  const provenance = parseWalkthroughProvenance(input, context);
-  if (!provenance.ok) {
-    return z.NEVER;
-  }
-
   const { tokens_used: _tokensUsed, ...reviewWithoutUsage } = parsed.data;
-  if (provenance.provenance !== undefined) {
-    return { ...reviewWithoutUsage, provenance: provenance.provenance };
+  if (provenance !== undefined) {
+    return { ...reviewWithoutUsage, provenance };
   }
 
   return reviewWithoutUsage;
-});
+}
 
-const WalkthroughInputWithUsageSchema = z.unknown().transform((input, context) => {
-  if (!isJsonRecord(input)) {
-    context.addIssue({
-      code: "custom",
-      message: "walkthrough input must be a review object",
-    });
-    return z.NEVER;
-  }
-
+function parseWalkthroughInputWithUsage(
+  input: Record<string, unknown>,
+  provenance: WalkthroughProvenance | undefined,
+  context: z.RefinementCtx,
+): WithWalkthroughProvenance<Review> {
   const parsed = ReviewSchema.safeParse(input);
   if (!parsed.success) {
     context.addIssue({ code: "custom", message: parsed.error.message });
     return z.NEVER;
   }
 
-  const provenance = parseWalkthroughProvenance(input, context);
-  if (!provenance.ok) {
-    return z.NEVER;
-  }
-
-  if (provenance.provenance !== undefined) {
-    return { ...parsed.data, provenance: provenance.provenance };
+  if (provenance !== undefined) {
+    return { ...parsed.data, provenance };
   }
 
   return parsed.data;
-});
-
-export const WalkthroughInputSchema = z.union([
-  WalkthroughInputWithUsageSchema,
-  WalkthroughInputWithoutUsageSchema,
-]);
+}
 
 function isJsonRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
