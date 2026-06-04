@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
-import { z } from "@sovri/core";
+import { z, type Review } from "@sovri/core";
+
+import { computeVerdict } from "../walkthrough/verdict.js";
 
 export type CheckRunName = "Sovri / review" | "Sovri / provenance" | "Sovri / license-scan";
 
@@ -16,6 +18,10 @@ export interface CheckRunDescriptor {
   readonly title: string;
   readonly summary: string;
 }
+
+export type ReviewWithCheckRunDescriptors = Review & {
+  readonly check_run_descriptors: readonly CheckRunDescriptor[];
+};
 
 export const MapChecksInputSchema = z
   .object({
@@ -83,4 +89,21 @@ export function mapChecks(input: unknown): readonly CheckRunDescriptor[] {
       summary: "License scan available in v1.0",
     },
   ];
+}
+
+export function buildReviewCheckDescriptors(
+  review: Pick<Review, "findings">,
+): readonly CheckRunDescriptor[] {
+  return mapChecks({
+    verdict: computeVerdict(review.findings),
+    findingCount: review.findings.length,
+    hasSignedAuditEntry: false,
+  });
+}
+
+export function attachCheckRunDescriptors(review: Review): ReviewWithCheckRunDescriptors {
+  return {
+    ...review,
+    check_run_descriptors: buildReviewCheckDescriptors(review),
+  };
 }

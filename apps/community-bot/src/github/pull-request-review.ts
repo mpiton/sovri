@@ -6,8 +6,6 @@ import { createProviderFromConfig } from "@sovri/llm-providers";
 import { createLogger } from "@sovri/observability";
 import {
   buildInlineComments,
-  computeVerdict,
-  mapChecks,
   reviewPullRequest,
   type CheckRunDescriptor,
   type Diff,
@@ -30,6 +28,10 @@ import { buildDeploymentDefaultConfig } from "../runtime-env.js";
 
 const logger = createLogger("community-bot.pull-request");
 export const ReviewTimeoutMs = 300_000;
+
+type ReviewWithOptionalCheckRunDescriptors = Review & {
+  readonly check_run_descriptors?: readonly CheckRunDescriptor[];
+};
 
 export function createPullRequestHandlerDependencies(
   context: PullRequestWebhookContext,
@@ -101,9 +103,9 @@ async function loadRepositoryConfig(
 async function postReview(
   context: PullRequestWebhookContext,
   target: ReviewPostTarget,
-  review: Review,
+  review: ReviewWithOptionalCheckRunDescriptors,
   diff: Diff,
-  checkSourceReview: Review = review,
+  checkSourceReview: ReviewWithOptionalCheckRunDescriptors = review,
 ): Promise<void> {
   const repo = splitRepoFullName(target.repoFullName, createPullRequestReviewAdapterError);
   await postPullRequestReview(
@@ -125,18 +127,30 @@ async function postReview(
 async function postCheckRuns(
   context: PullRequestWebhookContext,
   target: ReviewPostTarget,
-  review: Review,
+  review: ReviewWithOptionalCheckRunDescriptors,
 ): Promise<void> {
+  const checks = context.octokit.rest.checks;
+  if (checks === undefined) {
+    return;
+  }
+
+  const descriptors = requireCheckRunDescriptors(review);
   const repo = splitRepoFullName(target.repoFullName, createPullRequestReviewAdapterError);
-  const descriptors = mapChecks({
-    verdict: computeVerdict(review.findings),
-    findingCount: review.findings.length,
-    hasSignedAuditEntry: false,
-  });
 
   await Promise.all(
     descriptors.map((descriptor) => postCheckRun(context, target, repo, descriptor)),
   );
+}
+
+function requireCheckRunDescriptors(
+  review: ReviewWithOptionalCheckRunDescriptors,
+): readonly CheckRunDescriptor[] {
+  const descriptors = review.check_run_descriptors;
+  if (descriptors === undefined) {
+    throw new PullRequestReviewAdapterError("Review check descriptors are unavailable");
+  }
+
+  return descriptors;
 }
 
 async function postCheckRun(

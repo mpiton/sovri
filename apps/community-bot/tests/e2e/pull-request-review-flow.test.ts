@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+import { readFile } from "node:fs/promises";
 import { Probot } from "probot";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -26,6 +27,7 @@ const BaseSha = "dddddddddddddddddddddddddddddddddddddddd";
 const OpenedHeadSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const SynchronizedHeadSha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const SecondSynchronizedHeadSha = "cccccccccccccccccccccccccccccccccccccccc";
+const ChecksReviewedHeadSha = "0123456789abcdef0123456789abcdef01234567";
 const ReReviewHeadSha = "dddddddddddddddddddddddddddddddddddddddd";
 const ReReviewOrderHeadSha = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const ReReviewSuccessfulHeadSha = "ffffffffffffffffffffffffffffffffffffffff";
@@ -51,6 +53,10 @@ const SecretWebhookValue = "secret-webhook-value-45";
 const SecretLlmValue = "secret-llm-value-45";
 const SecretMistralValue = "test-key";
 const SecretInstallationToken = "secret-installation-token-45";
+const PullRequestReviewAdapterUrl = new URL(
+  "../../src/github/pull-request-review.ts",
+  import.meta.url,
+);
 
 const IssueCommentCreateSchema = z.object({ body: z.string() }).passthrough();
 const PullRequestReviewBodySchema = z
@@ -267,6 +273,47 @@ describe("community bot pull request review E2E ATDD", () => {
     expect(response.status).toBe(500);
     expect(unhandledRequests).toHaveLength(1);
   });
+
+  it("posts Sovri check descriptors through MSW without adapter decisions", async () => {
+    // Given MSW intercepts GitHub Checks API requests for repository "mpiton/sovri"
+    // And the bot has 3 Sovri check descriptors
+    // And the reviewed head SHA is "0123456789abcdef0123456789abcdef01234567"
+    const runtime = await runReviewFlow({ action: "opened", headSha: ChecksReviewedHeadSha });
+
+    // When the bot posts the Sovri check runs
+    const checkConclusions = new Map(
+      runtime.checkRunRequests.map((request) => [request.name, request.conclusion]),
+    );
+
+    // Then MSW observes exactly 3 checks.create requests
+    expect(runtime.checkRunRequests).toHaveLength(3);
+    // And each request uses head SHA "0123456789abcdef0123456789abcdef01234567"
+    expect(runtime.checkRunRequests.map((request) => request.head_sha)).toEqual([
+      ChecksReviewedHeadSha,
+      ChecksReviewedHeadSha,
+      ChecksReviewedHeadSha,
+    ]);
+    // And no real network request is made
+    expect(unhandledRequests).toEqual([]);
+
+    // Given the bot adapter receives a "Sovri / review" descriptor with conclusion "failure"
+    // And the bot adapter receives a "Sovri / provenance" descriptor with conclusion "neutral"
+    // And the bot adapter receives a "Sovri / license-scan" descriptor with conclusion "neutral"
+    // Then the outgoing checks.create requests preserve those conclusions unchanged
+    expect(checkConclusions).toEqual(
+      new Map([
+        ["Sovri / review", "failure"],
+        ["Sovri / provenance", "neutral"],
+        ["Sovri / license-scan", "neutral"],
+      ]),
+    );
+
+    const adapterSource = await readFile(PullRequestReviewAdapterUrl, "utf8");
+    // And the bot does not inspect finding severities
+    expect(adapterSource).not.toContain("computeVerdict");
+    // And the bot does not inspect signed audit entry contents
+    expect(adapterSource).not.toContain("mapChecks");
+  }, 15_000);
 
   it("delivers the opened webhook fixture through Probot", async () => {
     // Given the synthetic payload action is "opened"

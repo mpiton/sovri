@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(bot)`: add R-08 MSW coverage for GitHub Checks creation and the
+  thin-adapter descriptor contract (#2326).
+
 - `feat(bot)`: post Sovri GitHub Check runs after review posting on a
   best-effort basis, logging `checks.create` failures without failing the
   webhook flow (R-06, #2324).
@@ -251,6 +254,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   ADR-006).
 
 ### Fixed
+
+- `fix(bot, review-engine)`: attach GitHub Check descriptors to review-engine
+  results and keep the bot adapter as a descriptor-posting pass-through (R-08,
+  #2326).
 
 - `fix(bot)`: derive the `Sovri / review` Check run conclusion from the
   unreconciled review findings so already-posted blocking findings cannot be

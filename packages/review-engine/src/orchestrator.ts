@@ -32,6 +32,7 @@ import {
   reviewFailedEvent,
   reviewStartedEvent,
 } from "./audit-events.js";
+import { attachCheckRunDescriptors, type ReviewWithCheckRunDescriptors } from "./checks/index.js";
 import { filterDiffByIgnores, parseUnifiedDiff } from "./diff/index.js";
 import {
   buildReviewPrompt,
@@ -247,7 +248,7 @@ export async function runReview(
 export async function reviewPullRequest(
   input: ReviewPullRequestInput,
   options: ReviewPullRequestOptions,
-): Promise<Review> {
+): Promise<ReviewWithCheckRunDescriptors> {
   const reviewInput = ReviewPullRequestInputSchema.parse(input);
   const provider = parseInjectedProvider(options.provider);
   const startedAt = new Date();
@@ -261,7 +262,9 @@ export async function reviewPullRequest(
     if (limitError !== undefined) {
       await emitAuditEvent(sink, reviewFailedEvent("limit_exceeded"), logger);
 
-      return buildFailedReview(reviewInput.pullRequest, provider, startedAt, limitError);
+      return attachCheckRunDescriptors(
+        buildFailedReview(reviewInput.pullRequest, provider, startedAt, limitError),
+      );
     }
 
     const filteredDiff = filterDiffByIgnores(reviewInput.diff, reviewInput.config.ignores);
@@ -278,7 +281,9 @@ export async function reviewPullRequest(
     if (filteredDiff.files.length === 0) {
       await emitAuditEvent(sink, reviewCompletedEvent(), logger);
 
-      return buildNoFilesReview(reviewInput.pullRequest, provider, startedAt);
+      return attachCheckRunDescriptors(
+        buildNoFilesReview(reviewInput.pullRequest, provider, startedAt),
+      );
     }
 
     const prompt = buildReviewPrompt({
@@ -325,12 +330,16 @@ export async function reviewPullRequest(
           ? [buildReviewFailedFinding(filteredDiff, generation.error)]
           : [];
 
-      return buildFailedReview(reviewInput.pullRequest, provider, startedAt, generation.error, {
-        findings,
-        ...(generation.promptSha256 === undefined ? {} : { promptSha256: generation.promptSha256 }),
-        tokenUsage: generation.tokenUsage,
-        tokenUsageReported: generation.tokenUsageReported,
-      });
+      return attachCheckRunDescriptors(
+        buildFailedReview(reviewInput.pullRequest, provider, startedAt, generation.error, {
+          findings,
+          ...(generation.promptSha256 === undefined
+            ? {}
+            : { promptSha256: generation.promptSha256 }),
+          tokenUsage: generation.tokenUsage,
+          tokenUsageReported: generation.tokenUsageReported,
+        }),
+      );
     }
 
     const findings = applyReviewFilters(
@@ -368,9 +377,11 @@ export async function reviewPullRequest(
       status: generation.status,
     });
 
-    return withComposedWalkthrough(
-      review,
-      generation.promptSha256 === undefined ? {} : { promptSha256: generation.promptSha256 },
+    return attachCheckRunDescriptors(
+      withComposedWalkthrough(
+        review,
+        generation.promptSha256 === undefined ? {} : { promptSha256: generation.promptSha256 },
+      ),
     );
   } catch (error) {
     await emitAuditEvent(sink, reviewFailedEvent("unexpected_error"), logger);

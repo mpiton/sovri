@@ -23,13 +23,19 @@ export {
 } from "./prompt/builder.js";
 export type { PullRequestPromptContext, SystemPromptConfig } from "./prompt/builder.js";
 
-export { mapChecks, MapChecksInputSchema } from "./checks/index.js";
+export {
+  attachCheckRunDescriptors,
+  buildReviewCheckDescriptors,
+  mapChecks,
+  MapChecksInputSchema,
+} from "./checks/index.js";
 export type {
   CheckRunConclusion,
   CheckRunDescriptor,
   CheckRunName,
   CheckRunStatus,
   MapChecksInput,
+  ReviewWithCheckRunDescriptors,
 } from "./checks/index.js";
 
 export {

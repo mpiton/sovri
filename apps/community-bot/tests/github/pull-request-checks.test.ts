@@ -3,7 +3,12 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Diff, Review } from "@sovri/review-engine";
+import {
+  buildReviewCheckDescriptors,
+  type CheckRunDescriptor,
+  type Diff,
+  type Review,
+} from "@sovri/review-engine";
 
 import { createPullRequestHandlerDependencies } from "../../src/github/pull-request-review.js";
 import type { PullRequestWebhookContext } from "../../src/handlers/pull-request.js";
@@ -104,6 +109,10 @@ type ChecksRuntime = {
   readonly checkRequests: CheckRunCreateParameters[];
   readonly context: ChecksWebhookContext;
   readonly reviewRequests: unknown[];
+};
+
+type ReviewWithCheckRunDescriptors = Review & {
+  readonly check_run_descriptors: readonly CheckRunDescriptor[];
 };
 
 beforeEach(() => {
@@ -363,8 +372,10 @@ function buildTarget() {
   };
 }
 
-function buildReview(values: { readonly findings?: Review["findings"] } = {}): Review {
-  return {
+function buildReview(
+  values: { readonly findings?: Review["findings"] } = {},
+): ReviewWithCheckRunDescriptors {
+  const review: Review = {
     completed_at: new Date("2026-06-04T10:00:01.000Z"),
     commit_sha: ReviewedHeadSha,
     findings: values.findings ?? [],
@@ -381,6 +392,11 @@ function buildReview(values: { readonly findings?: Review["findings"] } = {}): R
       prompt: 100,
     },
     walkthrough_markdown: "Review complete",
+  };
+
+  return {
+    ...review,
+    check_run_descriptors: buildReviewCheckDescriptors(review),
   };
 }
 
