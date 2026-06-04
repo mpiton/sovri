@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add ATDD coverage for compliance reference lines
+  rendering framework labels, identifiers, descriptions, applicability
+  conditions, and no-fabrication behavior when references are absent (R-02,
+  #2295).
+
 - `feat(review-engine)`: render non-empty compliance output inside a
   default-collapsed GitHub `<details>` block while preserving the existing
   compliance content order (R-01, #2294).
