@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add ATDD coverage for hosting and data-residency
+  provenance lines, including omission when provenance is absent (R-05, #2298).
+
 - `feat(review-engine)`: validate optional walkthrough provenance, thread
   orchestrated prompt SHA-256 digests into composed walkthroughs, select the
   response-producing retry prompt digest for partial reviews, and render supplied
