@@ -324,6 +324,9 @@ function renderPreviewFixture(fixture: PreviewFixture): string {
   }
 }
 
+/**
+ * Match stored markdown snapshot files' final newline convention before raw-byte comparison.
+ */
 function ensureFinalNewline(markdown: string): string {
   return markdown.endsWith("\n") ? markdown : `${markdown}\n`;
 }
