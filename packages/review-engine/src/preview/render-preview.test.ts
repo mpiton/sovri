@@ -191,6 +191,25 @@ describe("preview HTML theme wrapper", () => {
     // And the failure names "theme root"
     expect(result.error).toContain("theme root");
   });
+
+  it("inlines the local preview stylesheet without changing markdown payload sections", () => {
+    // Given the rendered markdown payload contains the summary, assessment, inline finding, and provenance shapes
+    const sections = buildPreviewPayloadSections();
+    const markdownPayload = serializeMarkdownPayload(sections);
+
+    // When renderPreviewHtml renders the payload with theme "light"
+    const html = getRenderPreviewHtml()({ sections, theme: "light" });
+
+    // Then the HTML contains exactly one "<style>" element
+    expect(countOccurrences(html, "<style>")).toBe(1);
+    const styleElementText = extractStyleElementText(html);
+    // And the style element contains the ".ghc" selector
+    expect(styleElementText).toContain(".ghc");
+    // And the style element contains the ".gh-light" selector
+    expect(styleElementText).toContain(".gh-light");
+    // And the rendered markdown payload remains unchanged
+    expect(serializeMarkdownPayload(sections)).toBe(markdownPayload);
+  });
 });
 
 function loadTextFixture(name: string): string {
@@ -227,6 +246,39 @@ function hasValidatePreviewThemeRoot(
   );
 }
 
+function buildPreviewPayloadSections(): readonly PreviewHtmlSection[] {
+  return PreviewGoldenCases.map(({ shape, fixture }) => ({
+    title: shape,
+    markdown: renderPreviewFixtureMarkdown(fixture),
+  }));
+}
+
+function serializeMarkdownPayload(sections: readonly PreviewHtmlSection[]): string {
+  return sections.map((section) => section.markdown).join("\n\n---\n\n");
+}
+
+function countOccurrences(value: string, needle: string): number {
+  let count = 0;
+  let startIndex = value.indexOf(needle);
+
+  while (startIndex !== -1) {
+    count += 1;
+    startIndex = value.indexOf(needle, startIndex + needle.length);
+  }
+
+  return count;
+}
+
+function extractStyleElementText(html: string): string {
+  const styleElementText = /<style>([\s\S]*?)<\/style>/u.exec(html)?.[1];
+
+  if (styleElementText === undefined) {
+    throw new MissingPreviewStyleElementError();
+  }
+
+  return styleElementText;
+}
+
 function extractRootClasses(html: string): ReadonlySet<string> {
   const rootClassAttribute = /^<[^>\s]+[^>]*\sclass="([^"]*)"/u.exec(html)?.[1];
 
@@ -258,5 +310,13 @@ class MissingPreviewThemeRootValidatorError extends Error {
 
   public constructor() {
     super("validatePreviewThemeRoot export is missing from the preview renderer");
+  }
+}
+
+class MissingPreviewStyleElementError extends Error {
+  public override readonly name = "MissingPreviewStyleElementError";
+
+  public constructor() {
+    super("preview HTML wrapper is missing a style element");
   }
 }

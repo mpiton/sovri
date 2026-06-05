@@ -131,6 +131,12 @@ const HtmlEscapes: Readonly<Record<string, string>> = {
   "'": "&#39;",
 };
 
+const PreviewChromeStylesheet = [
+  ".ghc { display: block; }",
+  ".gh-light { color-scheme: light; }",
+  ".gh-dark { color-scheme: dark; }",
+].join("\n");
+
 class UnexpectedInlinePreviewCountError extends Error {
   public override readonly name = "UnexpectedInlinePreviewCountError";
 
@@ -168,7 +174,7 @@ export function renderPreviewHtml(request: RenderPreviewHtmlRequest): string {
   const themeClass = getPreviewThemeClass(request.theme);
   const sections = request.sections.map(renderPreviewHtmlSection).join("");
 
-  return `<div class="ghc ${themeClass}">${sections}</div>`;
+  return `<div class="ghc ${themeClass}">${renderPreviewStylesheet()}${sections}</div>`;
 }
 
 export function validatePreviewThemeRoot(rootClasses: string): PreviewThemeRootValidationResult {
@@ -195,6 +201,10 @@ function renderPreviewFixture(fixture: PreviewFixture): string {
     case "provenance":
       return renderProvenancePreview(fixture);
   }
+}
+
+function renderPreviewStylesheet(): string {
+  return `<style>${PreviewChromeStylesheet}</style>`;
 }
 
 function renderInlinePreview(
