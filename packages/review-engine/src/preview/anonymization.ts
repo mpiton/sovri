@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+import {
+  PreviewPlaceholderRepositoryName,
+  collectPreviewForbiddenIdentityReasons,
+} from "./forbidden-identities.js";
+
 export interface PreviewFixtureAnonymizationViolation {
   readonly fixture: string;
   readonly reason: string;
@@ -22,30 +27,10 @@ interface PreviewFixtureAnonymizationFields {
   readonly stringValues: string[];
 }
 
-interface PreviewForbiddenIdentityPattern {
-  readonly reason: string;
-  readonly expression: RegExp;
-}
-
-const PreviewPlaceholderRepositoryName = "example/review-target";
 const PreviewPlaceholderAuthorLoginPrefix = "test-";
 const PreviewPlaceholderProviderKey = "test-key";
 const PreviewRepositoryNameKeys = new Set(["repo_full_name", "repoFullName", "repositoryName"]);
 const PreviewAuthorLoginKeys = new Set(["author", "author_login", "authorLogin", "login"]);
-const PreviewForbiddenIdentityPatterns: readonly PreviewForbiddenIdentityPattern[] = [
-  {
-    reason: "github token shape",
-    expression: /\bghp_[A-Za-z0-9_]{20,}\b/u,
-  },
-  {
-    reason: "llm key shape",
-    expression: /\bsk-ant-api03-[A-Za-z0-9_-]+\b/u,
-  },
-  {
-    reason: "real repo shape",
-    expression: /\b(?!example\/review-target\b)[a-z0-9]+-[a-z0-9-]+\/[a-z0-9]+-[a-z0-9-]+\b/u,
-  },
-];
 
 export function validatePreviewFixtureAnonymization(
   fixtureName: string,
@@ -160,10 +145,8 @@ function collectForbiddenIdentityViolations(
   const violations: PreviewFixtureAnonymizationViolation[] = [];
 
   for (const value of values) {
-    for (const pattern of PreviewForbiddenIdentityPatterns) {
-      if (pattern.expression.test(value)) {
-        violations.push(createFixtureAnonymizationViolation(fixtureName, pattern.reason, value));
-      }
+    for (const reason of collectPreviewForbiddenIdentityReasons(value)) {
+      violations.push(createFixtureAnonymizationViolation(fixtureName, reason, value));
     }
   }
 

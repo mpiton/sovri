@@ -119,6 +119,11 @@ const PreviewForbiddenIdentityCases: readonly PreviewForbiddenIdentityCase[] = [
     forbiddenValue: "real-bank/payments-api",
     reason: "real repo shape",
   },
+  {
+    fixture: "provenance.review.json",
+    forbiddenValue: "realbank/payments",
+    reason: "real repo shape",
+  },
 ];
 
 const PreviewHtmlSections: readonly PreviewHtmlSection[] = [
