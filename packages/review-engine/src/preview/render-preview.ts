@@ -550,7 +550,7 @@ function isRawGitHubWebhookPayloadBody(value: string): boolean {
 }
 
 function normalizePreviewJsonEntities(value: string): string {
-  return value.replace(/&quot;|&#34;/gu, '"');
+  return value.replace(/&amp;quot;|&amp;#34;|&quot;|&#34;/gu, '"');
 }
 
 function renderPreviewFixture(fixture: PreviewFixture): string {

@@ -783,6 +783,11 @@ describe("preview HTML theme wrapper", () => {
         "{&quot;action&quot;:&quot;opened&quot;,&quot;pull_request&quot;:{},&quot;repository&quot;:{},&quot;sender&quot;:{}}",
       fragment: "raw GitHub webhook payload body",
     },
+    {
+      output:
+        "{&amp;quot;action&amp;quot;:&amp;quot;opened&amp;quot;,&amp;quot;pull_request&amp;quot;:{},&amp;quot;repository&amp;quot;:{},&amp;quot;sender&amp;quot;:{}}",
+      fragment: "raw GitHub webhook payload body",
+    },
   ])("rejects rendered output containing $fragment", ({ output, fragment }) => {
     const result = getValidatePreviewRenderedOutput()(output);
 

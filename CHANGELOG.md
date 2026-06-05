@@ -446,6 +446,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   parse JSON-shaped candidates instead of matching broad field-name lookaheads
   (R-08, #2366).
 
+- `fix(review-engine)`: detect double-escaped JSON quote entities when scanning
+  rendered preview output for raw GitHub webhook payload bodies (R-08, #2366).
+
 - `fix(review-engine)`: render preview golden snapshots from typed source
   fixtures through the walkthrough, inline, assessment, and provenance renderers
   instead of duplicating stored markdown lines, with an explicit fixture-renderer
