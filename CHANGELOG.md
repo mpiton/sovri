@@ -90,6 +90,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   each preview fixture once and renders it twice for byte-for-byte comparison
   (R-04, #2351).
 
+- `feat(review-engine)`: add preview section generation that follows the
+  explicit fixture catalog order independent of filesystem listing order (R-04,
+  #2352).
+
 - `fix(bot)`: extract GitHub Checks posting into a dedicated source adapter
   with project headers, explicit ESM imports, and payload-safe failure logging
   (R-10, #2328).
