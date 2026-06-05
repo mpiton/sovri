@@ -81,7 +81,7 @@ const ForbiddenTypeScriptTypePositionEscapeHatchExpressions: readonly ForbiddenT
   [
     {
       label: "any",
-      pattern: /(?::\s*any\b|\bas\s+any\b|(?:[=<,]|\[)\s*any\b|\bany\s*\[\])/u,
+      pattern: /(?::\s*any\b|\bas\s+any\b|(?:[=<,|&]|\[)\s*any\b|\bany\s*\[\])/u,
     },
     {
       label: "as unknown",
@@ -343,9 +343,12 @@ describe("@sovri/review-engine scaffold", () => {
         const explicitType: any = {};
         const asserted = value as any;
         const recordValues: Record<string, any> = {};
+        const unionValue: Safe | any = value;
+        const intersectionValue: Safe & any = value;
         const genericValues = new Set<any>();
         const arrayValues: any[] = [];
         const templateCast = \`\${value as any}\`;
+        const templateUrlCast = \`https://example.test/\${value as any}\`;
         const templateUnknown = \`\${value as unknown as string}\`;
       `),
     ).toEqual(["any", "as unknown"]);
@@ -432,12 +435,12 @@ function collectForbiddenTypeScriptExpressionLabels(
 }
 
 function stripTypeScriptCommentsAndStrings(content: string): string {
-  const contentWithoutCommentsAndQuotedStrings = content.replace(
+  const contentWithoutTemplateStaticText = stripTemplateLiteralStaticText(content);
+
+  return contentWithoutTemplateStaticText.replace(
     /\/\/[^\n\r]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/gu,
     "",
   );
-
-  return stripTemplateLiteralStaticText(contentWithoutCommentsAndQuotedStrings);
 }
 
 interface TemplateLiteralExpressionContent {
