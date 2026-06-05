@@ -142,7 +142,7 @@ const PreviewChromeStylesheet = [
   ".gh-dark { color-scheme: dark; }",
 ].join("\n");
 
-const PreviewMarkdownForbiddenFragments: readonly string[] = [
+export const PreviewMarkdownForbiddenFragments: readonly string[] = [
   "class=",
   "style=",
   "<style>",
@@ -205,6 +205,9 @@ export function validatePreviewThemeRoot(rootClasses: string): PreviewThemeRootV
   return { ok: true };
 }
 
+/**
+ * Validate posted preview markdown stays free of wrapper-only HTML/CSS fragments.
+ */
 export function validatePreviewMarkdownPayload(
   markdown: string,
 ): PreviewMarkdownPayloadValidationResult {

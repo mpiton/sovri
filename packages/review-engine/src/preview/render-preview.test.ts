@@ -5,7 +5,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import * as RenderPreviewModule from "./render-preview.js";
-import { renderPreviewFixtureMarkdown, validatePreviewFixtureCatalog } from "./render-preview.js";
+import {
+  PreviewMarkdownForbiddenFragments,
+  renderPreviewFixtureMarkdown,
+  validatePreviewFixtureCatalog,
+  validatePreviewMarkdownPayload,
+} from "./render-preview.js";
 
 interface PreviewGoldenCase {
   readonly shape: string;
@@ -33,13 +38,6 @@ interface PreviewThemeRootValidationResult {
 }
 
 type ValidatePreviewThemeRoot = (rootClasses: string) => PreviewThemeRootValidationResult;
-
-interface PreviewMarkdownPayloadValidationResult {
-  readonly ok: boolean;
-  readonly forbiddenFragments: readonly string[];
-}
-
-type ValidatePreviewMarkdownPayload = (markdown: string) => PreviewMarkdownPayloadValidationResult;
 
 interface PreviewThemeCase {
   readonly theme: PreviewTheme;
@@ -92,16 +90,6 @@ const PreviewThemeCases: readonly PreviewThemeCase[] = [
     themeClass: "gh-dark",
     otherThemeClass: "gh-light",
   },
-];
-
-const PreviewMarkdownForbiddenFragments: readonly string[] = [
-  "class=",
-  "style=",
-  "<style>",
-  ".ghc",
-  ".gh-light",
-  ".gh-dark",
-  "gh-chrome",
 ];
 
 describe("preview markdown golden fixtures", () => {
@@ -161,7 +149,7 @@ describe("preview markdown golden fixtures", () => {
       const markdown = loadTextFixture(golden);
 
       // When the preview harness validates the markdown payload
-      const result = getValidatePreviewMarkdownPayload()(markdown);
+      const result = validatePreviewMarkdownPayload(markdown);
 
       // Then the markdown does not contain "class="
       // And the markdown does not contain "style="
@@ -175,6 +163,22 @@ describe("preview markdown golden fixtures", () => {
       expect(result.forbiddenFragments).toEqual([]);
     },
   );
+
+  it("rejects markdown containing preview chrome stylesheet fragments", () => {
+    // Given markdown includes CSS copied from the preview HTML wrapper stylesheet
+    const markdown = [
+      ".ghc { display: block; }",
+      ".gh-light { color-scheme: light; }",
+      ".gh-dark { color-scheme: dark; }",
+    ].join("\n");
+
+    // When the preview harness validates the markdown payload
+    const result = validatePreviewMarkdownPayload(markdown);
+
+    // Then validation fails and reports the wrapper selectors
+    expect(result.ok).toBe(false);
+    expect(result.forbiddenFragments).toEqual([".ghc", ".gh-light", ".gh-dark"]);
+  });
 });
 
 describe("preview HTML theme wrapper", () => {
@@ -277,28 +281,11 @@ function getValidatePreviewThemeRoot(): ValidatePreviewThemeRoot {
   return RenderPreviewModule.validatePreviewThemeRoot;
 }
 
-function getValidatePreviewMarkdownPayload(): ValidatePreviewMarkdownPayload {
-  if (!hasValidatePreviewMarkdownPayload(RenderPreviewModule)) {
-    throw new MissingPreviewMarkdownPayloadValidatorError();
-  }
-
-  return RenderPreviewModule.validatePreviewMarkdownPayload;
-}
-
 function hasValidatePreviewThemeRoot(
   module: object,
 ): module is { readonly validatePreviewThemeRoot: ValidatePreviewThemeRoot } {
   return (
     "validatePreviewThemeRoot" in module && typeof module.validatePreviewThemeRoot === "function"
-  );
-}
-
-function hasValidatePreviewMarkdownPayload(
-  module: object,
-): module is { readonly validatePreviewMarkdownPayload: ValidatePreviewMarkdownPayload } {
-  return (
-    "validatePreviewMarkdownPayload" in module &&
-    typeof module.validatePreviewMarkdownPayload === "function"
   );
 }
 
@@ -366,14 +353,6 @@ class MissingPreviewThemeRootValidatorError extends Error {
 
   public constructor() {
     super("validatePreviewThemeRoot export is missing from the preview renderer");
-  }
-}
-
-class MissingPreviewMarkdownPayloadValidatorError extends Error {
-  public override readonly name = "MissingPreviewMarkdownPayloadValidatorError";
-
-  public constructor() {
-    super("validatePreviewMarkdownPayload export is missing from the preview renderer");
   }
 }
 
