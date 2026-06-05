@@ -100,6 +100,7 @@ const PreviewFixtureCatalogEntrySchema = z
 
 const PreviewFixtureCatalogSchema = z.array(PreviewFixtureCatalogEntrySchema);
 const AvailableGoldenFilesSchema = z.array(z.string().trim().min(1));
+const AvailableFixtureFilesSchema = z.array(z.string().trim().min(1));
 
 interface PreviewFixtureCatalogValidationResult {
   readonly ok: boolean;
@@ -191,6 +192,21 @@ export function validatePreviewFixtureCatalog(
     ok: missingGoldenFiles.length === 0,
     missingGoldenFiles,
   };
+}
+
+export function buildPreviewFixtureSections(
+  catalog: readonly unknown[],
+  fixtureFileNames: readonly unknown[],
+): readonly PreviewHtmlSection[] {
+  const entries = PreviewFixtureCatalogSchema.parse(catalog);
+  const availableFixtureFiles = new Set(AvailableFixtureFilesSchema.parse(fixtureFileNames));
+
+  return entries
+    .filter((entry) => availableFixtureFiles.has(entry.fixture))
+    .map((entry) => ({
+      title: entry.shape,
+      markdown: renderPreviewFixtureMarkdown(entry.fixture),
+    }));
 }
 
 export function renderPreviewHtml(request: RenderPreviewHtmlRequest): string {

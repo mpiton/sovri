@@ -32,6 +32,10 @@ interface PreviewHtmlRequest {
 
 type RenderPreviewHtml = (request: PreviewHtmlRequest) => string;
 type RenderPreviewFixtureMarkdownTwice = (fixtureName: string) => readonly [string, string];
+type BuildPreviewFixtureSections = (
+  catalog: readonly PreviewGoldenCase[],
+  fixtureFileNames: readonly string[],
+) => readonly PreviewHtmlSection[];
 
 interface PreviewThemeRootValidationResult {
   readonly ok: boolean;
@@ -223,6 +227,30 @@ describe("preview markdown deterministic rendering", () => {
       expect(secondMarkdown).toBe(firstMarkdown);
     },
   );
+
+  it("keeps preview sections in explicit catalog order when filesystem order is reversed", () => {
+    // Given the filesystem lists fixture files in reverse lexical order
+    const reverseLexicalFixtureFiles = PreviewGoldenCases.map(({ fixture }) => fixture).toSorted(
+      (left, right) => right.localeCompare(left),
+    );
+    const catalogOrderFixtureFiles = PreviewGoldenCases.map(({ fixture }) => fixture);
+    const buildSections = getBuildPreviewFixtureSections();
+
+    // When the preview script builds the preview sections
+    const sections = buildSections(PreviewGoldenCases, reverseLexicalFixtureFiles);
+
+    // Then the generated sections are ordered as "summary", "assessment", "inline finding", "compliance provenance"
+    expect(sections.map(({ title }) => title)).toEqual([
+      "summary",
+      "assessment",
+      "inline finding",
+      "compliance provenance",
+    ]);
+
+    // And the output does not depend on directory iteration order
+    const catalogOrderSections = buildSections(PreviewGoldenCases, catalogOrderFixtureFiles);
+    expect(serializeMarkdownPayload(sections)).toBe(serializeMarkdownPayload(catalogOrderSections));
+  });
 });
 
 describe("preview HTML theme wrapper", () => {
@@ -334,6 +362,23 @@ function hasRenderPreviewFixtureMarkdownTwice(module: object): module is {
   );
 }
 
+function getBuildPreviewFixtureSections(): BuildPreviewFixtureSections {
+  if (!hasBuildPreviewFixtureSections(RenderPreviewModule)) {
+    throw new MissingPreviewFixtureSectionBuilderError();
+  }
+
+  return RenderPreviewModule.buildPreviewFixtureSections;
+}
+
+function hasBuildPreviewFixtureSections(module: object): module is {
+  readonly buildPreviewFixtureSections: BuildPreviewFixtureSections;
+} {
+  return (
+    "buildPreviewFixtureSections" in module &&
+    typeof module.buildPreviewFixtureSections === "function"
+  );
+}
+
 function getValidatePreviewThemeRoot(): ValidatePreviewThemeRoot {
   if (!hasValidatePreviewThemeRoot(RenderPreviewModule)) {
     throw new MissingPreviewThemeRootValidatorError();
@@ -414,6 +459,14 @@ class MissingPreviewFixtureDeterminismRendererError extends Error {
 
   public constructor() {
     super("renderPreviewFixtureMarkdownTwice export is missing from the preview renderer");
+  }
+}
+
+class MissingPreviewFixtureSectionBuilderError extends Error {
+  public override readonly name = "MissingPreviewFixtureSectionBuilderError";
+
+  public constructor() {
+    super("buildPreviewFixtureSections export is missing from the preview renderer");
   }
 }
 
