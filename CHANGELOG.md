@@ -98,6 +98,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   explicit fixture catalog order independent of filesystem listing order (R-04,
   #2352).
 
+- `feat(review-engine)`: add determinism validation that reports `generated_at`
+  as a volatile preview fragment (R-04, #2353).
+
 - `fix(bot)`: extract GitHub Checks posting into a dedicated source adapter
   with project headers, explicit ESM imports, and payload-safe failure logging
   (R-10, #2328).
