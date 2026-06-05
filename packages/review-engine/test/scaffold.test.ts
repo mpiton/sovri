@@ -77,16 +77,20 @@ const ForbiddenCommonJsExpressions: readonly ForbiddenCommonJsExpression[] = [
   },
 ];
 
-const ForbiddenTypeScriptEscapeHatchExpressions: readonly ForbiddenTypeScriptEscapeHatchExpression[] =
+const ForbiddenTypeScriptTypePositionEscapeHatchExpressions: readonly ForbiddenTypeScriptEscapeHatchExpression[] =
   [
     {
       label: "any",
-      pattern: /(?::\s*any\b|\bas\s+any\b|<\s*any\s*>|\bany\s*\[\])/u,
+      pattern: /(?::\s*any\b|\bas\s+any\b|(?:[=<,]|\[)\s*any\b|\bany\s*\[\])/u,
     },
     {
       label: "as unknown",
       pattern: /\bas\s+unknown\b/u,
     },
+  ];
+
+const ForbiddenTypeScriptDirectiveEscapeHatchExpressions: readonly ForbiddenTypeScriptEscapeHatchExpression[] =
+  [
     {
       label: "@ts-ignore",
       pattern: /@ts-ignore/u,
@@ -327,15 +331,18 @@ describe("@sovri/review-engine scaffold", () => {
   it("allows ordinary prose that contains any without an explicit any type", () => {
     expect(
       collectForbiddenTypeScriptEscapeHatches(`
+        // type Unsafe = any;
         const previewCopy = "render any markdown payload";
-        const summary = "any source fixture can be rendered";
+        const summary = "Record<string, any> appears in docs";
       `),
     ).toEqual([]);
 
     expect(
       collectForbiddenTypeScriptEscapeHatches(`
+        type Unsafe = any;
         const explicitType: any = {};
         const asserted = value as any;
+        const recordValues: Record<string, any> = {};
         const genericValues = new Set<any>();
         const arrayValues: any[] = [];
       `),
@@ -402,8 +409,30 @@ function collectForbiddenCommonJsExpressions(content: string): readonly string[]
 }
 
 function collectForbiddenTypeScriptEscapeHatches(content: string): readonly string[] {
-  return ForbiddenTypeScriptEscapeHatchExpressions.flatMap(({ label, pattern }) =>
-    pattern.test(content) ? [label] : [],
+  const typePositionContent = stripTypeScriptCommentsAndStrings(content);
+  const typePositionMatches = collectForbiddenTypeScriptExpressionLabels(
+    typePositionContent,
+    ForbiddenTypeScriptTypePositionEscapeHatchExpressions,
+  );
+  const directiveMatches = collectForbiddenTypeScriptExpressionLabels(
+    content,
+    ForbiddenTypeScriptDirectiveEscapeHatchExpressions,
+  );
+
+  return [...typePositionMatches, ...directiveMatches];
+}
+
+function collectForbiddenTypeScriptExpressionLabels(
+  content: string,
+  expressions: readonly ForbiddenTypeScriptEscapeHatchExpression[],
+): readonly string[] {
+  return expressions.flatMap(({ label, pattern }) => (pattern.test(content) ? [label] : []));
+}
+
+function stripTypeScriptCommentsAndStrings(content: string): string {
+  return content.replace(
+    /\/\/[^\n\r]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/gu,
+    "",
   );
 }
 
