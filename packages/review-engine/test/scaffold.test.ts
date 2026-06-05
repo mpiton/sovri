@@ -47,6 +47,26 @@ interface ReviewEnginePackageManifest {
   readonly scripts: Readonly<Record<string, string>>;
 }
 
+interface ForbiddenCommonJsExpression {
+  readonly label: string;
+  readonly pattern: RegExp;
+}
+
+const ForbiddenCommonJsExpressions: readonly ForbiddenCommonJsExpression[] = [
+  {
+    label: "require(",
+    pattern: /\brequire\s*\(/u,
+  },
+  {
+    label: "module.exports",
+    pattern: /\bmodule\.exports\b/u,
+  },
+  {
+    label: "exports",
+    pattern: /\bexports(?:\.|\[)/u,
+  },
+];
+
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8"));
 }
@@ -206,8 +226,11 @@ describe("@sovri/review-engine scaffold", () => {
           `${relativePath} relative import "${importSpecifier}" must use a .js extension`,
         ).toMatch(/\.js$/u);
       }
-      // And no file contains "require("
-      expect(content, `${relativePath} must not contain require(`).not.toContain("require(");
+      // And no file contains "require(" or other CommonJS export forms
+      expect(
+        collectForbiddenCommonJsExpressions(content),
+        `${relativePath} must not contain CommonJS entry points`,
+      ).toEqual([]);
     }
   });
 
@@ -220,6 +243,17 @@ describe("@sovri/review-engine scaffold", () => {
         const lazy = await import("./lazy");
       `),
     ).toEqual(["./setup", "../value", "../exported", "./lazy"]);
+  });
+
+  it("collects forbidden CommonJS expressions for source contract checks", () => {
+    expect(
+      collectForbiddenCommonJsExpressions(`
+        const loader = require("./setup");
+        module.exports = {};
+        exports.value = 1;
+        exports["other"] = 2;
+      `),
+    ).toEqual(["require(", "module.exports", "exports"]);
   });
 
   it("keeps the deferred ingestion format out of production source", () => {
@@ -273,6 +307,12 @@ function collectRelativeImportSpecifiers(content: string): readonly string[] {
     const dynamicSpecifier = match.groups?.dynamicSpecifier;
     return [fromSpecifier, sideEffectSpecifier, dynamicSpecifier].filter(isDefinedString);
   });
+}
+
+function collectForbiddenCommonJsExpressions(content: string): readonly string[] {
+  return ForbiddenCommonJsExpressions.flatMap(({ label, pattern }) =>
+    pattern.test(content) ? [label] : [],
+  );
 }
 
 function isDefinedString(value: string | undefined): value is string {
