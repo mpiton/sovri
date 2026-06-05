@@ -126,6 +126,10 @@ const ForbiddenTypeScriptEscapeHatchCases: readonly ForbiddenTypeScriptEscapeHat
     source: "const unsafeValue: any = {};",
   },
   {
+    forbiddenFragment: "any",
+    source: "const unsafeValue = `${/* } */ value as any}`;",
+  },
+  {
     forbiddenFragment: "as unknown",
     source: "const unsafeValue = value as unknown;",
   },
@@ -559,7 +563,8 @@ function skipEscapedCharacter(index: number): number {
 
 /**
  * Reads an interpolation expression until its matching closing brace, ignoring
- * braces that appear inside quoted strings or nested expression blocks.
+ * braces that appear inside quoted strings, comments, or nested expression
+ * blocks.
  */
 function readTemplateLiteralExpressionContent(
   content: string,
@@ -576,6 +581,14 @@ function readTemplateLiteralExpressionContent(
       const stringContent = readQuotedStringContent(content, index, character);
       expressionContent += stringContent.content;
       index = stringContent.nextIndex;
+      continue;
+    }
+
+    const commentContent = readTypeScriptCommentContent(content, index);
+
+    if (commentContent !== undefined) {
+      expressionContent += commentContent.content;
+      index = commentContent.nextIndex;
       continue;
     }
 
@@ -609,6 +622,65 @@ function readTemplateLiteralExpressionContent(
   }
 
   return { content: expressionContent, nextIndex: content.length };
+}
+
+/**
+ * Reads a TypeScript comment inside an interpolation without interpreting
+ * comment braces as syntax.
+ */
+function readTypeScriptCommentContent(
+  content: string,
+  startIndex: number,
+): TemplateLiteralExpressionContent | undefined {
+  if (content[startIndex] !== "/") {
+    return undefined;
+  }
+
+  if (content[startIndex + 1] === "/") {
+    return readLineCommentContent(content, startIndex);
+  }
+
+  if (content[startIndex + 1] === "*") {
+    return readBlockCommentContent(content, startIndex);
+  }
+
+  return undefined;
+}
+
+/** Reads a line comment through its line terminator or EOF. */
+function readLineCommentContent(
+  content: string,
+  startIndex: number,
+): TemplateLiteralExpressionContent {
+  const lineFeedIndex = content.indexOf("\n", startIndex + 2);
+  const carriageReturnIndex = content.indexOf("\r", startIndex + 2);
+  const endIndex = minFoundIndex(lineFeedIndex, carriageReturnIndex) ?? content.length;
+
+  return { content: content.slice(startIndex, endIndex), nextIndex: endIndex };
+}
+
+/** Reads a block comment through its closing marker or EOF. */
+function readBlockCommentContent(
+  content: string,
+  startIndex: number,
+): TemplateLiteralExpressionContent {
+  const closingIndex = content.indexOf("*/", startIndex + 2);
+  const nextIndex = closingIndex === -1 ? content.length : closingIndex + 2;
+
+  return { content: content.slice(startIndex, nextIndex), nextIndex };
+}
+
+/** Returns the smallest found string index, treating -1 as not found. */
+function minFoundIndex(firstIndex: number, secondIndex: number): number | undefined {
+  if (firstIndex === -1) {
+    return secondIndex === -1 ? undefined : secondIndex;
+  }
+
+  if (secondIndex === -1) {
+    return firstIndex;
+  }
+
+  return Math.min(firstIndex, secondIndex);
 }
 
 /**

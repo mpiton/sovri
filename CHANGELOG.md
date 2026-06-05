@@ -106,8 +106,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `fix(review-engine)`: simplify redundant preview escape-hatch regex fragments
   and split template-literal scanning into documented helpers with loop-based
-  label collection without changing the source quality gate behavior (R-08,
-  #2365).
+  label collection while keeping comment braces inside interpolations from
+  hiding forbidden type fragments (R-08, #2365).
 
 - `feat(review-engine)`: expose Zod-derived preview fixture parsers for raw JSON
   text and parsed fixture values, and route preview fixture loading through that
