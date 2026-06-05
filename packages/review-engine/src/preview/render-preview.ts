@@ -218,7 +218,11 @@ export function validatePreviewGoldenMarkdownSnapshots(
 ): PreviewGoldenMarkdownValidationResult {
   const requiredSnapshotUpdates = PreviewFixtureCatalogSchema.parse(catalog)
     .filter(
-      (entry) => renderPreviewFixtureMarkdown(entry.fixture) !== loadGoldenFixture(entry.golden),
+      (entry) =>
+        !matchesPreviewGoldenSnapshotBytes(
+          renderPreviewFixtureMarkdown(entry.fixture),
+          loadTextFixture(entry.golden),
+        ),
     )
     .map((entry) => entry.golden);
 
@@ -226,6 +230,17 @@ export function validatePreviewGoldenMarkdownSnapshots(
     ok: requiredSnapshotUpdates.length === 0,
     requiredSnapshotUpdates,
   };
+}
+
+export function matchesPreviewGoldenSnapshotBytes(
+  renderedMarkdown: string,
+  storedGoldenMarkdown: string,
+): boolean {
+  const renderedSnapshotBytes = renderedMarkdown.endsWith("\n")
+    ? renderedMarkdown
+    : `${renderedMarkdown}\n`;
+
+  return renderedSnapshotBytes === storedGoldenMarkdown;
 }
 
 export function buildPreviewFixtureSections(
@@ -366,8 +381,4 @@ function loadPreviewFixture(fixtureName: string): PreviewFixture {
 
 function loadTextFixture(name: string): string {
   return readFileSync(new URL(`./__fixtures__/${name}`, import.meta.url), "utf8");
-}
-
-function loadGoldenFixture(name: string): string {
-  return loadTextFixture(name).trimEnd();
 }

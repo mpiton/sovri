@@ -120,8 +120,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   omitting them from rendered markdown (R-05, #2356).
 
 - `feat(review-engine)`: add preview golden catalog validation that reports no
-  required snapshot updates for unmodified preview fixtures as a catalog result
-  (R-06, #2357).
+  required snapshot updates for unmodified preview fixtures as a
+  byte-preserving catalog result (R-06, #2357).
 
 - `fix(bot)`: extract GitHub Checks posting into a dedicated source adapter
   with project headers, explicit ESM imports, and payload-safe failure logging

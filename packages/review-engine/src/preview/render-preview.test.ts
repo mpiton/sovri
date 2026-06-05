@@ -59,6 +59,10 @@ type RenderPreviewFixtureMarkdownTwice = (fixtureName: string) => readonly [stri
 type ValidatePreviewGoldenMarkdownSnapshots = (
   catalog: readonly PreviewGoldenCase[],
 ) => PreviewGoldenMarkdownValidationResult;
+type MatchesPreviewGoldenSnapshotBytes = (
+  renderedMarkdown: string,
+  storedGoldenMarkdown: string,
+) => boolean;
 type BuildPreviewFixtureSections = (
   catalog: readonly PreviewGoldenCase[],
   fixtureFileNames: readonly string[],
@@ -261,6 +265,16 @@ describe("preview markdown golden fixtures", () => {
     expect(result.ok).toBe(true);
     // And no snapshot update is required
     expect(result.requiredSnapshotUpdates).toEqual([]);
+  });
+
+  it("preserves trailing bytes when comparing golden markdown snapshots", () => {
+    const matchesSnapshotBytes = getMatchesPreviewGoldenSnapshotBytes();
+
+    expect(matchesSnapshotBytes("## Approve", "## Approve\n")).toBe(true);
+    expect(matchesSnapshotBytes("## Approve\n", "## Approve\n")).toBe(true);
+    expect(matchesSnapshotBytes("## Approve", "## Approve")).toBe(false);
+    expect(matchesSnapshotBytes("## Approve", "## Approve\n\n")).toBe(false);
+    expect(matchesSnapshotBytes("## Approve", "## Approve \n")).toBe(false);
   });
 
   it("rejects a fixture catalog when a stored markdown snapshot is missing", () => {
@@ -631,6 +645,23 @@ function hasValidatePreviewGoldenMarkdownSnapshots(module: object): module is {
   );
 }
 
+function getMatchesPreviewGoldenSnapshotBytes(): MatchesPreviewGoldenSnapshotBytes {
+  if (!hasMatchesPreviewGoldenSnapshotBytes(RenderPreviewModule)) {
+    throw new MissingPreviewGoldenSnapshotMatcherError();
+  }
+
+  return RenderPreviewModule.matchesPreviewGoldenSnapshotBytes;
+}
+
+function hasMatchesPreviewGoldenSnapshotBytes(module: object): module is {
+  readonly matchesPreviewGoldenSnapshotBytes: MatchesPreviewGoldenSnapshotBytes;
+} {
+  return (
+    "matchesPreviewGoldenSnapshotBytes" in module &&
+    typeof module.matchesPreviewGoldenSnapshotBytes === "function"
+  );
+}
+
 function getBuildPreviewFixtureSections(): BuildPreviewFixtureSections {
   if (!hasBuildPreviewFixtureSections(RenderPreviewModule)) {
     throw new MissingPreviewFixtureSectionBuilderError();
@@ -785,6 +816,14 @@ class MissingPreviewGoldenMarkdownValidatorError extends Error {
 
   public constructor() {
     super("validatePreviewGoldenMarkdownSnapshots export is missing from the preview renderer");
+  }
+}
+
+class MissingPreviewGoldenSnapshotMatcherError extends Error {
+  public override readonly name = "MissingPreviewGoldenSnapshotMatcherError";
+
+  public constructor() {
+    super("matchesPreviewGoldenSnapshotBytes export is missing from the preview renderer");
   }
 }
 
