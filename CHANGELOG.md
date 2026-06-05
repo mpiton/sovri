@@ -65,6 +65,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   reject generated preview output containing `generated_at` volatile bytes (R-04,
   #2353).
 
+- `test(review-engine)`: add RED coverage requiring preview fixtures to validate
+  placeholder repository, author, and provider key identity values (R-05, #2354).
+
 - `feat(review-engine)`: add the initial dev-only preview markdown fixture
   renderer and anonymized golden fixture catalog for the four review comment
   shapes (R-01, #2342).
