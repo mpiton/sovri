@@ -52,6 +52,11 @@ interface ForbiddenCommonJsExpression {
   readonly pattern: RegExp;
 }
 
+interface ForbiddenTypeScriptEscapeHatchExpression {
+  readonly label: string;
+  readonly pattern: RegExp;
+}
+
 interface ForbiddenTypeScriptEscapeHatchCase {
   readonly forbiddenFragment: string;
   readonly source: string;
@@ -71,6 +76,26 @@ const ForbiddenCommonJsExpressions: readonly ForbiddenCommonJsExpression[] = [
     pattern: /\bexports(?:\.|\[)/u,
   },
 ];
+
+const ForbiddenTypeScriptEscapeHatchExpressions: readonly ForbiddenTypeScriptEscapeHatchExpression[] =
+  [
+    {
+      label: "any",
+      pattern: /\bany\b/u,
+    },
+    {
+      label: "as unknown",
+      pattern: /\bas\s+unknown\b/u,
+    },
+    {
+      label: "@ts-ignore",
+      pattern: /@ts-ignore/u,
+    },
+    {
+      label: "@ts-expect-error",
+      pattern: /@ts-expect-error/u,
+    },
+  ];
 
 const ForbiddenTypeScriptEscapeHatchCases: readonly ForbiddenTypeScriptEscapeHatchCase[] = [
   {
@@ -255,6 +280,11 @@ describe("@sovri/review-engine scaffold", () => {
         collectForbiddenCommonJsExpressions(content),
         `${relativePath} must not contain CommonJS entry points`,
       ).toEqual([]);
+      // And no file contains forbidden TypeScript escape hatches
+      expect(
+        collectForbiddenTypeScriptEscapeHatches(content),
+        `${relativePath} must not contain TypeScript escape hatches`,
+      ).toEqual([]);
     }
   });
 
@@ -349,6 +379,12 @@ function collectRelativeImportSpecifiers(content: string): readonly string[] {
 
 function collectForbiddenCommonJsExpressions(content: string): readonly string[] {
   return ForbiddenCommonJsExpressions.flatMap(({ label, pattern }) =>
+    pattern.test(content) ? [label] : [],
+  );
+}
+
+function collectForbiddenTypeScriptEscapeHatches(content: string): readonly string[] {
+  return ForbiddenTypeScriptEscapeHatchExpressions.flatMap(({ label, pattern }) =>
     pattern.test(content) ? [label] : [],
   );
 }

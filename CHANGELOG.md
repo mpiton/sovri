@@ -81,6 +81,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   quality gate to fail and name forbidden TypeScript escape-hatch fragments
   (R-08, #2365).
 
+- `test(review-engine)`: extend the preview source contract quality gate to
+  reject and name `any`, `as unknown`, `@ts-ignore`, and `@ts-expect-error`
+  fragments (R-08, #2365).
+
 - `feat(review-engine)`: expose Zod-derived preview fixture parsers for raw JSON
   text and parsed fixture values, and route preview fixture loading through that
   boundary before rendering (R-08, #2364).
