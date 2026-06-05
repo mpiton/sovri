@@ -72,6 +72,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   sources and the preview script to keep required headers, explicit ESM import
   extensions, and no CommonJS usage (R-08, #2363).
 
+- `chore(review-engine)`: move the preview comments generator under the package
+  `scripts/` source contract while preserving package-local `.preview/` output
+  generation (R-08, #2363).
+
 - `feat(review-engine)`: add the initial dev-only preview markdown fixture
   renderer and anonymized golden fixture catalog for the four review comment
   shapes (R-01, #2342).
