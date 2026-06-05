@@ -1,0 +1,44 @@
+{
+  "kind": "provenance",
+  "findings": [
+    {
+      "id": "4fdcfcd1-113d-4d1f-8d28-3f2cc30f20b1",
+      "audit_reference": "SOVRI-AC-AB12-CD34",
+      "severity": "major",
+      "category": "security",
+      "file": "src/render.ts",
+      "line_start": 18,
+      "line_end": 18,
+      "title": "Escape user-supplied HTML",
+      "body": "The renderer must keep user-controlled HTML inert before posting review output.",
+      "source": "llm",
+      "confidence": 0.91,
+      "cwe": "CWE-79",
+      "compliance_references": [
+        {
+          "framework": "CWE",
+          "identifier": "CWE-79",
+          "description": "Improper Neutralization of Input During Web Page Generation",
+          "source_url": "https://cwe.mitre.org/data/definitions/79.html",
+          "applicability": "informational"
+        },
+        {
+          "framework": "ISO27001-2022",
+          "identifier": "A.8.28",
+          "description": "Secure coding",
+          "source_url": "https://www.iso.org/standard/27001",
+          "applicability": "applicable_if",
+          "condition": "the pull request changes production application code"
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "llmProvider": "test-provider",
+    "llmModel": "test-model",
+    "hostingRegion": "eu-west-3",
+    "dataResidency": "EU",
+    "promptSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "signedAuditEntry": "audit-entry-test-001"
+  }
+}

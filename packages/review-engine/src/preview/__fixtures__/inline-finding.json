@@ -1,0 +1,53 @@
+{
+  "kind": "inline",
+  "findings": [
+    {
+      "id": "4fdcfcd1-113d-4d1f-8d28-3f2cc30f20b1",
+      "audit_reference": "SOVRI-AC-AB12-CD34",
+      "severity": "major",
+      "category": "security",
+      "file": "src/render.ts",
+      "line_start": 18,
+      "line_end": 18,
+      "title": "Escape user-supplied HTML",
+      "body": "The renderer must keep user-controlled HTML inert before posting review output.",
+      "suggestion": {
+        "code": "const safeHtml = escapeHtml(input);",
+        "committable": true
+      },
+      "source": "llm",
+      "confidence": 0.91,
+      "cwe": "CWE-79",
+      "compliance_references": []
+    }
+  ],
+  "diff": {
+    "unified_diff": "diff --git a/src/render.ts b/src/render.ts\nindex 1111111..2222222 100644\n--- a/src/render.ts\n+++ b/src/render.ts\n@@ -16,4 +16,4 @@ export function render(input: string): string {\n export function render(input: string): string {\n const title = \"Preview\";\n+const safeHtml = input;\n return `<section>${title}${safeHtml}</section>`;\n }",
+    "files": [
+      {
+        "path": "src/render.ts",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 0,
+        "sha": "1111111111111111111111111111111111111111",
+        "patch": "@@ -16,4 +16,4 @@ export function render(input: string): string {\n export function render(input: string): string {\n const title = \"Preview\";\n+const safeHtml = input;\n return `<section>${title}${safeHtml}</section>`;\n }",
+        "hunks": [
+          {
+            "old_start": 16,
+            "old_lines": 4,
+            "new_start": 16,
+            "new_lines": 4,
+            "header": "@@ -16,4 +16,4 @@ export function render(input: string): string {",
+            "lines": [
+              " export function render(input: string): string {",
+              " const title = \"Preview\";",
+              "+const safeHtml = input;",
+              " return `<section>${title}${safeHtml}</section>`;",
+              " }"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

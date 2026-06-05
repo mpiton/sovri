@@ -21,6 +21,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add RED coverage for the preview markdown golden
+  snapshot catalog across the summary, assessment, inline finding, and
+  compliance provenance shapes (R-01, #2342).
+
+- `feat(review-engine)`: add the initial dev-only preview markdown fixture
+  renderer and anonymized golden fixture catalog for the four review comment
+  shapes (R-01, #2342).
+
 - `fix(bot)`: extract GitHub Checks posting into a dedicated source adapter
   with project headers, explicit ESM imports, and payload-safe failure logging
   (R-10, #2328).
@@ -265,6 +273,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   ADR-006).
 
 ### Fixed
+
+- `fix(review-engine)`: render preview golden snapshots from typed source
+  fixtures through the walkthrough, inline, assessment, and provenance renderers
+  instead of duplicating stored markdown lines, with an explicit fixture-renderer
+  API contract and specific inline-preview count errors (#2342).
 
 - `fix(bot, review-engine)`: address review feedback so failed reviews publish
   failing check conclusions, signed audit provenance feeds the provenance check,
