@@ -139,6 +139,9 @@ export interface PreviewMarkdownPayloadValidationResult {
 /**
  * Reports whether preview fixture markdown still matches its stored golden snapshots.
  *
+ * For example, if `summary.review.json` renders bytes that differ from
+ * `summary.golden.md`, `requiredSnapshotUpdates` contains `summary.golden.md`.
+ *
  * `requiredSnapshotUpdates` contains golden fixture file names whose stored bytes differ.
  */
 export interface PreviewGoldenMarkdownValidationResult {
