@@ -136,6 +136,19 @@ export interface PreviewMarkdownPayloadValidationResult {
   readonly forbiddenFragments: readonly string[];
 }
 
+/**
+ * Reports whether preview fixture markdown still matches its stored golden snapshots.
+ *
+ * For example, if `summary.review.json` renders bytes that differ from
+ * `summary.golden.md`, `requiredSnapshotUpdates` contains `summary.golden.md`.
+ *
+ * `requiredSnapshotUpdates` contains golden fixture file names whose stored bytes differ.
+ */
+export interface PreviewGoldenMarkdownValidationResult {
+  readonly ok: boolean;
+  readonly requiredSnapshotUpdates: readonly string[];
+}
+
 export interface PreviewDeterminismValidationResult {
   readonly ok: boolean;
   readonly volatileFragments: readonly string[];
@@ -181,7 +194,7 @@ class UnexpectedInlinePreviewCountError extends Error {
 export function renderPreviewFixtureMarkdown(fixtureName: string): string {
   const fixture = loadPreviewFixture(fixtureName);
 
-  return renderPreviewFixture(fixture);
+  return ensureFinalNewline(renderPreviewFixture(fixture));
 }
 
 export function renderPreviewFixtureMarkdownTwice(fixtureName: string): readonly [string, string] {
@@ -207,6 +220,41 @@ export function validatePreviewFixtureCatalog(
     missingGoldenFiles,
   };
 }
+
+/**
+ * Validate that every preview catalog entry renders to the same bytes as its stored golden markdown.
+ *
+ * @param catalog - Preview fixture catalog entries to render and compare.
+ * @returns A validation result containing golden file names that need snapshot updates.
+ */
+export function validatePreviewGoldenMarkdownSnapshots(
+  catalog: readonly unknown[],
+): PreviewGoldenMarkdownValidationResult {
+  const requiredSnapshotUpdates = PreviewFixtureCatalogSchema.parse(catalog)
+    .filter(
+      (entry) =>
+        !matchesPreviewGoldenSnapshotBytes(
+          renderPreviewFixtureMarkdown(entry.fixture),
+          loadTextFixture(entry.golden),
+        ),
+    )
+    .map((entry) => entry.golden);
+
+  return {
+    ok: requiredSnapshotUpdates.length === 0,
+    requiredSnapshotUpdates,
+  };
+}
+
+export function matchesPreviewGoldenSnapshotBytes(
+  renderedMarkdown: string,
+  storedGoldenMarkdown: string,
+): boolean {
+  return renderedMarkdown === storedGoldenMarkdown;
+}
+
+export type ValidatePreviewGoldenMarkdownSnapshots = typeof validatePreviewGoldenMarkdownSnapshots;
+export type MatchesPreviewGoldenSnapshotBytes = typeof matchesPreviewGoldenSnapshotBytes;
 
 export function buildPreviewFixtureSections(
   catalog: readonly unknown[],
@@ -283,6 +331,13 @@ function renderPreviewFixture(fixture: PreviewFixture): string {
     case "provenance":
       return renderProvenancePreview(fixture);
   }
+}
+
+/**
+ * Match stored markdown snapshot files' final newline convention before raw-byte comparison.
+ */
+function ensureFinalNewline(markdown: string): string {
+  return markdown.endsWith("\n") ? markdown : `${markdown}\n`;
 }
 
 function renderPreviewStylesheet(): string {
