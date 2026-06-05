@@ -25,6 +25,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   snapshot catalog across the summary, assessment, inline finding, and
   compliance provenance shapes (R-01, #2342).
 
+- `feat(review-engine)`: add the initial dev-only preview markdown fixture
+  renderer and anonymized golden fixture catalog for the four review comment
+  shapes (R-01, #2342).
+
 - `fix(bot)`: extract GitHub Checks posting into a dedicated source adapter
   with project headers, explicit ESM imports, and payload-safe failure logging
   (R-10, #2328).
