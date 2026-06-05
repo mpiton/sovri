@@ -61,6 +61,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   to preserve the explicit catalog order regardless of reverse filesystem
   ordering (R-04, #2352).
 
+- `test(review-engine)`: add RED coverage requiring determinism validation to
+  reject generated preview output containing `generated_at` volatile bytes (R-04,
+  #2353).
+
 - `feat(review-engine)`: add the initial dev-only preview markdown fixture
   renderer and anonymized golden fixture catalog for the four review comment
   shapes (R-01, #2342).
@@ -93,6 +97,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `feat(review-engine)`: add preview section generation that follows the
   explicit fixture catalog order independent of filesystem listing order (R-04,
   #2352).
+
+- `feat(review-engine)`: add determinism validation that reports `generated_at`
+  as a volatile preview fragment (R-04, #2353).
 
 - `fix(bot)`: extract GitHub Checks posting into a dedicated source adapter
   with project headers, explicit ESM imports, and payload-safe failure logging

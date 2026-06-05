@@ -129,6 +129,11 @@ export interface PreviewMarkdownPayloadValidationResult {
   readonly forbiddenFragments: readonly string[];
 }
 
+export interface PreviewDeterminismValidationResult {
+  readonly ok: boolean;
+  readonly volatileFragments: readonly string[];
+}
+
 const HtmlEscapes: Readonly<Record<string, string>> = {
   "&": "&amp;",
   "<": "&lt;",
@@ -152,6 +157,8 @@ export const PreviewMarkdownForbiddenFragments: readonly string[] = [
   ".gh-dark { color-scheme: dark; }",
   "gh-chrome",
 ];
+
+const PreviewVolatileFragments: readonly string[] = ["generated_at"];
 
 class UnexpectedInlinePreviewCountError extends Error {
   public override readonly name = "UnexpectedInlinePreviewCountError";
@@ -227,6 +234,19 @@ export function validatePreviewThemeRoot(rootClasses: string): PreviewThemeRootV
   }
 
   return { ok: true };
+}
+
+export function validatePreviewDeterminism(
+  renderedPreview: string,
+): PreviewDeterminismValidationResult {
+  const volatileFragments = PreviewVolatileFragments.filter((fragment) =>
+    renderedPreview.includes(fragment),
+  );
+
+  return {
+    ok: volatileFragments.length === 0,
+    volatileFragments,
+  };
 }
 
 /**

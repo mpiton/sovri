@@ -30,12 +30,18 @@ interface PreviewHtmlRequest {
   readonly theme: PreviewTheme;
 }
 
+interface PreviewDeterminismValidationResult {
+  readonly ok: boolean;
+  readonly volatileFragments: readonly string[];
+}
+
 type RenderPreviewHtml = (request: PreviewHtmlRequest) => string;
 type RenderPreviewFixtureMarkdownTwice = (fixtureName: string) => readonly [string, string];
 type BuildPreviewFixtureSections = (
   catalog: readonly PreviewGoldenCase[],
   fixtureFileNames: readonly string[],
 ) => readonly PreviewHtmlSection[];
+type ValidatePreviewDeterminism = (renderedPreview: string) => PreviewDeterminismValidationResult;
 
 interface PreviewThemeRootValidationResult {
   readonly ok: boolean;
@@ -251,6 +257,20 @@ describe("preview markdown deterministic rendering", () => {
     const catalogOrderSections = buildSections(PreviewGoldenCases, catalogOrderFixtureFiles);
     expect(serializeMarkdownPayload(sections)).toBe(serializeMarkdownPayload(catalogOrderSections));
   });
+
+  it("rejects generated previews containing volatile generated_at bytes", () => {
+    // Given a rendered preview contains "generated_at=2026-06-05T10:15:30.000Z"
+    const renderedPreview = ["# Preview", "", "generated_at=2026-06-05T10:15:30.000Z"].join("\n");
+    const validateDeterminism = getValidatePreviewDeterminism();
+
+    // When the determinism assertion runs
+    const result = validateDeterminism(renderedPreview);
+
+    // Then validation fails
+    expect(result.ok).toBe(false);
+    // And the failure names "generated_at"
+    expect(result.volatileFragments).toContain("generated_at");
+  });
 });
 
 describe("preview HTML theme wrapper", () => {
@@ -379,6 +399,23 @@ function hasBuildPreviewFixtureSections(module: object): module is {
   );
 }
 
+function getValidatePreviewDeterminism(): ValidatePreviewDeterminism {
+  if (!hasValidatePreviewDeterminism(RenderPreviewModule)) {
+    throw new MissingPreviewDeterminismValidatorError();
+  }
+
+  return RenderPreviewModule.validatePreviewDeterminism;
+}
+
+function hasValidatePreviewDeterminism(module: object): module is {
+  readonly validatePreviewDeterminism: ValidatePreviewDeterminism;
+} {
+  return (
+    "validatePreviewDeterminism" in module &&
+    typeof module.validatePreviewDeterminism === "function"
+  );
+}
+
 function getValidatePreviewThemeRoot(): ValidatePreviewThemeRoot {
   if (!hasValidatePreviewThemeRoot(RenderPreviewModule)) {
     throw new MissingPreviewThemeRootValidatorError();
@@ -467,6 +504,14 @@ class MissingPreviewFixtureSectionBuilderError extends Error {
 
   public constructor() {
     super("buildPreviewFixtureSections export is missing from the preview renderer");
+  }
+}
+
+class MissingPreviewDeterminismValidatorError extends Error {
+  public override readonly name = "MissingPreviewDeterminismValidatorError";
+
+  public constructor() {
+    super("validatePreviewDeterminism export is missing from the preview renderer");
   }
 }
 
