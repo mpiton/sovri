@@ -146,6 +146,9 @@ const PreviewMarkdownForbiddenFragments: readonly string[] = [
   "class=",
   "style=",
   "<style>",
+  ".ghc",
+  ".gh-light",
+  ".gh-dark",
   "gh-chrome",
 ];
 
