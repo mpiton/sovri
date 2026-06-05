@@ -29,6 +29,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   to fail and name the missing markdown golden file when a required snapshot is
   absent (R-01, #2343).
 
+- `test(review-engine)`: add explicit inline preview snapshot coverage for
+  suggestion fenced blocks, audit references, and byte-for-byte golden matching
+  (R-01, #2344).
+
 - `feat(review-engine)`: add the initial dev-only preview markdown fixture
   renderer and anonymized golden fixture catalog for the four review comment
   shapes (R-01, #2342).
