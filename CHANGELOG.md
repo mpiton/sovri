@@ -125,6 +125,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   focused edge-case coverage, exported helper types, and named helper guard
   coverage without repeated guard error subclasses (R-06, #2357).
 
+- `test(review-engine)`: add RED coverage requiring markdown golden snapshot
+  drift assertions to fail and name the affected golden file for every preview
+  fixture shape (R-06, #2358).
+
 - `fix(bot)`: extract GitHub Checks posting into a dedicated source adapter
   with project headers, explicit ESM imports, and payload-safe failure logging
   (R-10, #2328).

@@ -51,6 +51,11 @@ interface PreviewFixtureAnonymizationValidationResult {
   readonly violations: readonly PreviewFixtureAnonymizationViolation[];
 }
 
+interface PreviewGoldenMarkdownSnapshotSource {
+  readonly renderFixtureMarkdown: (fixtureName: string) => string;
+  readonly loadGoldenMarkdown: (goldenName: string) => string;
+}
+
 type RenderPreviewHtml = (request: PreviewHtmlRequest) => string;
 type RenderPreviewFixtureMarkdownTwice = (fixtureName: string) => readonly [string, string];
 type BuildPreviewFixtureSections = (
@@ -58,6 +63,10 @@ type BuildPreviewFixtureSections = (
   fixtureFileNames: readonly string[],
 ) => readonly PreviewHtmlSection[];
 type ValidatePreviewDeterminism = (renderedPreview: string) => PreviewDeterminismValidationResult;
+type AssertPreviewGoldenMarkdownSnapshots = (
+  catalog: readonly PreviewGoldenCase[],
+  snapshotSource?: PreviewGoldenMarkdownSnapshotSource,
+) => void;
 type ValidatePreviewFixtureAnonymization = (
   fixtureName: string,
   fixture: unknown,
@@ -256,6 +265,23 @@ describe("preview markdown golden fixtures", () => {
     // And no snapshot update is required
     expect(result.requiredSnapshotUpdates).toEqual([]);
   });
+
+  it.each(PreviewGoldenCases)(
+    "fails markdown drift for $fixture and names $golden",
+    ({ fixture, golden }) => {
+      // Given the generated markdown for "<fixture>" differs from "<golden>" by one heading
+      const assertGoldenMarkdownSnapshots = getAssertPreviewGoldenMarkdownSnapshots();
+      const snapshotSource = createHeadingDriftSnapshotSource(fixture);
+
+      // When render-preview.test.ts runs
+      const assertSnapshots = (): void =>
+        assertGoldenMarkdownSnapshots(PreviewGoldenCases, snapshotSource);
+
+      // Then the test suite fails
+      // And the thrown error message contains "<golden>"
+      expect(assertSnapshots).toThrow(golden);
+    },
+  );
 
   it("matches empty golden markdown bytes", () => {
     const matchesSnapshotBytes = getMatchesPreviewGoldenSnapshotBytes();
@@ -696,6 +722,26 @@ function hasValidatePreviewGoldenMarkdownSnapshots(module: object): module is {
   );
 }
 
+function getAssertPreviewGoldenMarkdownSnapshots(): AssertPreviewGoldenMarkdownSnapshots {
+  if (!hasAssertPreviewGoldenMarkdownSnapshots(RenderPreviewModule)) {
+    throw missingPreviewRendererExportError(
+      "MissingPreviewGoldenMarkdownSnapshotAssertionExportError",
+      "assertPreviewGoldenMarkdownSnapshots",
+    );
+  }
+
+  return RenderPreviewModule.assertPreviewGoldenMarkdownSnapshots;
+}
+
+function hasAssertPreviewGoldenMarkdownSnapshots(module: object): module is {
+  readonly assertPreviewGoldenMarkdownSnapshots: AssertPreviewGoldenMarkdownSnapshots;
+} {
+  return (
+    "assertPreviewGoldenMarkdownSnapshots" in module &&
+    typeof module.assertPreviewGoldenMarkdownSnapshots === "function"
+  );
+}
+
 function getMatchesPreviewGoldenSnapshotBytes(): MatchesPreviewGoldenSnapshotBytes {
   if (!hasMatchesPreviewGoldenSnapshotBytes(RenderPreviewModule)) {
     throw missingPreviewRendererExportError(
@@ -806,6 +852,30 @@ function serializeMarkdownPayload(sections: readonly PreviewHtmlSection[]): stri
   return sections.map((section) => section.markdown).join("\n\n---\n\n");
 }
 
+function createHeadingDriftSnapshotSource(
+  targetFixture: string,
+): PreviewGoldenMarkdownSnapshotSource {
+  return {
+    renderFixtureMarkdown: (fixtureName) => {
+      const markdown = renderPreviewFixtureMarkdown(fixtureName);
+
+      return fixtureName === targetFixture ? driftFirstMarkdownHeading(markdown) : markdown;
+    },
+    loadGoldenMarkdown: loadTextFixture,
+  };
+}
+
+function driftFirstMarkdownHeading(markdown: string): string {
+  const headingMatch = /^(#{1,6}\s+.+)$/mu.exec(markdown);
+  const heading = headingMatch?.[1];
+
+  if (heading === undefined) {
+    return `## Drifted preview heading\n${markdown}`;
+  }
+
+  return markdown.replace(heading, `${heading} drift`);
+}
+
 function injectFixtureString(fixture: unknown, value: string): unknown {
   if (!isJsonFixtureContainer(fixture)) {
     throw new InvalidPreviewFixtureInjectionError();
@@ -857,6 +927,7 @@ type MissingPreviewRendererExportErrorName =
   | "MissingPreviewHtmlRendererError"
   | "MissingPreviewFixtureDeterminismRendererError"
   | "MissingPreviewGoldenMarkdownValidatorExportError"
+  | "MissingPreviewGoldenMarkdownSnapshotAssertionExportError"
   | "MissingPreviewGoldenSnapshotMatcherExportError"
   | "MissingPreviewFixtureSectionBuilderError"
   | "MissingPreviewDeterminismValidatorError"
