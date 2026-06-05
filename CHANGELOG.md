@@ -105,8 +105,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   escape hatches (R-08, #2365).
 
 - `fix(review-engine)`: simplify redundant preview escape-hatch regex fragments
-  and split template-literal scanning into documented helpers without changing
-  the source quality gate behavior (R-08, #2365).
+  and split template-literal scanning into documented helpers with loop-based
+  label collection without changing the source quality gate behavior (R-08,
+  #2365).
 
 - `feat(review-engine)`: expose Zod-derived preview fixture parsers for raw JSON
   text and parsed fixture values, and route preview fixture loading through that

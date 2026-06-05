@@ -456,7 +456,15 @@ function collectForbiddenTypeScriptExpressionLabels(
   content: string,
   expressions: readonly ForbiddenTypeScriptEscapeHatchExpression[],
 ): readonly string[] {
-  return expressions.flatMap(({ label, pattern }) => (pattern.test(content) ? [label] : []));
+  const labels: string[] = [];
+
+  for (const { label, pattern } of expressions) {
+    if (pattern.test(content)) {
+      labels.push(label);
+    }
+  }
+
+  return labels;
 }
 
 function stripTypeScriptCommentsAndStrings(content: string): string {
@@ -478,6 +486,8 @@ interface TemplateLiteralExpressionContent {
 /**
  * Drops static template prose while preserving interpolation expressions so the
  * scanner still catches forbidden TypeScript inside `${...}` blocks.
+ * Unclosed templates are scanned to EOF, and nested interpolations are stripped
+ * recursively before their expression source is retained.
  */
 function stripTemplateLiteralStaticText(content: string): string {
   let strippedContent = "";
@@ -601,7 +611,11 @@ function readTemplateLiteralExpressionContent(
   return { content: expressionContent, nextIndex: content.length };
 }
 
-/** Reads a quoted string without interpreting braces inside it as syntax. */
+/**
+ * Reads a quoted string without interpreting braces inside it as syntax.
+ * Escaped quotes are skipped with their escaped byte pair, so they do not end
+ * the string.
+ */
 function readQuotedStringContent(
   content: string,
   startIndex: number,
