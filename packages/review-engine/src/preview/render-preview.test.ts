@@ -146,6 +146,11 @@ const PreviewForbiddenIdentityCases: readonly PreviewForbiddenIdentityCase[] = [
   },
   {
     fixture: "inline-finding.json",
+    forbiddenValue: "https://www.github.com/mpiton/sovri",
+    reason: "real repo shape",
+  },
+  {
+    fixture: "inline-finding.json",
     forbiddenValue: "git://github.com/mpiton/sovri",
     reason: "real repo shape",
   },

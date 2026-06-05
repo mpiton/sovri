@@ -23,9 +23,13 @@ interface PreviewUrlMatch {
   readonly end: number;
 }
 
+/**
+ * Repository identity placeholder allowed in checked preview fixtures.
+ */
 export const PreviewPlaceholderRepositoryName = "example/review-target";
 
 const PreviewDiffPathOwnerSegments = new Set(["a", "b"]);
+const PreviewGitHubHostnames = new Set(["github.com", "www.github.com"]);
 const PreviewSourcePathOwnerSegments = new Set([
   "apps",
   "dist",
@@ -62,6 +66,9 @@ const PreviewForbiddenIdentityPatterns: readonly PreviewForbiddenIdentityPattern
   },
 ];
 
+/**
+ * Returns every forbidden identity reason detected in one collected fixture string.
+ */
 export function collectPreviewForbiddenIdentityReasons(value: string): readonly string[] {
   const reasons: string[] = [];
 
@@ -172,13 +179,15 @@ function collectUrlMatches(value: string): readonly PreviewUrlMatch[] {
 }
 
 function hasGithubHostname(value: string): boolean {
-  return parseUrlHostname(value) === "github.com";
+  const hostname = parseUrlHostname(value);
+
+  return hostname !== undefined && PreviewGitHubHostnames.has(hostname);
 }
 
 function shouldRemoveUrlFromRepositoryScan(value: string): boolean {
   const hostname = parseUrlHostname(value);
 
-  return hostname !== undefined && hostname !== "github.com";
+  return hostname !== undefined && !PreviewGitHubHostnames.has(hostname);
 }
 
 function parseUrlHostname(value: string): string | undefined {
