@@ -70,7 +70,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `test(review-engine)`: add RED scaffold coverage requiring preview TypeScript
   sources and the preview script to keep required headers, explicit ESM import
-  extensions, and no CommonJS usage (R-08, #2363).
+  extensions including side-effect imports, and no CommonJS usage (R-08, #2363).
 
 - `chore(review-engine)`: move the preview comments generator under the package
   `scripts/` source contract while preserving package-local `.preview/` output

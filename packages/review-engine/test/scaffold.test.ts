@@ -22,7 +22,8 @@ const previewSourceRoot = join(packageRoot, "src/preview");
 const previewScriptRoot = join(packageRoot, "scripts");
 const sourceRoot = join(packageRoot, "src");
 const workspaceRoot = join(packageRoot, "../..");
-const RelativeTypeScriptImportExpression = /\bfrom\s+["'](\.{1,2}\/[^"']+)["']/gu;
+const RelativeTypeScriptImportExpression =
+  /\bfrom\s+["'](?<fromSpecifier>\.{1,2}\/[^"']+)["']|^\s*import\s+["'](?<sideEffectSpecifier>\.{1,2}\/[^"']+)["']/gmu;
 const PreviewHtmlOutputRelativePaths: readonly string[] = [
   "packages/review-engine/.preview/comments-light.html",
   "packages/review-engine/.preview/comments-dark.html",
@@ -210,6 +211,15 @@ describe("@sovri/review-engine scaffold", () => {
     }
   });
 
+  it("collects side-effect relative imports for source contract checks", () => {
+    expect(
+      collectRelativeImportSpecifiers(`
+        import "./setup";
+        import { value } from "../value";
+      `),
+    ).toEqual(["./setup", "../value"]);
+  });
+
   it("keeps the deferred ingestion format out of production source", () => {
     const deferredToken = ["sa", "rif"].join("");
     const deferredPattern = new RegExp(deferredToken, "iu");
@@ -256,9 +266,14 @@ function listTypeScriptFilesIfPresent(root: string): string[] {
 
 function collectRelativeImportSpecifiers(content: string): readonly string[] {
   return [...content.matchAll(RelativeTypeScriptImportExpression)].flatMap((match) => {
-    const importSpecifier = match[1];
-    return importSpecifier === undefined ? [] : [importSpecifier];
+    const fromSpecifier = match.groups?.fromSpecifier;
+    const sideEffectSpecifier = match.groups?.sideEffectSpecifier;
+    return [fromSpecifier, sideEffectSpecifier].filter(isDefinedString);
   });
+}
+
+function isDefinedString(value: string | undefined): value is string {
+  return value !== undefined;
 }
 
 function formatProcessOutput(result: SpawnSyncReturns<string>): string {
