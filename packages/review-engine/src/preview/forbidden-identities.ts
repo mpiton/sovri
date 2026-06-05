@@ -14,6 +14,9 @@ interface PreviewForbiddenIdentityPattern {
   readonly matches: (value: string) => boolean;
 }
 
+/**
+ * Tracks a URL-like substring and the source-string offsets it occupies.
+ */
 interface PreviewUrlMatch {
   readonly value: string;
   readonly start: number;
@@ -35,11 +38,15 @@ const PreviewSourcePathOwnerSegments = new Set([
   "test",
   "tests",
 ]);
+const PreviewRepositoryNameInnerMaxLength = 98;
+const PreviewRepositoryOwnerInnerMaxLength = 38;
 const PreviewGithubTokenExpression = /\bghp_[A-Za-z0-9_]{20,}\b/u;
 const PreviewLlmKeyExpression = /\bsk-ant-api03-[A-Za-z0-9_-]+\b/u;
 const PreviewUrlExpression = /\bhttps?:\/\/[^\s"'<>`]+/giu;
-const PreviewRepositoryIdentityCandidateExpression =
-  /(?:^|[^A-Za-z0-9._-])([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}[A-Za-z0-9])?\/[A-Za-z0-9](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9])?)(?=$|[^A-Za-z0-9_-])/gu;
+const PreviewRepositoryIdentityCandidateExpression = new RegExp(
+  String.raw`(?:^|[^A-Za-z0-9._-])([A-Za-z0-9](?:[A-Za-z0-9-]{0,${PreviewRepositoryOwnerInnerMaxLength}}[A-Za-z0-9])?/[A-Za-z0-9](?:[A-Za-z0-9._-]{0,${PreviewRepositoryNameInnerMaxLength}}[A-Za-z0-9])?)(?=$|[^A-Za-z0-9_-])`,
+  "gu",
+);
 const PreviewForbiddenIdentityPatterns: readonly PreviewForbiddenIdentityPattern[] = [
   {
     reason: "github token shape",
@@ -141,7 +148,7 @@ function removeNonGithubUrls(value: string): string {
   let searchableValue = value;
 
   for (const url of collectUrlMatches(value).toReversed()) {
-    if (!hasGithubHostname(url.value)) {
+    if (shouldRemoveUrlFromRepositoryScan(url.value)) {
       const replacement = " ".repeat(url.value.length);
       searchableValue = `${searchableValue.slice(0, url.start)}${replacement}${searchableValue.slice(url.end)}`;
     }
@@ -165,9 +172,19 @@ function collectUrlMatches(value: string): readonly PreviewUrlMatch[] {
 }
 
 function hasGithubHostname(value: string): boolean {
+  return parseUrlHostname(value) === "github.com";
+}
+
+function shouldRemoveUrlFromRepositoryScan(value: string): boolean {
+  const hostname = parseUrlHostname(value);
+
+  return hostname !== undefined && hostname !== "github.com";
+}
+
+function parseUrlHostname(value: string): string | undefined {
   try {
-    return new URL(value).hostname.toLowerCase() === "github.com";
+    return new URL(value).hostname.toLowerCase();
   } catch {
-    return false;
+    return undefined;
   }
 }
