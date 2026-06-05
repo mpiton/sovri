@@ -30,6 +30,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "preview:comments": "vitest run --root . src/preview/render-preview.test.ts --reporter=verbose",
     "test": "vitest run --root . --passWithNoTests",
     "lint": "oxlint . --max-warnings=0 --no-error-on-unmatched-pattern",
     "typecheck": "tsc -b --noEmit"

@@ -18,9 +18,56 @@ import {
 
 const packageRoot = fileURLToPath(new URL("../", import.meta.url));
 const sourceRoot = join(packageRoot, "src");
+const PreviewOnlyRuntimePackages: readonly string[] = [
+  "@playwright/test",
+  "happy-dom",
+  "jsdom",
+  "marked",
+  "markdown-it",
+  "playwright",
+  "puppeteer",
+  "react",
+  "react-dom",
+  "vite",
+];
+
+interface ReviewEnginePackageManifest {
+  readonly dependencies?: Readonly<Record<string, string>>;
+  readonly scripts: Readonly<Record<string, string>>;
+}
 
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function readReviewEnginePackageManifest(): ReviewEnginePackageManifest {
+  const manifest = readJson(join(packageRoot, "package.json"));
+
+  if (!isRecord(manifest)) {
+    throw new TypeError("Expected review-engine package manifest to be a JSON object.");
+  }
+
+  const { dependencies, scripts } = manifest;
+
+  if (!isStringRecord(scripts)) {
+    throw new TypeError("Expected review-engine package manifest scripts to be string entries.");
+  }
+
+  if (dependencies !== undefined && !isStringRecord(dependencies)) {
+    throw new TypeError(
+      "Expected review-engine package manifest dependencies to be string entries.",
+    );
+  }
+
+  return dependencies === undefined ? { scripts } : { dependencies, scripts };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return isRecord(value) && Object.values(value).every((entry) => typeof entry === "string");
 }
 
 function listTypeScriptFiles(root: string): string[] {
@@ -48,6 +95,24 @@ describe("@sovri/review-engine scaffold", () => {
     });
     expect(existsSync(join(packageRoot, "tsconfig.json"))).toBe(true);
     expect(existsSync(join(packageRoot, "tsup.config.ts"))).toBe(true);
+  });
+
+  it("exposes the comments preview script without runtime preview dependencies", () => {
+    // When the review-engine package manifest is inspected
+    const manifest = readReviewEnginePackageManifest();
+
+    // Then the "scripts" object contains "preview:comments"
+    expect(manifest.scripts["preview:comments"]).toBeDefined();
+    expect(manifest.scripts["preview:comments"]?.length).toBeGreaterThan(0);
+
+    // And the "dependencies" object contains no package added only for preview rendering
+    const dependencies = manifest.dependencies ?? {};
+    for (const packageName of PreviewOnlyRuntimePackages) {
+      expect(dependencies).not.toHaveProperty(packageName);
+    }
+
+    // And the preview script is not referenced by the package "build" script
+    expect(manifest.scripts.build ?? "").not.toContain("preview:comments");
   });
 
   it("keeps the deferred ingestion format out of production source", () => {

@@ -141,6 +141,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   wrapper theme drift with the affected theme name and expected GitHub chrome
   theme class (R-06, #2359).
 
+- `test(review-engine)`: add RED coverage requiring the package manifest to
+  expose a dev-only preview comments script without runtime preview rendering
+  dependencies or build-script coupling (R-07, #2360).
+
+- `feat(review-engine)`: expose a dev-only `preview:comments` package script
+  that runs the existing local preview comment harness without adding runtime
+  preview rendering dependencies or coupling it to `build` (R-07, #2360).
+
 - `fix(bot)`: extract GitHub Checks posting into a dedicated source adapter
   with project headers, explicit ESM imports, and payload-safe failure logging
   (R-10, #2328).
