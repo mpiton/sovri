@@ -93,6 +93,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   in the preview escape-hatch scanner while keeping prose strings/comments out
   of type-position matching (R-08, #2365).
 
+- `fix(review-engine)`: preserve template-literal interpolation expressions in
+  the preview escape-hatch scanner so casts inside `${...}` still fail while
+  static template prose is ignored (R-08, #2365).
+
 - `feat(review-engine)`: expose Zod-derived preview fixture parsers for raw JSON
   text and parsed fixture values, and route preview fixture loading through that
   boundary before rendering (R-08, #2364).

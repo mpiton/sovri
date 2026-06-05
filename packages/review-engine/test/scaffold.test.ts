@@ -345,8 +345,10 @@ describe("@sovri/review-engine scaffold", () => {
         const recordValues: Record<string, any> = {};
         const genericValues = new Set<any>();
         const arrayValues: any[] = [];
+        const templateCast = \`\${value as any}\`;
+        const templateUnknown = \`\${value as unknown as string}\`;
       `),
-    ).toEqual(["any"]);
+    ).toEqual(["any", "as unknown"]);
   });
 
   it("keeps the deferred ingestion format out of production source", () => {
@@ -430,10 +432,102 @@ function collectForbiddenTypeScriptExpressionLabels(
 }
 
 function stripTypeScriptCommentsAndStrings(content: string): string {
-  return content.replace(
-    /\/\/[^\n\r]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/gu,
+  const contentWithoutCommentsAndQuotedStrings = content.replace(
+    /\/\/[^\n\r]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/gu,
     "",
   );
+
+  return stripTemplateLiteralStaticText(contentWithoutCommentsAndQuotedStrings);
+}
+
+interface TemplateLiteralExpressionContent {
+  readonly content: string;
+  readonly nextIndex: number;
+}
+
+function stripTemplateLiteralStaticText(content: string): string {
+  let strippedContent = "";
+  let index = 0;
+
+  while (index < content.length) {
+    const character = content[index];
+
+    if (character !== "`") {
+      strippedContent += character;
+      index += 1;
+      continue;
+    }
+
+    index += 1;
+
+    while (index < content.length) {
+      const templateCharacter = content[index];
+
+      if (templateCharacter === "\\") {
+        index += 2;
+        continue;
+      }
+
+      if (templateCharacter === "`") {
+        index += 1;
+        break;
+      }
+
+      if (templateCharacter === "$" && content[index + 1] === "{") {
+        const expression = readTemplateLiteralExpressionContent(content, index + 2);
+        strippedContent += expression.content;
+        index = expression.nextIndex;
+        continue;
+      }
+
+      index += 1;
+    }
+  }
+
+  return strippedContent;
+}
+
+function readTemplateLiteralExpressionContent(
+  content: string,
+  startIndex: number,
+): TemplateLiteralExpressionContent {
+  let expressionContent = "";
+  let index = startIndex;
+  let depth = 1;
+
+  while (index < content.length) {
+    const character = content[index];
+
+    if (character === "\\") {
+      expressionContent += content.slice(index, index + 2);
+      index += 2;
+      continue;
+    }
+
+    if (character === "{") {
+      depth += 1;
+      expressionContent += character;
+      index += 1;
+      continue;
+    }
+
+    if (character === "}") {
+      depth -= 1;
+
+      if (depth === 0) {
+        return { content: expressionContent, nextIndex: index + 1 };
+      }
+
+      expressionContent += character;
+      index += 1;
+      continue;
+    }
+
+    expressionContent += character;
+    index += 1;
+  }
+
+  return { content: expressionContent, nextIndex: content.length };
 }
 
 function isDefinedString(value: string | undefined): value is string {
