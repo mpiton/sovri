@@ -110,6 +110,31 @@ const PreviewForbiddenIdentityCases: readonly PreviewForbiddenIdentityCase[] = [
     reason: "github token shape",
   },
   {
+    fixture: "summary.review.json",
+    forbiddenValue: "github_pat_1234567890abcdef1234567890abcdef",
+    reason: "github token shape",
+  },
+  {
+    fixture: "summary.review.json",
+    forbiddenValue: "ghs_1234567890abcdef1234567890abc",
+    reason: "github token shape",
+  },
+  {
+    fixture: "summary.review.json",
+    forbiddenValue: "ghu_1234567890abcdef1234567890abc",
+    reason: "github token shape",
+  },
+  {
+    fixture: "summary.review.json",
+    forbiddenValue: "gho_1234567890abcdef1234567890abc",
+    reason: "github token shape",
+  },
+  {
+    fixture: "summary.review.json",
+    forbiddenValue: "ghr_1234567890abcdef1234567890abc",
+    reason: "github token shape",
+  },
+  {
     fixture: "assessment.review.json",
     forbiddenValue: "sk-ant-api03-test",
     reason: "llm key shape",
@@ -421,6 +446,20 @@ describe("preview fixture anonymization", () => {
     );
 
     const result = getValidatePreviewFixtureAnonymization()(fixture, fixtureWithNonGithubUrl);
+
+    expect(result.ok).toBe(true);
+    expect(result.violations).toEqual([]);
+  });
+
+  it("ignores GitHub URLs with invalid repository owner length", () => {
+    const fixture = "summary.review.json";
+    const fixtureJson: unknown = JSON.parse(loadTextFixture(fixture));
+    const fixtureWithInvalidOwner = injectFixtureString(
+      fixtureJson,
+      "https://github.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/repo",
+    );
+
+    const result = getValidatePreviewFixtureAnonymization()(fixture, fixtureWithInvalidOwner);
 
     expect(result.ok).toBe(true);
     expect(result.violations).toEqual([]);

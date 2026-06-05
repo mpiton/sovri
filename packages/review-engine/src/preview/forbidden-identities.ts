@@ -43,8 +43,9 @@ const PreviewSourcePathOwnerSegments = new Set([
   "tests",
 ]);
 const PreviewRepositoryNameInnerMaxLength = 98;
-const PreviewRepositoryOwnerInnerMaxLength = 38;
-const PreviewGithubTokenExpression = /\bghp_[A-Za-z0-9_]{20,}\b/u;
+const PreviewRepositoryOwnerInnerMaxLength = 37;
+const PreviewGitHubTokenExpression =
+  /\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/u;
 const PreviewLlmKeyExpression = /\bsk-ant-api03-[A-Za-z0-9_-]+\b/u;
 const PreviewUrlExpression = /\bhttps?:\/\/[^\s"'<>`]+/giu;
 const PreviewRepositoryIdentityCandidateExpression = new RegExp(
@@ -54,7 +55,7 @@ const PreviewRepositoryIdentityCandidateExpression = new RegExp(
 const PreviewForbiddenIdentityPatterns: readonly PreviewForbiddenIdentityPattern[] = [
   {
     reason: "github token shape",
-    matches: (value) => PreviewGithubTokenExpression.test(value),
+    matches: (value) => PreviewGitHubTokenExpression.test(value),
   },
   {
     reason: "llm key shape",
