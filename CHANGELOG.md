@@ -116,8 +116,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   (R-05, #2355).
 
 - `feat(review-engine)`: keep preview provenance fixture placeholder provider
-  keys available to anonymization assertions while omitting them from rendered
-  markdown (R-05, #2356).
+  keys available to anonymization assertions and regression tests while
+  omitting them from rendered markdown (R-05, #2356).
 
 - `fix(bot)`: extract GitHub Checks posting into a dedicated source adapter
   with project headers, explicit ESM imports, and payload-safe failure logging

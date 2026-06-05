@@ -36,6 +36,7 @@
   "provenance": {
     "llmProvider": "test-provider",
     "llmModel": "test-model",
+    "providerKey": "test-key",
     "hostingRegion": "eu-west-3",
     "dataResidency": "EU",
     "promptSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",

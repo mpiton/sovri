@@ -58,6 +58,7 @@ const PreviewComplianceProvenanceSchema = z
   .object({
     llmProvider: z.string().trim().min(1),
     llmModel: z.string().trim().min(1),
+    providerKey: z.string().trim().min(1).optional(),
     promptSha256: z.string().regex(PromptSha256Pattern).optional(),
     hostingRegion: z.string().trim().min(1).optional(),
     dataResidency: z.string().trim().min(1).optional(),
