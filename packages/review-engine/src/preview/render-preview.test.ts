@@ -65,6 +65,7 @@ type ValidatePreviewFixtureAnonymization = (
   fixtureName: string,
   fixture: unknown,
 ) => PreviewFixtureAnonymizationValidationResult;
+type AssertPreviewDevOnlySurface = (publicExportNames: readonly string[]) => void;
 
 interface PreviewThemeRootValidationResult {
   readonly ok: boolean;
@@ -440,6 +441,18 @@ describe("preview markdown golden fixtures", () => {
     // And the HTML wrapper still contains exactly one trusted style element
     expect(countOccurrences(html, "<style>")).toBe(1);
     expect(html).not.toContain("<style>.ghc{display:none}</style>");
+  });
+
+  it("rejects preview internals exported by the public package API", () => {
+    // Given the package root exports "renderPreviewHtml"
+    const publicExportNames = ["parseReviewDiff", "renderPreviewHtml"];
+
+    // When the dev-only surface assertion runs
+    const assertDevOnlySurface = (): void => getAssertPreviewDevOnlySurface()(publicExportNames);
+
+    // Then validation fails
+    // And the failure names "renderPreviewHtml"
+    expect(assertDevOnlySurface).toThrow("renderPreviewHtml");
   });
 });
 
@@ -836,6 +849,26 @@ function hasValidatePreviewFixtureAnonymization(module: object): module is {
   );
 }
 
+function getAssertPreviewDevOnlySurface(): AssertPreviewDevOnlySurface {
+  if (!hasAssertPreviewDevOnlySurface(RenderPreviewModule)) {
+    throw missingPreviewRendererExportError(
+      "MissingPreviewDevOnlySurfaceAssertionError",
+      "assertPreviewDevOnlySurface",
+    );
+  }
+
+  return RenderPreviewModule.assertPreviewDevOnlySurface;
+}
+
+function hasAssertPreviewDevOnlySurface(module: object): module is {
+  readonly assertPreviewDevOnlySurface: AssertPreviewDevOnlySurface;
+} {
+  return (
+    "assertPreviewDevOnlySurface" in module &&
+    typeof module.assertPreviewDevOnlySurface === "function"
+  );
+}
+
 function getValidatePreviewThemeRoot(): ValidatePreviewThemeRoot {
   if (!hasValidatePreviewThemeRoot(RenderPreviewModule)) {
     throw missingPreviewRendererExportError(
@@ -963,6 +996,7 @@ type MissingPreviewRendererExportErrorName =
   | "MissingPreviewFixtureSectionBuilderError"
   | "MissingPreviewDeterminismValidatorError"
   | "MissingPreviewFixtureAnonymizationValidatorError"
+  | "MissingPreviewDevOnlySurfaceAssertionError"
   | "MissingPreviewThemeRootValidatorError"
   | "MissingPreviewThemeRootAssertionExportError";
 
