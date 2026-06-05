@@ -74,6 +74,12 @@ interface PreviewThemeCase {
   readonly otherThemeClass: string;
 }
 
+interface PreviewForbiddenIdentityCase {
+  readonly fixture: string;
+  readonly forbiddenValue: string;
+  readonly reason: string;
+}
+
 const PreviewGoldenCases: readonly PreviewGoldenCase[] = [
   {
     shape: "summary",
@@ -94,6 +100,104 @@ const PreviewGoldenCases: readonly PreviewGoldenCase[] = [
     shape: "compliance provenance",
     fixture: "provenance.review.json",
     golden: "provenance.golden.md",
+  },
+];
+
+const PreviewForbiddenIdentityCases: readonly PreviewForbiddenIdentityCase[] = [
+  {
+    fixture: "summary.review.json",
+    forbiddenValue: "ghp_1234567890abcdef1234567890abc",
+    reason: "github token shape",
+  },
+  {
+    fixture: "summary.review.json",
+    forbiddenValue: "github_pat_1234567890abcdef1234567890abcdef",
+    reason: "github token shape",
+  },
+  {
+    fixture: "summary.review.json",
+    forbiddenValue: "ghs_1234567890abcdef1234567890abc",
+    reason: "github token shape",
+  },
+  {
+    fixture: "summary.review.json",
+    forbiddenValue: "ghu_1234567890abcdef1234567890abc",
+    reason: "github token shape",
+  },
+  {
+    fixture: "summary.review.json",
+    forbiddenValue: "gho_1234567890abcdef1234567890abc",
+    reason: "github token shape",
+  },
+  {
+    fixture: "summary.review.json",
+    forbiddenValue: "ghr_1234567890abcdef1234567890abc",
+    reason: "github token shape",
+  },
+  {
+    fixture: "assessment.review.json",
+    forbiddenValue: "sk-ant-api03-test",
+    reason: "llm key shape",
+  },
+  {
+    fixture: "inline-finding.json",
+    forbiddenValue: "real-bank/payments-api",
+    reason: "real repo shape",
+  },
+  {
+    fixture: "provenance.review.json",
+    forbiddenValue: "realbank/payments",
+    reason: "real repo shape",
+  },
+  {
+    fixture: "inline-finding.json",
+    forbiddenValue: "Review for mpiton/sovri",
+    reason: "real repo shape",
+  },
+  {
+    fixture: "inline-finding.json",
+    forbiddenValue: "Review for mpiton/sovri.",
+    reason: "real repo shape",
+  },
+  {
+    fixture: "inline-finding.json",
+    forbiddenValue: "https://github.com/mpiton/sovri",
+    reason: "real repo shape",
+  },
+  {
+    fixture: "inline-finding.json",
+    forbiddenValue: "https://github.com/mpiton/sovri.",
+    reason: "real repo shape",
+  },
+  {
+    fixture: "inline-finding.json",
+    forbiddenValue: "https://www.github.com/mpiton/sovri",
+    reason: "real repo shape",
+  },
+  {
+    fixture: "inline-finding.json",
+    forbiddenValue: "git://github.com/mpiton/sovri",
+    reason: "real repo shape",
+  },
+  {
+    fixture: "inline-finding.json",
+    forbiddenValue: "https://github.com/mpiton/sovri%zz",
+    reason: "real repo shape",
+  },
+  {
+    fixture: "inline-finding.json",
+    forbiddenValue: "Review for acme/docs",
+    reason: "real repo shape",
+  },
+  {
+    fixture: "provenance.review.json",
+    forbiddenValue: "https://github.com/acme/tests",
+    reason: "real repo shape",
+  },
+  {
+    fixture: "summary.review.json",
+    forbiddenValue: "See https://cwe.mitre.org/data/definitions/79.html before realbank/payments",
+    reason: "real repo shape",
   },
 ];
 
@@ -312,6 +416,54 @@ describe("preview fixture anonymization", () => {
       expect(result.violations).toEqual([]);
     },
   );
+
+  it.each(PreviewForbiddenIdentityCases)(
+    "rejects $reason in $fixture",
+    ({ fixture, forbiddenValue, reason }) => {
+      // Given the "<fixture>" fixture contains "<forbiddenValue>"
+      const fixtureJson: unknown = JSON.parse(loadTextFixture(fixture));
+      const fixtureWithForbiddenValue = injectFixtureString(fixtureJson, forbiddenValue);
+      const validateAnonymization = getValidatePreviewFixtureAnonymization();
+
+      // When the anonymization assertion inspects the fixture
+      const result = validateAnonymization(fixture, fixtureWithForbiddenValue);
+
+      // Then validation fails
+      expect(result.ok).toBe(false);
+      // And the failure names "<fixture>"
+      expect(result.violations.some((violation) => violation.fixture === fixture)).toBe(true);
+      // And the failure reports "<reason>"
+      expect(result.violations).toContainEqual({ fixture, reason, value: forbiddenValue });
+    },
+  );
+
+  it("ignores repository-looking paths inside non-GitHub URLs", () => {
+    const fixture = "summary.review.json";
+    const fixtureJson: unknown = JSON.parse(loadTextFixture(fixture));
+    const fixtureWithNonGithubUrl = injectFixtureString(
+      fixtureJson,
+      "https://evil.example/github.com/mpiton/sovri",
+    );
+
+    const result = getValidatePreviewFixtureAnonymization()(fixture, fixtureWithNonGithubUrl);
+
+    expect(result.ok).toBe(true);
+    expect(result.violations).toEqual([]);
+  });
+
+  it("ignores GitHub URLs with invalid repository owner length", () => {
+    const fixture = "summary.review.json";
+    const fixtureJson: unknown = JSON.parse(loadTextFixture(fixture));
+    const fixtureWithInvalidOwner = injectFixtureString(
+      fixtureJson,
+      "https://github.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/repo",
+    );
+
+    const result = getValidatePreviewFixtureAnonymization()(fixture, fixtureWithInvalidOwner);
+
+    expect(result.ok).toBe(true);
+    expect(result.violations).toEqual([]);
+  });
 });
 
 describe("preview HTML theme wrapper", () => {
@@ -501,6 +653,21 @@ function serializeMarkdownPayload(sections: readonly PreviewHtmlSection[]): stri
   return sections.map((section) => section.markdown).join("\n\n---\n\n");
 }
 
+function injectFixtureString(fixture: unknown, value: string): unknown {
+  if (!isJsonFixtureContainer(fixture)) {
+    throw new InvalidPreviewFixtureInjectionError();
+  }
+
+  return {
+    fixture,
+    injected_fixture_values: [value],
+  };
+}
+
+function isJsonFixtureContainer(value: unknown): boolean {
+  return typeof value === "object" && value !== null;
+}
+
 function countOccurrences(value: string, needle: string): number {
   let count = 0;
   let startIndex = value.indexOf(needle);
@@ -594,5 +761,13 @@ class MissingPreviewStyleElementError extends Error {
 
   public constructor() {
     super("preview HTML wrapper is missing a style element");
+  }
+}
+
+class InvalidPreviewFixtureInjectionError extends Error {
+  public override readonly name = "InvalidPreviewFixtureInjectionError";
+
+  public constructor() {
+    super("preview fixture injection requires parsed JSON object or array input");
   }
 }

@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+import {
+  PreviewPlaceholderRepositoryName,
+  collectPreviewForbiddenIdentityReasons,
+} from "./forbidden-identities.js";
+
 export interface PreviewFixtureAnonymizationViolation {
   readonly fixture: string;
   readonly reason: string;
@@ -19,9 +24,9 @@ interface PreviewFixtureAnonymizationFields {
   readonly repositoryNames: string[];
   readonly authorLogins: string[];
   readonly providerKeyValues: string[];
+  readonly stringValues: string[];
 }
 
-const PreviewPlaceholderRepositoryName = "example/review-target";
 const PreviewPlaceholderAuthorLoginPrefix = "test-";
 const PreviewPlaceholderProviderKey = "test-key";
 const PreviewRepositoryNameKeys = new Set(["repo_full_name", "repoFullName", "repositoryName"]);
@@ -42,6 +47,7 @@ export function validatePreviewFixtureAnonymization(
     ...fields.providerKeyValues
       .filter((value) => value !== PreviewPlaceholderProviderKey)
       .map((value) => createFixtureAnonymizationViolation(fixtureName, "provider key", value)),
+    ...collectForbiddenIdentityViolations(fixtureName, fields.stringValues),
   ];
 
   return {
@@ -60,6 +66,7 @@ function collectPreviewFixtureAnonymizationFields(
     repositoryNames: [],
     authorLogins: [],
     providerKeyValues: [],
+    stringValues: [],
   };
 
   collectPreviewFixtureAnonymizationFieldsInto(value, fields);
@@ -71,6 +78,12 @@ function collectPreviewFixtureAnonymizationFieldsInto(
   value: unknown,
   fields: PreviewFixtureAnonymizationFields,
 ): void {
+  if (typeof value === "string") {
+    fields.stringValues.push(value);
+
+    return;
+  }
+
   if (Array.isArray(value)) {
     for (const item of value) {
       collectPreviewFixtureAnonymizationFieldsInto(item, fields);
@@ -123,6 +136,21 @@ function isProviderKeyName(key: string): boolean {
     normalizedKey === "llmproviderkey" ||
     normalizedKey === "apikey"
   );
+}
+
+function collectForbiddenIdentityViolations(
+  fixtureName: string,
+  values: readonly string[],
+): readonly PreviewFixtureAnonymizationViolation[] {
+  const violations: PreviewFixtureAnonymizationViolation[] = [];
+
+  for (const value of values) {
+    for (const reason of collectPreviewForbiddenIdentityReasons(value)) {
+      violations.push(createFixtureAnonymizationViolation(fixtureName, reason, value));
+    }
+  }
+
+  return violations;
 }
 
 function createFixtureAnonymizationViolation(
