@@ -65,6 +65,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   reject generated preview output containing `generated_at` volatile bytes (R-04,
   #2353).
 
+- `test(review-engine)`: add RED coverage requiring preview fixtures to validate
+  placeholder repository, author, and provider key identity values (R-05, #2354).
+
 - `feat(review-engine)`: add the initial dev-only preview markdown fixture
   renderer and anonymized golden fixture catalog for the four review comment
   shapes (R-01, #2342).
@@ -100,6 +103,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `feat(review-engine)`: add determinism validation that reports `generated_at`
   as a volatile preview fragment (R-04, #2353).
+
+- `feat(review-engine)`: add preview fixture anonymization validation for
+  placeholder repository names, author logins, and provider key values (R-05,
+  #2354).
 
 - `fix(bot)`: extract GitHub Checks posting into a dedicated source adapter
   with project headers, explicit ESM imports, and payload-safe failure logging

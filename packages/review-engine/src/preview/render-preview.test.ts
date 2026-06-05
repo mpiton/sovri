@@ -35,6 +35,20 @@ interface PreviewDeterminismValidationResult {
   readonly volatileFragments: readonly string[];
 }
 
+interface PreviewFixtureAnonymizationViolation {
+  readonly fixture: string;
+  readonly reason: string;
+  readonly value: string;
+}
+
+interface PreviewFixtureAnonymizationValidationResult {
+  readonly ok: boolean;
+  readonly repositoryNames: readonly string[];
+  readonly authorLogins: readonly string[];
+  readonly providerKeyValues: readonly string[];
+  readonly violations: readonly PreviewFixtureAnonymizationViolation[];
+}
+
 type RenderPreviewHtml = (request: PreviewHtmlRequest) => string;
 type RenderPreviewFixtureMarkdownTwice = (fixtureName: string) => readonly [string, string];
 type BuildPreviewFixtureSections = (
@@ -42,6 +56,10 @@ type BuildPreviewFixtureSections = (
   fixtureFileNames: readonly string[],
 ) => readonly PreviewHtmlSection[];
 type ValidatePreviewDeterminism = (renderedPreview: string) => PreviewDeterminismValidationResult;
+type ValidatePreviewFixtureAnonymization = (
+  fixtureName: string,
+  fixture: unknown,
+) => PreviewFixtureAnonymizationValidationResult;
 
 interface PreviewThemeRootValidationResult {
   readonly ok: boolean;
@@ -273,6 +291,29 @@ describe("preview markdown deterministic rendering", () => {
   });
 });
 
+describe("preview fixture anonymization", () => {
+  it.each(PreviewGoldenCases.map(({ fixture }) => fixture))(
+    "validates placeholder identity values in %s",
+    (fixture) => {
+      // Given the "<fixture>" fixture is loaded
+      const fixtureJson: unknown = JSON.parse(loadTextFixture(fixture));
+      const validateAnonymization = getValidatePreviewFixtureAnonymization();
+
+      // When the anonymization assertion inspects the fixture
+      const result = validateAnonymization(fixture, fixtureJson);
+
+      // Then every repository name is "example/review-target"
+      expect(result.repositoryNames.every((name) => name === "example/review-target")).toBe(true);
+      // And every author login starts with "test-"
+      expect(result.authorLogins.every((login) => login.startsWith("test-"))).toBe(true);
+      // And every provider key value is "test-key"
+      expect(result.providerKeyValues.every((value) => value === "test-key")).toBe(true);
+      expect(result.ok).toBe(true);
+      expect(result.violations).toEqual([]);
+    },
+  );
+});
+
 describe("preview HTML theme wrapper", () => {
   it.each(PreviewThemeCases)(
     "renders $theme root with $themeClass and without $otherThemeClass",
@@ -416,6 +457,23 @@ function hasValidatePreviewDeterminism(module: object): module is {
   );
 }
 
+function getValidatePreviewFixtureAnonymization(): ValidatePreviewFixtureAnonymization {
+  if (!hasValidatePreviewFixtureAnonymization(RenderPreviewModule)) {
+    throw new MissingPreviewFixtureAnonymizationValidatorError();
+  }
+
+  return RenderPreviewModule.validatePreviewFixtureAnonymization;
+}
+
+function hasValidatePreviewFixtureAnonymization(module: object): module is {
+  readonly validatePreviewFixtureAnonymization: ValidatePreviewFixtureAnonymization;
+} {
+  return (
+    "validatePreviewFixtureAnonymization" in module &&
+    typeof module.validatePreviewFixtureAnonymization === "function"
+  );
+}
+
 function getValidatePreviewThemeRoot(): ValidatePreviewThemeRoot {
   if (!hasValidatePreviewThemeRoot(RenderPreviewModule)) {
     throw new MissingPreviewThemeRootValidatorError();
@@ -512,6 +570,14 @@ class MissingPreviewDeterminismValidatorError extends Error {
 
   public constructor() {
     super("validatePreviewDeterminism export is missing from the preview renderer");
+  }
+}
+
+class MissingPreviewFixtureAnonymizationValidatorError extends Error {
+  public override readonly name = "MissingPreviewFixtureAnonymizationValidatorError";
+
+  public constructor() {
+    super("validatePreviewFixtureAnonymization export is missing from the preview renderer");
   }
 }
 

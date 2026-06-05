@@ -12,6 +12,12 @@ import {
 } from "../walkthrough/index.js";
 import { renderComplianceSection } from "../walkthrough/compliance.js";
 
+export {
+  validatePreviewFixtureAnonymization,
+  type PreviewFixtureAnonymizationValidationResult,
+  type PreviewFixtureAnonymizationViolation,
+} from "./anonymization.js";
+
 const TokensUsedSchema = z
   .object({
     prompt: z.number().int().nonnegative(),
