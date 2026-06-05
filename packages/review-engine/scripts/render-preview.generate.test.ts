@@ -11,7 +11,7 @@ import {
   buildPreviewFixtureSections,
   renderPreviewHtml,
   type PreviewHtmlTheme,
-} from "./render-preview.js";
+} from "../src/preview/render-preview.js";
 
 interface PreviewGoldenCase {
   readonly shape: string;
@@ -24,7 +24,7 @@ interface PreviewThemeOutput {
   readonly theme: PreviewHtmlTheme;
 }
 
-const PreviewOutputDirectory = fileURLToPath(new URL("../../.preview/", import.meta.url));
+const PreviewOutputDirectory = fileURLToPath(new URL("../.preview/", import.meta.url));
 const PreviewGoldenCases: readonly PreviewGoldenCase[] = [
   {
     shape: "summary",

@@ -18,8 +18,12 @@ import {
 } from "../src/index.js";
 
 const packageRoot = fileURLToPath(new URL("../", import.meta.url));
+const previewSourceRoot = join(packageRoot, "src/preview");
+const previewScriptRoot = join(packageRoot, "scripts");
 const sourceRoot = join(packageRoot, "src");
 const workspaceRoot = join(packageRoot, "../..");
+const RelativeTypeScriptImportExpression =
+  /\bfrom\s+["'](?<fromSpecifier>\.{1,2}\/[^"']+)["']|^\s*import\s+["'](?<sideEffectSpecifier>\.{1,2}\/[^"']+)["']|\bimport\s*\(\s*["'](?<dynamicSpecifier>\.{1,2}\/[^"']+)["']\s*\)/gmu;
 const PreviewHtmlOutputRelativePaths: readonly string[] = [
   "packages/review-engine/.preview/comments-light.html",
   "packages/review-engine/.preview/comments-dark.html",
@@ -42,6 +46,26 @@ interface ReviewEnginePackageManifest {
   readonly exports?: unknown;
   readonly scripts: Readonly<Record<string, string>>;
 }
+
+interface ForbiddenCommonJsExpression {
+  readonly label: string;
+  readonly pattern: RegExp;
+}
+
+const ForbiddenCommonJsExpressions: readonly ForbiddenCommonJsExpression[] = [
+  {
+    label: "require(",
+    pattern: /\brequire\s*\(/u,
+  },
+  {
+    label: "module.exports",
+    pattern: /\bmodule\.exports\b/u,
+  },
+  {
+    label: "exports",
+    pattern: /\bexports(?:\.|\[)/u,
+  },
+];
 
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -168,6 +192,70 @@ describe("@sovri/review-engine scaffold", () => {
     expect(rootBarrel).not.toContain(".html");
   });
 
+  it("keeps preview TypeScript files under the required source contract", () => {
+    // Given the new preview source files are under "packages/review-engine/src/preview/"
+    const previewSourceFiles = listTypeScriptFiles(previewSourceRoot);
+    // And the new preview script is under "packages/review-engine/scripts/"
+    const previewScriptFiles = listTypeScriptFilesIfPresent(previewScriptRoot);
+    expect(previewSourceFiles.length).toBeGreaterThan(0);
+    expect(
+      previewScriptFiles,
+      "packages/review-engine/scripts/ must contain the preview script TypeScript file",
+    ).not.toEqual([]);
+
+    // When the preview source files are inspected
+    const inspectedFiles = [...previewSourceFiles, ...previewScriptFiles];
+
+    for (const inspectedFile of inspectedFiles) {
+      const content = readFileSync(inspectedFile, "utf8");
+      const relativePath = relative(packageRoot, inspectedFile);
+      const [spdxHeader, copyrightHeader] = content.split(/\r?\n/u);
+
+      // Then every new TypeScript file starts with "SPDX-License-Identifier: Apache-2.0"
+      expect(spdxHeader, `${relativePath} must start with the SPDX header`).toContain(
+        "SPDX-License-Identifier: Apache-2.0",
+      );
+      // And every new TypeScript file starts with "Copyright 2026 Sovri SAS"
+      expect(copyrightHeader, `${relativePath} must carry the Sovri copyright header`).toContain(
+        "Copyright 2026 Sovri SAS",
+      );
+      // And every relative TypeScript import uses an explicit ".js" extension
+      for (const importSpecifier of collectRelativeImportSpecifiers(content)) {
+        expect(
+          importSpecifier,
+          `${relativePath} relative import "${importSpecifier}" must use a .js extension`,
+        ).toMatch(/\.js$/u);
+      }
+      // And no file contains "require(" or other CommonJS export forms
+      expect(
+        collectForbiddenCommonJsExpressions(content),
+        `${relativePath} must not contain CommonJS entry points`,
+      ).toEqual([]);
+    }
+  });
+
+  it("collects side-effect relative imports for source contract checks", () => {
+    expect(
+      collectRelativeImportSpecifiers(`
+        import "./setup";
+        import { value } from "../value";
+        export { exported } from "../exported";
+        const lazy = await import("./lazy");
+      `),
+    ).toEqual(["./setup", "../value", "../exported", "./lazy"]);
+  });
+
+  it("collects forbidden CommonJS expressions for source contract checks", () => {
+    expect(
+      collectForbiddenCommonJsExpressions(`
+        const loader = require("./setup");
+        module.exports = {};
+        exports.value = 1;
+        exports["other"] = 2;
+      `),
+    ).toEqual(["require(", "module.exports", "exports"]);
+  });
+
   it("keeps the deferred ingestion format out of production source", () => {
     const deferredToken = ["sa", "rif"].join("");
     const deferredPattern = new RegExp(deferredToken, "iu");
@@ -206,6 +294,29 @@ function removePreviewHtmlOutputs(): void {
   for (const outputRelativePath of PreviewHtmlOutputRelativePaths) {
     rmSync(join(workspaceRoot, outputRelativePath), { force: true });
   }
+}
+
+function listTypeScriptFilesIfPresent(root: string): string[] {
+  return existsSync(root) ? listTypeScriptFiles(root) : [];
+}
+
+function collectRelativeImportSpecifiers(content: string): readonly string[] {
+  return [...content.matchAll(RelativeTypeScriptImportExpression)].flatMap((match) => {
+    const fromSpecifier = match.groups?.fromSpecifier;
+    const sideEffectSpecifier = match.groups?.sideEffectSpecifier;
+    const dynamicSpecifier = match.groups?.dynamicSpecifier;
+    return [fromSpecifier, sideEffectSpecifier, dynamicSpecifier].filter(isDefinedString);
+  });
+}
+
+function collectForbiddenCommonJsExpressions(content: string): readonly string[] {
+  return ForbiddenCommonJsExpressions.flatMap(({ label, pattern }) =>
+    pattern.test(content) ? [label] : [],
+  );
+}
+
+function isDefinedString(value: string | undefined): value is string {
+  return value !== undefined;
 }
 
 function formatProcessOutput(result: SpawnSyncReturns<string>): string {
