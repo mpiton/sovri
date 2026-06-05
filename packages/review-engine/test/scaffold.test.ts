@@ -18,8 +18,11 @@ import {
 } from "../src/index.js";
 
 const packageRoot = fileURLToPath(new URL("../", import.meta.url));
+const previewSourceRoot = join(packageRoot, "src/preview");
+const previewScriptRoot = join(packageRoot, "scripts");
 const sourceRoot = join(packageRoot, "src");
 const workspaceRoot = join(packageRoot, "../..");
+const RelativeTypeScriptImportExpression = /\bfrom\s+["'](\.{1,2}\/[^"']+)["']/gu;
 const PreviewHtmlOutputRelativePaths: readonly string[] = [
   "packages/review-engine/.preview/comments-light.html",
   "packages/review-engine/.preview/comments-dark.html",
@@ -168,6 +171,45 @@ describe("@sovri/review-engine scaffold", () => {
     expect(rootBarrel).not.toContain(".html");
   });
 
+  it("keeps preview TypeScript files under the required source contract", () => {
+    // Given the new preview source files are under "packages/review-engine/src/preview/"
+    const previewSourceFiles = listTypeScriptFiles(previewSourceRoot);
+    // And the new preview script is under "packages/review-engine/scripts/"
+    const previewScriptFiles = listTypeScriptFilesIfPresent(previewScriptRoot);
+    expect(previewSourceFiles.length).toBeGreaterThan(0);
+    expect(
+      previewScriptFiles,
+      "packages/review-engine/scripts/ must contain the preview script TypeScript file",
+    ).not.toEqual([]);
+
+    // When the preview source files are inspected
+    const inspectedFiles = [...previewSourceFiles, ...previewScriptFiles];
+
+    for (const inspectedFile of inspectedFiles) {
+      const content = readFileSync(inspectedFile, "utf8");
+      const relativePath = relative(packageRoot, inspectedFile);
+      const [spdxHeader, copyrightHeader] = content.split(/\r?\n/u);
+
+      // Then every new TypeScript file starts with "SPDX-License-Identifier: Apache-2.0"
+      expect(spdxHeader, `${relativePath} must start with the SPDX header`).toContain(
+        "SPDX-License-Identifier: Apache-2.0",
+      );
+      // And every new TypeScript file starts with "Copyright 2026 Sovri SAS"
+      expect(copyrightHeader, `${relativePath} must carry the Sovri copyright header`).toContain(
+        "Copyright 2026 Sovri SAS",
+      );
+      // And every relative TypeScript import uses an explicit ".js" extension
+      for (const importSpecifier of collectRelativeImportSpecifiers(content)) {
+        expect(
+          importSpecifier,
+          `${relativePath} relative import "${importSpecifier}" must use a .js extension`,
+        ).toMatch(/\.js$/u);
+      }
+      // And no file contains "require("
+      expect(content, `${relativePath} must not contain require(`).not.toContain("require(");
+    }
+  });
+
   it("keeps the deferred ingestion format out of production source", () => {
     const deferredToken = ["sa", "rif"].join("");
     const deferredPattern = new RegExp(deferredToken, "iu");
@@ -206,6 +248,17 @@ function removePreviewHtmlOutputs(): void {
   for (const outputRelativePath of PreviewHtmlOutputRelativePaths) {
     rmSync(join(workspaceRoot, outputRelativePath), { force: true });
   }
+}
+
+function listTypeScriptFilesIfPresent(root: string): string[] {
+  return existsSync(root) ? listTypeScriptFiles(root) : [];
+}
+
+function collectRelativeImportSpecifiers(content: string): readonly string[] {
+  return [...content.matchAll(RelativeTypeScriptImportExpression)].flatMap((match) => {
+    const importSpecifier = match[1];
+    return importSpecifier === undefined ? [] : [importSpecifier];
+  });
 }
 
 function formatProcessOutput(result: SpawnSyncReturns<string>): string {

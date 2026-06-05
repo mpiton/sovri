@@ -68,6 +68,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `test(review-engine)`: add RED coverage requiring preview fixtures to validate
   placeholder repository, author, and provider key identity values (R-05, #2354).
 
+- `test(review-engine)`: add RED scaffold coverage requiring preview TypeScript
+  sources and the preview script to keep required headers, explicit ESM import
+  extensions, and no CommonJS usage (R-08, #2363).
+
 - `feat(review-engine)`: add the initial dev-only preview markdown fixture
   renderer and anonymized golden fixture catalog for the four review comment
   shapes (R-01, #2342).
