@@ -203,47 +203,55 @@ const PreviewRenderedOutputForbiddenExpressions: readonly PreviewRenderedOutputF
   [
     {
       label: "ghp_",
-      pattern: /ghp_/u,
+      matches: (renderedPreview) => renderedPreview.includes("ghp_"),
     },
     {
       label: "gho_",
-      pattern: /gho_/u,
+      matches: (renderedPreview) => renderedPreview.includes("gho_"),
     },
     {
       label: "ghu_",
-      pattern: /ghu_/u,
+      matches: (renderedPreview) => renderedPreview.includes("ghu_"),
     },
     {
       label: "ghs_",
-      pattern: /ghs_/u,
+      matches: (renderedPreview) => renderedPreview.includes("ghs_"),
     },
     {
       label: "ghr_",
-      pattern: /ghr_/u,
+      matches: (renderedPreview) => renderedPreview.includes("ghr_"),
     },
     {
       label: "github_pat_",
-      pattern: /github_pat_/u,
+      matches: (renderedPreview) => renderedPreview.includes("github_pat_"),
     },
     {
       label: "sk-ant-",
-      pattern: /sk-ant-/u,
+      matches: (renderedPreview) => renderedPreview.includes("sk-ant-"),
     },
     {
       label: "x-hub-signature-256",
-      pattern: /x-hub-signature-256/iu,
+      matches: (renderedPreview) => renderedPreview.toLowerCase().includes("x-hub-signature-256"),
     },
     {
       label: "raw GitHub webhook payload body",
-      pattern:
-        /(?=.*(?:"|&quot;)action(?:"|&quot;)\s*:)(?=.*(?:"|&quot;)pull_request(?:"|&quot;)\s*:)(?=.*(?:"|&quot;)repository(?:"|&quot;)\s*:)(?=.*(?:"|&quot;)sender(?:"|&quot;)\s*:)/su,
+      matches: containsRawGitHubWebhookPayloadBody,
     },
   ];
 
 interface PreviewRenderedOutputForbiddenExpression {
   readonly label: string;
-  readonly pattern: RegExp;
+  readonly matches: (renderedPreview: string) => boolean;
 }
+
+const RawGitHubWebhookPayloadSchema = z
+  .object({
+    action: z.unknown(),
+    pull_request: z.unknown(),
+    repository: z.unknown(),
+    sender: z.unknown(),
+  })
+  .passthrough();
 
 class UnexpectedInlinePreviewCountError extends Error {
   public override readonly name = "UnexpectedInlinePreviewCountError";
@@ -484,13 +492,65 @@ export function validatePreviewRenderedOutput(
   renderedPreview: string,
 ): PreviewRenderedOutputValidationResult {
   const forbiddenFragments = PreviewRenderedOutputForbiddenExpressions.flatMap(
-    ({ label, pattern }) => (pattern.test(renderedPreview) ? [label] : []),
+    ({ label, matches }) => (matches(renderedPreview) ? [label] : []),
   );
 
   return {
     ok: forbiddenFragments.length === 0,
     forbiddenFragments,
   };
+}
+
+function containsRawGitHubWebhookPayloadBody(renderedPreview: string): boolean {
+  return collectJsonObjectCandidates(renderedPreview).some(isRawGitHubWebhookPayloadBody);
+}
+
+function collectJsonObjectCandidates(value: string): readonly string[] {
+  const candidates: string[] = [];
+  let depth = 0;
+  let candidateStart: number | undefined;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value.charAt(index);
+
+    if (character === "{") {
+      if (depth === 0) {
+        candidateStart = index;
+      }
+      depth += 1;
+    }
+
+    if (character !== "}") {
+      continue;
+    }
+
+    if (depth === 0) {
+      continue;
+    }
+
+    depth -= 1;
+
+    if (depth === 0 && candidateStart !== undefined) {
+      candidates.push(value.slice(candidateStart, index + 1));
+      candidateStart = undefined;
+    }
+  }
+
+  return candidates;
+}
+
+function isRawGitHubWebhookPayloadBody(value: string): boolean {
+  try {
+    const parsedCandidate: unknown = JSON.parse(normalizePreviewJsonEntities(value));
+
+    return RawGitHubWebhookPayloadSchema.safeParse(parsedCandidate).success;
+  } catch {
+    return false;
+  }
+}
+
+function normalizePreviewJsonEntities(value: string): string {
+  return value.replace(/&quot;|&#34;/gu, '"');
 }
 
 function renderPreviewFixture(fixture: PreviewFixture): string {

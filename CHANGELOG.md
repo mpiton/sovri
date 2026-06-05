@@ -442,6 +442,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   GitHub token prefixes already rejected in preview fixture anonymization and
   validate generated HTML before it is written to disk (R-08, #2366).
 
+- `fix(review-engine)`: refine rendered preview raw webhook body detection to
+  parse JSON-shaped candidates instead of matching broad field-name lookaheads
+  (R-08, #2366).
+
 - `fix(review-engine)`: render preview golden snapshots from typed source
   fixtures through the walkthrough, inline, assessment, and provenance renderers
   instead of duplicating stored markdown lines, with an explicit fixture-renderer

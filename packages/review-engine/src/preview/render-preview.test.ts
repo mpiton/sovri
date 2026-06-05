@@ -789,6 +789,14 @@ describe("preview HTML theme wrapper", () => {
     expect(result.ok).toBe(false);
     expect(result.forbiddenFragments).toContain(fragment);
   });
+
+  it("accepts prose naming webhook fields without a raw JSON payload body", () => {
+    const output = "Webhook fields: action, pull_request, repository, sender.";
+    const result = getValidatePreviewRenderedOutput()(output);
+
+    expect(result.ok).toBe(true);
+    expect(result.forbiddenFragments).toEqual([]);
+  });
 });
 
 function loadTextFixture(name: string): string {
