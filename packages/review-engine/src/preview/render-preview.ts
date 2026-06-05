@@ -123,6 +123,11 @@ export interface PreviewThemeRootValidationResult {
   readonly error?: string;
 }
 
+export interface PreviewMarkdownPayloadValidationResult {
+  readonly ok: boolean;
+  readonly forbiddenFragments: readonly string[];
+}
+
 const HtmlEscapes: Readonly<Record<string, string>> = {
   "&": "&amp;",
   "<": "&lt;",
@@ -136,6 +141,16 @@ const PreviewChromeStylesheet = [
   ".gh-light { color-scheme: light; }",
   ".gh-dark { color-scheme: dark; }",
 ].join("\n");
+
+export const PreviewMarkdownForbiddenFragments: readonly string[] = [
+  "class=",
+  "style=",
+  "<style>",
+  ".ghc",
+  ".gh-light",
+  ".gh-dark",
+  "gh-chrome",
+];
 
 class UnexpectedInlinePreviewCountError extends Error {
   public override readonly name = "UnexpectedInlinePreviewCountError";
@@ -188,6 +203,22 @@ export function validatePreviewThemeRoot(rootClasses: string): PreviewThemeRootV
   }
 
   return { ok: true };
+}
+
+/**
+ * Validate posted preview markdown stays free of wrapper-only HTML/CSS fragments.
+ */
+export function validatePreviewMarkdownPayload(
+  markdown: string,
+): PreviewMarkdownPayloadValidationResult {
+  const forbiddenFragments = PreviewMarkdownForbiddenFragments.filter((fragment) =>
+    markdown.includes(fragment),
+  );
+
+  return {
+    ok: forbiddenFragments.length === 0,
+    forbiddenFragments,
+  };
 }
 
 function renderPreviewFixture(fixture: PreviewFixture): string {

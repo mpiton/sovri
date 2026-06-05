@@ -5,7 +5,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import * as RenderPreviewModule from "./render-preview.js";
-import { renderPreviewFixtureMarkdown, validatePreviewFixtureCatalog } from "./render-preview.js";
+import {
+  PreviewMarkdownForbiddenFragments,
+  renderPreviewFixtureMarkdown,
+  validatePreviewFixtureCatalog,
+  validatePreviewMarkdownPayload,
+} from "./render-preview.js";
 
 interface PreviewGoldenCase {
   readonly shape: string;
@@ -135,6 +140,44 @@ describe("preview markdown golden fixtures", () => {
     expect(markdown).toContain("SOVRI-AC-AB12-CD34");
     // And the rendered markdown equals "inline-finding.golden.md" byte-for-byte
     expect(markdown).toBe(expectedMarkdown);
+  });
+
+  it.each(PreviewGoldenCases)(
+    "validates $golden without CSS-only payload fragments",
+    ({ golden }) => {
+      // Given the stored markdown snapshot is "<golden>"
+      const markdown = loadTextFixture(golden);
+
+      // When the preview harness validates the markdown payload
+      const result = validatePreviewMarkdownPayload(markdown);
+
+      // Then the markdown does not contain "class="
+      // And the markdown does not contain "style="
+      // And the markdown does not contain "<style>"
+      // And the markdown does not contain "gh-chrome"
+      for (const fragment of PreviewMarkdownForbiddenFragments) {
+        expect(markdown).not.toContain(fragment);
+        expect(result.forbiddenFragments).not.toContain(fragment);
+      }
+      expect(result.ok).toBe(true);
+      expect(result.forbiddenFragments).toEqual([]);
+    },
+  );
+
+  it("rejects markdown containing preview chrome stylesheet fragments", () => {
+    // Given markdown includes CSS copied from the preview HTML wrapper stylesheet
+    const markdown = [
+      ".ghc { display: block; }",
+      ".gh-light { color-scheme: light; }",
+      ".gh-dark { color-scheme: dark; }",
+    ].join("\n");
+
+    // When the preview harness validates the markdown payload
+    const result = validatePreviewMarkdownPayload(markdown);
+
+    // Then validation fails and reports the wrapper selectors
+    expect(result.ok).toBe(false);
+    expect(result.forbiddenFragments).toEqual([".ghc", ".gh-light", ".gh-dark"]);
   });
 });
 

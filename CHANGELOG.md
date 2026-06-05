@@ -47,6 +47,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   inline exactly one local stylesheet without mutating markdown payload sections
   (R-03, #2348).
 
+- `test(review-engine)`: add RED coverage requiring stored preview markdown
+  snapshots to validate free of CSS-only wrapper fragments (R-03, #2349).
+
 - `feat(review-engine)`: add the initial dev-only preview markdown fixture
   renderer and anonymized golden fixture catalog for the four review comment
   shapes (R-01, #2342).
@@ -63,6 +66,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `feat(review-engine)`: inline the local preview chrome stylesheet in the
   dev-only HTML wrapper while keeping markdown payload data unchanged (R-03,
   #2348).
+
+- `feat(review-engine)`: add preview markdown payload validation that reports
+  CSS-only wrapper fragments and reuses an exported preview chrome selector
+  list before posted markdown snapshot checks (R-03, #2349).
 
 - `fix(bot)`: extract GitHub Checks posting into a dedicated source adapter
   with project headers, explicit ESM imports, and payload-safe failure logging
