@@ -86,8 +86,6 @@ const ExplicitAnyTypePositionPatternFragments: readonly string[] = [
   String.raw`(?<typeAssertion>\bas\s+any\b)`,
   // Alias, generic, union, intersection, and tuple positions.
   String.raw`(?<structuredTypePosition>(?:[=<,|&]|\[)\s*any\b)`,
-  // Array types: any[]
-  String.raw`(?<arrayType>\bany\s*\[\])`,
 ];
 
 const ExplicitAnyTypePositionPattern = new RegExp(
@@ -490,33 +488,52 @@ function stripTemplateLiteralStaticText(content: string): string {
       continue;
     }
 
-    index += 1;
-
-    while (index < content.length) {
-      const templateCharacter = content[index];
-
-      if (templateCharacter === "\\") {
-        index += 2;
-        continue;
-      }
-
-      if (templateCharacter === "`") {
-        index += 1;
-        break;
-      }
-
-      if (templateCharacter === "$" && content[index + 1] === "{") {
-        const expression = readTemplateLiteralExpressionContent(content, index + 2);
-        strippedContent += stripTemplateLiteralStaticText(expression.content);
-        index = expression.nextIndex;
-        continue;
-      }
-
-      index += 1;
-    }
+    const templateContent = readTemplateLiteralRetainedContent(content, index + 1);
+    strippedContent += templateContent.content;
+    index = templateContent.nextIndex;
   }
 
   return strippedContent;
+}
+
+function readTemplateLiteralRetainedContent(
+  content: string,
+  startIndex: number,
+): TemplateLiteralExpressionContent {
+  let retainedContent = "";
+  let index = startIndex;
+
+  while (index < content.length) {
+    const character = content[index];
+
+    if (character === "\\") {
+      index = skipEscapedCharacter(index);
+      continue;
+    }
+
+    if (character === "`") {
+      return { content: retainedContent, nextIndex: index + 1 };
+    }
+
+    if (isTemplateInterpolationStart(content, index)) {
+      const expression = readTemplateLiteralExpressionContent(content, index + 2);
+      retainedContent += stripTemplateLiteralStaticText(expression.content);
+      index = expression.nextIndex;
+      continue;
+    }
+
+    index += 1;
+  }
+
+  return { content: retainedContent, nextIndex: content.length };
+}
+
+function isTemplateInterpolationStart(content: string, index: number): boolean {
+  return content[index] === "$" && content[index + 1] === "{";
+}
+
+function skipEscapedCharacter(index: number): number {
+  return index + 2;
 }
 
 function readTemplateLiteralExpressionContent(
@@ -539,7 +556,7 @@ function readTemplateLiteralExpressionContent(
 
     if (character === "\\") {
       expressionContent += content.slice(index, index + 2);
-      index += 2;
+      index = skipEscapedCharacter(index);
       continue;
     }
 
@@ -580,7 +597,7 @@ function readQuotedStringContent(
     const character = content[index];
 
     if (character === "\\") {
-      index += 2;
+      index = skipEscapedCharacter(index);
       continue;
     }
 
