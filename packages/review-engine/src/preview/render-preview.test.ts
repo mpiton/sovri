@@ -31,6 +31,7 @@ interface PreviewHtmlRequest {
 }
 
 type RenderPreviewHtml = (request: PreviewHtmlRequest) => string;
+type RenderPreviewFixtureMarkdownTwice = (fixtureName: string) => readonly [string, string];
 
 interface PreviewThemeRootValidationResult {
   readonly ok: boolean;
@@ -208,6 +209,22 @@ describe("preview markdown golden fixtures", () => {
   });
 });
 
+describe("preview markdown deterministic rendering", () => {
+  it.each(PreviewGoldenCases)(
+    "renders $shape fixture twice with identical bytes",
+    ({ fixture }) => {
+      // Given the "<shape>" fixture is loaded once
+      const renderTwice = getRenderPreviewFixtureMarkdownTwice();
+
+      // When the preview harness renders markdown for the fixture twice in the same process
+      const [firstMarkdown, secondMarkdown] = renderTwice(fixture);
+
+      // Then the first rendered markdown equals the second rendered markdown byte-for-byte
+      expect(secondMarkdown).toBe(firstMarkdown);
+    },
+  );
+});
+
 describe("preview HTML theme wrapper", () => {
   it.each(PreviewThemeCases)(
     "renders $theme root with $themeClass and without $otherThemeClass",
@@ -300,6 +317,23 @@ function hasRenderPreviewHtml(
   return "renderPreviewHtml" in module && typeof module.renderPreviewHtml === "function";
 }
 
+function getRenderPreviewFixtureMarkdownTwice(): RenderPreviewFixtureMarkdownTwice {
+  if (!hasRenderPreviewFixtureMarkdownTwice(RenderPreviewModule)) {
+    throw new MissingPreviewFixtureDeterminismRendererError();
+  }
+
+  return RenderPreviewModule.renderPreviewFixtureMarkdownTwice;
+}
+
+function hasRenderPreviewFixtureMarkdownTwice(module: object): module is {
+  readonly renderPreviewFixtureMarkdownTwice: RenderPreviewFixtureMarkdownTwice;
+} {
+  return (
+    "renderPreviewFixtureMarkdownTwice" in module &&
+    typeof module.renderPreviewFixtureMarkdownTwice === "function"
+  );
+}
+
 function getValidatePreviewThemeRoot(): ValidatePreviewThemeRoot {
   if (!hasValidatePreviewThemeRoot(RenderPreviewModule)) {
     throw new MissingPreviewThemeRootValidatorError();
@@ -372,6 +406,14 @@ class MissingPreviewRootClassError extends Error {
 
   public constructor() {
     super("preview HTML root element is missing a class attribute");
+  }
+}
+
+class MissingPreviewFixtureDeterminismRendererError extends Error {
+  public override readonly name = "MissingPreviewFixtureDeterminismRendererError";
+
+  public constructor() {
+    super("renderPreviewFixtureMarkdownTwice export is missing from the preview renderer");
   }
 }
 

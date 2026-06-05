@@ -54,6 +54,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   fixture `<style>` tags to render as inert markdown while the HTML wrapper
   keeps a single trusted style element (R-03, #2350).
 
+- `test(review-engine)`: add RED coverage requiring each preview fixture to
+  render twice in the same process with identical markdown bytes (R-04, #2351).
+
 - `feat(review-engine)`: add the initial dev-only preview markdown fixture
   renderer and anonymized golden fixture catalog for the four review comment
   shapes (R-01, #2342).
@@ -78,6 +81,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `feat(review-engine)`: add a summary preview fixture case proving
   user-authored `<style>` tags stay escaped in markdown while the HTML wrapper
   keeps the only trusted style element (R-03, #2350).
+
+- `feat(review-engine)`: add a deterministic fixture render helper that loads
+  each preview fixture once and renders it twice for byte-for-byte comparison
+  (R-04, #2351).
 
 - `fix(bot)`: extract GitHub Checks posting into a dedicated source adapter
   with project headers, explicit ESM imports, and payload-safe failure logging

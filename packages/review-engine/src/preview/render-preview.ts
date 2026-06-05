@@ -169,6 +169,14 @@ export function renderPreviewFixtureMarkdown(fixtureName: string): string {
   return renderPreviewFixture(fixture);
 }
 
+export function renderPreviewFixtureMarkdownTwice(fixtureName: string): readonly [string, string] {
+  const fixture = loadPreviewFixture(fixtureName);
+  const firstMarkdown = renderPreviewFixture(fixture);
+  const secondMarkdown = renderPreviewFixture(fixture);
+
+  return [firstMarkdown, secondMarkdown];
+}
+
 export function validatePreviewFixtureCatalog(
   catalog: readonly unknown[],
   availableGoldenFiles: readonly unknown[],
