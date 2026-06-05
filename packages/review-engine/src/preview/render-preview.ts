@@ -106,6 +106,26 @@ interface PreviewFixtureCatalogValidationResult {
   readonly missingGoldenFiles: readonly string[];
 }
 
+export type PreviewHtmlTheme = "light" | "dark";
+
+export interface PreviewHtmlSection {
+  readonly title: string;
+  readonly markdown: string;
+}
+
+export interface RenderPreviewHtmlRequest {
+  readonly sections: readonly PreviewHtmlSection[];
+  readonly theme: PreviewHtmlTheme;
+}
+
+const HtmlEscapes: Readonly<Record<string, string>> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+
 class UnexpectedInlinePreviewCountError extends Error {
   public override readonly name = "UnexpectedInlinePreviewCountError";
 
@@ -137,6 +157,13 @@ export function validatePreviewFixtureCatalog(
     ok: missingGoldenFiles.length === 0,
     missingGoldenFiles,
   };
+}
+
+export function renderPreviewHtml(request: RenderPreviewHtmlRequest): string {
+  const themeClass = getPreviewThemeClass(request.theme);
+  const sections = request.sections.map(renderPreviewHtmlSection).join("");
+
+  return `<div class="ghc ${themeClass}">${sections}</div>`;
 }
 
 function renderPreviewFixture(fixture: PreviewFixture): string {
@@ -186,6 +213,21 @@ function renderProvenancePreview(
   };
 
   return renderComplianceSection(fixture.findings, provenance).join("\n");
+}
+
+function getPreviewThemeClass(theme: PreviewHtmlTheme): "gh-light" | "gh-dark" {
+  return theme === "light" ? "gh-light" : "gh-dark";
+}
+
+function renderPreviewHtmlSection(section: PreviewHtmlSection): string {
+  const title = escapeHtml(section.title);
+  const markdown = escapeHtml(section.markdown);
+
+  return `<section><h2>${title}</h2><pre>${markdown}</pre></section>`;
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/gu, (character) => HtmlEscapes[character] ?? character);
 }
 
 function loadPreviewFixture(fixtureName: string): PreviewFixture {
