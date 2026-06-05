@@ -90,6 +90,22 @@ const PreviewFixtureSchema = z.discriminatedUnion("kind", [
 
 type PreviewFixture = z.infer<typeof PreviewFixtureSchema>;
 
+const PreviewFixtureCatalogEntrySchema = z
+  .object({
+    shape: z.string().trim().min(1),
+    fixture: z.string().trim().min(1),
+    golden: z.string().trim().min(1),
+  })
+  .strict();
+
+const PreviewFixtureCatalogSchema = z.array(PreviewFixtureCatalogEntrySchema);
+const AvailableGoldenFilesSchema = z.array(z.string().trim().min(1));
+
+interface PreviewFixtureCatalogValidationResult {
+  readonly ok: boolean;
+  readonly missingGoldenFiles: readonly string[];
+}
+
 class UnexpectedInlinePreviewCountError extends Error {
   public override readonly name = "UnexpectedInlinePreviewCountError";
 
@@ -105,6 +121,22 @@ export function renderPreviewFixtureMarkdown(fixtureName: string): string {
   const fixture = loadPreviewFixture(fixtureName);
 
   return renderPreviewFixture(fixture);
+}
+
+export function validatePreviewFixtureCatalog(
+  catalog: readonly unknown[],
+  availableGoldenFiles: readonly unknown[],
+): PreviewFixtureCatalogValidationResult {
+  const entries = PreviewFixtureCatalogSchema.parse(catalog);
+  const available = new Set(AvailableGoldenFilesSchema.parse(availableGoldenFiles));
+  const missingGoldenFiles = entries
+    .map((entry) => entry.golden)
+    .filter((golden) => !available.has(golden));
+
+  return {
+    ok: missingGoldenFiles.length === 0,
+    missingGoldenFiles,
+  };
 }
 
 function renderPreviewFixture(fixture: PreviewFixture): string {
