@@ -124,6 +124,11 @@ const PreviewForbiddenIdentityCases: readonly PreviewForbiddenIdentityCase[] = [
     forbiddenValue: "realbank/payments",
     reason: "real repo shape",
   },
+  {
+    fixture: "inline-finding.json",
+    forbiddenValue: "Review for mpiton/sovri",
+    reason: "real repo shape",
+  },
 ];
 
 const PreviewHtmlSections: readonly PreviewHtmlSection[] = [
@@ -551,10 +556,18 @@ function serializeMarkdownPayload(sections: readonly PreviewHtmlSection[]): stri
 }
 
 function injectFixtureString(fixture: unknown, value: string): unknown {
+  if (!isJsonFixtureContainer(fixture)) {
+    throw new InvalidPreviewFixtureInjectionError();
+  }
+
   return {
     fixture,
     injected_fixture_values: [value],
   };
+}
+
+function isJsonFixtureContainer(value: unknown): boolean {
+  return typeof value === "object" && value !== null;
 }
 
 function countOccurrences(value: string, needle: string): number {
@@ -650,5 +663,13 @@ class MissingPreviewStyleElementError extends Error {
 
   public constructor() {
     super("preview HTML wrapper is missing a style element");
+  }
+}
+
+class InvalidPreviewFixtureInjectionError extends Error {
+  public override readonly name = "InvalidPreviewFixtureInjectionError";
+
+  public constructor() {
+    super("preview fixture injection requires parsed JSON object or array input");
   }
 }

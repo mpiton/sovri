@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+/**
+ * Detects secret-shaped and real repository identity strings in preview fixtures.
+ * Kept separate from traversal so anonymization stays focused on JSON walking and reporting.
+ */
 interface PreviewForbiddenIdentityPattern {
   readonly reason: string;
   readonly matches: (value: string) => boolean;
@@ -22,8 +26,8 @@ const PreviewSourcePathOwners = new Set([
 ]);
 const PreviewGithubTokenExpression = /\bghp_[A-Za-z0-9_]{20,}\b/u;
 const PreviewLlmKeyExpression = /\bsk-ant-api03-[A-Za-z0-9_-]+\b/u;
-const PreviewRepositoryIdentityExpression =
-  /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?\/[a-z0-9](?:[a-z0-9_-]{0,98}[a-z0-9])?$/u;
+const PreviewRepositoryIdentityCandidateExpression =
+  /(?:^|[^A-Za-z0-9._-])([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}[A-Za-z0-9])?\/[A-Za-z0-9](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9])?)(?=$|[^A-Za-z0-9._-])/gu;
 const PreviewForbiddenIdentityPatterns: readonly PreviewForbiddenIdentityPattern[] = [
   {
     reason: "github token shape",
@@ -52,21 +56,30 @@ export function collectPreviewForbiddenIdentityReasons(value: string): readonly 
 }
 
 function hasRealRepositoryShape(value: string): boolean {
-  const trimmedValue = value.trim();
-
-  if (trimmedValue === PreviewPlaceholderRepositoryName) {
+  if (value.includes("://") && !value.includes("github.com/")) {
     return false;
   }
 
-  if (!PreviewRepositoryIdentityExpression.test(trimmedValue)) {
-    return false;
+  for (const match of value.matchAll(PreviewRepositoryIdentityCandidateExpression)) {
+    const candidate = match[1];
+
+    if (candidate === undefined || candidate === PreviewPlaceholderRepositoryName) {
+      continue;
+    }
+
+    const [owner, repository] = candidate.split("/");
+
+    if (owner === undefined || repository === undefined) {
+      continue;
+    }
+
+    if (
+      !PreviewSourcePathOwners.has(owner.toLowerCase()) &&
+      !PreviewSourcePathOwners.has(repository.toLowerCase())
+    ) {
+      return true;
+    }
   }
 
-  const [owner] = trimmedValue.split("/");
-
-  if (owner === undefined) {
-    return false;
-  }
-
-  return !PreviewSourcePathOwners.has(owner);
+  return false;
 }
