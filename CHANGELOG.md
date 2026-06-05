@@ -85,6 +85,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   reject and name `any`, `as unknown`, `@ts-ignore`, and `@ts-expect-error`
   fragments (R-08, #2365).
 
+- `fix(review-engine)`: constrain the preview escape-hatch scanner so ordinary
+  prose containing `any` is allowed while explicit `any` type positions still
+  fail the quality gate (R-08, #2365).
+
 - `feat(review-engine)`: expose Zod-derived preview fixture parsers for raw JSON
   text and parsed fixture values, and route preview fixture loading through that
   boundary before rendering (R-08, #2364).

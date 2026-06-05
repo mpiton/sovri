@@ -81,7 +81,7 @@ const ForbiddenTypeScriptEscapeHatchExpressions: readonly ForbiddenTypeScriptEsc
   [
     {
       label: "any",
-      pattern: /\bany\b/u,
+      pattern: /(?::\s*any\b|\bas\s+any\b|<\s*any\s*>|\bany\s*\[\])/u,
     },
     {
       label: "as unknown",
@@ -323,6 +323,24 @@ describe("@sovri/review-engine scaffold", () => {
       expect(violations).toContain(forbiddenFragment);
     },
   );
+
+  it("allows ordinary prose that contains any without an explicit any type", () => {
+    expect(
+      collectForbiddenTypeScriptEscapeHatches(`
+        const previewCopy = "render any markdown payload";
+        const summary = "any source fixture can be rendered";
+      `),
+    ).toEqual([]);
+
+    expect(
+      collectForbiddenTypeScriptEscapeHatches(`
+        const explicitType: any = {};
+        const asserted = value as any;
+        const genericValues = new Set<any>();
+        const arrayValues: any[] = [];
+      `),
+    ).toEqual(["any"]);
+  });
 
   it("keeps the deferred ingestion format out of production source", () => {
     const deferredToken = ["sa", "rif"].join("");
