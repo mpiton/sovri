@@ -149,6 +149,20 @@ export interface PreviewGoldenMarkdownValidationResult {
   readonly requiredSnapshotUpdates: readonly string[];
 }
 
+/**
+ * Supplies rendered fixture markdown and stored golden bytes to snapshot validation.
+ *
+ * @example
+ * const source: PreviewGoldenMarkdownSnapshotSource = {
+ *   renderFixtureMarkdown: (fixtureName) => renderedFixtures.get(fixtureName) ?? "",
+ *   loadGoldenMarkdown: (goldenName) => storedGoldens.get(goldenName) ?? "",
+ * };
+ */
+export interface PreviewGoldenMarkdownSnapshotSource {
+  readonly renderFixtureMarkdown: (fixtureName: string) => string;
+  readonly loadGoldenMarkdown: (goldenName: string) => string;
+}
+
 export interface PreviewDeterminismValidationResult {
   readonly ok: boolean;
   readonly volatileFragments: readonly string[];
@@ -187,6 +201,19 @@ class UnexpectedInlinePreviewCountError extends Error {
     super(`inline preview fixture must render exactly one comment, rendered ${renderedCount}`);
   }
 }
+
+export class PreviewGoldenMarkdownSnapshotDriftError extends Error {
+  public override readonly name = "PreviewGoldenMarkdownSnapshotDriftError";
+
+  public constructor(requiredSnapshotUpdates: readonly string[]) {
+    super(`preview golden markdown snapshots are outdated: ${requiredSnapshotUpdates.join(", ")}`);
+  }
+}
+
+const PreviewGoldenMarkdownFileSource: PreviewGoldenMarkdownSnapshotSource = {
+  renderFixtureMarkdown: renderPreviewFixtureMarkdown,
+  loadGoldenMarkdown: loadTextFixture,
+};
 
 /**
  * Render a source fixture through the matching review-comment markdown path.
@@ -229,13 +256,14 @@ export function validatePreviewFixtureCatalog(
  */
 export function validatePreviewGoldenMarkdownSnapshots(
   catalog: readonly unknown[],
+  snapshotSource: PreviewGoldenMarkdownSnapshotSource = PreviewGoldenMarkdownFileSource,
 ): PreviewGoldenMarkdownValidationResult {
   const requiredSnapshotUpdates = PreviewFixtureCatalogSchema.parse(catalog)
     .filter(
       (entry) =>
         !matchesPreviewGoldenSnapshotBytes(
-          renderPreviewFixtureMarkdown(entry.fixture),
-          loadTextFixture(entry.golden),
+          snapshotSource.renderFixtureMarkdown(entry.fixture),
+          snapshotSource.loadGoldenMarkdown(entry.golden),
         ),
     )
     .map((entry) => entry.golden);
@@ -246,6 +274,22 @@ export function validatePreviewGoldenMarkdownSnapshots(
   };
 }
 
+/**
+ * Throw when generated fixture markdown does not match stored golden markdown snapshots.
+ */
+export function assertPreviewGoldenMarkdownSnapshots(
+  catalog: readonly unknown[],
+  snapshotSource?: PreviewGoldenMarkdownSnapshotSource,
+): void {
+  const result = validatePreviewGoldenMarkdownSnapshots(catalog, snapshotSource);
+
+  if (result.ok) {
+    return;
+  }
+
+  throw new PreviewGoldenMarkdownSnapshotDriftError(result.requiredSnapshotUpdates);
+}
+
 export function matchesPreviewGoldenSnapshotBytes(
   renderedMarkdown: string,
   storedGoldenMarkdown: string,
@@ -254,6 +298,7 @@ export function matchesPreviewGoldenSnapshotBytes(
 }
 
 export type ValidatePreviewGoldenMarkdownSnapshots = typeof validatePreviewGoldenMarkdownSnapshots;
+export type AssertPreviewGoldenMarkdownSnapshots = typeof assertPreviewGoldenMarkdownSnapshots;
 export type MatchesPreviewGoldenSnapshotBytes = typeof matchesPreviewGoldenSnapshotBytes;
 
 export function buildPreviewFixtureSections(

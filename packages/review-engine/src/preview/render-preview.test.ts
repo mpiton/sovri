@@ -6,8 +6,10 @@ import { describe, expect, it } from "vitest";
 
 import * as RenderPreviewModule from "./render-preview.js";
 import {
+  type AssertPreviewGoldenMarkdownSnapshots,
   PreviewMarkdownForbiddenFragments,
   type MatchesPreviewGoldenSnapshotBytes,
+  type PreviewGoldenMarkdownSnapshotSource,
   renderPreviewFixtureMarkdown,
   type ValidatePreviewGoldenMarkdownSnapshots,
   validatePreviewFixtureCatalog,
@@ -247,6 +249,7 @@ describe("preview markdown golden fixtures", () => {
   it("passes golden validation without snapshot updates for unmodified fixtures", () => {
     // Given all four preview fixtures match their stored golden markdown
     const validateGoldenMarkdownSnapshots = getValidatePreviewGoldenMarkdownSnapshots();
+    const assertGoldenMarkdownSnapshots = getAssertPreviewGoldenMarkdownSnapshots();
 
     // When render-preview.test.ts runs
     const result = validateGoldenMarkdownSnapshots(PreviewGoldenCases);
@@ -255,7 +258,26 @@ describe("preview markdown golden fixtures", () => {
     expect(result.ok).toBe(true);
     // And no snapshot update is required
     expect(result.requiredSnapshotUpdates).toEqual([]);
+    // And real catalog drift would fail through the assertion path with named golden files
+    expect(() => assertGoldenMarkdownSnapshots(PreviewGoldenCases)).not.toThrow();
   });
+
+  it.each(PreviewGoldenCases)(
+    "fails markdown drift for $fixture and names $golden",
+    ({ fixture, golden }) => {
+      // Given the generated markdown for "<fixture>" differs from "<golden>" by one heading
+      const assertGoldenMarkdownSnapshots = getAssertPreviewGoldenMarkdownSnapshots();
+      const snapshotSource = createHeadingDriftSnapshotSource(fixture);
+
+      // When render-preview.test.ts runs
+      const assertSnapshots = (): void =>
+        assertGoldenMarkdownSnapshots(PreviewGoldenCases, snapshotSource);
+
+      // Then the test suite fails
+      // And the thrown error message contains "<golden>"
+      expect(assertSnapshots).toThrow(golden);
+    },
+  );
 
   it("matches empty golden markdown bytes", () => {
     const matchesSnapshotBytes = getMatchesPreviewGoldenSnapshotBytes();
@@ -696,6 +718,26 @@ function hasValidatePreviewGoldenMarkdownSnapshots(module: object): module is {
   );
 }
 
+function getAssertPreviewGoldenMarkdownSnapshots(): AssertPreviewGoldenMarkdownSnapshots {
+  if (!hasAssertPreviewGoldenMarkdownSnapshots(RenderPreviewModule)) {
+    throw missingPreviewRendererExportError(
+      "MissingPreviewGoldenMarkdownSnapshotAssertionExportError",
+      "assertPreviewGoldenMarkdownSnapshots",
+    );
+  }
+
+  return RenderPreviewModule.assertPreviewGoldenMarkdownSnapshots;
+}
+
+function hasAssertPreviewGoldenMarkdownSnapshots(module: object): module is {
+  readonly assertPreviewGoldenMarkdownSnapshots: AssertPreviewGoldenMarkdownSnapshots;
+} {
+  return (
+    "assertPreviewGoldenMarkdownSnapshots" in module &&
+    typeof module.assertPreviewGoldenMarkdownSnapshots === "function"
+  );
+}
+
 function getMatchesPreviewGoldenSnapshotBytes(): MatchesPreviewGoldenSnapshotBytes {
   if (!hasMatchesPreviewGoldenSnapshotBytes(RenderPreviewModule)) {
     throw missingPreviewRendererExportError(
@@ -806,6 +848,30 @@ function serializeMarkdownPayload(sections: readonly PreviewHtmlSection[]): stri
   return sections.map((section) => section.markdown).join("\n\n---\n\n");
 }
 
+function createHeadingDriftSnapshotSource(
+  targetFixture: string,
+): PreviewGoldenMarkdownSnapshotSource {
+  return {
+    renderFixtureMarkdown: (fixtureName) => {
+      const markdown = renderPreviewFixtureMarkdown(fixtureName);
+
+      return fixtureName === targetFixture ? driftFirstMarkdownHeading(markdown) : markdown;
+    },
+    loadGoldenMarkdown: loadTextFixture,
+  };
+}
+
+function driftFirstMarkdownHeading(markdown: string): string {
+  const headingMatch = /^(#{1,6}\s+.+)$/mu.exec(markdown);
+  const heading = headingMatch?.[1];
+
+  if (heading === undefined) {
+    return `## Drifted preview heading\n${markdown}`;
+  }
+
+  return markdown.replace(heading, `${heading} drift`);
+}
+
 function injectFixtureString(fixture: unknown, value: string): unknown {
   if (!isJsonFixtureContainer(fixture)) {
     throw new InvalidPreviewFixtureInjectionError();
@@ -857,6 +923,7 @@ type MissingPreviewRendererExportErrorName =
   | "MissingPreviewHtmlRendererError"
   | "MissingPreviewFixtureDeterminismRendererError"
   | "MissingPreviewGoldenMarkdownValidatorExportError"
+  | "MissingPreviewGoldenMarkdownSnapshotAssertionExportError"
   | "MissingPreviewGoldenSnapshotMatcherExportError"
   | "MissingPreviewFixtureSectionBuilderError"
   | "MissingPreviewDeterminismValidatorError"
