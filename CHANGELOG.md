@@ -44,6 +44,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `feat(review-engine)`: add preview fixture catalog validation that reports
   missing markdown golden snapshots by filename (R-01, #2343).
 
+- `feat(review-engine)`: add the initial preview HTML wrapper renderer with
+  deterministic light and dark GitHub chrome root classes (R-02, #2345).
+
 - `fix(bot)`: extract GitHub Checks posting into a dedicated source adapter
   with project headers, explicit ESM imports, and payload-safe failure logging
   (R-10, #2328).
