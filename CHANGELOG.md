@@ -73,6 +73,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   import extensions including side-effect and dynamic imports, and no CommonJS
   require/export usage (R-08, #2363).
 
+- `test(review-engine)`: add RED coverage requiring preview fixture JSON and
+  parsed values to pass through Zod-derived boundary validation before rendering
+  (R-08, #2364).
+
 - `chore(review-engine)`: move the preview comments generator under the package
   `scripts/` source contract while preserving package-local `.preview/` output
   generation (R-08, #2363).

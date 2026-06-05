@@ -10,6 +10,7 @@ import {
   type AssertPreviewThemeRoot,
   PreviewMarkdownForbiddenFragments,
   type MatchesPreviewGoldenSnapshotBytes,
+  type PreviewFixture,
   type PreviewGoldenMarkdownSnapshotSource,
   renderPreviewFixtureMarkdown,
   type ValidatePreviewGoldenMarkdownSnapshots,
@@ -55,6 +56,8 @@ interface PreviewFixtureAnonymizationValidationResult {
 }
 
 type RenderPreviewHtml = (request: PreviewHtmlRequest) => string;
+type ParsePreviewFixture = (fixture: unknown) => PreviewFixture;
+type ParsePreviewFixtureJson = (fixtureJson: string) => PreviewFixture;
 type RenderPreviewFixtureMarkdownTwice = (fixtureName: string) => readonly [string, string];
 type BuildPreviewFixtureSections = (
   catalog: readonly PreviewGoldenCase[],
@@ -359,6 +362,48 @@ describe("preview markdown golden fixtures", () => {
     expect(result.ok).toBe(false);
     // And the failure names "assessment.golden.md"
     expect(result.missingGoldenFiles).toContain("assessment.golden.md");
+  });
+
+  it("validates fixture JSON through inferred preview schemas before rendering", () => {
+    // Given the summary fixture is parsed from JSON
+    const parsePreviewFixture = getParsePreviewFixture();
+    const parsePreviewFixtureJson = getParsePreviewFixtureJson();
+    const summaryFixture: PreviewFixture = parsePreviewFixtureJson(
+      loadTextFixture("summary.review.json"),
+    );
+
+    // And the provenance fixture contains optional provenance data
+    const provenanceFixture: PreviewFixture = parsePreviewFixture(
+      JSON.parse(loadTextFixture("provenance.review.json")),
+    );
+
+    // When the preview harness loads the fixtures
+    // Then Zod schemas validate the parsed fixture values
+    expect(summaryFixture.kind).toBe("summary");
+    if (summaryFixture.kind === "summary") {
+      expect(summaryFixture.review.status).toBe("success");
+      expect(summaryFixture.review.findings.length).toBeGreaterThan(0);
+    }
+
+    // And TypeScript types are inferred from those schemas
+    expect(provenanceFixture.kind).toBe("provenance");
+    if (provenanceFixture.kind === "provenance") {
+      expect(provenanceFixture.provenance.promptSha256).toMatch(/^[a-f0-9]{64}$/u);
+      expect(provenanceFixture.provenance.signedAuditEntry).toBeDefined();
+    }
+
+    // And malformed fixture JSON fails before rendering starts
+    expect(() => parsePreviewFixtureJson("{")).toThrow(SyntaxError);
+    expect(() =>
+      parsePreviewFixture({
+        kind: "provenance",
+        findings: [],
+        provenance: {
+          llmProvider: "",
+          llmModel: "test-model",
+        },
+      }),
+    ).toThrow();
   });
 
   it("renders inline finding suggestion and audit reference markup in its golden snapshot", () => {
@@ -709,6 +754,42 @@ function hasRenderPreviewHtml(
   return "renderPreviewHtml" in module && typeof module.renderPreviewHtml === "function";
 }
 
+function getParsePreviewFixture(): ParsePreviewFixture {
+  if (!hasParsePreviewFixture(RenderPreviewModule)) {
+    throw missingPreviewRendererExportError(
+      "MissingPreviewFixtureParserError",
+      "parsePreviewFixture",
+    );
+  }
+
+  return RenderPreviewModule.parsePreviewFixture;
+}
+
+function hasParsePreviewFixture(
+  module: object,
+): module is { readonly parsePreviewFixture: ParsePreviewFixture } {
+  return "parsePreviewFixture" in module && typeof module.parsePreviewFixture === "function";
+}
+
+function getParsePreviewFixtureJson(): ParsePreviewFixtureJson {
+  if (!hasParsePreviewFixtureJson(RenderPreviewModule)) {
+    throw missingPreviewRendererExportError(
+      "MissingPreviewFixtureJsonParserError",
+      "parsePreviewFixtureJson",
+    );
+  }
+
+  return RenderPreviewModule.parsePreviewFixtureJson;
+}
+
+function hasParsePreviewFixtureJson(
+  module: object,
+): module is { readonly parsePreviewFixtureJson: ParsePreviewFixtureJson } {
+  return (
+    "parsePreviewFixtureJson" in module && typeof module.parsePreviewFixtureJson === "function"
+  );
+}
+
 function getRenderPreviewFixtureMarkdownTwice(): RenderPreviewFixtureMarkdownTwice {
   if (!hasRenderPreviewFixtureMarkdownTwice(RenderPreviewModule)) {
     throw missingPreviewRendererExportError(
@@ -989,6 +1070,8 @@ function extractRootClasses(html: string): ReadonlySet<string> {
 
 type MissingPreviewRendererExportErrorName =
   | "MissingPreviewHtmlRendererError"
+  | "MissingPreviewFixtureParserError"
+  | "MissingPreviewFixtureJsonParserError"
   | "MissingPreviewFixtureDeterminismRendererError"
   | "MissingPreviewGoldenMarkdownValidatorExportError"
   | "MissingPreviewGoldenMarkdownSnapshotAssertionExportError"
