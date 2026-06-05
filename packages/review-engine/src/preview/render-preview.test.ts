@@ -152,6 +152,25 @@ describe("preview HTML theme wrapper", () => {
       expect(rootClasses.has(otherThemeClass)).toBe(false);
     },
   );
+
+  it("changes only the root theme class between light and dark output", () => {
+    // Given a preview section titled "Summary" with markdown "## Approve"
+    // And a preview section titled "Inline finding" with markdown "Major: Escape user-supplied HTML"
+    const sections = PreviewHtmlSections;
+
+    // When renderPreviewHtml renders the same sections with theme "light"
+    const lightHtml = getRenderPreviewHtml()({ sections, theme: "light" });
+    // And renderPreviewHtml renders the same sections with theme "dark"
+    const darkHtml = getRenderPreviewHtml()({ sections, theme: "dark" });
+
+    // Then replacing "gh-light" with "gh-dark" in the light HTML yields the dark HTML
+    const normalizedLightHtml = lightHtml.replace("gh-light", "gh-dark");
+    expect(normalizedLightHtml).toBe(darkHtml);
+    // And no other byte differs between the two outputs
+    expect(
+      [...normalizedLightHtml].findIndex((character, index) => character !== darkHtml[index]),
+    ).toBe(-1);
+  });
 });
 
 function loadTextFixture(name: string): string {

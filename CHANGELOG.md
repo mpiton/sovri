@@ -37,6 +37,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   carry the shared wrapper class plus exactly one requested GitHub chrome theme
   class (R-02, #2345).
 
+- `test(review-engine)`: add explicit preview HTML coverage proving light and
+  dark renders differ only by the root theme class replacement (R-02, #2346).
+
 - `feat(review-engine)`: add the initial dev-only preview markdown fixture
   renderer and anonymized golden fixture catalog for the four review comment
   shapes (R-01, #2342).
