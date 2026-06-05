@@ -25,6 +25,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   snapshot catalog across the summary, assessment, inline finding, and
   compliance provenance shapes (R-01, #2342).
 
+- `test(review-engine)`: add RED coverage requiring preview catalog validation
+  to fail and name the missing markdown golden file when a required snapshot is
+  absent (R-01, #2343).
+
 - `feat(review-engine)`: add the initial dev-only preview markdown fixture
   renderer and anonymized golden fixture catalog for the four review comment
   shapes (R-01, #2342).

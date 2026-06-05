@@ -10,6 +10,16 @@ interface PreviewGoldenCase {
   readonly golden: string;
 }
 
+interface PreviewCatalogValidationResult {
+  readonly ok: boolean;
+  readonly missingGoldenFiles: readonly string[];
+}
+
+type PreviewFixtureCatalogValidator = (
+  catalog: readonly PreviewGoldenCase[],
+  availableGoldenFiles: readonly string[],
+) => PreviewCatalogValidationResult;
+
 const PreviewGoldenCases: readonly PreviewGoldenCase[] = [
   {
     shape: "summary",
@@ -52,8 +62,42 @@ describe("preview markdown golden fixtures", () => {
       expect(markdown.length).toBeGreaterThan(0);
     },
   );
+
+  it("rejects a fixture catalog when a stored markdown snapshot is missing", async () => {
+    // Given the fixture catalog contains the four required review comment shapes
+    const validatePreviewFixtureCatalog = await loadPreviewFixtureCatalogValidator();
+
+    // And the stored markdown snapshots omit "assessment.golden.md"
+    const availableGoldenFiles = PreviewGoldenCases.map(({ golden }) => golden).filter(
+      (golden) => golden !== "assessment.golden.md",
+    );
+
+    // When the preview harness validates the catalog
+    const result = validatePreviewFixtureCatalog(PreviewGoldenCases, availableGoldenFiles);
+
+    // Then validation fails
+    expect(result.ok).toBe(false);
+    // And the failure names "assessment.golden.md"
+    expect(result.missingGoldenFiles).toContain("assessment.golden.md");
+  });
 });
 
 function loadTextFixture(name: string): string {
   return readFileSync(new URL(`./__fixtures__/${name}`, import.meta.url), "utf8").trimEnd();
+}
+
+async function loadPreviewFixtureCatalogValidator(): Promise<PreviewFixtureCatalogValidator> {
+  const previewModule = await import("./render-preview.js");
+  const candidate: unknown = Reflect.get(previewModule, "validatePreviewFixtureCatalog");
+
+  expect(candidate).toBeTypeOf("function");
+  if (!isPreviewFixtureCatalogValidator(candidate)) {
+    throw new TypeError("validatePreviewFixtureCatalog must be a function");
+  }
+
+  return candidate;
+}
+
+function isPreviewFixtureCatalogValidator(value: unknown): value is PreviewFixtureCatalogValidator {
+  return typeof value === "function";
 }
