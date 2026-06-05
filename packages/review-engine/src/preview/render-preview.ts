@@ -193,6 +193,7 @@ export const PreviewMarkdownForbiddenFragments: readonly string[] = [
 ];
 
 const PreviewVolatileFragments: readonly string[] = ["generated_at"];
+const PreviewDevOnlyPublicExportName = "renderPreviewHtml";
 
 class UnexpectedInlinePreviewCountError extends Error {
   public override readonly name = "UnexpectedInlinePreviewCountError";
@@ -215,6 +216,14 @@ export class PreviewThemeRootDriftError extends Error {
 
   public constructor(theme: PreviewHtmlTheme, error: string) {
     super(`preview ${theme} theme root drift: ${error}`);
+  }
+}
+
+export class PreviewDevOnlySurfaceError extends Error {
+  public override readonly name = "PreviewDevOnlySurfaceError";
+
+  public constructor(forbiddenExports: readonly string[]) {
+    super(`preview dev-only exports must not be public: ${forbiddenExports.join(", ")}`);
   }
 }
 
@@ -369,6 +378,18 @@ export function assertPreviewThemeRoot(theme: PreviewHtmlTheme, rootClasses: str
 }
 
 export type AssertPreviewThemeRoot = typeof assertPreviewThemeRoot;
+
+export function assertPreviewDevOnlySurface(publicExportNames: readonly string[]): void {
+  const forbiddenExports = publicExportNames.filter(
+    (exportName) => exportName === PreviewDevOnlyPublicExportName,
+  );
+
+  if (forbiddenExports.length === 0) {
+    return;
+  }
+
+  throw new PreviewDevOnlySurfaceError(forbiddenExports);
+}
 
 export function validatePreviewDeterminism(
   renderedPreview: string,

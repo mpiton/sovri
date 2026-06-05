@@ -164,6 +164,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   surface assertion to reject public package exports of `renderPreviewHtml`
   (R-07, #2362).
 
+- `feat(review-engine)`: add a dev-only preview surface assertion that rejects
+  public package exports of the local preview HTML renderer by name without
+  exporting preview helper types (R-07, #2362).
+
 - `fix(bot)`: extract GitHub Checks posting into a dedicated source adapter
   with project headers, explicit ESM imports, and payload-safe failure logging
   (R-10, #2328).
