@@ -21,6 +21,19 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.5.0] - 2026-06-06
+### Added
+
 - `test(review-engine)`: add RED coverage for the preview markdown golden
   snapshot catalog across the summary, assessment, inline finding, and
   compliance provenance shapes (R-01, #2342).

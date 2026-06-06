@@ -29,7 +29,7 @@ jobs:
           node scripts/ci-policy.mjs release-verify-tag
           --tag "${GITHUB_REF_NAME}"
           --package-files
-          "packages/core/package.json,packages/review-engine/package.json,packages/llm-providers/package.json,packages/config/package.json,packages/observability/package.json,packages/compliance/package.json,apps/community-bot/package.json"
+          "packages/core/package.json,packages/review-engine/package.json,packages/llm-providers/package.json,packages/config/package.json,packages/observability/package.json,packages/compliance/package.json,packages/brand/package.json,apps/community-bot/package.json"
           --changelog CHANGELOG.md
 
   build-and-push:
