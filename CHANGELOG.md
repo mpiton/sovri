@@ -48,7 +48,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   NodeSDK auto-starting OTLP metric/log exporters from `OTEL_METRICS_EXPORTER` /
   `OTEL_LOGS_EXPORTER` (metrics are a later task). The bundled Pino auto-instrumentation
   is disabled so the standalone `PinoInstrumentation` is the only one (no double-wrap).
-  Both public functions carry JSDoc.
+  `shutdownTelemetry()` deregisters the OTel global trace/context/propagation/metric
+  providers so a later `initTelemetry()` re-registers a live pipeline instead of hitting
+  duplicate-registration. Both public functions carry JSDoc.
   Additive — the `createLogger`/`Logger` surface is unchanged (R-01..R-08, #2401).
 
 ### Changed

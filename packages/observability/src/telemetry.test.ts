@@ -41,6 +41,17 @@ const mocks = vi.hoisted(() => ({
       attributes: attrs,
     }),
   ),
+  traceDisable: vi.fn(),
+  contextDisable: vi.fn(),
+  propagationDisable: vi.fn(),
+  metricsDisable: vi.fn(),
+}));
+
+vi.mock("@opentelemetry/api", () => ({
+  trace: { disable: mocks.traceDisable },
+  context: { disable: mocks.contextDisable },
+  propagation: { disable: mocks.propagationDisable },
+  metrics: { disable: mocks.metricsDisable },
 }));
 
 vi.mock("@opentelemetry/sdk-node", () => ({
@@ -249,6 +260,21 @@ describe("shutdownTelemetry — drain safety (R-06)", () => {
 
     expect(mocks.nodeSdkCtor).toHaveBeenCalledTimes(2);
     expect(mocks.startSpy).toHaveBeenCalledTimes(2);
+  });
+
+  // NodeSDK.shutdown() leaves the global trace/context/propagation/metric providers registered;
+  // they must be disabled so a later init re-registers instead of hitting duplicate-registration.
+  it("deregisters the OTel global providers on shutdown", async () => {
+    vi.stubEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318");
+    const { initTelemetry, shutdownTelemetry } = await loadTelemetry();
+
+    initTelemetry();
+    await shutdownTelemetry();
+
+    expect(mocks.traceDisable).toHaveBeenCalledTimes(1);
+    expect(mocks.contextDisable).toHaveBeenCalledTimes(1);
+    expect(mocks.propagationDisable).toHaveBeenCalledTimes(1);
+    expect(mocks.metricsDisable).toHaveBeenCalledTimes(1);
   });
 });
 
