@@ -48,8 +48,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   NodeSDK auto-starting OTLP metric/log exporters from `OTEL_METRICS_EXPORTER` /
   `OTEL_LOGS_EXPORTER` (metrics are a later task). The bundled Pino auto-instrumentation
   is disabled so the standalone `PinoInstrumentation` is the only one (no double-wrap).
-  `shutdownTelemetry()` deregisters the OTel global trace/context/propagation/metric
-  providers (in a `finally`, so a failed drain still deregisters) so a later
+  `shutdownTelemetry()` deregisters the OTel global trace/context/propagation/metric/log
+  providers (`@opentelemetry/api-logs` added, exact-pinned `0.218.0`; in a `finally`, so a
+  failed drain still deregisters) so a later
   `initTelemetry()` re-registers a live pipeline instead of hitting duplicate-registration;
   the handle is cleared only after deregistration, so a concurrent init during an in-flight
   drain no-ops rather than starting an SDK the drain would tear down, and concurrent

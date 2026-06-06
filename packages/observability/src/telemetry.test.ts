@@ -45,6 +45,7 @@ const mocks = vi.hoisted(() => ({
   contextDisable: vi.fn(),
   propagationDisable: vi.fn(),
   metricsDisable: vi.fn(),
+  logsDisable: vi.fn(),
 }));
 
 vi.mock("@opentelemetry/api", () => ({
@@ -53,6 +54,7 @@ vi.mock("@opentelemetry/api", () => ({
   propagation: { disable: mocks.propagationDisable },
   metrics: { disable: mocks.metricsDisable },
 }));
+vi.mock("@opentelemetry/api-logs", () => ({ logs: { disable: mocks.logsDisable } }));
 
 vi.mock("@opentelemetry/sdk-node", () => ({
   NodeSDK: class {
@@ -275,6 +277,7 @@ describe("shutdownTelemetry — drain safety (R-06)", () => {
     expect(mocks.contextDisable).toHaveBeenCalledTimes(1);
     expect(mocks.propagationDisable).toHaveBeenCalledTimes(1);
     expect(mocks.metricsDisable).toHaveBeenCalledTimes(1);
+    expect(mocks.logsDisable).toHaveBeenCalledTimes(1);
   });
 
   // A failed drain must not leak the global registrations — otherwise a later init can't re-register.
@@ -291,6 +294,7 @@ describe("shutdownTelemetry — drain safety (R-06)", () => {
     expect(mocks.contextDisable).toHaveBeenCalledTimes(1);
     expect(mocks.propagationDisable).toHaveBeenCalledTimes(1);
     expect(mocks.metricsDisable).toHaveBeenCalledTimes(1);
+    expect(mocks.logsDisable).toHaveBeenCalledTimes(1);
   });
 
   // A concurrent init while a shutdown is still draining must not start a second SDK — the

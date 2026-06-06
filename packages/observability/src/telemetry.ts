@@ -2,6 +2,7 @@
 // Copyright 2026 Sovri SAS
 
 import { context, metrics, propagation, trace } from "@opentelemetry/api";
+import { logs } from "@opentelemetry/api-logs";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { PinoInstrumentation } from "@opentelemetry/instrumentation-pino";
@@ -120,6 +121,9 @@ export function shutdownTelemetry(): Promise<void> {
       propagation.disable();
       trace.disable();
       metrics.disable();
+      // NodeSDK also registers an (empty, trace-only) global logger provider via @opentelemetry/
+      // api-logs; deregister it too so a restart doesn't "duplicate registration of API: logs".
+      logs.disable();
       // Clear the handles LAST. While the drain is in flight `sdk` stays set, so a concurrent
       // initTelemetry() no-ops (R-05) rather than starting a second SDK whose freshly registered
       // globals this `finally` would then disable.
