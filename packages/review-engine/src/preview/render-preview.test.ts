@@ -55,6 +55,11 @@ interface PreviewFixtureAnonymizationValidationResult {
   readonly violations: readonly PreviewFixtureAnonymizationViolation[];
 }
 
+interface PreviewRenderedOutputValidationResult {
+  readonly ok: boolean;
+  readonly forbiddenFragments: readonly string[];
+}
+
 type RenderPreviewHtml = (request: PreviewHtmlRequest) => string;
 type ParsePreviewFixture = (fixture: unknown) => PreviewFixture;
 type ParsePreviewFixtureJson = (fixtureJson: string) => PreviewFixture;
@@ -68,6 +73,9 @@ type ValidatePreviewFixtureAnonymization = (
   fixtureName: string,
   fixture: unknown,
 ) => PreviewFixtureAnonymizationValidationResult;
+type ValidatePreviewRenderedOutput = (
+  renderedPreview: string,
+) => PreviewRenderedOutputValidationResult;
 type AssertPreviewDevOnlySurface = (publicExportNames: readonly string[]) => void;
 
 interface PreviewThemeRootValidationResult {
@@ -733,6 +741,103 @@ describe("preview HTML theme wrapper", () => {
     // And the rendered markdown payload remains unchanged
     expect(serializeMarkdownPayload(sections)).toBe(markdownPayload);
   });
+
+  it("keeps generated light and dark outputs free of tokens and raw webhook payloads", () => {
+    // Given the fixture catalog uses only placeholder identity data
+    const sections = buildPreviewPayloadSections();
+    const validateRenderedOutput = getValidatePreviewRenderedOutput();
+
+    for (const theme of ["light", "dark"] satisfies readonly PreviewTheme[]) {
+      // When the preview script writes both theme outputs
+      const html = getRenderPreviewHtml()({ sections, theme });
+      const result = validateRenderedOutput(html);
+
+      // Then no output contains "ghp_"
+      expect(html).not.toContain("ghp_");
+      // And no output contains "sk-ant-"
+      expect(html).not.toContain("sk-ant-");
+      // And no output contains "x-hub-signature-256"
+      expect(html).not.toContain("x-hub-signature-256");
+      // And no output contains a raw GitHub webhook payload body
+      expect(result.ok).toBe(true);
+      expect(result.forbiddenFragments).toEqual([]);
+    }
+  });
+
+  it.each([
+    { output: "token ghp_1234567890abcdef", fragment: "ghp_" },
+    { output: "token gho_1234567890abcdef", fragment: "gho_" },
+    { output: "token ghu_1234567890abcdef", fragment: "ghu_" },
+    { output: "token ghs_1234567890abcdef", fragment: "ghs_" },
+    { output: "token ghr_1234567890abcdef", fragment: "ghr_" },
+    { output: "token github_pat_1234567890abcdef", fragment: "github_pat_" },
+    { output: "key sk-ant-api03-test", fragment: "sk-ant-" },
+    { output: "header x-hub-signature-256=sha256:test", fragment: "x-hub-signature-256" },
+    {
+      output:
+        '{"action":"opened","pull_request":{"number":1},"repository":{"full_name":"example/review-target"},"sender":{"login":"test-author"}}',
+      fragment: "raw GitHub webhook payload body",
+    },
+    {
+      output:
+        "{&quot;action&quot;:&quot;opened&quot;,&quot;pull_request&quot;:{},&quot;repository&quot;:{},&quot;sender&quot;:{}}",
+      fragment: "raw GitHub webhook payload body",
+    },
+    {
+      output:
+        "{&amp;quot;action&amp;quot;:&amp;quot;opened&amp;quot;,&amp;quot;pull_request&amp;quot;:{},&amp;quot;repository&amp;quot;:{},&amp;quot;sender&amp;quot;:{}}",
+      fragment: "raw GitHub webhook payload body",
+    },
+    {
+      output: '{"action":"opened","pull_request":{"title":"done}"},"repository":{},"sender":{}}',
+      fragment: "raw GitHub webhook payload body",
+    },
+    {
+      output: 'before "x {"action":"opened","pull_request":{},"repository":{},"sender":{}}',
+      fragment: "raw GitHub webhook payload body",
+    },
+    {
+      output:
+        '{"body":{"action":"opened","pull_request":{},"repository":{},"sender":{}},"logged_at":"now"}',
+      fragment: "raw GitHub webhook payload body",
+    },
+    {
+      output: '{"note":"oops {"action":"opened","pull_request":{},"repository":{},"sender":{}}',
+      fragment: "raw GitHub webhook payload body",
+    },
+    {
+      output: '{"action":"created","issue":{},"comment":{},"repository":{},"sender":{}}',
+      fragment: "raw GitHub webhook payload body",
+    },
+    {
+      output:
+        '{"body":"{\\"action\\":\\"opened\\",\\"pull_request\\":{},\\"repository\\":{},\\"sender\\":{}}"}',
+      fragment: "raw GitHub webhook payload body",
+    },
+    {
+      output:
+        "{&#x22;action&#x22;:&#x22;opened&#x22;,&#x22;pull_request&#x22;:{},&#x22;repository&#x22;:{},&#x22;sender&#x22;:{}}",
+      fragment: "raw GitHub webhook payload body",
+    },
+    {
+      output:
+        "{&amp;#x22;action&amp;#x22;:&amp;#x22;opened&amp;#x22;,&amp;#x22;pull_request&amp;#x22;:{},&amp;#x22;repository&amp;#x22;:{},&amp;#x22;sender&amp;#x22;:{}}",
+      fragment: "raw GitHub webhook payload body",
+    },
+  ])("rejects rendered output containing $fragment", ({ output, fragment }) => {
+    const result = getValidatePreviewRenderedOutput()(output);
+
+    expect(result.ok).toBe(false);
+    expect(result.forbiddenFragments).toContain(fragment);
+  });
+
+  it("accepts prose naming webhook fields without a raw JSON payload body", () => {
+    const output = "Webhook fields: action, pull_request, repository, sender.";
+    const result = getValidatePreviewRenderedOutput()(output);
+
+    expect(result.ok).toBe(true);
+    expect(result.forbiddenFragments).toEqual([]);
+  });
 });
 
 function loadTextFixture(name: string): string {
@@ -927,6 +1032,26 @@ function hasValidatePreviewFixtureAnonymization(module: object): module is {
   return (
     "validatePreviewFixtureAnonymization" in module &&
     typeof module.validatePreviewFixtureAnonymization === "function"
+  );
+}
+
+function getValidatePreviewRenderedOutput(): ValidatePreviewRenderedOutput {
+  if (!hasValidatePreviewRenderedOutput(RenderPreviewModule)) {
+    throw missingPreviewRendererExportError(
+      "MissingPreviewRenderedOutputValidatorError",
+      "validatePreviewRenderedOutput",
+    );
+  }
+
+  return RenderPreviewModule.validatePreviewRenderedOutput;
+}
+
+function hasValidatePreviewRenderedOutput(module: object): module is {
+  readonly validatePreviewRenderedOutput: ValidatePreviewRenderedOutput;
+} {
+  return (
+    "validatePreviewRenderedOutput" in module &&
+    typeof module.validatePreviewRenderedOutput === "function"
   );
 }
 

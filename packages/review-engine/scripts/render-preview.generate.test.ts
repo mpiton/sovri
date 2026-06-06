@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPreviewFixtureSections,
   renderPreviewHtml,
+  validatePreviewRenderedOutput,
   type PreviewHtmlTheme,
 } from "../src/preview/render-preview.js";
 
@@ -69,7 +70,10 @@ describe("preview comments HTML generator", () => {
     for (const { fileName, theme } of PreviewThemeOutputs) {
       const outputPath = join(PreviewOutputDirectory, fileName);
       const html = renderPreviewHtml({ sections, theme });
+      const outputValidation = validatePreviewRenderedOutput(html);
 
+      expect(outputValidation.ok).toBe(true);
+      expect(outputValidation.forbiddenFragments).toEqual([]);
       writeFileSync(outputPath, ensureFinalNewline(html), "utf8");
 
       const writtenHtml = readFileSync(outputPath, "utf8");

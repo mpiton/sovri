@@ -109,9 +109,17 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   label collection while keeping comment braces inside interpolations from
   hiding forbidden type fragments (R-08, #2365).
 
+- `test(review-engine)`: add RED coverage requiring generated light and dark
+  preview HTML output to contain no token prefixes, webhook signature marker, or
+  raw webhook payload body (R-08, #2366).
+
 - `feat(review-engine)`: expose Zod-derived preview fixture parsers for raw JSON
   text and parsed fixture values, and route preview fixture loading through that
   boundary before rendering (R-08, #2364).
+
+- `feat(review-engine)`: add rendered preview output validation for token
+  prefixes, webhook signature markers, and raw GitHub webhook payload bodies
+  before local preview HTML files are accepted (R-08, #2366).
 
 - `chore(review-engine)`: move the preview comments generator under the package
   `scripts/` source contract while preserving package-local `.preview/` output
@@ -461,6 +469,42 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   ADR-006).
 
 ### Fixed
+
+- `fix(review-engine)`: broaden rendered preview output validation to cover all
+  GitHub token prefixes already rejected in preview fixture anonymization and
+  validate generated HTML before it is written to disk (R-08, #2366).
+
+- `fix(review-engine)`: refine rendered preview raw webhook body detection to
+  parse JSON-shaped candidates instead of matching broad field-name lookaheads
+  (R-08, #2366).
+
+- `fix(review-engine)`: detect double-escaped JSON quote entities when scanning
+  rendered preview output for raw GitHub webhook payload bodies (R-08, #2366).
+
+- `fix(review-engine)`: track JSON string state when collecting rendered preview
+  payload candidates so a `}` inside a string field no longer bypasses raw
+  webhook body detection, and normalize hex quote entities (`&#x22;`,
+  `&amp;#x22;`) before parsing (R-08, #2366).
+
+- `fix(review-engine)`: only track preview payload string state once a JSON
+  candidate has started, so an unmatched prose quote before a raw webhook object
+  no longer swallows its opening brace and bypasses detection (R-08, #2366).
+
+- `fix(review-engine)`: emit every balanced JSON object, including nested ones,
+  when scanning preview output, so a raw webhook payload wrapped inside a larger
+  envelope is still detected (R-08, #2366).
+
+- `fix(review-engine)`: extract each preview JSON object candidate independently
+  from its opening brace, so a malformed prefix with an unclosed string can no
+  longer desync the scan and hide a later payload (R-08, #2366).
+
+- `fix(review-engine)`: recognize `issue_comment` webhook bodies (not just
+  `pull_request`) when guarding rendered preview output, matching the events the
+  bot subscribes to (R-08, #2366).
+
+- `fix(review-engine)`: unescape backslash-escaped quotes when scanning preview
+  output, so a webhook body serialized as a JSON string value (the common logged
+  form) is still detected (R-08, #2366).
 
 - `fix(review-engine)`: render preview golden snapshots from typed source
   fixtures through the walkthrough, inline, assessment, and provenance renderers

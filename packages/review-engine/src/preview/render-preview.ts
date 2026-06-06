@@ -136,6 +136,11 @@ export interface PreviewMarkdownPayloadValidationResult {
   readonly forbiddenFragments: readonly string[];
 }
 
+export interface PreviewRenderedOutputValidationResult {
+  readonly ok: boolean;
+  readonly forbiddenFragments: readonly string[];
+}
+
 /**
  * Reports whether preview fixture markdown still matches its stored golden snapshots.
  *
@@ -194,6 +199,63 @@ export const PreviewMarkdownForbiddenFragments: readonly string[] = [
 
 const PreviewVolatileFragments: readonly string[] = ["generated_at"];
 const PreviewDevOnlyPublicExportName = "renderPreviewHtml";
+const PreviewRenderedOutputForbiddenExpressions: readonly PreviewRenderedOutputForbiddenExpression[] =
+  [
+    {
+      label: "ghp_",
+      matches: (renderedPreview) => renderedPreview.includes("ghp_"),
+    },
+    {
+      label: "gho_",
+      matches: (renderedPreview) => renderedPreview.includes("gho_"),
+    },
+    {
+      label: "ghu_",
+      matches: (renderedPreview) => renderedPreview.includes("ghu_"),
+    },
+    {
+      label: "ghs_",
+      matches: (renderedPreview) => renderedPreview.includes("ghs_"),
+    },
+    {
+      label: "ghr_",
+      matches: (renderedPreview) => renderedPreview.includes("ghr_"),
+    },
+    {
+      label: "github_pat_",
+      matches: (renderedPreview) => renderedPreview.includes("github_pat_"),
+    },
+    {
+      label: "sk-ant-",
+      matches: (renderedPreview) => renderedPreview.includes("sk-ant-"),
+    },
+    {
+      label: "x-hub-signature-256",
+      matches: (renderedPreview) => renderedPreview.toLowerCase().includes("x-hub-signature-256"),
+    },
+    {
+      label: "raw GitHub webhook payload body",
+      matches: containsRawGitHubWebhookPayloadBody,
+    },
+  ];
+
+interface PreviewRenderedOutputForbiddenExpression {
+  readonly label: string;
+  readonly matches: (renderedPreview: string) => boolean;
+}
+
+const RawGitHubWebhookPayloadSchema = z
+  .object({
+    action: z.unknown(),
+    repository: z.unknown(),
+    sender: z.unknown(),
+  })
+  .passthrough()
+  // Recognize the webhook event shapes the bot subscribes to (pull_request and
+  // issue_comment) by their event-specific payload keys, not pull_request alone.
+  .refine((payload) => "pull_request" in payload || ("issue" in payload && "comment" in payload), {
+    message: "missing recognized GitHub webhook event payload",
+  });
 
 class UnexpectedInlinePreviewCountError extends Error {
   public override readonly name = "UnexpectedInlinePreviewCountError";
@@ -428,6 +490,108 @@ export function validatePreviewMarkdownPayload(
     ok: forbiddenFragments.length === 0,
     forbiddenFragments,
   };
+}
+
+export function validatePreviewRenderedOutput(
+  renderedPreview: string,
+): PreviewRenderedOutputValidationResult {
+  const forbiddenFragments = PreviewRenderedOutputForbiddenExpressions.flatMap(
+    ({ label, matches }) => (matches(renderedPreview) ? [label] : []),
+  );
+
+  return {
+    ok: forbiddenFragments.length === 0,
+    forbiddenFragments,
+  };
+}
+
+function containsRawGitHubWebhookPayloadBody(renderedPreview: string): boolean {
+  const decoded = normalizePreviewJsonEntities(renderedPreview);
+
+  return collectJsonObjectCandidates(decoded).some(isRawGitHubWebhookPayloadBody);
+}
+
+function collectJsonObjectCandidates(value: string): readonly string[] {
+  const candidates: string[] = [];
+
+  // Extract a balanced object independently from every `{`, so a malformed
+  // prefix (such as an unclosed string) cannot desync the scan and hide a
+  // later or nested webhook payload object.
+  for (let index = 0; index < value.length; index += 1) {
+    if (value.charAt(index) !== "{") {
+      continue;
+    }
+
+    const candidate = extractBalancedJsonObject(value, index);
+
+    if (candidate !== undefined) {
+      candidates.push(candidate);
+    }
+  }
+
+  return candidates;
+}
+
+function extractBalancedJsonObject(value: string, start: number): string | undefined {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < value.length; index += 1) {
+    const character = value.charAt(index);
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (character === '"') {
+        inString = false;
+      }
+
+      continue;
+    }
+
+    if (character === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (character === "{") {
+      depth += 1;
+      continue;
+    }
+
+    if (character === "}") {
+      depth -= 1;
+
+      if (depth === 0) {
+        return value.slice(start, index + 1);
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function isRawGitHubWebhookPayloadBody(value: string): boolean {
+  try {
+    const parsedCandidate: unknown = JSON.parse(value);
+
+    return RawGitHubWebhookPayloadSchema.safeParse(parsedCandidate).success;
+  } catch {
+    return false;
+  }
+}
+
+function normalizePreviewJsonEntities(value: string): string {
+  return (
+    value
+      .replace(/&amp;quot;|&amp;#34;|&amp;#x22;|&quot;|&#34;|&#x22;/giu, '"')
+      // Unescape backslash-escaped quotes so a webhook body serialized as a JSON
+      // string value (the common logged form) still parses as a candidate object.
+      .replace(/\\"/gu, '"')
+  );
 }
 
 function renderPreviewFixture(fixture: PreviewFixture): string {
