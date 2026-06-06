@@ -42,7 +42,7 @@ The Community bot ships as a multi-arch container image on the GitHub Container 
 docker pull ghcr.io/mpiton/sovri/community-bot:v0.5.0
 ```
 
-Additional tags follow the [Image tags](#image-tags) section of `Run the Community bot` below (`v0.4`, `v0`, `latest`).
+Additional tags follow the [Image tags](#image-tags) section of `Run the Community bot` below (`v0.5`, `v0`, `latest`).
 
 ---
 
