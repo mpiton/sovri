@@ -3,3 +3,4 @@
 
 export { createLogger } from "./logger.js";
 export type { Logger } from "./logger.js";
+export { initTelemetry, shutdownTelemetry } from "./telemetry.js";

@@ -21,23 +21,36 @@ interface PinoConfig {
 type AutoInstrConfig = Readonly<Record<string, { readonly enabled?: boolean }>>;
 type ResourceAttrs = Readonly<Record<string, unknown>>;
 
-// Hoisted capture spies shared with the vi.mock factories below. Each OTel collaborator is a
-// plain `vi.fn` rather than a class: a `vi.fn` returning an object becomes the `new` instance, so
-// `new NodeSDK(...)` yields `{ start, shutdown }` while `nodeSdkCtor.mock.calls` records construction.
-const mocks = vi.hoisted(() => {
-  const startSpy = vi.fn();
-  const shutdownSpy = vi.fn<() => Promise<void>>(() => Promise.resolve());
-  const nodeSdkCtor = vi.fn(() => ({ start: startSpy, shutdown: shutdownSpy }));
-  const otlpCtor = vi.fn<(config: ExporterConfig) => void>();
-  const autoInstr = vi.fn<(config: AutoInstrConfig) => string>(() => "auto-instrumentations");
-  const pinoCtor = vi.fn<(config: PinoConfig) => void>();
-  const resourceFrom = vi.fn<(attrs: ResourceAttrs) => { readonly attributes: ResourceAttrs }>(
-    (attrs) => ({ attributes: attrs }),
-  );
-  return { startSpy, shutdownSpy, nodeSdkCtor, otlpCtor, autoInstr, pinoCtor, resourceFrom };
-});
+// Hoisted capture spies shared with the vi.mock factories below. NodeSDK is mocked as a class
+// (it needs constructable `start`/`shutdown` instances); the exporter / instrumentation are bare
+// `vi.fn`s — newable construction spies whose `.mock.calls` capture the config the impl passes.
+const mocks = vi.hoisted(() => ({
+  nodeSdkCtor: vi.fn(),
+  startSpy: vi.fn(),
+  shutdownSpy: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+  otlpCtor: vi.fn<(config: ExporterConfig) => void>(),
+  autoInstr: vi.fn<(config: AutoInstrConfig) => string>(() => "auto-instrumentations"),
+  pinoCtor: vi.fn<(config: PinoConfig) => void>(),
+  resourceFrom: vi.fn<(attrs: ResourceAttrs) => { readonly attributes: ResourceAttrs }>(
+    (attrs) => ({
+      attributes: attrs,
+    }),
+  ),
+}));
 
-vi.mock("@opentelemetry/sdk-node", () => ({ NodeSDK: mocks.nodeSdkCtor }));
+vi.mock("@opentelemetry/sdk-node", () => ({
+  NodeSDK: class {
+    constructor(_config: unknown) {
+      mocks.nodeSdkCtor();
+    }
+    start(): void {
+      mocks.startSpy();
+    }
+    shutdown(): Promise<void> {
+      return mocks.shutdownSpy();
+    }
+  },
+}));
 vi.mock("@opentelemetry/exporter-trace-otlp-http", () => ({ OTLPTraceExporter: mocks.otlpCtor }));
 vi.mock("@opentelemetry/auto-instrumentations-node", () => ({
   getNodeAutoInstrumentations: mocks.autoInstr,

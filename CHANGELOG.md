@@ -40,8 +40,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   exporter at `${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`, fs/dns auto-instrumentation
   disabled, `PinoInstrumentation`) only when an OTLP endpoint is set and otherwise
   stays a complete no-op; `shutdownTelemetry()` drains it safely whether or not it
-  started. Additive — the `createLogger`/`Logger` surface is unchanged
-  (R-01..R-08, #2401).
+  started. The three `OTEL_*` env vars are read through a `zod` schema (added,
+  exact-pinned `4.4.3`) so no secret-bearing env reaches a span or the exporter.
+  Additive — the `createLogger`/`Logger` surface is unchanged (R-01..R-08, #2401).
 
 ### Changed
 

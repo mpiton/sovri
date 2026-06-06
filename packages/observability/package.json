@@ -44,7 +44,8 @@
     "@opentelemetry/sdk-metrics": "2.7.1",
     "@opentelemetry/sdk-node": "0.218.0",
     "@opentelemetry/semantic-conventions": "1.41.1",
-    "pino": "9.14.0"
+    "pino": "9.14.0",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/node": "24.12.4",
