@@ -21,6 +21,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(observability)`: add RED acceptance test for the generic `withSpan`/
+  `recordMetric` facade over `@opentelemetry/api` — `withSpan` is a transparent
+  pass-through that records the exception, sets ERROR status, and rethrows the
+  original error on reject while ending the span once in `finally`; `recordMetric`
+  lazily creates and reuses each instrument by name, rejects an unmodelled
+  descriptor with a typed validation error, routes counter/histogram values with
+  string tags, and stays a no-op when no SDK is running. OTel API mocked, no
+  network (R-01..R-09, #2406).
 - `chore(deps)`: add the pinned OpenTelemetry SDK set to `@sovri/observability`,
   declared but unused until the v0.6 telemetry init lands. Trace baseline:
   `@opentelemetry/api` 1.9.1, `@opentelemetry/sdk-node` 0.218.0,
