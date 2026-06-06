@@ -98,7 +98,6 @@ export async function shutdownTelemetry(): Promise<void> {
     return; // R-06: nothing started — resolve cleanly.
   }
   const current = sdk;
-  sdk = undefined; // Clear first so a later init starts fresh and a repeat shutdown no-ops.
   try {
     await current.shutdown();
   } finally {
@@ -111,5 +110,9 @@ export async function shutdownTelemetry(): Promise<void> {
     propagation.disable();
     trace.disable();
     metrics.disable();
+    // Clear the handle LAST. While the drain is in flight `sdk` stays set, so a concurrent
+    // initTelemetry() no-ops (R-05) instead of starting a second SDK whose freshly registered
+    // globals this `finally` would then disable.
+    sdk = undefined;
   }
 }

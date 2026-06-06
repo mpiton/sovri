@@ -292,6 +292,31 @@ describe("shutdownTelemetry — drain safety (R-06)", () => {
     expect(mocks.propagationDisable).toHaveBeenCalledTimes(1);
     expect(mocks.metricsDisable).toHaveBeenCalledTimes(1);
   });
+
+  // A concurrent init while a shutdown is still draining must not start a second SDK — the
+  // in-flight shutdown's finally would otherwise tear down the new SDK's globals.
+  it("no-ops initTelemetry while a shutdown is still draining", async () => {
+    vi.stubEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318");
+    const { initTelemetry, shutdownTelemetry } = await loadTelemetry();
+
+    initTelemetry();
+    let releaseDrain: (() => void) | undefined;
+    mocks.shutdownSpy.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseDrain = resolve;
+        }),
+    );
+
+    const pending = shutdownTelemetry();
+    initTelemetry(); // drain still pending → handle is set → no-op
+
+    expect(mocks.nodeSdkCtor).toHaveBeenCalledTimes(1);
+    expect(mocks.startSpy).toHaveBeenCalledTimes(1);
+
+    releaseDrain?.();
+    await pending;
+  });
 });
 
 describe("barrel — the package surface is additive (R-07)", () => {

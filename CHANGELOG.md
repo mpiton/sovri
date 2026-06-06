@@ -50,8 +50,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   is disabled so the standalone `PinoInstrumentation` is the only one (no double-wrap).
   `shutdownTelemetry()` deregisters the OTel global trace/context/propagation/metric
   providers (in a `finally`, so a failed drain still deregisters) so a later
-  `initTelemetry()` re-registers a live pipeline instead of hitting duplicate-registration.
-  Both public functions carry JSDoc.
+  `initTelemetry()` re-registers a live pipeline instead of hitting duplicate-registration;
+  the handle is cleared only after deregistration, so a concurrent init during an in-flight
+  drain no-ops rather than starting an SDK the drain would tear down. Both public functions
+  carry JSDoc.
   Additive — the `createLogger`/`Logger` surface is unchanged (R-01..R-08, #2401).
 
 ### Changed
