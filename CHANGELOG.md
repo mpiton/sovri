@@ -21,6 +21,21 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `chore(deps)`: add the pinned OpenTelemetry SDK set to `@sovri/observability`,
+  declared but unused until the v0.6 telemetry init lands. Trace baseline:
+  `@opentelemetry/api` 1.9.1, `@opentelemetry/sdk-node` 0.218.0,
+  `@opentelemetry/auto-instrumentations-node` 0.76.0,
+  `@opentelemetry/instrumentation-pino` 0.64.0,
+  `@opentelemetry/exporter-trace-otlp-http` 0.218.0, `@opentelemetry/resources`
+  2.7.1, `@opentelemetry/semantic-conventions` 1.41.1. Metrics, for the later
+  `/metrics` endpoint: `@opentelemetry/sdk-metrics` 2.7.1,
+  `@opentelemetry/exporter-prometheus` 0.218.0. All exact-pinned, Apache-2.0,
+  install-script-free, audit/dedupe clean (R-01, R-03, R-04, R-05, R-08, #2396).
+- `test(observability)`: add RED acceptance test asserting the v0.6 OpenTelemetry
+  dependency set is exact-pinned, declared under `dependencies` only, recorded in
+  the lockfile, Apache-2.0 licensed, with `createLogger`/`Logger` and the package
+  `exports` map untouched (R-01, R-02, R-03, R-06, R-07, R-08, #2396).
+
 ### Changed
 
 ### Deprecated

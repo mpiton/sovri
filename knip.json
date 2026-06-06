@@ -13,7 +13,18 @@
     "packages/observability": {
       "entry": ["src/index.ts!", "src/{cli,bin,server,worker}.ts!"],
       "project": ["src/**/*.{ts,tsx,mts}!"],
-      "ignoreDependencies": ["pino-pretty"]
+      "ignoreDependencies": [
+        "pino-pretty",
+        "@opentelemetry/api",
+        "@opentelemetry/auto-instrumentations-node",
+        "@opentelemetry/exporter-prometheus",
+        "@opentelemetry/exporter-trace-otlp-http",
+        "@opentelemetry/instrumentation-pino",
+        "@opentelemetry/resources",
+        "@opentelemetry/sdk-metrics",
+        "@opentelemetry/sdk-node",
+        "@opentelemetry/semantic-conventions"
+      ]
     },
     "packages/config": {
       "entry": ["src/index.ts!", "src/{cli,bin,server,worker}.ts!"],
