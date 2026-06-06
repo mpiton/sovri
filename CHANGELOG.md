@@ -21,6 +21,210 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(review-engine)`: add RED coverage for the preview markdown golden
+  snapshot catalog across the summary, assessment, inline finding, and
+  compliance provenance shapes (R-01, #2342).
+
+- `test(review-engine)`: add RED coverage requiring preview catalog validation
+  to fail and name the missing markdown golden file when a required snapshot is
+  absent (R-01, #2343).
+
+- `test(review-engine)`: add explicit inline preview snapshot coverage for
+  suggestion fenced blocks, audit references, and byte-for-byte golden matching
+  (R-01, #2344).
+
+- `test(review-engine)`: add RED coverage requiring the preview HTML root to
+  carry the shared wrapper class plus exactly one requested GitHub chrome theme
+  class (R-02, #2345).
+
+- `test(review-engine)`: add explicit preview HTML coverage proving light and
+  dark renders differ only by the root theme class replacement (R-02, #2346).
+
+- `test(review-engine)`: add RED coverage requiring theme-root validation to
+  reject wrappers carrying both `gh-light` and `gh-dark` (R-02, #2347).
+
+- `test(review-engine)`: add RED coverage requiring the preview HTML wrapper to
+  inline exactly one local stylesheet without mutating markdown payload sections
+  (R-03, #2348).
+
+- `test(review-engine)`: add RED coverage requiring stored preview markdown
+  snapshots to validate free of CSS-only wrapper fragments (R-03, #2349).
+
+- `test(review-engine)`: add RED coverage requiring user-authored summary
+  fixture `<style>` tags to render as inert markdown while the HTML wrapper
+  keeps a single trusted style element (R-03, #2350).
+
+- `test(review-engine)`: add RED coverage requiring each preview fixture to
+  render twice in the same process with identical markdown bytes (R-04, #2351).
+
+- `test(review-engine)`: add RED coverage requiring preview section generation
+  to preserve the explicit catalog order regardless of reverse filesystem
+  ordering (R-04, #2352).
+
+- `test(review-engine)`: add RED coverage requiring determinism validation to
+  reject generated preview output containing `generated_at` volatile bytes (R-04,
+  #2353).
+
+- `test(review-engine)`: add RED coverage requiring preview fixtures to validate
+  placeholder repository, author, and provider key identity values (R-05, #2354).
+
+- `test(review-engine)`: add RED scaffold coverage requiring preview TypeScript
+  sources and the preview script to keep SPDX/Sovri headers, explicit `.js` ESM
+  import extensions including side-effect and dynamic imports, and no CommonJS
+  require/export usage (R-08, #2363).
+
+- `test(review-engine)`: add RED coverage requiring preview fixture JSON and
+  parsed values to pass through Zod-derived boundary validation before rendering
+  (R-08, #2364).
+
+- `test(review-engine)`: add RED scaffold coverage requiring the preview source
+  quality gate to fail and name forbidden TypeScript escape-hatch fragments
+  (R-08, #2365).
+
+- `test(review-engine)`: extend the preview source contract quality gate to
+  reject and name `any`, `as unknown`, `@ts-ignore`, and `@ts-expect-error`
+  fragments (R-08, #2365).
+
+- `fix(review-engine)`: constrain the preview escape-hatch scanner so ordinary
+  prose containing `any` is allowed while explicit `any` type positions still
+  fail the quality gate (R-08, #2365).
+
+- `fix(review-engine)`: cover explicit `any` aliases and generic type arguments
+  in the preview escape-hatch scanner while keeping prose strings/comments out
+  of type-position matching (R-08, #2365).
+
+- `fix(review-engine)`: preserve template-literal interpolation expressions in
+  the preview escape-hatch scanner so casts inside `${...}` still fail while
+  static template prose is ignored (R-08, #2365).
+
+- `fix(review-engine)`: detect explicit `any` in preview union and intersection
+  type positions while preserving template URL interpolations before comment
+  stripping, keeping directive scans out of preview prose, and naming pattern
+  fragments and capture groups for maintainability; quoted braces inside
+  template interpolations and object-literal `as unknown` casts no longer hide
+  escape hatches (R-08, #2365).
+
+- `fix(review-engine)`: simplify redundant preview escape-hatch regex fragments
+  and split template-literal scanning into documented helpers with loop-based
+  label collection while keeping comment braces inside interpolations from
+  hiding forbidden type fragments (R-08, #2365).
+
+- `test(review-engine)`: add RED coverage requiring generated light and dark
+  preview HTML output to contain no token prefixes, webhook signature marker, or
+  raw webhook payload body (R-08, #2366).
+
+- `feat(review-engine)`: expose Zod-derived preview fixture parsers for raw JSON
+  text and parsed fixture values, and route preview fixture loading through that
+  boundary before rendering (R-08, #2364).
+
+- `feat(review-engine)`: add rendered preview output validation for token
+  prefixes, webhook signature markers, and raw GitHub webhook payload bodies
+  before local preview HTML files are accepted (R-08, #2366).
+
+- `chore(review-engine)`: move the preview comments generator under the package
+  `scripts/` source contract while preserving package-local `.preview/` output
+  generation (R-08, #2363).
+
+- `feat(review-engine)`: add the initial dev-only preview markdown fixture
+  renderer and anonymized golden fixture catalog for the four review comment
+  shapes (R-01, #2342).
+
+- `feat(review-engine)`: add preview fixture catalog validation that reports
+  missing markdown golden snapshots by filename (R-01, #2343).
+
+- `feat(review-engine)`: add the initial preview HTML wrapper renderer with
+  deterministic light and dark GitHub chrome root classes (R-02, #2345).
+
+- `feat(review-engine)`: add preview theme-root validation that rejects wrappers
+  carrying both GitHub chrome theme classes (R-02, #2347).
+
+- `feat(review-engine)`: inline the local preview chrome stylesheet in the
+  dev-only HTML wrapper while keeping markdown payload data unchanged (R-03,
+  #2348).
+
+- `feat(review-engine)`: add preview markdown payload validation that reports
+  CSS-only wrapper fragments and reuses an exported preview chrome stylesheet
+  list before posted markdown snapshot checks (R-03, #2349).
+
+- `feat(review-engine)`: add a summary preview fixture case proving
+  user-authored `<style>` tags stay escaped in markdown while the HTML wrapper
+  keeps the only trusted style element (R-03, #2350).
+
+- `feat(review-engine)`: add a deterministic fixture render helper that loads
+  each preview fixture once and renders it twice for byte-for-byte comparison
+  (R-04, #2351).
+
+- `feat(review-engine)`: add preview section generation that follows the
+  explicit fixture catalog order independent of filesystem listing order (R-04,
+  #2352).
+
+- `feat(review-engine)`: add determinism validation that reports `generated_at`
+  as a volatile preview fragment (R-04, #2353).
+
+- `feat(review-engine)`: add preview fixture anonymization validation for
+  placeholder repository names, author logins, and provider key values (R-05,
+  #2354).
+
+- `feat(review-engine)`: detect and report secret-shaped and real identity
+  values, including current GitHub token prefixes, direct array entries,
+  embedded owner/repository names, and GitHub and `www.github.com` URLs with
+  sentence punctuation or malformed URL escapes, without letting local source
+  paths mask real repository leaks, in preview fixture anonymization validation
+  (R-05, #2355).
+
+- `feat(review-engine)`: keep preview provenance fixture placeholder provider
+  keys available to anonymization assertions and regression tests while
+  omitting them from rendered markdown (R-05, #2356).
+
+- `feat(review-engine)`: add preview golden catalog validation that reports no
+  required snapshot updates for unmodified preview fixtures as a
+  raw byte-preserving catalog result with documented validation behavior plus
+  focused edge-case coverage, exported helper types, and named helper guard
+  coverage without repeated guard error subclasses (R-06, #2357).
+
+- `test(review-engine)`: add RED coverage requiring markdown golden snapshot
+  drift assertions to fail and name the affected golden file for every preview
+  fixture shape and the real unmodified preview catalog path (R-06, #2358).
+
+- `feat(review-engine)`: add a preview golden markdown assertion helper that
+  throws with the affected golden snapshot file names when generated markdown
+  drifts from stored snapshots, with documented custom snapshot source usage
+  (R-06, #2358).
+
+- `test(review-engine)`: add RED coverage requiring wrapper theme drift
+  assertions to fail and name the affected preview theme (R-06, #2359).
+
+- `feat(review-engine)`: add a preview theme-root assertion helper that fails
+  wrapper theme drift with the affected theme name and expected GitHub chrome
+  theme class (R-06, #2359).
+
+- `test(review-engine)`: add RED coverage requiring the package manifest to
+  expose a dev-only preview comments script without runtime preview rendering
+  dependencies or build-script coupling (R-07, #2360).
+
+- `feat(review-engine)`: expose a dev-only `preview:comments` package script
+  that runs the existing local preview comment harness without adding runtime
+  preview rendering dependencies or coupling it to `build` (R-07, #2360).
+
+- `test(review-engine)`: add RED coverage requiring `preview:comments` to
+  generate ignored light and dark HTML files outside package exports and the
+  review-engine root barrel (R-07, #2361).
+
+- `feat(review-engine)`: make `preview:comments` generate light and dark HTML
+  previews under an ignored package-local preview directory without exporting
+  generated artifacts (R-07, #2361).
+
+- `fix(review-engine)`: make the preview-output scaffold assertion inspect the
+  real package export map instead of an empty fallback (R-07, #2361).
+
+- `test(review-engine)`: add RED coverage requiring the dev-only preview
+  surface assertion to reject public package exports of `renderPreviewHtml`
+  (R-07, #2362).
+
+- `feat(review-engine)`: add a dev-only preview surface assertion that rejects
+  public package exports of the local preview HTML renderer by name without
+  exporting preview helper types (R-07, #2362).
+
 - `fix(bot)`: extract GitHub Checks posting into a dedicated source adapter
   with project headers, explicit ESM imports, and payload-safe failure logging
   (R-10, #2328).
@@ -265,6 +469,56 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   ADR-006).
 
 ### Fixed
+
+- `fix(review-engine)`: recognize every URL scheme, not just HTTP(S), when
+  scanning preview fixtures for real repository identities, so an `owner/repo`
+  path inside an `ssh://`/`git://` URL gets the same non-GitHub exemption as its
+  HTTPS form (#2392).
+
+- `fix(review-engine)`: make the preview escape-hatch scanner step over regex
+  literals before stripping comments, so a `//` inside a regex body can no longer
+  hide a forbidden `as any` later on the same line (#2392).
+
+- `fix(review-engine)`: broaden rendered preview output validation to cover all
+  GitHub token prefixes already rejected in preview fixture anonymization and
+  validate generated HTML before it is written to disk (R-08, #2366).
+
+- `fix(review-engine)`: refine rendered preview raw webhook body detection to
+  parse JSON-shaped candidates instead of matching broad field-name lookaheads
+  (R-08, #2366).
+
+- `fix(review-engine)`: detect double-escaped JSON quote entities when scanning
+  rendered preview output for raw GitHub webhook payload bodies (R-08, #2366).
+
+- `fix(review-engine)`: track JSON string state when collecting rendered preview
+  payload candidates so a `}` inside a string field no longer bypasses raw
+  webhook body detection, and normalize hex quote entities (`&#x22;`,
+  `&amp;#x22;`) before parsing (R-08, #2366).
+
+- `fix(review-engine)`: only track preview payload string state once a JSON
+  candidate has started, so an unmatched prose quote before a raw webhook object
+  no longer swallows its opening brace and bypasses detection (R-08, #2366).
+
+- `fix(review-engine)`: emit every balanced JSON object, including nested ones,
+  when scanning preview output, so a raw webhook payload wrapped inside a larger
+  envelope is still detected (R-08, #2366).
+
+- `fix(review-engine)`: extract each preview JSON object candidate independently
+  from its opening brace, so a malformed prefix with an unclosed string can no
+  longer desync the scan and hide a later payload (R-08, #2366).
+
+- `fix(review-engine)`: recognize `issue_comment` webhook bodies (not just
+  `pull_request`) when guarding rendered preview output, matching the events the
+  bot subscribes to (R-08, #2366).
+
+- `fix(review-engine)`: unescape backslash-escaped quotes when scanning preview
+  output, so a webhook body serialized as a JSON string value (the common logged
+  form) is still detected (R-08, #2366).
+
+- `fix(review-engine)`: render preview golden snapshots from typed source
+  fixtures through the walkthrough, inline, assessment, and provenance renderers
+  instead of duplicating stored markdown lines, with an explicit fixture-renderer
+  API contract and specific inline-preview count errors (#2342).
 
 - `fix(bot, review-engine)`: address review feedback so failed reviews publish
   failing check conclusions, signed audit provenance feeds the provenance check,

@@ -59,6 +59,7 @@ Thumbs.db
 sbom.json
 *.sbom.json
 *.cyclonedx.json
+packages/review-engine/.preview/
 
 # Runtime / temp
 tmp/
