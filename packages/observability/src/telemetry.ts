@@ -44,8 +44,10 @@ export function initTelemetry(): void {
   }
 
   const env: TelemetryEnv = TelemetryEnvSchema.parse(process.env);
-  const endpoint = envOrUndefined(env.OTEL_EXPORTER_OTLP_ENDPOINT);
-  if (endpoint === undefined) {
+  // Strip trailing slashes so a collector URL like "http://host:4318/" yields
+  // ".../v1/traces", not the broken "...//v1/traces".
+  const endpoint = envOrUndefined(env.OTEL_EXPORTER_OTLP_ENDPOINT)?.replace(/\/+$/u, "");
+  if (endpoint === undefined || endpoint.length === 0) {
     return; // R-01: no OTLP endpoint configured — OTel stays a complete no-op.
   }
 
@@ -55,6 +57,10 @@ export function initTelemetry(): void {
   });
 
   const started = new NodeSDK({
+    // Keep the closed env boundary (R-08): without this, NodeSDK's default env detector reads
+    // OTEL_RESOURCE_ATTRIBUTES / OTEL_NODE_RESOURCE_DETECTORS at runtime and could override the
+    // service.name/version resolved above. Only the three OTEL_ vars in the schema feed the SDK.
+    autoDetectResources: false,
     resource,
     traceExporter: new OTLPTraceExporter({ url: `${endpoint}/v1/traces` }),
     instrumentations: [

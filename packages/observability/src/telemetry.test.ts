@@ -12,6 +12,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // dials a real OTLP collector; the exporter URL is asserted on the captured config, never sent.
 // Rules R-01..R-08 (R-09 is a non-business gate enforced by tsc + oxlint + oxfmt).
 
+interface NodeSdkConfig {
+  readonly autoDetectResources?: boolean;
+}
 interface ExporterConfig {
   readonly url?: string;
 }
@@ -25,7 +28,7 @@ type ResourceAttrs = Readonly<Record<string, unknown>>;
 // (it needs constructable `start`/`shutdown` instances); the exporter / instrumentation are bare
 // `vi.fn`s — newable construction spies whose `.mock.calls` capture the config the impl passes.
 const mocks = vi.hoisted(() => ({
-  nodeSdkCtor: vi.fn(),
+  nodeSdkCtor: vi.fn<(config: NodeSdkConfig) => void>(),
   startSpy: vi.fn(),
   shutdownSpy: vi.fn<() => Promise<void>>(() => Promise.resolve()),
   otlpCtor: vi.fn<(config: ExporterConfig) => void>(),
@@ -40,8 +43,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@opentelemetry/sdk-node", () => ({
   NodeSDK: class {
-    constructor(_config: unknown) {
-      mocks.nodeSdkCtor();
+    constructor(config: NodeSdkConfig) {
+      mocks.nodeSdkCtor(config);
     }
     start(): void {
       mocks.startSpy();
@@ -121,6 +124,27 @@ describe("initTelemetry — starts the OTLP trace SDK when the endpoint is set (
     expect(autoCfg?.["@opentelemetry/instrumentation-dns"]?.enabled).toBe(false);
 
     expect(mocks.pinoCtor.mock.calls.at(0)?.[0]?.disableLogSending).toBe(false);
+  });
+
+  // R-08 closed boundary: NodeSDK's default env detector (autoDetectResources:true) would read
+  // OTEL_RESOURCE_ATTRIBUTES at runtime and override service identity — it must be disabled.
+  it("disables NodeSDK default resource auto-detection", async () => {
+    vi.stubEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318");
+    const { initTelemetry } = await loadTelemetry();
+
+    initTelemetry();
+
+    expect(mocks.nodeSdkCtor.mock.calls.at(0)?.[0]?.autoDetectResources).toBe(false);
+  });
+
+  // A trailing slash on the endpoint must not produce "//v1/traces".
+  it("normalizes a trailing slash on the endpoint", async () => {
+    vi.stubEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318/");
+    const { initTelemetry } = await loadTelemetry();
+
+    initTelemetry();
+
+    expect(mocks.otlpCtor.mock.calls.at(0)?.[0]?.url).toBe("http://localhost:4318/v1/traces");
   });
 });
 

@@ -41,7 +41,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   disabled, `PinoInstrumentation`) only when an OTLP endpoint is set and otherwise
   stays a complete no-op; `shutdownTelemetry()` drains it safely whether or not it
   started. The three `OTEL_*` env vars are read through a `zod` schema (added,
-  exact-pinned `4.4.3`) so no secret-bearing env reaches a span or the exporter.
+  exact-pinned `4.4.3`) so no secret-bearing env reaches a span or the exporter;
+  NodeSDK default resource auto-detection is off (`autoDetectResources: false`) to
+  keep that boundary closed, and a trailing slash on the endpoint is normalized.
   Additive — the `createLogger`/`Logger` surface is unchanged (R-01..R-08, #2401).
 
 ### Changed
