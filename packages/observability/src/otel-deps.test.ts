@@ -115,9 +115,9 @@ describe("@sovri/observability logger API is unchanged (R-07)", () => {
   });
 
   it("keeps logger.ts and tracing.ts state expected by the deps slice", () => {
-    // task-125 adds telemetry.ts (the SDK lifecycle); tracing.ts is a later task and stays absent.
+    // task-125 adds telemetry.ts (the SDK lifecycle); task-126 adds tracing.ts (the span/metric facade).
     expect(fileExists("./telemetry.ts"), "telemetry.ts must exist after task-125").toBe(true);
-    expect(fileExists("./tracing.ts"), "tracing.ts must not exist yet").toBe(false);
+    expect(fileExists("./tracing.ts"), "tracing.ts must exist after task-126").toBe(true);
     expect(fileExists("./logger.ts"), "logger.ts must still exist").toBe(true);
   });
 

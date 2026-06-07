@@ -21,6 +21,24 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(observability)`: add the generic `withSpan`/`recordMetric` facade to
+  `@sovri/observability` over `@opentelemetry/api`. `withSpan(name, fn, attributes?)`
+  runs `fn` in an active span from the `"sovri"` tracer, returns its value unchanged,
+  records the exception + ERROR status and rethrows the original on reject, and ends
+  the span once in `finally`. `recordMetric(descriptor, value, tags?)` validates the
+  descriptor against a Zod instrument model (`counter`/`histogram`), lazily creates and
+  caches each instrument by name over the `"sovri"` meter, and routes the value by kind.
+  Both stay no-op-safe when no SDK is started (OTel's own no-op tracer/meter). Re-exported
+  from the barrel alongside `createLogger`/`initTelemetry`; `createLogger` API unchanged
+  (R-01..R-09, #2406).
+- `test(observability)`: add RED acceptance test for the generic `withSpan`/
+  `recordMetric` facade over `@opentelemetry/api` — `withSpan` is a transparent
+  pass-through that records the exception, sets ERROR status, and rethrows the
+  original error on reject while ending the span once in `finally`; `recordMetric`
+  lazily creates and reuses each instrument by name, rejects an unmodelled
+  descriptor with a typed validation error, routes counter/histogram values with
+  string tags, and stays a no-op when no SDK is running. OTel API mocked, no
+  network (R-01..R-09, #2406).
 - `chore(deps)`: add the pinned OpenTelemetry SDK set to `@sovri/observability`,
   declared but unused until the v0.6 telemetry init lands. Trace baseline:
   `@opentelemetry/api` 1.9.1, `@opentelemetry/sdk-node` 0.218.0,
