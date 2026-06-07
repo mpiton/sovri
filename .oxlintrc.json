@@ -25,7 +25,8 @@
     ],
     "typescript/no-non-null-assertion": "error",
     "eqeqeq": ["error", "always"],
-    "no-console": "warn"
+    "no-console": "warn",
+    "import/no-unassigned-import": ["error", { "allow": ["**/instrumentation.js"] }]
   },
   "overrides": [
     {

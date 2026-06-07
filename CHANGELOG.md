@@ -21,6 +21,21 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(bot)`: add RED acceptance test (`tests/operational/otel-bootstrap.test.ts`) for the
+  community-bot OpenTelemetry bootstrap — asserts the `instrumentation.js` import is the first
+  statement in `server.ts` ahead of probot/observability/app, `initTelemetry()` runs once on import
+  with no argument, graceful `SIGTERM`/`SIGINT` shutdown awaits `shutdownTelemetry()` before exit
+  (double-signal-safe, a no-op shutdown resolves, a rejecting flush still exits non-zero), `/health`
+  and `/version` serve unchanged with and without an OTLP endpoint, the bot stays a thin adapter, and
+  no secret reaches the bootstrap (R-01..R-09, #2424).
+- `feat(bot)`: bootstrap OpenTelemetry in the community bot. `instrumentation.ts` calls `initTelemetry()`
+  as the first import side effect of `server.ts` — before probot/Octokit/http load — and `shutdown.ts`
+  registers a graceful `SIGTERM`/`SIGINT` drain that awaits `shutdownTelemetry()` before exit
+  (double-signal-safe, a no-op shutdown resolves cleanly, a rejecting flush still exits non-zero instead
+  of hanging the container). With no `OTEL_EXPORTER_OTLP_ENDPOINT` set the bot boots and serves
+  `/health`+`/version` exactly as before; the bot stays a thin adapter, so all telemetry logic remains in
+  `@sovri/observability` and no token, LLM key, or raw webhook payload reaches the bootstrap
+  (R-01..R-09, #2424).
 - `feat(review-engine)`: emit the `sovri.reviews.total` (counter), `sovri.reviews.duration_ms`
   (histogram), and `sovri.findings.total` (counter) business metrics through `recordMetric`, defined
   once as a typed Zod registry in `metrics.ts`. Tags stay low-cardinality — `status`/`llm_provider`
@@ -117,6 +132,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   Additive — the `createLogger`/`Logger` surface is unchanged (R-01..R-08, #2401).
 
 ### Changed
+
+- `build(bot)`: start the community bot under the OpenTelemetry auto-instrumentation hook. The
+  `start` script and the Docker runtime `CMD` now run
+  `node --require @opentelemetry/auto-instrumentations-node/register dist/server.js`, so the SDK loads
+  before any instrumented module. `@opentelemetry/auto-instrumentations-node` (exact-pinned `0.76.0`,
+  matching `@sovri/observability`) is now a direct bot dependency so the `--require` hook resolves at the
+  app root under pnpm's isolated layout. The runtime image is otherwise unchanged — non-root `sovri`
+  user, `EXPOSE 3000`, and the `/health` HEALTHCHECK all intact (#2424).
 
 ### Deprecated
 

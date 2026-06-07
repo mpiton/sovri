@@ -32,4 +32,4 @@ EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD wget -qO- http://127.0.0.1:3000/health >/dev/null || exit 1
 
-CMD ["node", "dist/server.js"]
+CMD ["node", "--require", "@opentelemetry/auto-instrumentations-node/register", "dist/server.js"]

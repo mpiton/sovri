@@ -32,11 +32,12 @@
     "build": "tsup",
     "dev": "tsup && node ./dist/server.js",
     "lint": "oxlint . --max-warnings=0 --no-error-on-unmatched-pattern",
-    "start": "node ./dist/server.js",
+    "start": "node --require @opentelemetry/auto-instrumentations-node/register dist/server.js",
     "test": "vitest run --root . --passWithNoTests",
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@opentelemetry/auto-instrumentations-node": "0.76.0",
     "@sovri/config": "workspace:*",
     "@sovri/core": "workspace:*",
     "@sovri/llm-providers": "workspace:*",

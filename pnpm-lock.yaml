@@ -41,6 +41,9 @@ importers:
 
   apps/community-bot:
     dependencies:
+      '@opentelemetry/auto-instrumentations-node':
+        specifier: 0.76.0
+        version: 0.76.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.1))
       '@sovri/config':
         specifier: workspace:*
         version: link:../../packages/config

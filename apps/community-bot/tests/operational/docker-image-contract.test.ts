@@ -132,8 +132,10 @@ describe("community bot Docker image contract", () => {
     // And the builder stage runs `pnpm --filter @sovri/community-bot... build`
     expect(dockerfile).toContain("pnpm --filter @sovri/community-bot... build");
 
-    // And the runtime image still contains "/app/dist/server.js"
-    expect(dockerfile).toContain('CMD ["node", "dist/server.js"]');
+    // And the runtime image still contains "/app/dist/server.js" started under the OTel --require hook
+    expect(dockerfile).toContain(
+      'CMD ["node", "--require", "@opentelemetry/auto-instrumentations-node/register", "dist/server.js"]',
+    );
   });
 
   it("excludes tests and fixtures from the Docker context", () => {
