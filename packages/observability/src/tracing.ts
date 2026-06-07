@@ -32,16 +32,28 @@ class InvalidInstrumentError extends Error {
   }
 }
 
+// Scalar attribute value accepted on a span — the safe, non-array subset of OTel's attribute type.
+export type SpanAttributeValue = string | number | boolean;
+
+// Minimal span handle forwarded to `fn`, narrowing OTel's `Span` to attribute-setting only. Lets a
+// caller stamp an attribute computed inside the operation (e.g. a count known only after the work)
+// without importing `@opentelemetry/*`. The real OTel `Span` satisfies it structurally.
+export interface SpanLike {
+  setAttribute(key: string, value: SpanAttributeValue): void;
+}
+
 /**
  * Run an async operation inside an active OTel span. Transparent pass-through: returns fn's
  * resolved value unchanged (R-01); on reject, records the exception and an ERROR status then
  * rethrows the original error (R-02); always ends the span exactly once in finally (R-03).
- * Safe when telemetry was never initialized — the no-op tracer still runs fn (R-04).
+ * Safe when telemetry was never initialized — the no-op tracer still runs fn (R-04). The active
+ * span is forwarded to `fn` as a {@link SpanLike} so callers can set attributes computed during
+ * the operation; existing zero-argument callers are unaffected.
  */
 export function withSpan<T>(
   name: string,
-  fn: () => Promise<T>,
-  attributes?: Record<string, string | number | boolean>,
+  fn: (span: SpanLike) => Promise<T>,
+  attributes?: Record<string, SpanAttributeValue>,
 ): Promise<T> {
   const tracer = trace.getTracer(TRACER_NAME);
   return tracer.startActiveSpan(name, async (span): Promise<T> => {
@@ -49,7 +61,7 @@ export function withSpan<T>(
       if (attributes) {
         span.setAttributes(attributes);
       }
-      return await fn();
+      return await fn(span);
     } catch (error) {
       span.recordException(error instanceof Error ? error : String(error));
       span.setStatus({

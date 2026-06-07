@@ -95,6 +95,21 @@ describe("withSpan — transparent pass-through of fn's resolved value (R-01)", 
     expect(mocks.span.setAttributes).toHaveBeenCalledWith({ repo: "acme/web", "pr.number": 42 });
     expect(result).toBe("done");
   });
+
+  // Given fn needs an attribute computed inside the operation
+  // When withSpan("review.run", (span) => span.setAttribute("findings.count", 3)) is awaited
+  // Then the forwarded span receives that attribute and withSpan resolves to fn's value.
+  it("forwards the active span so fn can set an attribute computed during the operation", async () => {
+    const { withSpan } = await loadTracing();
+
+    const result = await withSpan("review.run", async (span) => {
+      span.setAttribute("findings.count", 3);
+      return "done";
+    });
+
+    expect(mocks.span.setAttribute).toHaveBeenCalledWith("findings.count", 3);
+    expect(result).toBe("done");
+  });
 });
 
 describe("withSpan — records the exception and rethrows the original on reject (R-02)", () => {

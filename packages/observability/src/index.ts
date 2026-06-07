@@ -5,4 +5,4 @@ export { createLogger } from "./logger.js";
 export type { Logger } from "./logger.js";
 export { initTelemetry, shutdownTelemetry } from "./telemetry.js";
 export { withSpan, recordMetric } from "./tracing.js";
-export type { InstrumentDescriptor } from "./tracing.js";
+export type { InstrumentDescriptor, SpanAttributeValue, SpanLike } from "./tracing.js";

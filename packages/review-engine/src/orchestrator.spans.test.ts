@@ -14,21 +14,20 @@ import { readFileSync } from "node:fs";
 import { ReviewSchema, z, type Diff, type PullRequest } from "@sovri/core";
 import { MemoryAuditTrailSink } from "@sovri/compliance";
 import type { GenerateStructuredParams, LLMProvider } from "@sovri/llm-providers";
+import type { SpanAttributeValue } from "@sovri/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { reviewPullRequest, type ReviewPullRequestConfig } from "./orchestrator.js";
 
-type AttrValue = string | number | boolean;
-
 interface FakeSpan {
   readonly name: string;
   // Attributes passed to withSpan when the span opens (the upfront map).
-  readonly openingAttributes: Record<string, AttrValue>;
+  readonly openingAttributes: Record<string, SpanAttributeValue>;
   // Live attribute map: opening attributes plus anything set via setAttribute on the forwarded span.
-  readonly attributes: Record<string, AttrValue>;
+  readonly attributes: Record<string, SpanAttributeValue>;
   readonly exceptions: unknown[];
   ended: number;
-  setAttribute(key: string, value: AttrValue): void;
+  setAttribute(key: string, value: SpanAttributeValue): void;
 }
 
 interface SpanEvent {
@@ -46,16 +45,16 @@ const tracing = vi.hoisted(() => {
   async function withSpan<T>(
     name: string,
     fn: (span: FakeSpan) => Promise<T>,
-    attributes?: Record<string, AttrValue>,
+    attributes?: Record<string, SpanAttributeValue>,
   ): Promise<T> {
-    const attrs: Record<string, AttrValue> = { ...attributes };
+    const attrs: Record<string, SpanAttributeValue> = { ...attributes };
     const span: FakeSpan = {
       name,
       openingAttributes: { ...attributes },
       attributes: attrs,
       exceptions: [],
       ended: 0,
-      setAttribute(key: string, value: AttrValue): void {
+      setAttribute(key: string, value: SpanAttributeValue): void {
         attrs[key] = value;
         if (!passthrough) {
           events.push({ kind: "attr", name, key });

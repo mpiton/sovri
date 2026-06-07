@@ -21,6 +21,17 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(review-engine)`: instrument `reviewPullRequest` with the `review.pull_request` business span
+  tree — child spans `review.fetch_diff` / `review.build_prompt` / `review.llm_call` /
+  `review.parse_findings`, carrying only non-sensitive scalar attributes (`pr.number`, `pr.repo`,
+  `llm.provider`, `findings.count` set after parsing; child `changed_files`/`reviewable_files` and
+  `provider.model`). The engine reaches tracing only through `@sovri/observability` `withSpan` and
+  imports no `@opentelemetry/*`; behavior, return shape, error propagation, and audit events are
+  unchanged, and the span path is a no-op when telemetry is uninitialized (R-01..R-09, #2413).
+- `feat(observability)`: `withSpan` now forwards the active span to `fn` as a minimal `SpanLike`
+  (`setAttribute` only), so callers can stamp an attribute computed during the operation without
+  importing `@opentelemetry/*`. Backward-compatible — existing zero-argument callbacks are
+  unaffected; `SpanLike`/`SpanAttributeValue` re-exported from the barrel (#2413).
 - `test(review-engine)`: add RED acceptance test (`orchestrator.spans.test.ts`) for the
   `review.pull_request` business span tree — drives `reviewPullRequest` through the success, throw,
   provider/parse failure, partial, limit-exceeded and no-files branches with a captured `withSpan`,

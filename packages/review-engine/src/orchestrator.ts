@@ -19,7 +19,7 @@ import {
   type Severity,
 } from "@sovri/core";
 import type { GenerateStructuredParams, LLMProvider } from "@sovri/llm-providers";
-import type { Logger } from "@sovri/observability";
+import { withSpan, type Logger, type SpanLike } from "@sovri/observability";
 import { v4 as uuidv4, v7 as uuidv7 } from "uuid";
 
 import { generateAuditReference } from "./audit-ref.js";
@@ -245,6 +245,17 @@ export async function runReview(
   };
 }
 
+// Stamp the final findings count on the parent review span. Called at each terminal (non-throwing)
+// return so the count reflects the descriptor actually returned; the throw path never reaches it,
+// so the parent span carries no findings.count.
+function stampFindingsCount(
+  span: SpanLike,
+  descriptor: ReviewWithCheckRunDescriptors,
+): ReviewWithCheckRunDescriptors {
+  span.setAttribute("findings.count", descriptor.findings.length);
+  return descriptor;
+}
+
 export async function reviewPullRequest(
   input: ReviewPullRequestInput,
   options: ReviewPullRequestOptions,
@@ -257,146 +268,182 @@ export async function reviewPullRequest(
 
   await emitAuditEvent(sink, reviewStartedEvent(reviewInput.pullRequest, provider), logger);
 
-  try {
-    const limitError = getLimitError(reviewInput.pullRequest, reviewInput.config);
-    if (limitError !== undefined) {
-      await emitAuditEvent(sink, reviewFailedEvent("limit_exceeded"), logger);
+  // Business span tree (docs/adr/019): review.pull_request wraps the whole review with the four
+  // stage spans as children. Attributes are non-sensitive scalars only — never diff, prompt,
+  // response, token, or key content. The span wrapper is the outermost layer; the existing
+  // try/catch audit flow stays intact, so error propagation and audit events are unchanged.
+  return withSpan(
+    "review.pull_request",
+    async (reviewSpan) => {
+      try {
+        const limitError = getLimitError(reviewInput.pullRequest, reviewInput.config);
+        if (limitError !== undefined) {
+          await emitAuditEvent(sink, reviewFailedEvent("limit_exceeded"), logger);
 
-      const failedReview = buildFailedReview(
-        reviewInput.pullRequest,
-        provider,
-        startedAt,
-        limitError,
-      );
-      return attachCheckRunDescriptors(failedReview);
-    }
+          const failedReview = buildFailedReview(
+            reviewInput.pullRequest,
+            provider,
+            startedAt,
+            limitError,
+          );
+          return stampFindingsCount(reviewSpan, attachCheckRunDescriptors(failedReview));
+        }
 
-    const filteredDiff = filterDiffByIgnores(reviewInput.diff, reviewInput.config.ignores);
-    logger?.info(
-      {
-        provider: provider.name,
-        changed_files: reviewInput.diff.files.length,
-        reviewable_files: filteredDiff.files.length,
-        ignored_files: reviewInput.diff.files.length - filteredDiff.files.length,
-      },
-      "Review engine ignore filters applied",
-    );
+        const filteredDiff = await withSpan("review.fetch_diff", async (diffSpan) => {
+          const filtered = filterDiffByIgnores(reviewInput.diff, reviewInput.config.ignores);
+          diffSpan.setAttribute("changed_files", reviewInput.diff.files.length);
+          diffSpan.setAttribute("reviewable_files", filtered.files.length);
+          return filtered;
+        });
+        logger?.info(
+          {
+            provider: provider.name,
+            changed_files: reviewInput.diff.files.length,
+            reviewable_files: filteredDiff.files.length,
+            ignored_files: reviewInput.diff.files.length - filteredDiff.files.length,
+          },
+          "Review engine ignore filters applied",
+        );
 
-    if (filteredDiff.files.length === 0) {
-      await emitAuditEvent(sink, reviewCompletedEvent(), logger);
+        if (filteredDiff.files.length === 0) {
+          await emitAuditEvent(sink, reviewCompletedEvent(), logger);
 
-      return attachCheckRunDescriptors(
-        buildNoFilesReview(reviewInput.pullRequest, provider, startedAt),
-      );
-    }
+          return stampFindingsCount(
+            reviewSpan,
+            attachCheckRunDescriptors(
+              buildNoFilesReview(reviewInput.pullRequest, provider, startedAt),
+            ),
+          );
+        }
 
-    const prompt = buildReviewPrompt({
-      unifiedDiff: filteredDiff.unified_diff,
-      mode: reviewInput.config.review.mode,
-      pullRequest: {
-        number: reviewInput.pullRequest.number,
-        repoFullName: reviewInput.pullRequest.repo_full_name,
-        title: reviewInput.pullRequest.title,
-        description: reviewInput.pullRequest.body ?? "",
-      },
-    });
+        const prompt = await withSpan("review.build_prompt", async () =>
+          buildReviewPrompt({
+            unifiedDiff: filteredDiff.unified_diff,
+            mode: reviewInput.config.review.mode,
+            pullRequest: {
+              number: reviewInput.pullRequest.number,
+              repoFullName: reviewInput.pullRequest.repo_full_name,
+              title: reviewInput.pullRequest.title,
+              description: reviewInput.pullRequest.body ?? "",
+            },
+          }),
+        );
 
-    logger?.info(
-      { provider: provider.name, changed_files: filteredDiff.files.length },
-      "Review engine request started",
-    );
+        logger?.info(
+          { provider: provider.name, changed_files: filteredDiff.files.length },
+          "Review engine request started",
+        );
 
-    const generation = await generateParsedProviderReview(provider, {
-      systemPrompt: prompt.systemPrompt,
-      userPrompt: prompt.userPrompt,
-      schema: ProviderReviewResponseSchema,
-      maxTokens: provider.maxTokens,
-    });
+        const generation = await withSpan(
+          "review.llm_call",
+          async () =>
+            generateParsedProviderReview(provider, {
+              systemPrompt: prompt.systemPrompt,
+              userPrompt: prompt.userPrompt,
+              schema: ProviderReviewResponseSchema,
+              maxTokens: provider.maxTokens,
+            }),
+          { "llm.provider": provider.name, "provider.model": provider.model },
+        );
 
-    if (generation.responseReturned && generation.promptSha256 !== undefined) {
-      await emitAuditEvent(
-        sink,
-        llmCalledEvent(
-          generation.promptSha256,
-          generation.tokenUsage.prompt,
-          generation.tokenUsage.completion,
-        ),
-        logger,
-      );
-    }
+        if (generation.responseReturned && generation.promptSha256 !== undefined) {
+          await emitAuditEvent(
+            sink,
+            llmCalledEvent(
+              generation.promptSha256,
+              generation.tokenUsage.prompt,
+              generation.tokenUsage.completion,
+            ),
+            logger,
+          );
+        }
 
-    if (generation.status === "failed") {
-      const errorCode = generation.failureKind === "parse" ? "parse_error" : "provider_error";
-      await emitAuditEvent(sink, reviewFailedEvent(errorCode), logger);
+        if (generation.status === "failed") {
+          const errorCode = generation.failureKind === "parse" ? "parse_error" : "provider_error";
+          await emitAuditEvent(sink, reviewFailedEvent(errorCode), logger);
 
-      const findings =
-        generation.failureKind === "parse"
-          ? [buildReviewFailedFinding(filteredDiff, generation.error)]
-          : [];
+          const findings =
+            generation.failureKind === "parse"
+              ? [buildReviewFailedFinding(filteredDiff, generation.error)]
+              : [];
 
-      const failedReview = buildFailedReview(
-        reviewInput.pullRequest,
-        provider,
-        startedAt,
-        generation.error,
-        {
+          const failedReview = buildFailedReview(
+            reviewInput.pullRequest,
+            provider,
+            startedAt,
+            generation.error,
+            {
+              findings,
+              ...(generation.promptSha256 === undefined
+                ? {}
+                : { promptSha256: generation.promptSha256 }),
+              tokenUsage: generation.tokenUsage,
+              tokenUsageReported: generation.tokenUsageReported,
+            },
+          );
+          return stampFindingsCount(reviewSpan, attachCheckRunDescriptors(failedReview));
+        }
+
+        const findings = await withSpan("review.parse_findings", async () =>
+          applyReviewFilters(
+            generation.parsed.findings.map((finding) => toFinding(finding, logger)),
+            reviewInput.config.review.severityThreshold,
+            reviewInput.config.ignores,
+          ),
+        );
+
+        // Append findings in order: a chaining sink (the Cloud file writer) links
+        // entries by hash, so they must be awaited sequentially, never in parallel.
+        await findings.reduce(async (previous, finding) => {
+          await previous;
+          const event = findingCreatedEvent(finding);
+          if (event !== undefined) {
+            await emitAuditEvent(sink, event, logger);
+          }
+        }, Promise.resolve());
+
+        await emitAuditEvent(sink, reviewCompletedEvent(), logger);
+
+        const review = ReviewSchema.parse({
+          id: uuidv7(),
+          pr_number: reviewInput.pullRequest.number,
+          repo_full_name: reviewInput.pullRequest.repo_full_name,
+          commit_sha: reviewInput.pullRequest.head_sha,
+          started_at: startedAt,
+          completed_at: new Date(),
+          llm_provider: provider.name,
+          llm_model: provider.model,
+          tokens_used: generation.tokenUsage,
+          token_usage_reported: generation.tokenUsageReported,
+          summary: generation.parsed.summary,
           findings,
-          ...(generation.promptSha256 === undefined
-            ? {}
-            : { promptSha256: generation.promptSha256 }),
-          tokenUsage: generation.tokenUsage,
-          tokenUsageReported: generation.tokenUsageReported,
-        },
-      );
-      return attachCheckRunDescriptors(failedReview);
-    }
+          walkthrough_markdown: generation.parsed.walkthrough_markdown,
+          status: generation.status,
+        });
 
-    const findings = applyReviewFilters(
-      generation.parsed.findings.map((finding) => toFinding(finding, logger)),
-      reviewInput.config.review.severityThreshold,
-      reviewInput.config.ignores,
-    );
+        return stampFindingsCount(
+          reviewSpan,
+          attachCheckRunDescriptors(
+            withComposedWalkthrough(
+              review,
+              generation.promptSha256 === undefined
+                ? {}
+                : { promptSha256: generation.promptSha256 },
+            ),
+          ),
+        );
+      } catch (error) {
+        await emitAuditEvent(sink, reviewFailedEvent("unexpected_error"), logger);
 
-    // Append findings in order: a chaining sink (the Cloud file writer) links
-    // entries by hash, so they must be awaited sequentially, never in parallel.
-    await findings.reduce(async (previous, finding) => {
-      await previous;
-      const event = findingCreatedEvent(finding);
-      if (event !== undefined) {
-        await emitAuditEvent(sink, event, logger);
+        throw error;
       }
-    }, Promise.resolve());
-
-    await emitAuditEvent(sink, reviewCompletedEvent(), logger);
-
-    const review = ReviewSchema.parse({
-      id: uuidv7(),
-      pr_number: reviewInput.pullRequest.number,
-      repo_full_name: reviewInput.pullRequest.repo_full_name,
-      commit_sha: reviewInput.pullRequest.head_sha,
-      started_at: startedAt,
-      completed_at: new Date(),
-      llm_provider: provider.name,
-      llm_model: provider.model,
-      tokens_used: generation.tokenUsage,
-      token_usage_reported: generation.tokenUsageReported,
-      summary: generation.parsed.summary,
-      findings,
-      walkthrough_markdown: generation.parsed.walkthrough_markdown,
-      status: generation.status,
-    });
-
-    return attachCheckRunDescriptors(
-      withComposedWalkthrough(
-        review,
-        generation.promptSha256 === undefined ? {} : { promptSha256: generation.promptSha256 },
-      ),
-    );
-  } catch (error) {
-    await emitAuditEvent(sink, reviewFailedEvent("unexpected_error"), logger);
-
-    throw error;
-  }
+    },
+    {
+      "pr.number": reviewInput.pullRequest.number,
+      "pr.repo": reviewInput.pullRequest.repo_full_name,
+      "llm.provider": provider.name,
+    },
+  );
 }
 
 function buildNoFilesReview(
