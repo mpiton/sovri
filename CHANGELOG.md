@@ -21,6 +21,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `test(bot,observability)`: add `@integration` acceptance tests for the `GET /metrics` Prometheus
+  endpoint — `operational-routes.test.ts` (200 + `text/plain; version=0.0.4`, non-GET fall-through,
+  telemetry-off 200 empty body, `/health`+`/version` unchanged, metadata-only logging, thin-adapter
+  guards) and `metrics-reader.test.ts` (real `PrometheusExporter` with `preventServerStart: true`,
+  accessor/serializer NO-OP, single shared instance, `sovri.*` serialization, no-leak) (R-01..R-10,
+  #2429).
 - `test(bot)`: add RED acceptance test (`tests/operational/otel-bootstrap.test.ts`) for the
   community-bot OpenTelemetry bootstrap — asserts the `instrumentation.js` import is the first
   statement in `server.ts` ahead of probot/observability/app, `initTelemetry()` runs once on import
