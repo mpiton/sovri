@@ -11,6 +11,8 @@ import { NodeSDK } from "@opentelemetry/sdk-node";
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
 import { z } from "zod";
 
+import { createPrometheusReader } from "./metrics-reader.js";
+
 // OTel SDK init/shutdown lifecycle for @sovri/observability (ARCHI §10.2.1, docs/adr/019,
 // revising docs/adr/006). Additive to the package: the createLogger/Logger surface is untouched.
 // SDK lifecycle only — the metrics meter and withSpan/recordMetric helpers are a later task.
@@ -72,11 +74,11 @@ export function initTelemetry(): void {
     // OTEL_RESOURCE_ATTRIBUTES / OTEL_NODE_RESOURCE_DETECTORS at runtime and could override the
     // service.name/version resolved above. Only the three OTEL_ vars in the schema feed the SDK.
     autoDetectResources: false,
-    // This task ships the TRACE lifecycle only (metrics are task-126). Passing explicit empty
-    // arrays stops NodeSDK from auto-configuring metric/log exporters from OTEL_METRICS_EXPORTER /
-    // OTEL_LOGS_EXPORTER (which default to OTLP when unset) — keeping init trace-only and the
-    // env boundary closed.
-    metricReaders: [],
+    // Register the single shared Prometheus reader so /metrics can serve the aggregated sovri.*
+    // registry — built with preventServerStart:true, it opens no second port. logRecordProcessors
+    // stays explicitly empty so NodeSDK does not auto-configure a log exporter from OTEL_LOGS_EXPORTER
+    // (which defaults to OTLP when unset), keeping the env boundary closed.
+    metricReaders: [createPrometheusReader()],
     logRecordProcessors: [],
     resource,
     traceExporter: new OTLPTraceExporter({ url: `${endpoint}/v1/traces` }),

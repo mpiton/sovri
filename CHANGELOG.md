@@ -21,6 +21,24 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `feat(observability)`: wire a single shared `PrometheusExporter` (`MetricReader`,
+  `preventServerStart: true`) into the meter provider and expose `getPrometheusExporter()` plus an async
+  `collectPrometheusText()` serializer. The accessor returns `undefined` and the serializer resolves to
+  `""` when telemetry is a NO-OP (`OTEL_EXPORTER_OTLP_ENDPOINT` unset); otherwise the serializer renders
+  the aggregated `sovri.*` registry as Prometheus text. No second metrics port is opened (R-01..R-10,
+  #2429).
+- `feat(bot)`: serve `GET /metrics` as Prometheus text exposition (`text/plain; version=0.0.4`) from the
+  operational router via a thin `sendText` helper — the bot serializes the shared exporter, it never
+  aggregates or stores metrics. With telemetry off the endpoint returns `200` with an empty-but-valid
+  body (a scraper reads an empty exposition as a healthy zero-series target, so a 503 would falsely mark
+  the bot down); non-GET requests fall through and `/health`/`/version` are unchanged. The exposition
+  carries only low-cardinality labels — never a token, LLM key, or PR payload (R-01..R-10, #2429).
+- `test(bot,observability)`: add `@integration` acceptance tests for the `GET /metrics` Prometheus
+  endpoint — `operational-routes.test.ts` (200 + `text/plain; version=0.0.4`, non-GET fall-through,
+  telemetry-off 200 empty body, `/health`+`/version` unchanged, metadata-only logging, thin-adapter
+  guards) and `metrics-reader.test.ts` (real `PrometheusExporter` with `preventServerStart: true`,
+  accessor/serializer NO-OP, single shared instance, `sovri.*` serialization, no-leak) (R-01..R-10,
+  #2429).
 - `test(bot)`: add RED acceptance test (`tests/operational/otel-bootstrap.test.ts`) for the
   community-bot OpenTelemetry bootstrap — asserts the `instrumentation.js` import is the first
   statement in `server.ts` ahead of probot/observability/app, `initTelemetry()` runs once on import

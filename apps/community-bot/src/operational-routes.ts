@@ -6,7 +6,13 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { ApplicationFunctionOptions } from "probot";
 
+import { collectPrometheusText } from "@sovri/observability";
+
 const JSON_HEADERS: Readonly<Record<string, string>> = { "content-type": "application/json" };
+// Prometheus text exposition v0.0.4 content-type; the registry is plain text, not JSON.
+const TEXT_HEADERS: Readonly<Record<string, string>> = {
+  "content-type": "text/plain; version=0.0.4",
+};
 const PACKAGE_JSON_URL = new URL("../package.json", import.meta.url);
 const COMMUNITY_BOT_VERSION = readCommunityBotVersion();
 const NODE_MAJOR_VERSION = /^\d+/u;
@@ -41,7 +47,7 @@ export function buildVersionResponse(
   return { version: COMMUNITY_BOT_VERSION, node: `${major}.x` };
 }
 
-const handleOperationalRoute: NodeHandler = (request, response) => {
+const handleOperationalRoute: NodeHandler = async (request, response) => {
   if (request.method !== "GET") {
     return false;
   }
@@ -53,6 +59,14 @@ const handleOperationalRoute: NodeHandler = (request, response) => {
   }
   if (pathname === "/version") {
     sendJson(response, buildVersionResponse());
+    return true;
+  }
+  if (pathname === "/metrics") {
+    // Serialize the shared OTel Prometheus registry; the bot serializes, it never aggregates.
+    // When telemetry is a NO-OP (no OTLP endpoint) the serializer returns "", and we answer 200 with
+    // that empty-but-valid body on purpose: a scraper reads an empty exposition as a healthy
+    // zero-series target, whereas a 503 would falsely mark the bot down.
+    sendText(response, 200, await collectPrometheusText());
     return true;
   }
 
@@ -74,6 +88,11 @@ function getPathname(request: IncomingMessage): string {
 function sendJson(response: ServerResponse, body: Record<string, string>): void {
   response.writeHead(200, JSON_HEADERS);
   response.end(JSON.stringify(body));
+}
+
+function sendText(response: ServerResponse, status: number, body: string): void {
+  response.writeHead(status, TEXT_HEADERS);
+  response.end(body);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

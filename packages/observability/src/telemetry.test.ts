@@ -155,16 +155,16 @@ describe("initTelemetry — starts the OTLP trace SDK when the endpoint is set (
     expect(mocks.nodeSdkCtor.mock.calls.at(0)?.[0]?.autoDetectResources).toBe(false);
   });
 
-  // Trace-only: NodeSDK must not auto-configure metric/log exporters from OTEL_METRICS_EXPORTER /
-  // OTEL_LOGS_EXPORTER (both default to OTLP when unset). Explicit empty arrays keep init traces-only.
-  it("does not start metric or log exporters", async () => {
+  // Metrics flow through the single shared Prometheus reader (task-130); log exporters must still not
+  // be auto-configured from OTEL_LOGS_EXPORTER (defaults to OTLP when unset), so that array stays empty.
+  it("registers exactly one Prometheus metric reader and starts no log exporter", async () => {
     vi.stubEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318");
     const { initTelemetry } = await loadTelemetry();
 
     initTelemetry();
 
     const cfg = mocks.nodeSdkCtor.mock.calls.at(0)?.[0];
-    expect(cfg?.metricReaders).toEqual([]);
+    expect(cfg?.metricReaders).toHaveLength(1);
     expect(cfg?.logRecordProcessors).toEqual([]);
   });
 
