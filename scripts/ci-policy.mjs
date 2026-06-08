@@ -152,6 +152,8 @@ const promoteChangelogUsage =
   "Usage: node scripts/ci-policy.mjs promote-changelog --version <X.Y.Z> --date <YYYY-MM-DD> --changelog <path>";
 const cosignDeferralUsage =
   "Usage: node scripts/ci-policy.mjs cosign-deferral --workflow <path> --changelog <path>";
+const cosignSigningUsage =
+  "Usage: node scripts/ci-policy.mjs cosign-signing --workflow <path> --changelog <path>";
 const actionPinningUsage = "Usage: node scripts/ci-policy.mjs action-pinning --workflow <path>";
 const gitleaksActionPinningUsage =
   "Usage: node scripts/ci-policy.mjs gitleaks-action-pinning --workflow <path> --metadata <gitleaks-pin-metadata.json>";
@@ -191,7 +193,7 @@ const packageCoverageWorkflowUsage =
   "Usage: node scripts/ci-policy.mjs package-coverage-workflow --workflow <path> --package <package-path> --branches <min>";
 const coverageArtifactPolicyUsage =
   "Usage: node scripts/ci-policy.mjs coverage-artifact-policy --workflow <path>";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dependencyReviewWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${releaseExtractNotesUsage}\n${releaseVerifyTagAnnotationUsage}\n${releaseVerifyCommitSubjectUsage}\n${readmeReferencesReleaseUsage}\n${promoteChangelogUsage}\n${cosignDeferralUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}\n${coverageGateUsage}\n${llmProvidersCoverageWorkflowUsage}\n${packageCoverageWorkflowUsage}\n${coverageArtifactPolicyUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dependencyReviewWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${releaseExtractNotesUsage}\n${releaseVerifyTagAnnotationUsage}\n${releaseVerifyCommitSubjectUsage}\n${readmeReferencesReleaseUsage}\n${promoteChangelogUsage}\n${cosignDeferralUsage}\n${cosignSigningUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}\n${coverageGateUsage}\n${llmProvidersCoverageWorkflowUsage}\n${packageCoverageWorkflowUsage}\n${coverageArtifactPolicyUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -2856,6 +2858,153 @@ const runCosignDeferral = (args) => {
   writeStdout("cosign_deferral=pass\nboundary_reason=documented target version\n");
 };
 
+const COSIGN_INSTALLER_REPOSITORY = "sigstore/cosign-installer";
+const SIGNING_JOB_NAME = "build-and-push";
+// `echo` of a GitHub secret expression or the OIDC request token leaks a credential into job logs.
+const COSIGN_LEAK_PATTERN = /echo\b[^\n]*(?:\$\{\{\s*secrets\.|\bACTIONS_ID_TOKEN_REQUEST_TOKEN\b)/;
+
+const getSigningJobStepBlocks = (workflow) => {
+  const stepsBlockEntry = getJobStepsBlockEntry(workflow, SIGNING_JOB_NAME);
+  if (stepsBlockEntry === undefined) return [];
+  return getTopLevelListItemBlockEntries(stepsBlockEntry.block, stepsBlockEntry.startIndex).map(
+    (entry) => entry.block,
+  );
+};
+
+const getCosignSignRun = (workflow) => {
+  for (const block of getSigningJobStepBlocks(workflow)) {
+    const run = getStepPropertyValue(block, "run");
+    if (run !== undefined && /\bcosign\s+sign\b/.test(run)) return run;
+  }
+  return undefined;
+};
+
+const getCosignInstallerRef = (workflow) => {
+  for (const block of getSigningJobStepBlocks(workflow)) {
+    const uses = getStepPropertyValue(block, "uses");
+    if (uses?.startsWith(`${COSIGN_INSTALLER_REPOSITORY}@`)) {
+      return uses.slice(`${COSIGN_INSTALLER_REPOSITORY}@`.length);
+    }
+  }
+  return undefined;
+};
+
+const readJobPermissions = (workflow, jobName) => {
+  const jobEntry = getJobBlockEntry(workflow, jobName);
+  if (jobEntry === undefined) return undefined;
+  const permissionsEntry = findDirectChildEntry(
+    getYamlStructureEntries(workflow),
+    jobEntry,
+    /^\s+permissions:\s*(?:#.*)?$/,
+  );
+  if (permissionsEntry === undefined) return undefined;
+  return readDirectChildScalarMap(workflow, permissionsEntry);
+};
+
+const listJobNames = (workflow) => {
+  const entries = getYamlStructureEntries(workflow);
+  const jobsEntry = findRootEntry(entries, /^\s*jobs:\s*(?:#.*)?$/);
+  if (jobsEntry === undefined) return [];
+  const jobsIndent = getIndent(jobsEntry.line);
+  const names = [];
+  let childIndent;
+  for (const entry of entries.filter((candidate) => candidate.index > jobsEntry.index)) {
+    const trimmed = entry.line.trim();
+    if (trimmed.length === 0 || trimmed.startsWith("#")) continue;
+    const indent = getIndent(entry.line);
+    if (indent <= jobsIndent) break;
+    childIndent ??= indent;
+    if (indent !== childIndent) continue;
+    const match = trimmed.match(/^([A-Za-z0-9_-]+):/);
+    if (match?.[1] !== undefined) names.push(match[1]);
+  }
+  return names;
+};
+
+const documentsCosignVerifyCommand = (workflow) =>
+  /cosign\s+verify/.test(workflow) &&
+  new RegExp(`${escapeRegExp(RELEASE_IMAGE_REPOSITORY)}@`).test(workflow) &&
+  /--certificate-identity-regexp/.test(workflow) &&
+  /--certificate-oidc-issuer\s+https:\/\/token\.actions\.githubusercontent\.com/.test(workflow);
+
+// R-01..R-09: the release workflow signs the pushed image digest with cosign keyless, scoped to the
+// build-and-push job, by digest, with a documented verify command and a clean changelog entry. Each
+// failing check emits `cosign_signing=fail` plus a specific status token, mirroring the deferral gate
+// it supersedes (a release.yml that signs can no longer be "deferred").
+const runCosignSigning = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", cosignSigningUsage);
+  const changelogPath = readRequiredOption(options, "changelog", cosignSigningUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const changelog = readTextFile(changelogPath, "changelog");
+
+  if (COSIGN_LEAK_PATTERN.test(workflow)) {
+    writeStdout("cosign_signing=fail\nsecret_leak=detected\n");
+    fail("a workflow step echoes a credential into job logs", 1);
+  }
+
+  const signRun = getCosignSignRun(workflow);
+  if (signRun === undefined) {
+    writeStdout("cosign_signing=fail\nsign_step=missing\n");
+    fail(`${SIGNING_JOB_NAME} has no cosign sign step`, 1);
+  }
+
+  const eventNames = readWorkflowRootEventNames(workflow);
+  if (eventNames.length !== 1 || eventNames[0] !== "push") {
+    writeStdout("cosign_signing=fail\ntrigger=not_tag_only\n");
+    fail("cosign signing must run only on push tags v*", 1);
+  }
+
+  if (/--key(?:=|\s|$)/.test(signRun)) {
+    writeStdout("cosign_signing=fail\nkeyless=violated\n");
+    fail("cosign signing must be keyless — no --key argument", 1);
+  }
+
+  if (!new RegExp(`${escapeRegExp(RELEASE_IMAGE_REPOSITORY)}@`).test(signRun)) {
+    writeStdout("cosign_signing=fail\nsign_target=tag_not_digest\n");
+    fail("cosign must sign the image by digest, not a mutable tag", 1);
+  }
+
+  if (readJobPermissions(workflow, SIGNING_JOB_NAME)?.get("id-token") !== "write") {
+    writeStdout("cosign_signing=fail\nid_token=missing\n");
+    fail(`${SIGNING_JOB_NAME} needs id-token: write for keyless OIDC`, 1);
+  }
+
+  const widenedJob = listJobNames(workflow).find(
+    (name) =>
+      name !== SIGNING_JOB_NAME && readJobPermissions(workflow, name)?.get("id-token") === "write",
+  );
+  if (widenedJob !== undefined) {
+    writeStdout("cosign_signing=fail\npermissions=widened\n");
+    fail(`id-token: write must not be granted to ${widenedJob}`, 1);
+  }
+
+  const installerRef = getCosignInstallerRef(workflow);
+  if (installerRef === undefined || !/^[0-9a-f]{40}$/.test(installerRef)) {
+    writeStdout("cosign_signing=fail\naction_pinning=unpinned\n");
+    fail(`${COSIGN_INSTALLER_REPOSITORY} must be pinned to a 40-character commit SHA`, 1);
+  }
+
+  if (!documentsCosignVerifyCommand(workflow)) {
+    writeStdout("cosign_signing=fail\nverify_command=missing\n");
+    fail("workflow must document the client cosign verify command", 1);
+  }
+
+  const unreleased = getChangelogUnreleasedBody(changelog) ?? "";
+  if (/[Cc]osign\s+signing\s+is\s+deferred/.test(unreleased)) {
+    writeStdout("cosign_signing=fail\nchangelog=stale_deferral\n");
+    fail("CHANGELOG [Unreleased] still defers cosign while the workflow signs", 1);
+  }
+  if (!/cosign/i.test(unreleased)) {
+    writeStdout("cosign_signing=fail\nchangelog=missing\n");
+    fail("CHANGELOG [Unreleased] must record the cosign signing change", 1);
+  }
+
+  writeStdout(
+    "cosign_signing=pass\nsign_target=digest\npermissions=scoped\nverify_command=documented\naction_pinning=pinned\nchangelog=recorded\n",
+  );
+};
+
 const runChangelogTrigger = (args) => {
   const options = parseOptions(args);
   const workflowPath = readRequiredOption(options, "workflow", changelogTriggerUsage);
@@ -4154,6 +4303,7 @@ const commandHandlers = new Map([
   ["readme-references-release", runReadmeReferencesRelease],
   ["promote-changelog", runPromoteChangelog],
   ["cosign-deferral", runCosignDeferral],
+  ["cosign-signing", runCosignSigning],
   ["action-pinning", runActionPinning],
   ["gitleaks-action-pinning", runGitleaksActionPinning],
   ["audit-gate", runAuditGate],
