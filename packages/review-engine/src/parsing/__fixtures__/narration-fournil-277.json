@@ -1,0 +1,122 @@
+[
+  {
+    "severity": "minor",
+    "category": "maintainability",
+    "file": "src/seo/prerender.ts",
+    "line_start": 12,
+    "line_end": 28,
+    "title": "Added `generateAuthContent` function",
+    "body": "A new function `generateAuthContent` was added to handle the generation of minimal crawler-friendly content for auth routes. This ensures these routes are not empty when prerendered.",
+    "recommendation": "No change needed; the function works as written."
+  },
+  {
+    "severity": "minor",
+    "category": "maintainability",
+    "file": "src/seo/types.ts",
+    "line_start": 4,
+    "line_end": 9,
+    "title": "Extended `SeoRoute` interface",
+    "body": "The `SeoRoute` interface was extended to include `authKey` and `noindex` properties so auth routes can be described declaratively.",
+    "recommendation": "Keep the new fields as they are."
+  },
+  {
+    "severity": "minor",
+    "category": "maintainability",
+    "file": "src/seo/prerender.ts",
+    "line_start": 40,
+    "line_end": 46,
+    "title": "Updated route iteration to use `PRERENDER_ROUTES`",
+    "body": "The loop now iterates over `PRERENDER_ROUTES` instead of `PUBLIC_ROUTES`, so the prerender step also covers the auth routes.",
+    "recommendation": "Leave the iteration source as PRERENDER_ROUTES."
+  },
+  {
+    "severity": "minor",
+    "category": "maintainability",
+    "file": "src/seo/prerender.ts",
+    "line_start": 50,
+    "line_end": 55,
+    "title": "Introduced `PRERENDER_ROUTES` constant",
+    "body": "A new `PRERENDER_ROUTES` constant was introduced to combine the public and auth route lists into a single source.",
+    "recommendation": "The constant reads clearly; nothing to change."
+  },
+  {
+    "severity": "minor",
+    "category": "maintainability",
+    "file": "src/seo/auth-content.ts",
+    "line_start": 1,
+    "line_end": 20,
+    "title": "Created `auth-content.ts` module",
+    "body": "A new module `auth-content.ts` was created to hold the crawler-friendly content helpers for the auth area.",
+    "recommendation": "Keep the module as a dedicated home for these helpers."
+  },
+  {
+    "severity": "minor",
+    "category": "maintainability",
+    "file": "src/seo/utils.ts",
+    "line_start": 8,
+    "line_end": 14,
+    "title": "Moved `buildSitemap` into `utils.ts`",
+    "body": "The `buildSitemap` helper was moved into `utils.ts` alongside the other sitemap utilities.",
+    "recommendation": "The new location groups related helpers together."
+  },
+  {
+    "severity": "minor",
+    "category": "maintainability",
+    "file": "src/seo/prerender.ts",
+    "line_start": 60,
+    "line_end": 64,
+    "title": "Renamed `fetchData` to `loadRouteData`",
+    "body": "The `fetchData` helper was renamed to `loadRouteData` to match the surrounding naming.",
+    "recommendation": "Keep the clearer name."
+  },
+  {
+    "severity": "minor",
+    "category": "maintainability",
+    "file": "src/seo/prerender.ts",
+    "line_start": 70,
+    "line_end": 74,
+    "title": "Removed unused `legacyRoutes` import",
+    "body": "The unused `legacyRoutes` import was removed now that the prerender step uses the combined route list.",
+    "recommendation": "Nothing further to do here."
+  },
+  {
+    "severity": "minor",
+    "category": "maintainability",
+    "file": "src/seo/prerender.ts",
+    "line_start": 80,
+    "line_end": 88,
+    "title": "Refactored `buildSitemap` for clarity",
+    "body": "The `buildSitemap` body was refactored into smaller steps so the sitemap assembly reads top to bottom.",
+    "recommendation": "The refactor is fine as written."
+  },
+  {
+    "severity": "minor",
+    "category": "maintainability",
+    "file": "tsconfig.json",
+    "line_start": 18,
+    "line_end": 20,
+    "title": "Updated `tsconfig` paths",
+    "body": "The `tsconfig` path aliases were updated to point the `@seo` alias at the new module location.",
+    "recommendation": "Leave the alias pointing at the new location."
+  },
+  {
+    "severity": "minor",
+    "category": "maintainability",
+    "file": "src/seo/prerender.ts",
+    "line_start": 90,
+    "line_end": 96,
+    "title": "Added `noindex` handling to prerender loop",
+    "body": "The prerender loop now reads the `noindex` flag from each route and writes the matching meta tag.",
+    "recommendation": "Keep the new branch as written."
+  },
+  {
+    "severity": "minor",
+    "category": "maintainability",
+    "file": "src/seo/auth-content.ts",
+    "line_start": 22,
+    "line_end": 30,
+    "title": "Implemented crawler-friendly fallback content",
+    "body": "Fallback content was implemented so crawler requests to auth routes receive a minimal but valid HTML document.",
+    "recommendation": "The fallback content is adequate."
+  }
+]

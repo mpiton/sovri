@@ -19,6 +19,7 @@ const baseFinding: Finding = {
   line_end: 18,
   title: "Missing payload null guard",
   body: "The review payload is read before validation.",
+  recommendation: "Add a null check on the payload before accessing its properties.",
   source: "llm",
   confidence: 0.87,
 };

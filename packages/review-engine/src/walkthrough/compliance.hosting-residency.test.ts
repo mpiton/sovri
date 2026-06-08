@@ -15,6 +15,8 @@ const baseFinding: Finding = {
   line_end: 19,
   title: "Hosting provenance missing",
   body: "The walkthrough should identify hosting and residency provenance.",
+  recommendation:
+    "Add hosting_region and data_residency fields to the provenance payload before rendering.",
   source: "llm",
   confidence: 0.87,
   audit_reference: "SOVRI-SC-AB12-CD34",

@@ -29,6 +29,8 @@ const baseReview: Review = {
       line_end: 12,
       title: "Possible null dereference",
       body: "Variable `foo` may be `null` here because the early-return guard only checks `bar`.",
+      recommendation:
+        "Add a null check for `foo` before dereferencing it, or extend the early-return guard to cover both `foo` and `bar`.",
       source: "llm",
       confidence: 0.85,
       compliance_references: [],

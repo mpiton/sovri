@@ -91,6 +91,7 @@ function providerFinding(
     line_end: lineStart,
     title,
     body: `${title} body.`,
+    recommendation: `Fix the issue described in: ${title}.`,
     confidence,
   };
 }
@@ -740,5 +741,21 @@ describe("reviewPullRequest config filters", () => {
     expect(review.summary).toContain("exceeds review limits");
     // And the returned Review error contains "exceeds review limits"
     expect(review.error).toContain("exceeds review limits");
+  });
+
+  it("drops narration findings through the full review path while keeping real issues (issue #2450)", async () => {
+    // Given the provider returns one narration finding and one real issue at the same severity
+    const provider = createProvider([
+      providerFinding("major", "src/app.ts", 4, "Added shared helper function", "maintainability"),
+      providerFinding("major", "src/app.ts", 9, "Missing null guard on payload", "bug"),
+    ]);
+    const reviewPullRequest = getReviewPullRequest();
+
+    // When the maintainer calls `reviewPullRequest`
+    const review = await reviewPullRequest({ pullRequest, diff, config }, { provider });
+
+    // Then only the real issue survives — the narration is dropped before metrics, audit, and render
+    expect(review.findings).toHaveLength(1);
+    expect(review.findings[0]?.title).toBe("Missing null guard on payload");
   });
 });

@@ -58,6 +58,7 @@ interface RawFindingFixture {
   readonly line_end: number;
   readonly title: string;
   readonly body: string;
+  readonly recommendation: string;
   readonly confidence: number;
   readonly cwe?: string;
 }
@@ -71,6 +72,8 @@ function rawFinding(overrides: Partial<RawFindingFixture> = {}): RawFindingFixtu
     line_end: 12,
     title: "Missing validation",
     body: "The charge amount is used without validation.",
+    recommendation:
+      "Validate the charge amount against allowed bounds before processing the payment.",
     confidence: 0.9,
     ...overrides,
   };

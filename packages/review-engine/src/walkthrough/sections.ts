@@ -11,9 +11,13 @@ export function sortFindings(findings: readonly Finding[]): Finding[] {
   return findings.toSorted(compareFindings);
 }
 
+// The empty-review marker shown in the sticky walkthrough when nothing blocks (issue #2450): a clean
+// diff posts the summary plus this line and zero inline comments — never a narration of unchanged code.
+export const NO_BLOCKING_ISSUES_LINE = "✅ No blocking issues found.";
+
 export function renderFindings(findings: readonly Finding[]): string[] {
   if (findings.length === 0) {
-    return ["No findings."];
+    return [NO_BLOCKING_ISSUES_LINE];
   }
 
   const ordered = sortFindings(findings);

@@ -64,6 +64,7 @@ function toFinding(finding: LLMRawFinding): Finding {
     line_end: finding.line_end,
     title: finding.title,
     body: finding.body,
+    recommendation: finding.recommendation,
     suggestion: toFindingSuggestion(finding),
     source: "llm",
     confidence: finding.confidence,

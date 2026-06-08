@@ -22,6 +22,7 @@ function makeFinding(severity: Severity, file: string): Finding {
     line_end: findingSeq,
     title: `${severity} finding ${findingSeq}`,
     body: `Body ${findingSeq}.`,
+    recommendation: `Fix finding ${findingSeq}.`,
     source: "llm",
     confidence: 0.8,
   };

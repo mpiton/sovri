@@ -12,7 +12,10 @@ export const ProviderFindingSchema = z
     line_start: z.number().int().positive(),
     line_end: z.number().int().positive(),
     title: z.string().min(1).max(200),
+    // Mirror of @sovri/core Finding: `body` is the problem and its impact, `recommendation` is the
+    // concrete fix. Required so the provider contract itself rejects a finding that only narrates.
     body: z.string().min(1).max(2000),
+    recommendation: z.string().min(1).max(1000),
     suggested_code: z.string().nullable().optional(),
     confidence: z.number().min(0).max(1).default(1),
     cwe: z
@@ -50,3 +53,10 @@ export {
   type ParseWithRetryOptions,
   type ParseWithRetryPrompts,
 } from "./retry.js";
+
+export {
+  isActionable,
+  partitionActionableFindings,
+  type ActionableFindingShape,
+  type PartitionedFindings,
+} from "./actionable.js";

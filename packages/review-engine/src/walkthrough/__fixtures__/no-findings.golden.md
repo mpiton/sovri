@@ -12,7 +12,7 @@ No actionable findings were found.
 
 ### Findings
 
-No findings.
+✅ No blocking issues found.
 
 ### File-by-file
 

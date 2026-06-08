@@ -18,6 +18,7 @@ const baseFinding = {
   line_end: 12,
   title: "Hardcoded credential",
   body: "Avoid hardcoding credentials in source.",
+  recommendation: "Load credentials from environment variables or a secrets manager instead.",
   confidence: 0.9,
 } as const;
 

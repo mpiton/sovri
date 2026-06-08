@@ -47,6 +47,7 @@ import {
 } from "./prompt/index.js";
 import {
   parseLLMReviewResponse,
+  partitionActionableFindings,
   ProviderReviewResponseSchema,
   type ProviderFinding,
   type ProviderReviewResponse,
@@ -406,13 +407,27 @@ export async function reviewPullRequest(
             return stampFindingsCount(reviewSpan, attachCheckRunDescriptors(failedReview));
           }
 
-          const findings = await withSpan("review.parse_findings", async () =>
-            applyReviewFilters(
-              generation.parsed.findings.map((finding) => toFinding(finding, logger)),
+          const findings = await withSpan("review.parse_findings", async () => {
+            // Deterministic backstop (issue #2450): drop narration the prompt and schema let through,
+            // then map the survivors. Log the dropped count so the reduction is auditable, never silent.
+            const { kept, droppedCount } = partitionActionableFindings(generation.parsed.findings);
+            if (droppedCount > 0) {
+              logger?.info(
+                {
+                  provider: provider.name,
+                  dropped_narration: droppedCount,
+                  kept_findings: kept.length,
+                },
+                "Review engine dropped non-actionable narration findings",
+              );
+            }
+
+            return applyReviewFilters(
+              kept.map((finding) => toFinding(finding, logger)),
               reviewInput.config.review.severityThreshold,
               reviewInput.config.ignores,
-            ),
-          );
+            );
+          });
 
           // Append findings in order: a chaining sink (the Cloud file writer) links
           // entries by hash, so they must be awaited sequentially, never in parallel.
@@ -908,6 +923,7 @@ function buildReviewFailedFinding(diff: Diff, error: string): Finding {
     line_end: fallbackLocation.line,
     title: "review_failed",
     body: buildReviewFailedFindingBody(error),
+    recommendation: "Re-run the review; if the failure recurs, check the provider configuration.",
     source: "llm",
     confidence: 1,
     compliance_references: [],
@@ -958,6 +974,7 @@ function toFinding(finding: ProviderFinding, logger?: Logger): Finding {
     line_end: finding.line_end,
     title: finding.title,
     body: finding.body,
+    recommendation: finding.recommendation,
     source: "llm",
     confidence: finding.confidence,
     audit_reference: generateAuditReference(finding.category),

@@ -6,36 +6,42 @@ import { z } from "zod";
 const TRIPLE_BACKTICK = "`".repeat(3);
 export const SYSTEM_PROMPT_MAX_BYTES = 1024;
 
+// Shared reviewer contract appended to every mode. The model reviews — it does not narrate. These
+// lines (with the required `recommendation`) are the prompt half of issue #2450's defense in depth;
+// the schema enforces the same field so the contract survives prompt decay across models.
+const REVIEWER_DIRECTIVES = [
+  "Never describe what the code does; a hunk with no issue yields no finding.",
+  "Each finding states the problem and its impact in `body` and the concrete fix in `recommendation`.",
+  "Write a neutral one-paragraph `summary` separately from the findings.",
+  "Return structured JSON findings that match the requested schema.",
+];
+
 const FULL_REVIEW_SYSTEM_TEMPLATE = [
   "You are Sovri's review engine.",
   "Review only the supplied pull request metadata and unified diff.",
-  "Return structured JSON findings that match the requested schema.",
+  "Report only defects and concrete improvements: bugs, security, performance, real design or maintainability problems, missing tests, and risky edge cases.",
+  ...REVIEWER_DIRECTIVES,
 ].join(" ");
 
 const BUGS_ONLY_REVIEW_SYSTEM_TEMPLATE = [
   "You are Sovri's review engine.",
   "Review only the supplied pull request metadata and unified diff.",
-  "Focus on correctness bugs that can change runtime behavior.",
-  "Ignore style-only findings and formatting nits.",
-  "Ignore performance-only findings unless they cause incorrect behavior.",
-  "Return structured JSON findings that match the requested schema.",
+  "Report only correctness bugs that can change runtime behavior; ignore style, formatting, and performance-only nits.",
+  ...REVIEWER_DIRECTIVES,
 ].join(" ");
 
 const STRICT_REVIEW_SYSTEM_TEMPLATE = [
   "You are Sovri's review engine.",
   "Review only the supplied pull request metadata and unified diff.",
-  "Hold the diff to a high bar.",
-  "Report all valid blocker, major, and minor issues, including maintainability, style, readability, and test-quality concerns that justify at least minor severity.",
-  "Return structured JSON findings that match the requested schema.",
+  "Hold the diff to a high bar: report every valid blocker, major, and minor issue, including maintainability, style, readability, and test-quality problems that justify at least minor severity.",
+  ...REVIEWER_DIRECTIVES,
 ].join(" ");
 
 const MINIMAL_REVIEW_SYSTEM_TEMPLATE = [
   "You are Sovri's review engine.",
   "Review only the supplied pull request metadata and unified diff.",
-  "Return at most 3 findings.",
-  "Include only blocker or major severity findings.",
-  "Suppress nits, style-only comments, and minor findings.",
-  "Return structured JSON findings that match the requested schema.",
+  "Report at most 3 findings, blocker or major severity only; suppress nits, style, and minor findings.",
+  ...REVIEWER_DIRECTIVES,
 ].join(" ");
 
 export const ReviewPromptModeSchema = z.enum(["full", "bugs-only", "strict", "minimal"]);
@@ -116,10 +122,25 @@ export function buildSystemPrompt(config: unknown): string {
   return validateSystemTemplateSize(FULL_REVIEW_SYSTEM_TEMPLATE);
 }
 
+// Few-shot lives here, not in the system prompt, because the system template is capped at 1024 bytes
+// (issue #2450). One worked finding and one forbidden narration teach the problem/fix shape concretely.
+const FEW_SHOT_PREAMBLE = [
+  "Findings flag a problem and its fix — they never narrate the change.",
+  "Good finding:",
+  "  title: Unvalidated session token",
+  "  body: The handler trusts req.body.token without a signature check, so a forged token is accepted.",
+  "  recommendation: Verify the token with the existing verifySession helper before use.",
+  "Forbidden narration (emit nothing instead):",
+  "  title: Added generateAuthContent function",
+  "  body: A new function was added to generate crawler-friendly content for auth routes.",
+];
+
 export function buildUserPrompt(diff: string, prContext: PullRequestPromptContext): string {
   const context = PullRequestPromptContextSchema.parse(prContext);
 
   return [
+    ...FEW_SHOT_PREAMBLE,
+    "",
     "Review this pull request.",
     "Repository:",
     fencedUserData("text", context.repoFullName),

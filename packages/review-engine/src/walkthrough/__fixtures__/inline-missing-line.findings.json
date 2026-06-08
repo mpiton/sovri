@@ -9,6 +9,7 @@
     "title": "Missing payload guard",
     "body": "`request.body` can be undefined before user access.",
     "source": "llm",
-    "confidence": 0.88
+    "confidence": 0.88,
+    "recommendation": "Apply the fix for missing payload guard: change the code so the problem no longer occurs."
   }
 ]

@@ -15,6 +15,7 @@ type RawFindingFixture = {
   line_end: number;
   title: string;
   body: string;
+  recommendation: string;
   suggested_code: string | null;
   confidence: number;
 };
@@ -45,6 +46,7 @@ export function buildRawFinding(overrides: Partial<RawFindingFixture> = {}): Raw
     line_end: 30,
     title: "Retry fixed response",
     body: "The retry response is valid.",
+    recommendation: "Fix the retry logic so that the response is always valid on retry.",
     suggested_code: null,
     confidence: 0.88,
     ...overrides,
@@ -128,6 +130,7 @@ export function expectSyntheticFailure(finding: unknown): void {
     line_end: 1,
     title: "review_failed",
   });
+  expect(finding).toHaveProperty("recommendation");
   expect(finding).not.toHaveProperty("suggestion");
   expect(finding).not.toHaveProperty("cwe");
 }

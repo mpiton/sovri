@@ -451,6 +451,7 @@ function buildFinding(
     id: "123e4567-e89b-42d3-a456-426614174099",
     line_end: 42,
     line_start: 42,
+    recommendation: "Address the underlying issue before marking the finding as resolved.",
     severity: "major",
     source: "llm",
     title: "Reconciled blocker",

@@ -1465,6 +1465,8 @@ function defaultProviderFindings(): ProviderReviewResponse["findings"] {
       line_end: 42,
       title: "Missing webhook payload guard",
       body: "The opened webhook fixture must be validated before delivery.",
+      recommendation:
+        "Add a Zod schema guard at the top of the handler before processing the payload.",
       confidence: 0.91,
     },
     {
@@ -1475,6 +1477,8 @@ function defaultProviderFindings(): ProviderReviewResponse["findings"] {
       line_end: 57,
       title: "Dropped inline comment",
       body: "The posted review must include the expected inline comment.",
+      recommendation:
+        "Return the inline comment draft from the builder and include it in the review payload.",
       confidence: 0.91,
     },
     {
@@ -1485,6 +1489,8 @@ function defaultProviderFindings(): ProviderReviewResponse["findings"] {
       line_end: 88,
       title: "Redundant severity grouping",
       body: "Severity counts must remain stable in the posted walkthrough.",
+      recommendation:
+        "Remove the duplicate grouping pass and derive counts from the single findings array.",
       confidence: 0.91,
     },
     {
@@ -1495,6 +1501,8 @@ function defaultProviderFindings(): ProviderReviewResponse["findings"] {
       line_end: 90,
       title: "Extra fixture finding",
       body: "This fourth finding is intentionally invalid for the fixture contract.",
+      recommendation:
+        "This finding exists only to test the 4-finding rejection path; do not use in valid responses.",
       confidence: 0.91,
     },
   ];

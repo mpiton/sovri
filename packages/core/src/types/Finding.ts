@@ -66,7 +66,11 @@ export const FindingSchema = z.object({
   line_start: z.number().int().positive(),
   line_end: z.number().int().positive(),
   title: z.string().min(1).max(200),
+  // `body` states what is wrong and why it matters; `recommendation` states the concrete fix.
+  // Splitting the two and requiring `recommendation` is the load-bearing guard against narration:
+  // a finding that only restates the diff cannot satisfy a mandatory "what to change" field.
   body: z.string().min(1).max(2000),
+  recommendation: z.string().min(1).max(1000),
   suggestion: SuggestionSchema.optional(),
   source: z.enum(["llm", "sarif"]),
   confidence: z.number().min(0).max(1),

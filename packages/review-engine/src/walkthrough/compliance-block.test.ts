@@ -15,6 +15,8 @@ const baseFinding: Finding = {
   line_end: 42,
   title: "Hardcoded credentials detected",
   body: "The connection string contains a hardcoded password.",
+  recommendation:
+    "Remove the hardcoded password and load credentials from environment variables or a secrets manager.",
   source: "llm",
   confidence: 0.9,
   audit_reference: "SOVRI-SC-AB12-CD34",

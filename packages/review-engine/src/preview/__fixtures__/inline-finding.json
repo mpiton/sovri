@@ -18,7 +18,8 @@
       "source": "llm",
       "confidence": 0.91,
       "cwe": "CWE-79",
-      "compliance_references": []
+      "compliance_references": [],
+      "recommendation": "Apply the fix for escape user-supplied html: change the code so the problem no longer occurs."
     }
   ],
   "diff": {

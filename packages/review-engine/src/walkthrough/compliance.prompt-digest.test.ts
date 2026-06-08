@@ -17,6 +17,8 @@ const baseFinding: Finding = {
   line_end: 27,
   title: "Prompt provenance missing",
   body: "The walkthrough should identify the prompt digest used for review.",
+  recommendation:
+    "Set prompt_sha256 in the provenance payload so the compliance block can render the digest line.",
   source: "llm",
   confidence: 0.89,
   audit_reference: "SOVRI-SC-AB12-CD34",

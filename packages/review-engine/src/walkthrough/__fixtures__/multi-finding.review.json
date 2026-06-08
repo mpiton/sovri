@@ -24,7 +24,8 @@
       "title": "Duplicated branch",
       "body": "The branch repeats an existing condition.",
       "source": "llm",
-      "confidence": 0.74
+      "confidence": 0.74,
+      "recommendation": "Apply the fix for duplicated branch: change the code so the problem no longer occurs."
     },
     {
       "id": "33333333-3333-4333-8333-333333333333",
@@ -36,7 +37,8 @@
       "title": "Unvalidated session token",
       "body": "The handler accepts a token without signature validation.",
       "source": "llm",
-      "confidence": 0.93
+      "confidence": 0.93,
+      "recommendation": "Apply the fix for unvalidated session token: change the code so the problem no longer occurs."
     },
     {
       "id": "11111111-1111-4111-8111-111111111111",
@@ -48,7 +50,8 @@
       "title": "Missing payload null guard",
       "body": "The review payload is read before validation.",
       "source": "llm",
-      "confidence": 0.87
+      "confidence": 0.87,
+      "recommendation": "Apply the fix for missing payload null guard: change the code so the problem no longer occurs."
     }
   ],
   "walkthrough_markdown": "Previous provider walkthrough.",

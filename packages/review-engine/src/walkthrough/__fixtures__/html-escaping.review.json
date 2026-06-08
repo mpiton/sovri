@@ -24,7 +24,8 @@
       "title": "Avoid <b>trusted</b> HTML",
       "body": "Use <strong>escaped</strong> text & validate.",
       "source": "llm",
-      "confidence": 0.91
+      "confidence": 0.91,
+      "recommendation": "Apply the fix for avoid <b>trusted</b> html: change the code so the problem no longer occurs."
     }
   ],
   "walkthrough_markdown": "Previous provider walkthrough.",

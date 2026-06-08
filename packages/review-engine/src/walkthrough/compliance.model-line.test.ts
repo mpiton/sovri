@@ -15,6 +15,8 @@ const baseFinding: Finding = {
   line_end: 17,
   title: "Provider provenance missing",
   body: "The walkthrough should identify the model used for review.",
+  recommendation:
+    "Populate llm_provider and llm_model on the review so the compliance block can render the model line.",
   source: "llm",
   confidence: 0.88,
   audit_reference: "SOVRI-SC-AB12-CD34",

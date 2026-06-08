@@ -16,6 +16,7 @@ const baseFinding: Finding = {
   line_end: 10,
   title: "Missing payload null guard",
   body: "The review payload is read before validation.",
+  recommendation: "Add a null check on the payload before accessing nested fields.",
   source: "llm",
   confidence: 0.87,
 };
@@ -160,8 +161,8 @@ describe("composeWalkthrough required sections", () => {
     expect(markdown).toContain("### Findings");
     // And the markdown contains "### File-by-file"
     expect(markdown).toContain("### File-by-file");
-    // And the Findings section states "No findings"
-    expect(findingsSection).toContain("No findings");
+    // And the Findings section states "No blocking issues found"
+    expect(findingsSection).toContain("No blocking issues found");
     // And the File-by-file section states "No changed files with findings"
     expect(fileByFileSection).toContain("No changed files with findings");
   });

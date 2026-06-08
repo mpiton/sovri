@@ -154,6 +154,7 @@ function createConfigFinding(lineStart: number, lineEnd: number): Finding {
     line_end: lineEnd,
     title: "Unsafe config read",
     body: "The config value is read before validation.",
+    recommendation: "Validate the config value against its schema before using it.",
     source: "llm",
     confidence: 0.87,
   };

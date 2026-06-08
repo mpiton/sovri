@@ -138,6 +138,7 @@ function finding(input: FindingInput): Finding {
     line_end: input.lineEnd,
     title: input.title,
     body: `Review details for ${input.title}.`,
+    recommendation: `Address the issue in ${input.title}.`,
     source: "llm",
     confidence: 0.87,
   };

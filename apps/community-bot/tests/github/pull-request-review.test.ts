@@ -209,7 +209,7 @@ review:
         comments: [
           {
             body: expect.stringMatching(
-              /^🔴 🔧 Maintainability\n\*\*Delegation check\*\*\n\nThe handler should delegate review work\.\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u,
+              /^🔴 🔧 Maintainability\n\*\*Delegation check\*\*\n\n\*\*Problem:\*\* The handler should delegate review work\.\n\n\*\*Fix:\*\* Extract review logic into a dedicated collaborator and call it from the handler\.\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u,
             ),
             line: 42,
             path: "apps/community-bot/src/handlers/pull-request.ts",
@@ -253,7 +253,7 @@ review:
         comments: [
           {
             body: expect.stringMatching(
-              /^🔴 🔧 Maintainability\n\*\*Multi-line anchor\*\*\n\nThe handler should anchor a range only when every line is in the diff\.\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u,
+              /^🔴 🔧 Maintainability\n\*\*Multi-line anchor\*\*\n\n\*\*Problem:\*\* The handler should anchor a range only when every line is in the diff\.\n\n\*\*Fix:\*\* Extract review logic into a dedicated collaborator and call it from the handler\.\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u,
             ),
             line: 43,
             path: "apps/community-bot/src/handlers/pull-request.ts",
@@ -478,6 +478,8 @@ function buildFinding(
     id: "123e4567-e89b-42d3-a456-426614174000",
     line_end: values.lineEnd ?? 42,
     line_start: values.lineStart ?? 42,
+    recommendation:
+      "Extract review logic into a dedicated collaborator and call it from the handler.",
     severity: "major",
     source: "llm",
     title: values.title ?? "Delegation check",

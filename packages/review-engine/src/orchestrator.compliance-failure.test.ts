@@ -72,6 +72,8 @@ const provider: LLMProvider = {
           line_end: 42,
           title: "Hardcoded credential",
           body: "Avoid hardcoding credentials in source.",
+          recommendation:
+            "Move the credential to an environment variable or a secrets manager instead of hardcoding it.",
           confidence: 0.9,
           cwe: "CWE-798",
         },

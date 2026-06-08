@@ -18,6 +18,7 @@ type RawFindingFixture = {
   line_end: number;
   title: string;
   body: string;
+  recommendation: string;
   suggested_code: string | null;
   confidence: number;
 };
@@ -31,6 +32,7 @@ function buildRawFinding(overrides: Partial<RawFindingFixture> = {}): RawFinding
     line_end: 8,
     title: "Reject blocked card state",
     body: "Blocked cards are still treated as active.",
+    recommendation: "Guard the card path by checking its status before proceeding.",
     suggested_code: "return false;",
     confidence: 0.87,
     ...overrides,
@@ -46,6 +48,7 @@ function buildPaymentFinding(overrides: Partial<RawFindingFixture> = {}): RawFin
     line_end: 12,
     title: "Reject expired cards",
     body: "The expired card path is accepted.",
+    recommendation: "Reject the request early when the card expiry date is in the past.",
     suggested_code: "return false;",
     confidence: 0.91,
     ...overrides,
@@ -63,6 +66,8 @@ describe("LLMRawFindingSchema", () => {
         line_end: 44,
         title: "Reject unsigned session token",
         body: "The session token path accepts unsigned tokens.",
+        recommendation:
+          "Verify the token signature with the existing verifySession helper before use.",
         suggested_code: "throw new UnauthorizedError();",
         confidence: 0.99,
         cwe: "CWE-347",
@@ -75,6 +80,7 @@ describe("LLMRawFindingSchema", () => {
         line_end: 1,
         title: "Reject missing payment status",
         body: "The payment status can be omitted.",
+        recommendation: "Require the payment status field and reject requests where it is absent.",
         suggested_code: null,
         confidence: 0,
       },
@@ -86,6 +92,7 @@ describe("LLMRawFindingSchema", () => {
         line_end: 7,
         title: "t".repeat(200),
         body: "b".repeat(2000),
+        recommendation: "r".repeat(1000),
         suggested_code: "const total = amount ?? 0;",
         confidence: 1,
       },
@@ -145,6 +152,8 @@ describe("LLMRawFindingSchema", () => {
         line_end: 44,
         title: "Reject unsigned session token",
         body: "The session token path accepts unsigned tokens.",
+        recommendation:
+          "Verify the token signature with the existing verifySession helper before use.",
         suggested_code: null,
         confidence: 0.8,
         [field]: value,
@@ -303,6 +312,8 @@ describe("LLMRawFindingSchema", () => {
         line_end: 44,
         title: "Reject unsigned session token",
         body: "The session token path accepts unsigned tokens.",
+        recommendation:
+          "Verify the token signature with the existing verifySession helper before use.",
         suggested_code: null,
         confidence: 0.8,
         cwe,

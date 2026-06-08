@@ -132,6 +132,7 @@ function buildSyntheticFailureFinding(failure: unknown, retryBudget: number): Fi
     line_end: 1,
     title: "review_failed",
     body: failureBody(failure, retryBudget),
+    recommendation: "Re-run the review; if the failure recurs, check the provider configuration.",
     source: "llm",
     confidence: 1,
   });

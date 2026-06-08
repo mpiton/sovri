@@ -30,6 +30,7 @@ function makeFinding(spec: Spec): Finding {
     line_end: spec.line,
     title: spec.title,
     body: `Body for ${spec.title}.`,
+    recommendation: `Fix the issue in ${spec.title}.`,
     source: "llm",
     confidence: 0.8,
   };

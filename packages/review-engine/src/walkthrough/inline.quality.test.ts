@@ -33,8 +33,10 @@ describe("inline renderer quality contract (R-08)", () => {
     expect(lines[0]).toBe("// SPDX-License-Identifier: Apache-2.0");
     expect(lines[1]).toBe("// Copyright 2026 Sovri SAS");
     // And the renderer source contains no TypeScript escape hatches
-    expect(source).not.toMatch(/\bany\b/u);
-    expect(source).not.toMatch(/\sas\s/u);
+    // Strip single-line comments before checking so prose in comments does not false-positive
+    const codeOnly = stripSingleLineComments(source);
+    expect(codeOnly).not.toMatch(/\bany\b/u);
+    expect(codeOnly).not.toMatch(/\sas\s/u);
     expect(source).not.toContain("@ts-ignore");
     expect(source).not.toContain("@ts-expect-error");
     expect(source).not.toContain("oxlint-disable");
@@ -54,6 +56,14 @@ describe("inline renderer quality contract (R-08)", () => {
 
 function readInlineSource(): string {
   return readFileSync(INLINE_SOURCE_URL, "utf8");
+}
+
+/** Remove `//` single-line comments so prose inside them doesn't trip TS keyword checks. */
+function stripSingleLineComments(source: string): string {
+  return source
+    .split(/\r?\n/u)
+    .map((line) => line.replace(/\/\/.*$/u, ""))
+    .join("\n");
 }
 
 function extractBadgeImports(source: string): string {

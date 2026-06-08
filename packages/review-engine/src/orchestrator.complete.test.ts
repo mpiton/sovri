@@ -251,6 +251,7 @@ interface ProviderFindingFixture {
   readonly line_end: number;
   readonly title: string;
   readonly body: string;
+  readonly recommendation: string;
   readonly confidence: number;
 }
 
@@ -265,6 +266,8 @@ const MajorFindingProviderResponse: ProviderResponseFixture = {
       line_end: 42,
       title: "Missing orchestration guard",
       body: "The orchestration path should preserve the complete Review contract.",
+      recommendation:
+        "Add a null check before accessing the orchestration result to preserve the complete Review contract.",
       confidence: 0.91,
     },
   ],
@@ -282,6 +285,8 @@ const SchemaValidationProviderResponse: ProviderResponseFixture = {
       line_end: 42,
       title: "Schema-valid finding",
       body: "The returned finding should satisfy the core FindingSchema.",
+      recommendation:
+        "Ensure the finding object includes all required fields defined by FindingSchema before returning it.",
       confidence: 0.91,
     },
   ],

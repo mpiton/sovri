@@ -24,6 +24,7 @@ const baseFinding: Finding = {
   line_end: 45,
   title: "Unvalidated session token",
   body: "The handler accepts a token without signature validation.",
+  recommendation: "Validate the token signature before accepting it.",
   source: "llm",
   confidence: 0.9,
   audit_reference: "SOVRI-SC-AB12-CD34",

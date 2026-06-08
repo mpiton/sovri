@@ -17,6 +17,8 @@ const baseFinding: Finding = {
   line_end: 31,
   title: "Provenance validation missing",
   body: "The walkthrough should reject malformed provenance before rendering markdown.",
+  recommendation:
+    "Validate the provenance payload with WalkthroughInputSchema before calling composeWalkthrough.",
   source: "llm",
   confidence: 0.91,
   audit_reference: "SOVRI-SC-AB12-CD34",

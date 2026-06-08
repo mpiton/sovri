@@ -15,6 +15,8 @@ const baseFinding: Finding = {
   line_end: 42,
   title: "Secret provenance leak",
   body: "The walkthrough should not render non-provenance secret-shaped values.",
+  recommendation:
+    "Strip non-provenance fields from the review before passing it to composeWalkthrough.",
   source: "llm",
   confidence: 0.9,
   audit_reference: "SOVRI-SC-AB12-CD34",

@@ -88,11 +88,15 @@ function buildInlineCommentDraft(finding: Finding, diff: Diff): InlineCommentDra
 }
 
 function formatInlineBody(finding: Finding, fingerprint: string): string {
+  // Issue-only inline comments (issue #2450): badges, then the problem and its concrete fix on
+  // labelled lines — never a bare narration of the hunk. `body` is the problem, `recommendation` the fix.
   const body = [
     `${severityBadge(finding.severity)} ${categoryBadge(finding.category)}`,
     `**${finding.title}**`,
     "",
-    finding.body,
+    `**Problem:** ${finding.body}`,
+    "",
+    `**Fix:** ${finding.recommendation}`,
   ].join("\n");
   const auditLine = renderAuditReference(finding);
   const suggestionBlock = renderCommittableSuggestionBlock(finding);

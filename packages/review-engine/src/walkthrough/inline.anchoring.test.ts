@@ -128,6 +128,7 @@ function createBillingFinding(file: string, lineStart: number, lineEnd = lineSta
     line_end: lineEnd,
     title: "Missing billing guard",
     body: "This billing path can be reached without verifying payment state.",
+    recommendation: "Add a payment state check before proceeding with the billing operation.",
     source: "llm",
     confidence: 0.9,
   };

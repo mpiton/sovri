@@ -129,6 +129,7 @@ describe("zodToProviderJsonSchema — @sovri/core integration", () => {
       "line_end",
       "title",
       "body",
+      "recommendation",
       "source",
       "confidence",
       "compliance_references",

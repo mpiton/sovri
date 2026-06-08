@@ -26,6 +26,8 @@ const baseFinding: Finding = {
   line_end: 12,
   title: "Possible null dereference",
   body: "Variable `foo` may be `null` here because the early-return guard above only checks `bar`.",
+  recommendation:
+    "Guard `foo` for `null` before dereferencing it, or widen the early-return check to cover `foo`.",
   source: "llm",
   confidence: 0.85,
   compliance_references: [],
@@ -196,6 +198,30 @@ describe("FindingSchema — body length", () => {
 
   it("rejects a body longer than 2000 characters", () => {
     expect(FindingSchema.safeParse({ ...baseFinding, body: "b".repeat(2001) }).success).toBe(false);
+  });
+});
+
+describe("FindingSchema — recommendation (required fix, issue #2450)", () => {
+  it("rejects a finding with no recommendation", () => {
+    const { recommendation: _dropped, ...withoutRecommendation } = baseFinding;
+    expect(FindingSchema.safeParse(withoutRecommendation).success).toBe(false);
+  });
+
+  it("rejects an empty recommendation", () => {
+    expect(FindingSchema.safeParse({ ...baseFinding, recommendation: "" }).success).toBe(false);
+  });
+
+  it("rejects a recommendation longer than 1000 characters", () => {
+    expect(
+      FindingSchema.safeParse({ ...baseFinding, recommendation: "r".repeat(1001) }).success,
+    ).toBe(false);
+  });
+
+  it("accepts recommendation at the maximum length (1000)", () => {
+    const recommendation = "r".repeat(1000);
+    expect(FindingSchema.parse({ ...baseFinding, recommendation }).recommendation).toHaveLength(
+      1000,
+    );
   });
 });
 
@@ -553,6 +579,7 @@ describe("FindingSchema — backward compatibility (R-06)", () => {
       line_end: 12,
       title: "Possible null dereference",
       body: "Variable foo may be null here.",
+      recommendation: "Add a null check on foo before dereferencing it.",
       source: "llm",
       confidence: 0.85,
     };

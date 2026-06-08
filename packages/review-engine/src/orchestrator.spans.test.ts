@@ -133,6 +133,7 @@ function majorFinding(overrides: Record<string, unknown> = {}): Record<string, u
     line_end: 42,
     title: "Missing orchestration guard",
     body: "The orchestration path should preserve the complete Review contract.",
+    recommendation: "Add a guard to verify the orchestration result before returning it.",
     confidence: 0.91,
     ...overrides,
   };

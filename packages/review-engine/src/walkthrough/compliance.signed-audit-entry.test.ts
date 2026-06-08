@@ -15,6 +15,8 @@ const baseFinding: Finding = {
   line_end: 23,
   title: "Signed audit entry missing",
   body: "The walkthrough should identify the signed audit entry when one exists.",
+  recommendation:
+    "Add a signed_audit_entry field to the provenance payload so the compliance block renders it.",
   source: "llm",
   confidence: 0.91,
   audit_reference: "SOVRI-SC-AB12-CD34",

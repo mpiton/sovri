@@ -161,6 +161,7 @@ function createAuthFinding(): Finding {
     line_end: 42,
     title: "Missing authorization check",
     body: "This path can be reached without verifying the session.",
+    recommendation: "Add a session verification check before executing the handler.",
     source: "llm",
     confidence: 0.92,
   };

@@ -155,6 +155,7 @@ describe("review-engine parsing source conventions", () => {
           line_end: 12,
           title: "Preserve fallback user name",
           body: "The user name fallback should stay explicit.",
+          recommendation: "Use the nullish coalescing operator to provide a concrete fallback.",
           suggested_code: 'return user.name ?? "Anonymous";',
           confidence: 0.94,
         },

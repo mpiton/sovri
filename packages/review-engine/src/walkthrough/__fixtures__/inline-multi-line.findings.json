@@ -9,6 +9,7 @@
     "title": "Missing payload guard",
     "body": "`request.body.user` is read repeatedly without validation.",
     "source": "llm",
-    "confidence": 0.9
+    "confidence": 0.9,
+    "recommendation": "Apply the fix for missing payload guard: change the code so the problem no longer occurs."
   }
 ]

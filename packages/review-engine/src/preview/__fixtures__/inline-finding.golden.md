@@ -1,7 +1,9 @@
 🔴 🔒 Security
 **Escape user-supplied HTML**
 
-The renderer must keep user-controlled HTML inert before posting review output.
+**Problem:** The renderer must keep user-controlled HTML inert before posting review output.
+
+**Fix:** Apply the fix for escape user-supplied html: change the code so the problem no longer occurs.
 
 🔍 Audit Reference: SOVRI-AC-AB12-CD34
 

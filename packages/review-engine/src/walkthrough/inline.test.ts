@@ -92,6 +92,7 @@ describe("buildInlineComments", () => {
         line_end: 18,
         title: "Missing null guard",
         body: "`session.user` can be undefined.",
+        recommendation: "Add a null check for `session.user` before accessing its properties.",
         source: "llm",
         confidence: 0.87,
       },
@@ -104,6 +105,7 @@ describe("buildInlineComments", () => {
         line_end: 19,
         title: "Weak error message",
         body: "The thrown error hides useful context.",
+        recommendation: "Include the original cause and relevant context in the thrown error.",
         source: "llm",
         confidence: 0.72,
       },
@@ -136,6 +138,7 @@ describe("buildInlineComments", () => {
         line_end: 18,
         title: "Missing null guard",
         body: "`session.user` can be undefined.",
+        recommendation: "Add a null check for `session.user` before accessing its properties.",
         source: "llm",
         confidence: 0.87,
       },
@@ -263,6 +266,7 @@ describe("buildInlineComments — refreshed inline finding header", () => {
         line_end: 18,
         title: "Missing null guard",
         body: "`session.user` can be undefined.",
+        recommendation: "Add a null check for `session.user` before accessing its properties.",
         source: "llm",
         confidence: 0.87,
       },
@@ -285,12 +289,14 @@ describe("buildInlineComments — refreshed inline finding header", () => {
     // Given the finding title is "Preserve body markdown"
     // And the finding body has two markdown lines
     const body = "`value` should stay untouched.\nSecond line keeps **markdown**.";
+    const recommendation = "Replace the raw value with the validated form before use.";
     const findings: Finding[] = [
       makeFinding({
         file: "src/format.ts",
         lineStart: 12,
         title: "Preserve body markdown",
         body,
+        recommendation,
       }),
     ];
     const diff = makeDiff("src/format.ts", [12]);
@@ -299,11 +305,15 @@ describe("buildInlineComments — refreshed inline finding header", () => {
     const comments = buildInlineComments(findings, diff);
     const lines = comments[0]?.body.split("\n") ?? [];
 
-    // Then the badge prefix, bold title, blank separator, and body order is exact
+    // Then the badge prefix, bold title, blank separator, and Problem/Fix order is exact
     expect(lines[0]).toBe(`${severityBadge("minor")} ${categoryBadge("maintainability")}`);
     expect(lines[1]).toBe("**Preserve body markdown**");
     expect(lines[2]).toBe("");
-    expect(lines.slice(3, 5).join("\n")).toBe(body);
+    // Problem label precedes the body text, Fix label follows it
+    expect(lines[3]).toBe(`**Problem:** ${body.split("\n")[0]}`);
+    expect(lines[4]).toBe(body.split("\n")[1]);
+    expect(lines[5]).toBe("");
+    expect(lines[6]).toBe(`**Fix:** ${recommendation}`);
   });
 });
 
@@ -344,6 +354,7 @@ describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04, 
         line_end: 18,
         title: "Missing null guard",
         body: "`session.user` can be undefined.",
+        recommendation: "Add a null check for `session.user` before accessing its properties.",
         source: "llm",
         confidence: 0.87,
       },
@@ -357,12 +368,12 @@ describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04, 
     // Then exactly one inline comment is produced for "src/session.ts"
     expect(comments).toHaveLength(1);
     expect(comments[0]?.path).toBe("src/session.ts");
-    // And the inline comment body renders the badge prefix, title, body and
+    // And the inline comment body renders the badge prefix, title, Problem/Fix block and
     // audit reference, then the hidden finding marker as the very last line —
     // enforced as a single start-to-end match so nothing can be inserted before
     // the marker
     expect(comments[0]?.body).toMatch(
-      /^🔴 🐛 Bug\n\*\*Missing null guard\*\*\n\n`session\.user` can be undefined\.\n\n🔍 Audit Reference: SOVRI-SC-AB12-CD34\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u,
+      /^🔴 🐛 Bug\n\*\*Missing null guard\*\*\n\n\*\*Problem:\*\* `session\.user` can be undefined\.\n\n\*\*Fix:\*\* Add a null check for `session\.user` before accessing its properties\.\n\n🔍 Audit Reference: SOVRI-SC-AB12-CD34\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u,
     );
   });
 
@@ -380,6 +391,7 @@ describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04, 
         line_end: 18,
         title: "Missing null guard",
         body: "`session.user` can be undefined.",
+        recommendation: "Add a null check for `session.user` before accessing its properties.",
         source: "llm",
         confidence: 0.87,
       },
@@ -392,10 +404,10 @@ describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04, 
 
     // Then the inline comment body does not contain "🔍 Audit Reference:"
     expect(comments[0]?.body).not.toContain("🔍 Audit Reference:");
-    // And the inline comment body renders the badge prefix, title and body, then
+    // And the inline comment body renders the badge prefix, title and Problem/Fix block, then
     // the hidden finding marker as the very last line — single start-to-end match
     expect(comments[0]?.body).toMatch(
-      /^🔴 🐛 Bug\n\*\*Missing null guard\*\*\n\n`session\.user` can be undefined\.\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u,
+      /^🔴 🐛 Bug\n\*\*Missing null guard\*\*\n\n\*\*Problem:\*\* `session\.user` can be undefined\.\n\n\*\*Fix:\*\* Add a null check for `session\.user` before accessing its properties\.\n\n<!-- sovri-finding-id: [0-9a-f]{16} -->$/u,
     );
   });
 
@@ -415,6 +427,8 @@ describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04, 
         line_end: 42,
         title: "Hardcoded credentials detected",
         body: "Credentials must not be committed to source control.",
+        recommendation:
+          "Store credentials in environment variables and access them via a secrets manager.",
         source: "llm",
         confidence: 0.95,
         compliance_references: [
@@ -469,6 +483,7 @@ describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04, 
         line_end: 18,
         title: "Unvalidated session token",
         body: "The token is trusted unchecked.",
+        recommendation: "Validate and verify the session token signature before trusting it.",
         source: "llm",
         confidence: 0.9,
       },
@@ -482,6 +497,7 @@ describe("buildInlineComments — audit reference line (R-01, R-02, R-03, R-04, 
         line_end: 42,
         title: "Missing payload null guard",
         body: "The payload can be null here.",
+        recommendation: "Guard against a null payload with an early return or explicit check.",
         source: "llm",
         confidence: 0.8,
       },
@@ -864,6 +880,7 @@ function makeFinding(options: {
   readonly lineEnd?: number;
   readonly title: string;
   readonly body: string;
+  readonly recommendation?: string;
   readonly severity?: Finding["severity"];
   readonly category?: Finding["category"];
   readonly suggestion?: Finding["suggestion"];
@@ -878,6 +895,8 @@ function makeFinding(options: {
     line_end: options.lineEnd ?? options.lineStart,
     title: options.title,
     body: options.body,
+    recommendation:
+      options.recommendation ?? `Fix the issue described in: ${options.title.toLowerCase()}.`,
     ...(options.suggestion === undefined ? {} : { suggestion: options.suggestion }),
     source: "llm",
     confidence: 0.86,

@@ -53,6 +53,8 @@ describe("reviewPullRequest MSW integration paths", () => {
                 line_end: 42,
                 title: "Missing error guard",
                 body: "Guard this path before returning the review.",
+                recommendation:
+                  "Add an error guard before returning the review to handle missing or invalid results.",
                 suggested_code: "const review = await runReview(input, options);",
                 confidence: 0.91,
               },
@@ -302,6 +304,7 @@ const findingFor = (cwe: string | undefined, category: string, severity: string)
   line_end: 42,
   title: "Finding title",
   body: "Finding body.",
+  recommendation: "Review the finding and apply the appropriate fix.",
   confidence: 0.9,
   ...(cwe === undefined ? {} : { cwe }),
 });

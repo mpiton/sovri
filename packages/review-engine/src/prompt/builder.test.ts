@@ -493,10 +493,10 @@ describe("buildSystemPrompt", () => {
     expect(new Set(Object.values(prompts)).size).toBe(4);
     expect(prompts).toMatchInlineSnapshot(`
       {
-        "bugs-only": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Focus on correctness bugs that can change runtime behavior. Ignore style-only findings and formatting nits. Ignore performance-only findings unless they cause incorrect behavior. Return structured JSON findings that match the requested schema.",
-        "full": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Return structured JSON findings that match the requested schema.",
-        "minimal": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Return at most 3 findings. Include only blocker or major severity findings. Suppress nits, style-only comments, and minor findings. Return structured JSON findings that match the requested schema.",
-        "strict": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Hold the diff to a high bar. Report all valid blocker, major, and minor issues, including maintainability, style, readability, and test-quality concerns that justify at least minor severity. Return structured JSON findings that match the requested schema.",
+        "bugs-only": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Report only correctness bugs that can change runtime behavior; ignore style, formatting, and performance-only nits. Never describe what the code does; a hunk with no issue yields no finding. Each finding states the problem and its impact in \`body\` and the concrete fix in \`recommendation\`. Write a neutral one-paragraph \`summary\` separately from the findings. Return structured JSON findings that match the requested schema.",
+        "full": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Report only defects and concrete improvements: bugs, security, performance, real design or maintainability problems, missing tests, and risky edge cases. Never describe what the code does; a hunk with no issue yields no finding. Each finding states the problem and its impact in \`body\` and the concrete fix in \`recommendation\`. Write a neutral one-paragraph \`summary\` separately from the findings. Return structured JSON findings that match the requested schema.",
+        "minimal": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Report at most 3 findings, blocker or major severity only; suppress nits, style, and minor findings. Never describe what the code does; a hunk with no issue yields no finding. Each finding states the problem and its impact in \`body\` and the concrete fix in \`recommendation\`. Write a neutral one-paragraph \`summary\` separately from the findings. Return structured JSON findings that match the requested schema.",
+        "strict": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Hold the diff to a high bar: report every valid blocker, major, and minor issue, including maintainability, style, readability, and test-quality problems that justify at least minor severity. Never describe what the code does; a hunk with no issue yields no finding. Each finding states the problem and its impact in \`body\` and the concrete fix in \`recommendation\`. Write a neutral one-paragraph \`summary\` separately from the findings. Return structured JSON findings that match the requested schema.",
       }
     `);
   });
@@ -508,11 +508,11 @@ describe("buildSystemPrompt", () => {
     const systemPrompt = buildSystemPrompt({ mode: "bugs-only" });
 
     // Then the system prompt instructs the model to focus on correctness bugs.
-    expect(systemPrompt).toContain("Focus on correctness bugs");
-    // And the system prompt instructs the model to ignore style-only findings.
-    expect(systemPrompt).toContain("Ignore style-only findings");
+    expect(systemPrompt).toContain("correctness bugs");
+    // And the system prompt instructs the model to ignore style findings.
+    expect(systemPrompt).toContain("ignore style");
     // And the system prompt instructs the model to ignore performance-only findings.
-    expect(systemPrompt).toContain("Ignore performance-only findings");
+    expect(systemPrompt).toContain("performance-only");
     // And the system prompt does not contain runtime pull request data.
     expect(systemPrompt).not.toContain("src/payment.ts");
   });
@@ -528,7 +528,7 @@ describe("buildSystemPrompt", () => {
     // And the system prompt limits findings to severity "blocker" or "major".
     expect(systemPrompt).toContain("blocker or major");
     // And the system prompt suppresses nits and minor findings.
-    expect(systemPrompt).toContain("Suppress nits");
+    expect(systemPrompt).toContain("suppress nits");
     expect(systemPrompt).toContain("minor findings");
     // And the system prompt does not contain runtime pull request data.
     expect(systemPrompt).not.toContain("src/payment.ts");
@@ -576,6 +576,24 @@ describe("buildSystemPrompt", () => {
     // And validateSystemTemplateSize returns the same prompt.
     expect(validateSystemTemplateSize(systemPrompt)).toBe(systemPrompt);
   });
+
+  it.each(["full", "bugs-only", "strict", "minimal"] as const)(
+    "keeps %s mode within the system prompt byte budget after the reviewer reframe (issue #2450)",
+    (mode) => {
+      const systemPrompt = buildSystemPrompt({ mode });
+
+      expect(new TextEncoder().encode(systemPrompt).byteLength).toBeLessThanOrEqual(
+        SYSTEM_PROMPT_MAX_BYTES,
+      );
+      // And every reframed mode states the required recommendation contract.
+      expect(systemPrompt).toContain("`recommendation`");
+      // And no mode narrates.
+      expect(systemPrompt).toContain("Never describe what the code does");
+      // And the few-shot examples live in the user prompt, never the capped system prompt.
+      expect(systemPrompt).not.toContain("generateAuthContent");
+      expect(systemPrompt).not.toContain("Unvalidated session token");
+    },
+  );
 
   it("keeps strict mode on the structured JSON and supplied-data-only contract", () => {
     // Given the raw prompt config is {"mode":"strict"}.

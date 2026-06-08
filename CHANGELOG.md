@@ -171,6 +171,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Changed
 
+- `feat(core)!`: inline review comments now flag issues instead of narrating the diff (#2450). `Finding`
+  and the provider response contract gain a **required** `recommendation` (`z.string().min(1).max(1000)`):
+  `body` states what is wrong and why it matters, `recommendation` states the concrete fix. A finding
+  with no fix is now structurally invalid, so a model cannot pass narration through validation. Inline
+  comment bodies render `**Problem:**` / `**Fix:**` lines, and the four review-prompt modes are reframed
+  from narrator to reviewer (report only defects and concrete improvements; a clean hunk yields no
+  finding) within the unchanged 1024-byte system-prompt cap, with a few-shot example carried in the user
+  prompt. An empty review renders `✅ No blocking issues found.` and zero inline comments. The PR
+  description is never edited. Breaking schema change (new required field); pre-1.0, shipped as a minor
+  bump.
 - `build(bot)`: start the community bot under the OpenTelemetry auto-instrumentation hook. The
   `start` script and the Docker runtime `CMD` now run
   `node --require @opentelemetry/auto-instrumentations-node/register dist/server.js`, so the SDK loads

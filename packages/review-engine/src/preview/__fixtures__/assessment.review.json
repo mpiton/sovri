@@ -18,7 +18,8 @@
       "source": "llm",
       "confidence": 0.91,
       "cwe": "CWE-79",
-      "compliance_references": []
+      "compliance_references": [],
+      "recommendation": "Apply the fix for escape user-supplied html: change the code so the problem no longer occurs."
     },
     {
       "id": "37d0314c-8947-4bc4-9e28-41da054db580",
@@ -31,7 +32,8 @@
       "body": "The summary renderer repeats section assembly logic that should stay centralized.",
       "source": "llm",
       "confidence": 0.72,
-      "compliance_references": []
+      "compliance_references": [],
+      "recommendation": "Apply the fix for extract markdown section builder: change the code so the problem no longer occurs."
     },
     {
       "id": "5c4d8d67-2e4a-4f3a-a5db-a9d52c6f6d12",
@@ -44,7 +46,8 @@
       "body": "The preview catalog needs an assertion for empty review output before changing the summary template.",
       "source": "llm",
       "confidence": 0.67,
-      "compliance_references": []
+      "compliance_references": [],
+      "recommendation": "Apply the fix for cover empty findings in snapshots: change the code so the problem no longer occurs."
     },
     {
       "id": "accd2fd7-d5c1-44ed-93f6-25d035691acc",
@@ -57,7 +60,8 @@
       "body": "The local-only preview workflow should be discoverable for maintainers.",
       "source": "llm",
       "confidence": 0.58,
-      "compliance_references": []
+      "compliance_references": [],
+      "recommendation": "Apply the fix for document preview harness usage: change the code so the problem no longer occurs."
     }
   ]
 }
