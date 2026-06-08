@@ -41,6 +41,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `docs`: self-host observability and image-verification guide (docs/observability.md) covering the
+  three recommended OTel stacks, the `OTEL_*` variables and the no-op default, the `/metrics` endpoint
+  with the five `sovri.*` metrics and the `review.*` spans, and the pre-deploy cosign + SLSA image
+  verification steps (R-01..R-10, #2454).
 - `feat(observability)`: wire a single shared `PrometheusExporter` (`MetricReader`,
   `preventServerStart: true`) into the meter provider and expose `getPrometheusExporter()` plus an async
   `collectPrometheusText()` serializer. The accessor returns `undefined` and the serializer resolves to

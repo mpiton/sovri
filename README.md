@@ -165,13 +165,14 @@ Deployments that need reproducibility should pin to `vX.Y.Z`. The moving aliases
 
 ## Documentation
 
-| Resource                                                     | What you will find                                                     |
-| ------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| [`CHANGELOG.md`](CHANGELOG.md)                               | Keep-a-Changelog 1.1 history, Unreleased section updated on every PR.  |
-| [`docs/sovri-yml-reference.md`](docs/sovri-yml-reference.md) | `.sovri.yml` fields, defaults, providers, and examples.                |
-| [`docs/adr/`](docs/adr/)                                     | Architecture Decision Records (toolchain, licensing, security policy). |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md)                         | How to file issues, propose features, send pull requests.              |
-| [`.github/SECURITY.md`](.github/SECURITY.md)                 | Vulnerability reporting policy, scope, response SLA.                   |
+| Resource                                                     | What you will find                                                      |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| [`CHANGELOG.md`](CHANGELOG.md)                               | Keep-a-Changelog 1.1 history, Unreleased section updated on every PR.   |
+| [`docs/sovri-yml-reference.md`](docs/sovri-yml-reference.md) | `.sovri.yml` fields, defaults, providers, and examples.                 |
+| [`docs/observability.md`](docs/observability.md)             | Self-host OTel wiring, the `/metrics` endpoint, and image verification. |
+| [`docs/adr/`](docs/adr/)                                     | Architecture Decision Records (toolchain, licensing, security policy).  |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md)                         | How to file issues, propose features, send pull requests.               |
+| [`.github/SECURITY.md`](.github/SECURITY.md)                 | Vulnerability reporting policy, scope, response SLA.                    |
 
 ---
 
