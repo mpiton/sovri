@@ -109,11 +109,13 @@ good_workflow() {
       contents: read}"
   local extra_scope="${EXTRA_SCOPE:-}"
   local attest_ref="${ATTEST_REF:-${ATTEST_PROVENANCE_SHA}}"
-  local subject_name="${SUBJECT_NAME:-${IMAGE}}"
+  # `-` (not `:-`) so SUBJECT_NAME="" passes an empty value through instead of falling back to IMAGE.
+  local subject_name="${SUBJECT_NAME-${IMAGE}}"
   local subject_digest="${SUBJECT_DIGEST:-\${{ needs.build-and-push.outputs.digest }}}"
   local push_to_registry="${PUSH_TO_REGISTRY-true}"
   local verify_comment="${VERIFY_COMMENT:-yes}"
   local rebuild="${REBUILD:-}"
+  local rebuild_run="${REBUILD_RUN:-}"
   local omit_attest="${OMIT_ATTEST:-}"
   local leak_step="${LEAK_STEP:-}"
 
@@ -142,6 +144,10 @@ ${extra_scope}"
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf
         with:
           push: true
+"
+  elif [ -n "$rebuild_run" ]; then
+    rebuild_step="      - name: Rebuild image
+        run: docker buildx build --push -t ${IMAGE}:1.2.3 .
 "
   fi
 
@@ -263,7 +269,7 @@ MARKDOWN
 # leak into the next; cases must NOT run in a subshell or their PASS/FAIL counters would be discarded.
 reset_knobs() {
   unset TRIGGER BUILD_OUTPUTS ATTEST_NEEDS ATTEST_PERMS EXTRA_SCOPE ATTEST_REF SUBJECT_NAME \
-    SUBJECT_DIGEST PUSH_TO_REGISTRY VERIFY_COMMENT REBUILD OMIT_ATTEST LEAK_STEP CHANGELOG_FN
+    SUBJECT_DIGEST PUSH_TO_REGISTRY VERIFY_COMMENT REBUILD REBUILD_RUN OMIT_ATTEST LEAK_STEP CHANGELOG_FN
 }
 
 run_case() {
@@ -302,6 +308,9 @@ PUSH_TO_REGISTRY="" run_case "R-01 push empty" fail "slsa_provenance=fail" "push
 SUBJECT_NAME="${IMAGE}:latest" run_case "R-01 subject tag latest" fail "slsa_provenance=fail" "subject_name=tagged"
 SUBJECT_NAME="${IMAGE}:\${{ steps.image-tags.outputs.full }}" run_case "R-01 subject tag expr" fail "slsa_provenance=fail" "subject_name=tagged"
 
+# R-01 — an empty subject-name is rejected, not deferred to runtime.
+SUBJECT_NAME="" run_case "R-01 subject empty" fail "slsa_provenance=fail" "subject_name=tagged"
+
 # R-02 — the build-and-push job surfaces the pushed digest as a job output (nominal).
 run_case "R-02 subject digest wired" pass "subject_digest=wired"
 
@@ -317,8 +326,10 @@ SUBJECT_DIGEST="\${{ steps.image-tags.outputs.full }}" \
 # R-03 — provenance and cosign bind the same build-and-push digest (nominal).
 run_case "R-03 digest binding shared" pass "digest_binding=shared"
 
-# R-03 — an attest job that rebuilds the image is rejected (no rebuild between sign and attest).
+# R-03 — an attest job that rebuilds the image is rejected (no rebuild between sign and attest),
+# whether via a build-push action or a raw `run: docker buildx build` shell step.
 REBUILD="yes" run_case "R-03 rebuild detected" fail "slsa_provenance=fail" "rebuild=detected"
+REBUILD_RUN="yes" run_case "R-03 rebuild via run" fail "slsa_provenance=fail" "rebuild=detected"
 
 # R-04 — exactly id-token+attestations+packages write, contents read (nominal).
 run_case "R-04 scoped perms" pass "permissions=scoped"
@@ -339,6 +350,10 @@ ATTEST_PERMS="      id-token: write
       attestations: write
       packages: write
       contents: write" run_case "R-04 contents write overbroad" fail "slsa_provenance=fail" "permissions=overbroad"
+# R-04 — contents must be pinned to read explicitly; a missing contents key is over-broad too.
+ATTEST_PERMS="      id-token: write
+      attestations: write
+      packages: write" run_case "R-04 contents missing overbroad" fail "slsa_provenance=fail" "permissions=overbroad"
 EXTRA_SCOPE="      actions: write" run_case "R-04 actions write overbroad" fail "slsa_provenance=fail" "permissions=overbroad"
 
 # R-05 — the attest job depends on build-and-push so the digest is signed first (nominal).

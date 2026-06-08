@@ -3063,9 +3063,13 @@ const getJobNeeds = (workflow, jobName) => {
   return needsEntry === undefined ? [] : readYamlListEntryValues(workflow, needsEntry);
 };
 
+// A rebuild can sneak in either as a build-push action or as a raw `run: docker build|buildx build`
+// shell step; both reconstruct the image between sign and attest and break the one-digest guarantee.
 const attestJobRebuildsImage = (workflow) =>
-  getJobStepBlocks(workflow, ATTEST_PROVENANCE_JOB_NAME).some((block) =>
-    getStepPropertyValue(block, "uses")?.startsWith(`${DOCKER_BUILD_ACTION_REPOSITORY}@`),
+  getJobStepBlocks(workflow, ATTEST_PROVENANCE_JOB_NAME).some(
+    (block) =>
+      getStepPropertyValue(block, "uses")?.startsWith(`${DOCKER_BUILD_ACTION_REPOSITORY}@`) ||
+      /\bdocker\s+(?:buildx\s+build|build)\b/.test(block),
   );
 
 const documentsAttestationVerifyCommand = (workflow) =>
@@ -3108,7 +3112,7 @@ const runSlsaProvenance = (args) => {
   }
 
   const subjectName = readStepWithInput(attestStep, "subject-name");
-  if (subjectName === undefined || subjectName.includes(":")) {
+  if (subjectName === undefined || subjectName.trim().length === 0 || subjectName.includes(":")) {
     writeStdout("slsa_provenance=fail\nsubject_name=tagged\n");
     fail("attestation subject-name must be the bare image repository, not a tagged reference", 1);
   }
@@ -3148,10 +3152,11 @@ const runSlsaProvenance = (args) => {
     writeStdout("slsa_provenance=fail\npackages=missing\n");
     fail(`${ATTEST_PROVENANCE_JOB_NAME} needs packages: write to push the attestation to GHCR`, 1);
   }
-  const requestsOverbroadScope = [...permissions.entries()].some(
-    ([name, value]) =>
-      !ATTEST_ALLOWED_PERMISSIONS.has(name) || (name === "contents" && value !== "read"),
-  );
+  // contents must be pinned to read explicitly: an absent contents key lets the job inherit a broadened
+  // root permission, so "missing" is treated as over-broad, not least-privilege.
+  const requestsOverbroadScope =
+    permissions.get("contents") !== "read" ||
+    [...permissions.keys()].some((name) => !ATTEST_ALLOWED_PERMISSIONS.has(name));
   if (requestsOverbroadScope) {
     writeStdout("slsa_provenance=fail\npermissions=overbroad\n");
     fail(`${ATTEST_PROVENANCE_JOB_NAME} requests a broader scope than the attestation needs`, 1);
