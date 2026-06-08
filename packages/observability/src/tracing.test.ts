@@ -82,17 +82,20 @@ describe("withSpan — transparent pass-through of fn's resolved value (R-01)", 
   });
 
   // Given a span is obtained from the tracer named "sovri"
-  // When withSpan("review.run", fn, { "repo": "acme/web", "pr.number": 42 }) is awaited
-  // Then the span carries those attributes and withSpan resolves to fn's value.
+  // When withSpan("review.run", fn, { "pr.repo": "acme/web", "pr.number": 42 }) is awaited
+  // Then the span carries those allowlisted attributes and withSpan resolves to fn's value.
   it("sets the caller's attributes on the span", async () => {
     const { withSpan } = await loadTracing();
 
     const result = await withSpan("review.run", async () => "done", {
-      repo: "acme/web",
+      "pr.repo": "acme/web",
       "pr.number": 42,
     });
 
-    expect(mocks.span.setAttributes).toHaveBeenCalledWith({ repo: "acme/web", "pr.number": 42 });
+    expect(mocks.span.setAttributes).toHaveBeenCalledWith({
+      "pr.repo": "acme/web",
+      "pr.number": 42,
+    });
     expect(result).toBe("done");
   });
 
@@ -250,8 +253,8 @@ describe("recordMetric — routes the value by instrument kind (R-07)", () => {
 
 describe("the helpers emit only caller-supplied attributes and tags (R-08)", () => {
   // Given a GitHub token and an LLM API key are in scope around the call site
-  // When withSpan("review.run", fn, { "repo": "acme/web" }) is awaited
-  // Then the only attribute on the span is "repo", and no token/key/payload appears among them.
+  // When withSpan("review.run", fn, { "pr.repo": "acme/web" }) is awaited
+  // Then the only attribute on the span is "pr.repo", and no token/key/payload appears among them.
   // When recordMetric(..., { "provider": "anthropic" }) is called
   // Then the only tag is "provider", and no secret appears among the tags.
   it("never serializes a token, key, or payload into a span attribute or metric tag", async () => {
@@ -267,10 +270,10 @@ describe("the helpers emit only caller-supplied attributes and tags (R-08)", () 
         void llmKey;
         return "ok";
       },
-      { repo: "acme/web" },
+      { "pr.repo": "acme/web" },
     );
 
-    expect(mocks.span.setAttributes).toHaveBeenCalledWith({ repo: "acme/web" });
+    expect(mocks.span.setAttributes).toHaveBeenCalledWith({ "pr.repo": "acme/web" });
     const spanArgs = JSON.stringify(mocks.span.setAttributes.mock.calls);
     for (const secret of [githubToken, llmKey]) {
       expect(spanArgs.includes(secret), `span attributes must not contain ${secret}`).toBe(false);

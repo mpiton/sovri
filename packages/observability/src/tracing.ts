@@ -5,6 +5,8 @@ import { metrics, SpanStatusCode, trace } from "@opentelemetry/api";
 import type { Counter, Histogram, MetricOptions } from "@opentelemetry/api";
 import { z } from "zod";
 
+import { sanitizeTelemetryAttributes } from "./redaction.js";
+
 // Generic span/metric facade over @opentelemetry/api (docs/adr/019). Pure facade: the SDK/exporter
 // wiring lives in telemetry.ts. @opentelemetry/api hands back no-op tracers/meters until an SDK is
 // started, which is what makes the uninitialized path safe — there is no is-initialized branch here.
@@ -59,9 +61,20 @@ export function withSpan<T>(
   return tracer.startActiveSpan(name, async (span): Promise<T> => {
     try {
       if (attributes) {
-        span.setAttributes(attributes);
+        span.setAttributes(sanitizeTelemetryAttributes(attributes));
       }
-      return await fn(span);
+      // Forward a guarded handle: every fn-set attribute is sanitized at the same choke point, so a
+      // disallowed key or secret-looking value computed during the operation cannot bypass the guard.
+      const guarded: SpanLike = {
+        setAttribute(key, value) {
+          for (const [safeKey, safeValue] of Object.entries(
+            sanitizeTelemetryAttributes({ [key]: value }),
+          )) {
+            span.setAttribute(safeKey, safeValue);
+          }
+        },
+      };
+      return await fn(guarded);
     } catch (error) {
       span.recordException(error instanceof Error ? error : String(error));
       span.setStatus({
@@ -129,9 +142,12 @@ export function recordMetric(
     throw new InvalidInstrumentError(parsed.error);
   }
   const valid = parsed.data;
+  // Sanitize the tag set before it reaches the meter so an off-allowlist or secret-looking tag can
+  // never widen cardinality or leak a value (R-06).
+  const safeTags = tags ? sanitizeTelemetryAttributes(tags) : undefined;
   if (valid.kind === "counter") {
-    getCounter(valid).add(value, tags);
+    getCounter(valid).add(value, safeTags);
   } else {
-    getHistogram(valid).record(value, tags);
+    getHistogram(valid).record(value, safeTags);
   }
 }

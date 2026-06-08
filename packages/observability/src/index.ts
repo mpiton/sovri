@@ -11,3 +11,5 @@ export {
   getPrometheusExporter,
   collectPrometheusText,
 } from "./metrics-reader.js";
+export { sanitizeTelemetryAttributes, ALLOWED_TELEMETRY_KEYS } from "./redaction.js";
+export type { AllowedTelemetryKey } from "./redaction.js";
