@@ -38,6 +38,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # id-token: write mints the ephemeral GitHub OIDC token that drives keyless cosign signing.
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -71,6 +73,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Build and push Community bot image
+        id: build
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf
         with:
           context: .
@@ -83,6 +86,19 @@ jobs:
             ghcr.io/mpiton/sovri/community-bot:${{ steps.image-tags.outputs.major }}
             ghcr.io/mpiton/sovri/community-bot:latest
           labels: org.opencontainers.image.source=https://github.com/mpiton/sovri
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da
+
+      # Sign the multi-arch manifest BY DIGEST with cosign keyless (Sigstore + GitHub OIDC): no private
+      # key, only the ephemeral id-token. The signature lands in the Rekor transparency log. Self-hosters
+      # verify the image before deploy with the command below — cert identity is THIS workflow, issuer is
+      # GitHub Actions OIDC. Copy it verbatim into the self-host guide (task-134):
+      #   cosign verify ghcr.io/mpiton/sovri/community-bot@sha256:<digest> \
+      #     --certificate-identity-regexp "^https://github.com/mpiton/sovri/.github/workflows/release.yml@.*" \
+      #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
+      - name: Sign image (keyless)
+        run: cosign sign --yes ghcr.io/mpiton/sovri/community-bot@${{ steps.build.outputs.digest }}
 
   sbom:
     runs-on: ubuntu-latest

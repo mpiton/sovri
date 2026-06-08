@@ -19,6 +19,18 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Security
+
+- `ci`: sign the Community-bot GHCR image with cosign keyless (Sigstore + GitHub OIDC) in
+  `release.yml`. The `build-and-push` job gains `id-token: write` and signs the multi-arch manifest
+  **by digest** — no private or KMS key is committed or referenced; the signing identity is the
+  ephemeral GitHub OIDC token and the signature lands in the Rekor transparency log. Self-hosters can
+  verify the published image before deploy with `cosign verify ...@sha256:<digest>
+  --certificate-identity-regexp <release.yml> --certificate-oidc-issuer
+  https://token.actions.githubusercontent.com` (documented verbatim in the workflow). The
+  `cosign-signing` CI policy in `scripts/ci-policy.mjs` enforces keyless, by-digest, SHA-pinned,
+  least-privilege signing and supersedes the earlier cosign deferral (R-01..R-09, #2442).
+
 ### Added
 
 - `feat(observability)`: wire a single shared `PrometheusExporter` (`MetricReader`,
