@@ -30,6 +30,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   https://token.actions.githubusercontent.com` (documented verbatim in the workflow). The
   `cosign-signing` CI policy in `scripts/ci-policy.mjs` enforces keyless, by-digest, SHA-pinned,
   least-privilege signing and supersedes the earlier cosign deferral (R-01..R-09, #2442).
+- `ci`: attach a SLSA build-provenance attestation to the Community-bot GHCR image in `release.yml`. A
+  new `attest-provenance` job (`needs: build-and-push`, `id-token`/`attestations`/`packages: write`) runs
+  `actions/attest-build-provenance` against `needs.build-and-push.outputs.digest` — the same digest cosign
+  signs — and pushes the attestation to GHCR. Self-hosters prove how and where the image was built with
+  `gh attestation verify oci://ghcr.io/mpiton/sovri/community-bot:<tag> --owner mpiton` (and
+  `cosign verify-attestation --type slsaprovenance`), documented verbatim in the workflow. The
+  `slsa-provenance` CI policy in `scripts/ci-policy.mjs` enforces digest binding, least privilege,
+  SHA-pinned actions, a documented verify command, and no secret leakage (R-01..R-10, #2447).
 
 ### Added
 

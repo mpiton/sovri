@@ -154,6 +154,8 @@ const cosignDeferralUsage =
   "Usage: node scripts/ci-policy.mjs cosign-deferral --workflow <path> --changelog <path>";
 const cosignSigningUsage =
   "Usage: node scripts/ci-policy.mjs cosign-signing --workflow <path> --changelog <path>";
+const slsaProvenanceUsage =
+  "Usage: node scripts/ci-policy.mjs slsa-provenance --workflow <path> --changelog <path>";
 const actionPinningUsage = "Usage: node scripts/ci-policy.mjs action-pinning --workflow <path>";
 const gitleaksActionPinningUsage =
   "Usage: node scripts/ci-policy.mjs gitleaks-action-pinning --workflow <path> --metadata <gitleaks-pin-metadata.json>";
@@ -193,7 +195,7 @@ const packageCoverageWorkflowUsage =
   "Usage: node scripts/ci-policy.mjs package-coverage-workflow --workflow <path> --package <package-path> --branches <min>";
 const coverageArtifactPolicyUsage =
   "Usage: node scripts/ci-policy.mjs coverage-artifact-policy --workflow <path>";
-const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dependencyReviewWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${releaseExtractNotesUsage}\n${releaseVerifyTagAnnotationUsage}\n${releaseVerifyCommitSubjectUsage}\n${readmeReferencesReleaseUsage}\n${promoteChangelogUsage}\n${cosignDeferralUsage}\n${cosignSigningUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}\n${coverageGateUsage}\n${llmProvidersCoverageWorkflowUsage}\n${packageCoverageWorkflowUsage}\n${coverageArtifactPolicyUsage}`;
+const usage = `${durationBudgetUsage}\n${secretsDurationBudgetUsage}\n${forbiddenJobsDurationBudgetUsage}\n${buildDockerDurationBudgetUsage}\n${codeqlDurationBudgetUsage}\n${codeqlWorkflowConfigUsage}\n${dependencyReviewWorkflowConfigUsage}\n${dockerBuildActionUsage}\n${dockerSetupActionPinningUsage}\n${buildDockerNeedsUsage}\n${buildDockerSchedulerUsage}\n${releasePipelineResultUsage}\n${releaseTriggerUsage}\n${releaseVerifyTagUsage}\n${releaseBuildAndPushUsage}\n${releaseExtractNotesUsage}\n${releaseVerifyTagAnnotationUsage}\n${releaseVerifyCommitSubjectUsage}\n${readmeReferencesReleaseUsage}\n${promoteChangelogUsage}\n${cosignDeferralUsage}\n${cosignSigningUsage}\n${slsaProvenanceUsage}\n${actionPinningUsage}\n${gitleaksActionPinningUsage}\n${auditGateUsage}\n${trivyVulnerabilityGateUsage}\n${trivyScanConfigUsage}\n${trivyStepCompletionUsage}\n${trivySarifUploadConfigUsage}\n${trivySarifUploadAfterFailureUsage}\n${secretsCheckoutDepthUsage}\n${secretsFixtureEvidenceUsage}\n${secretsNoSecretsReuseUsage}\n${changelogTriggerUsage}\n${changelogDiffUsage}\n${changelogCiOnlyAssertUsage}\n${changelogRemediationMessageUsage}\n${changelogDocumentationOnlyAssertUsage}\n${coverageGateUsage}\n${llmProvidersCoverageWorkflowUsage}\n${packageCoverageWorkflowUsage}\n${coverageArtifactPolicyUsage}`;
 
 const fail = (message, code) => {
   writeStderr(`${message}\n`);
@@ -2860,6 +2862,10 @@ const runCosignDeferral = (args) => {
 
 const COSIGN_INSTALLER_REPOSITORY = "sigstore/cosign-installer";
 const SIGNING_JOB_NAME = "build-and-push";
+// The two release jobs that legitimately mint a keyless GitHub OIDC token: build-and-push (cosign
+// signing) and attest-provenance (SLSA build provenance). id-token: write on any other job is widened.
+const ATTEST_PROVENANCE_JOB_NAME = "attest-provenance";
+const ID_TOKEN_JOB_NAMES = new Set([SIGNING_JOB_NAME, ATTEST_PROVENANCE_JOB_NAME]);
 // `echo` of a GitHub secret expression or the OIDC request token leaks a credential into job logs.
 const COSIGN_LEAK_PATTERN = /echo\b[^\n]*(?:\$\{\{\s*secrets\.|\bACTIONS_ID_TOKEN_REQUEST_TOKEN\b)/;
 
@@ -2972,7 +2978,8 @@ const runCosignSigning = (args) => {
 
   const widenedJob = listJobNames(workflow).find(
     (name) =>
-      name !== SIGNING_JOB_NAME && readJobPermissions(workflow, name)?.get("id-token") === "write",
+      !ID_TOKEN_JOB_NAMES.has(name) &&
+      readJobPermissions(workflow, name)?.get("id-token") === "write",
   );
   if (widenedJob !== undefined) {
     writeStdout("cosign_signing=fail\npermissions=widened\n");
@@ -3002,6 +3009,178 @@ const runCosignSigning = (args) => {
 
   writeStdout(
     "cosign_signing=pass\nsign_target=digest\npermissions=scoped\nverify_command=documented\naction_pinning=pinned\nchangelog=recorded\n",
+  );
+};
+
+const ATTEST_PROVENANCE_ACTION = "actions/attest-build-provenance";
+// The attest job may hold only these scopes; anything else, or `contents` other than read, is an
+// over-broad grant that R-04 (least privilege) rejects.
+const ATTEST_ALLOWED_PERMISSIONS = new Set(["id-token", "attestations", "packages", "contents"]);
+
+const getJobStepBlocks = (workflow, jobName) => {
+  const stepsBlockEntry = getJobStepsBlockEntry(workflow, jobName);
+  if (stepsBlockEntry === undefined) return [];
+  return getTopLevelListItemBlockEntries(stepsBlockEntry.block, stepsBlockEntry.startIndex).map(
+    (entry) => entry.block,
+  );
+};
+
+const getAttestProvenanceStep = (workflow) =>
+  getJobStepBlocks(workflow, ATTEST_PROVENANCE_JOB_NAME).find((block) =>
+    getStepPropertyValue(block, "uses")?.startsWith(`${ATTEST_PROVENANCE_ACTION}@`),
+  );
+
+// Read a `with:` input from a step block. subject-name, subject-digest and push-to-registry only ever
+// appear under `with:`, so a direct line match is unambiguous; an empty value (e.g. `push-to-registry:`)
+// returns the empty string, which the caller treats as disabled.
+const readStepWithInput = (stepBlock, key) => {
+  const match = stepBlock.match(
+    new RegExp(`^\\s*${escapeRegExp(key)}:\\s*(.*?)\\s*(?:#.*)?$`, "m"),
+  );
+  return match === null ? undefined : stripYamlQuotes(match[1].trim());
+};
+
+const getBuildAndPushDigestOutput = (workflow) => {
+  const jobEntry = getJobBlockEntry(workflow, SIGNING_JOB_NAME);
+  if (jobEntry === undefined) return undefined;
+  const outputsEntry = findDirectChildEntry(
+    getYamlStructureEntries(workflow),
+    jobEntry,
+    /^\s+outputs:\s*(?:#.*)?$/,
+  );
+  if (outputsEntry === undefined) return undefined;
+  return readDirectChildScalarMap(workflow, outputsEntry).get("digest");
+};
+
+const getJobNeeds = (workflow, jobName) => {
+  const jobEntry = getJobBlockEntry(workflow, jobName);
+  if (jobEntry === undefined) return [];
+  const needsEntry = findDirectChildEntry(
+    getYamlStructureEntries(workflow),
+    jobEntry,
+    /^\s+needs:\s*(?:.*)?$/,
+  );
+  return needsEntry === undefined ? [] : readYamlListEntryValues(workflow, needsEntry);
+};
+
+const attestJobRebuildsImage = (workflow) =>
+  getJobStepBlocks(workflow, ATTEST_PROVENANCE_JOB_NAME).some((block) =>
+    getStepPropertyValue(block, "uses")?.startsWith(`${DOCKER_BUILD_ACTION_REPOSITORY}@`),
+  );
+
+const documentsAttestationVerifyCommand = (workflow) =>
+  new RegExp(`gh attestation verify oci://${escapeRegExp(RELEASE_IMAGE_REPOSITORY)}`).test(
+    workflow,
+  ) &&
+  /--owner\s+mpiton/.test(workflow) &&
+  /cosign\s+verify-attestation/.test(workflow) &&
+  /--type\s+slsaprovenance/.test(workflow);
+
+// R-01..R-10: the release workflow attaches a SLSA build-provenance attestation to the pushed image
+// digest — the same digest task-132 signs — from a least-privilege `attest-provenance` job that runs
+// after signing, with every action SHA-pinned and a documented verify command. Each failing check
+// emits `slsa_provenance=fail` plus a specific status token; the digest binding is structural (the
+// build job surfaces `outputs.digest` and the attest step consumes `needs.build-and-push.outputs.digest`).
+const runSlsaProvenance = (args) => {
+  const options = parseOptions(args);
+  const workflowPath = readRequiredOption(options, "workflow", slsaProvenanceUsage);
+  const changelogPath = readRequiredOption(options, "changelog", slsaProvenanceUsage);
+  const workflow = readWorkflowFile(workflowPath);
+  const changelog = readTextFile(changelogPath, "changelog");
+
+  if (COSIGN_LEAK_PATTERN.test(workflow)) {
+    writeStdout("slsa_provenance=fail\nsecret_leak=detected\n");
+    fail("a workflow step echoes a credential into job logs", 1);
+  }
+
+  const attestStep = getAttestProvenanceStep(workflow);
+  if (attestStep === undefined) {
+    writeStdout("slsa_provenance=fail\nattest_step=missing\n");
+    fail(`${ATTEST_PROVENANCE_JOB_NAME} has no ${ATTEST_PROVENANCE_ACTION} step`, 1);
+  }
+
+  const attestRef = (getStepPropertyValue(attestStep, "uses") ?? "").slice(
+    `${ATTEST_PROVENANCE_ACTION}@`.length,
+  );
+  if (!/^[0-9a-f]{40}$/.test(attestRef)) {
+    writeStdout("slsa_provenance=fail\naction_pinning=unpinned\n");
+    fail(`${ATTEST_PROVENANCE_ACTION} must be pinned to a 40-character commit SHA`, 1);
+  }
+
+  const subjectName = readStepWithInput(attestStep, "subject-name");
+  if (subjectName === undefined || subjectName.includes(":")) {
+    writeStdout("slsa_provenance=fail\nsubject_name=tagged\n");
+    fail("attestation subject-name must be the bare image repository, not a tagged reference", 1);
+  }
+
+  const pushToRegistry = readStepWithInput(attestStep, "push-to-registry");
+  if (pushToRegistry !== "true") {
+    writeStdout("slsa_provenance=fail\npush_to_registry=disabled\n");
+    fail("attestation must set push-to-registry: true to attach to the GHCR image", 1);
+  }
+
+  if (getBuildAndPushDigestOutput(workflow) !== "${{ steps.build.outputs.digest }}") {
+    writeStdout("slsa_provenance=fail\njob_output=missing\n");
+    fail(`${SIGNING_JOB_NAME} must expose outputs.digest from the build step`, 1);
+  }
+
+  const subjectDigest = readStepWithInput(attestStep, "subject-digest");
+  if (subjectDigest !== "${{ needs.build-and-push.outputs.digest }}") {
+    writeStdout("slsa_provenance=fail\nsubject_digest=not_wired\n");
+    fail("attestation subject-digest must be the build-and-push digest output", 1);
+  }
+
+  if (attestJobRebuildsImage(workflow)) {
+    writeStdout("slsa_provenance=fail\nrebuild=detected\n");
+    fail("the attest-provenance job must not rebuild the image", 1);
+  }
+
+  const permissions = readJobPermissions(workflow, ATTEST_PROVENANCE_JOB_NAME) ?? new Map();
+  if (permissions.get("id-token") !== "write") {
+    writeStdout("slsa_provenance=fail\nid_token=missing\n");
+    fail(`${ATTEST_PROVENANCE_JOB_NAME} needs id-token: write for keyless OIDC`, 1);
+  }
+  if (permissions.get("attestations") !== "write") {
+    writeStdout("slsa_provenance=fail\nattestations=missing\n");
+    fail(`${ATTEST_PROVENANCE_JOB_NAME} needs attestations: write to record the attestation`, 1);
+  }
+  if (permissions.get("packages") !== "write") {
+    writeStdout("slsa_provenance=fail\npackages=missing\n");
+    fail(`${ATTEST_PROVENANCE_JOB_NAME} needs packages: write to push the attestation to GHCR`, 1);
+  }
+  const requestsOverbroadScope = [...permissions.entries()].some(
+    ([name, value]) =>
+      !ATTEST_ALLOWED_PERMISSIONS.has(name) || (name === "contents" && value !== "read"),
+  );
+  if (requestsOverbroadScope) {
+    writeStdout("slsa_provenance=fail\npermissions=overbroad\n");
+    fail(`${ATTEST_PROVENANCE_JOB_NAME} requests a broader scope than the attestation needs`, 1);
+  }
+
+  if (!getJobNeeds(workflow, ATTEST_PROVENANCE_JOB_NAME).includes(SIGNING_JOB_NAME)) {
+    writeStdout("slsa_provenance=fail\nordering=not_after_signing\n");
+    fail(
+      `${ATTEST_PROVENANCE_JOB_NAME} must need ${SIGNING_JOB_NAME} so the digest is signed first`,
+      1,
+    );
+  }
+
+  if (!documentsAttestationVerifyCommand(workflow)) {
+    writeStdout("slsa_provenance=fail\nverify_command=missing\n");
+    fail(
+      "workflow must document the gh attestation verify and cosign verify-attestation commands",
+      1,
+    );
+  }
+
+  const unreleased = getChangelogUnreleasedBody(changelog) ?? "";
+  if (!/provenance|attestation/i.test(unreleased)) {
+    writeStdout("slsa_provenance=fail\nchangelog=missing\n");
+    fail("CHANGELOG [Unreleased] must record the SLSA build-provenance change", 1);
+  }
+
+  writeStdout(
+    "slsa_provenance=pass\nsubject_digest=wired\ndigest_binding=shared\npermissions=scoped\nordering=after_signing\naction_pinning=pinned\nverify_command=documented\nchangelog=recorded\n",
   );
 };
 
@@ -4304,6 +4483,7 @@ const commandHandlers = new Map([
   ["promote-changelog", runPromoteChangelog],
   ["cosign-deferral", runCosignDeferral],
   ["cosign-signing", runCosignSigning],
+  ["slsa-provenance", runSlsaProvenance],
   ["action-pinning", runActionPinning],
   ["gitleaks-action-pinning", runGitleaksActionPinning],
   ["audit-gate", runAuditGate],

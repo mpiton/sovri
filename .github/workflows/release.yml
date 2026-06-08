@@ -40,6 +40,10 @@ jobs:
       packages: write
       # id-token: write mints the ephemeral GitHub OIDC token that drives keyless cosign signing.
       id-token: write
+    # Surface the pushed manifest digest so the downstream attest-provenance job binds its SLSA
+    # attestation to the very artifact this job signed — one immutable digest, signed AND attested.
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -99,6 +103,43 @@ jobs:
       #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
       - name: Sign image (keyless)
         run: cosign sign --yes ghcr.io/mpiton/sovri/community-bot@${{ steps.build.outputs.digest }}
+
+  attest-provenance:
+    runs-on: ubuntu-latest
+    # Runs after build-and-push so the digest is signed first, then attested — never one without the
+    # other. Binds to needs.build-and-push.outputs.digest: the same immutable manifest digest cosign
+    # signed, never a rebuilt image or a mutable tag.
+    needs: build-and-push
+    permissions:
+      contents: read
+      # id-token: write mints the keyless OIDC token; attestations: write records the SLSA predicate;
+      # packages: write pushes the attestation to GHCR. Least privilege — nothing broader.
+      id-token: write
+      attestations: write
+      packages: write
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Generate a SLSA build-provenance attestation for the multi-arch manifest BY DIGEST and push it
+      # to GHCR. The subject is keyed by digest, so the attestation covers every tag (full, minor,
+      # major, latest) that resolves to it. Self-hosters verify provenance before deploy (keyless,
+      # issuer = GitHub Actions OIDC, identity = THIS workflow):
+      #   gh attestation verify oci://ghcr.io/mpiton/sovri/community-bot:<tag> --owner mpiton
+      #   cosign verify-attestation --type slsaprovenance \
+      #     --certificate-identity-regexp "^https://github.com/mpiton/sovri/.github/workflows/release.yml@.*" \
+      #     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      #     ghcr.io/mpiton/sovri/community-bot@${{ needs.build-and-push.outputs.digest }}
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32
+        with:
+          subject-name: ghcr.io/mpiton/sovri/community-bot
+          subject-digest: ${{ needs.build-and-push.outputs.digest }}
+          push-to-registry: true
 
   sbom:
     runs-on: ubuntu-latest
