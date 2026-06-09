@@ -21,6 +21,20 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.7.0] - 2026-06-09
+
+### Added
+
 - cross-cutting invariants test for the batch-3 CWE compliance mappings.
 - compliance mappings for authentication CWEs (307, 521) and Tier-2 crypto CWEs (327, 916).
 - compliance mappings for resilience and logging CWEs (674, 754, 778, 223).
