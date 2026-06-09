@@ -6,6 +6,7 @@ export { z } from "zod";
 
 export {
   CategorySchema,
+  COMPLIANCE_MIN_CONFIDENCE,
   ComplianceFrameworkSchema,
   ComplianceReferenceSchema,
   FindingSchema,

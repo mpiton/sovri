@@ -19,6 +19,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Added
+
+- COMPLIANCE_MIN_CONFIDENCE domain threshold in @sovri/core.
+
 ### Changed
 
 - review prompt now asks the LLM for a CWE id (e.g. CWE-287) and a confidence score (0–1) on security/bug findings.

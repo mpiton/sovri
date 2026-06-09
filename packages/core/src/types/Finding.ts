@@ -17,6 +17,10 @@ export const CategorySchema = z.enum([
 ]);
 export type Category = z.infer<typeof CategorySchema>;
 
+// Minimum LLM-reported confidence for a finding to receive compliance references. Below this, a
+// security/bug finding's CWE is treated as too uncertain to anchor a regulatory reference.
+export const COMPLIANCE_MIN_CONFIDENCE = 0.7;
+
 const SuggestionSchema = z.object({
   code: z.string(),
   committable: z.boolean(),
