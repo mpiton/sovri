@@ -22,8 +22,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Added
 
 - `@sovri/cli` package with a `sovri verify <trail.jsonl>` command that verifies an audit trail
-  offline (Ed25519 hash chain + signatures), reading the signing key from the trail's `trail.started`
-  entry or a `--public-key` PEM file; exits non-zero on tamper or malformed input.
+  offline (Ed25519 hash chain + signatures), reading the verification public key from the trail's
+  `trail.started` entry or a `--public-key` PEM file; exits non-zero on tamper or malformed input.
 - `createCommunityAuditTrailWriter` in `@sovri/compliance`: an opt-in, file-backed audit-trail sink
   that prepends the `trail.started` genesis and owns its signing key (operator-provided Ed25519 PEM,
   or an ephemeral key generated per trail), so a trail driven by the review orchestrator verifies

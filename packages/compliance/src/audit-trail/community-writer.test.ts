@@ -2,7 +2,7 @@
 // Copyright 2026 Sovri SAS
 
 import { createPublicKey, generateKeyPairSync } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -106,6 +106,25 @@ describe("createCommunityAuditTrailWriter — genesis + chain (MAT-7)", () => {
     expect(publicKeyPem).toBe(expectedPublicPem);
     const entries = await readEntries(filePath);
     expect(verifyAuditTrail(entries, publicKey)).toStrictEqual({ valid: true });
+  });
+
+  it("keeps the genesis pending when the first write fails, so a retry re-emits it", async () => {
+    // Given a writer whose target directory does not exist yet
+    const missingDir = join(dir, "missing");
+    const missingPath = join(missingDir, "trail.jsonl");
+    const { sink } = createCommunityAuditTrailWriter({ filePath: missingPath });
+
+    // When the first append fails because the directory is absent
+    await expect(sink.append(reviewStarted)).rejects.toThrow();
+
+    // And the directory is created and the append retried
+    await mkdir(missingDir, { recursive: true });
+    await sink.append(reviewStarted);
+
+    // Then the trail still opens with exactly one trail.started genesis
+    const entries = await readEntries(missingPath);
+    expect(entries[0]?.event).toBe("trail.started");
+    expect(entries.filter((entry) => entry.event === "trail.started")).toHaveLength(1);
   });
 
   it("generates a distinct ephemeral key per writer when no key is provided", async () => {

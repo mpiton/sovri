@@ -68,13 +68,16 @@ export function createCommunityAuditTrailWriter(
   const sink: AuditTrailSink = {
     async append(event: AuditTrailLogicalEvent): Promise<void> {
       if (!started) {
-        started = true;
+        // Flip `started` only after the genesis write resolves: if it throws, the next append
+        // retries the genesis instead of writing a headless chain (the orchestrator's
+        // emitAuditEvent swallows the error and keeps going, so the retry is reachable).
         await inner.append({
           ts: new Date().toISOString(),
           event: "trail.started",
           trail_id: trailId,
           public_key: publicKeyPem,
         });
+        started = true;
       }
       await inner.append(event);
     },
