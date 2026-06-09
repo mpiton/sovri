@@ -1,0 +1,30 @@
+{
+  "cwe_id": "CWE-359",
+  "title": "Exposure of Private Personal Information to an Unauthorized Actor",
+  "mitre_url": "https://cwe.mitre.org/data/definitions/359.html",
+  "impacts": ["Privacy breach", "Confidentiality loss"],
+  "references": [
+    {
+      "framework": "CWE",
+      "identifier": "CWE-359",
+      "description": "Exposure of Private Personal Information to an Unauthorized Actor",
+      "source_url": "https://cwe.mitre.org/data/definitions/359.html",
+      "applicability": "informational"
+    },
+    {
+      "framework": "GDPR",
+      "identifier": "Art. 32",
+      "description": "Security of processing when personal information is exposed to unauthorized parties.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679#d1e3316-1-1",
+      "applicability": "applicable_if",
+      "condition": "The affected system processes personal data as defined by GDPR Art. 4"
+    },
+    {
+      "framework": "ISO27001-2022",
+      "identifier": "A.5.34",
+      "description": "Privacy and protection of personally identifiable information.",
+      "source_url": "https://www.iso.org/standard/82875.html",
+      "applicability": "informational"
+    }
+  ]
+}

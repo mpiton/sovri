@@ -11,6 +11,7 @@ import cwe94Entry from "./data/CWE-94.json" with { type: "json" };
 import cwe120Entry from "./data/CWE-120.json" with { type: "json" };
 import cwe125Entry from "./data/CWE-125.json" with { type: "json" };
 import cwe352Entry from "./data/CWE-352.json" with { type: "json" };
+import cwe359Entry from "./data/CWE-359.json" with { type: "json" };
 import cwe416Entry from "./data/CWE-416.json" with { type: "json" };
 import cwe434Entry from "./data/CWE-434.json" with { type: "json" };
 import cwe476Entry from "./data/CWE-476.json" with { type: "json" };
@@ -22,6 +23,8 @@ import cwe77Entry from "./data/CWE-77.json" with { type: "json" };
 import cwe121Entry from "./data/CWE-121.json" with { type: "json" };
 import cwe122Entry from "./data/CWE-122.json" with { type: "json" };
 import cwe200Entry from "./data/CWE-200.json" with { type: "json" };
+import cwe209Entry from "./data/CWE-209.json" with { type: "json" };
+import cwe256Entry from "./data/CWE-256.json" with { type: "json" };
 import cwe284Entry from "./data/CWE-284.json" with { type: "json" };
 import cwe306Entry from "./data/CWE-306.json" with { type: "json" };
 import cwe312Entry from "./data/CWE-312.json" with { type: "json" };
@@ -29,6 +32,7 @@ import cwe313Entry from "./data/CWE-313.json" with { type: "json" };
 import cwe319Entry from "./data/CWE-319.json" with { type: "json" };
 import cwe328Entry from "./data/CWE-328.json" with { type: "json" };
 import cwe502Entry from "./data/CWE-502.json" with { type: "json" };
+import cwe522Entry from "./data/CWE-522.json" with { type: "json" };
 import cwe532Entry from "./data/CWE-532.json" with { type: "json" };
 import cwe639Entry from "./data/CWE-639.json" with { type: "json" };
 import cwe770Entry from "./data/CWE-770.json" with { type: "json" };
@@ -44,6 +48,7 @@ const mappingEntries = [
   cwe120Entry,
   cwe125Entry,
   cwe352Entry,
+  cwe359Entry,
   cwe416Entry,
   cwe434Entry,
   cwe476Entry,
@@ -55,6 +60,8 @@ const mappingEntries = [
   cwe121Entry,
   cwe122Entry,
   cwe200Entry,
+  cwe209Entry,
+  cwe256Entry,
   cwe284Entry,
   cwe306Entry,
   cwe312Entry,
@@ -62,6 +69,7 @@ const mappingEntries = [
   cwe319Entry,
   cwe328Entry,
   cwe502Entry,
+  cwe522Entry,
   cwe532Entry,
   cwe639Entry,
   cwe770Entry,
