@@ -35,12 +35,12 @@
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.99.0",
+    "@anthropic-ai/sdk": "0.100.1",
     "@mistralai/mistralai": "2.2.5",
     "@sovri/config": "workspace:*",
     "@sovri/core": "workspace:*",
     "@sovri/observability": "workspace:*",
-    "openai": "6.39.1"
+    "openai": "6.41.0"
   },
   "devDependencies": {
     "@types/node": "24.12.4",
