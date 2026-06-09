@@ -21,6 +21,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- compliance mapping for CWE-532 (sensitive data in logs) → GDPR/NIS2/ISO references; only GDPR Art. 32 is enforced, NIS2 and ISO 27001 are present but not required pending DPO review.
 - COMPLIANCE_MIN_CONFIDENCE domain threshold in @sovri/core.
 - compliance enrichment gate (security/bug + CWE + confidence >= 0.7); category filter is an explicit allowlist — style findings with a CWE are excluded by category, not by CWE absence.
 - compliance references are now emitted on eligible security/bug findings.

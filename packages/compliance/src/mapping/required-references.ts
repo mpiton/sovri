@@ -13,8 +13,12 @@ interface ReferenceLike {
   readonly identifier: string;
 }
 
+// Only the primary mandatory framework per CWE is enforced here. Secondary references (e.g. NIS2,
+// ISO 27001) are present in the data files but not required, pending expert/DPO review of their
+// exact article/control identifiers.
 const requiredReferencesByCwe: Record<string, readonly RequiredReference[]> = {
   "CWE-200": [{ framework: "GDPR", identifier: "Art. 32" }],
+  "CWE-532": [{ framework: "GDPR", identifier: "Art. 32" }],
   "CWE-284": [
     { framework: "GDPR", identifier: "Art. 32" },
     { framework: "DORA", identifier: "Art. 9" },

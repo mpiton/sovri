@@ -21,8 +21,8 @@ const batchTwoNewCweIds = [
 ];
 
 describe("The static CWE map reaches the full Top 25 2025 plus CWE-798", () => {
-  it("exposes exactly twenty-six entries after batch 2", () => {
-    expect(getCweMap().size).toBe(26);
+  it("exposes at least the twenty-six batch 2 entries", () => {
+    expect(getCweMap().size).toBeGreaterThanOrEqual(26);
   });
 
   it.each(batchTwoNewCweIds)("contains the new batch 2 entry %s", (cweId) => {
@@ -36,8 +36,8 @@ describe("The static CWE map reaches the full Top 25 2025 plus CWE-798", () => {
     // When getCweMap is read after batch 2
     const cwe798Keys = [...map.keys()].filter((key) => key === "CWE-798");
 
-    // Then exactly one entry has cwe_id CWE-798 and the map size is 26
+    // Then exactly one entry has cwe_id CWE-798 and the map has at least 26 entries
     expect(cwe798Keys).toHaveLength(1);
-    expect(map.size).toBe(26);
+    expect(map.size).toBeGreaterThanOrEqual(26);
   });
 });
