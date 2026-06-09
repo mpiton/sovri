@@ -52,6 +52,7 @@ import {
   type ProviderFinding,
   type ProviderReviewResponse,
 } from "./parsing/index.js";
+import { shouldEnrichCompliance } from "./compliance-gate.js";
 import { toFindingSuggestion } from "./parsing/suggestion.js";
 import { renderComplianceSection } from "./walkthrough/compliance.js";
 import { composeWalkthrough, type WalkthroughInput } from "./walkthrough/index.js";
@@ -982,6 +983,10 @@ function toFinding(finding: ProviderFinding, logger?: Logger): Finding {
     ...(suggestion === undefined ? {} : { suggestion }),
     ...(finding.cwe === undefined ? {} : { cwe: finding.cwe }),
   };
+
+  if (!shouldEnrichCompliance(finding)) {
+    return base;
+  }
 
   try {
     return enrichFindingCompliance(base);

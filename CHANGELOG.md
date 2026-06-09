@@ -23,10 +23,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - COMPLIANCE_MIN_CONFIDENCE domain threshold in @sovri/core.
 - compliance enrichment gate (security/bug + CWE + confidence >= 0.7); category filter is an explicit allowlist — style findings with a CWE are excluded by category, not by CWE absence.
+- compliance references are now emitted on eligible security/bug findings.
 
 ### Changed
 
 - review prompt now asks the LLM for a CWE id (e.g. CWE-287) and a confidence score (0–1) on security/bug findings.
+- compliance integration test: split weak `?? 0` existence guard into separate `toBeDefined()` + length assertions.
 
 ## [0.6.0] - 2026-06-09
 ### Security

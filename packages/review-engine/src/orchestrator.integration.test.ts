@@ -392,6 +392,55 @@ describe("reviewPullRequest compliance enrichment", () => {
     expect(finding?.compliance_references).toEqual([]);
   });
 
+  // Rule: ADR-013 (gate: non-eligible categories are never enriched)
+  it("does not populate compliance references for a maintainability finding even with a mapped CWE", async () => {
+    // Given the LLM provider returns one finding for category "maintainability" with cwe "CWE-89" and confidence 1
+    mockProviderFindings([
+      {
+        ...findingFor("CWE-89", "maintainability", "minor"),
+        confidence: 1,
+      },
+    ]);
+    const diff = parseUnifiedDiff(unifiedDiff);
+
+    // When reviewPullRequest runs with the injected provider
+    const review = await reviewPullRequest(
+      { pullRequest, diff, config },
+      { provider: createHttpProvider() },
+    );
+
+    // Then the returned Review status is "success"
+    expect(review.status).toBe("success");
+    const finding = review.findings.at(0);
+    // And that finding's compliance_references is empty (gated out by category)
+    expect(finding?.compliance_references).toEqual([]);
+  });
+
+  // Rule: ADR-013 (gate: eligible security finding with mapped CWE gets enriched)
+  it("populates compliance references for a security finding with a mapped CWE", async () => {
+    // Given the LLM provider returns one finding for category "security" with cwe "CWE-89" and confidence 0.9
+    mockProviderFindings([
+      {
+        ...findingFor("CWE-89", "security", "major"),
+        confidence: 0.9,
+      },
+    ]);
+    const diff = parseUnifiedDiff(unifiedDiff);
+
+    // When reviewPullRequest runs with the injected provider
+    const review = await reviewPullRequest(
+      { pullRequest, diff, config },
+      { provider: createHttpProvider() },
+    );
+
+    // Then the returned Review status is "success"
+    expect(review.status).toBe("success");
+    const finding = review.findings.at(0);
+    // And that finding's compliance_references is non-empty (CWE-89 is in the static map)
+    expect(finding).toBeDefined();
+    expect(finding?.compliance_references.length).toBeGreaterThan(0);
+  });
+
   // Rule: R-03 (triangulation across a mixed batch)
   it("gives every LLM-derived finding in the Review an audit reference", async () => {
     // Given the LLM provider returns three findings (mapped cwe, no cwe, unmapped cwe)
