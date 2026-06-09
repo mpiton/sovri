@@ -24,3 +24,10 @@ export {
 } from "./audit-trail/schema.js";
 export { type AuditTrailSink, MemoryAuditTrailSink } from "./audit-trail/sink.js";
 export { verifyAuditTrail, type VerifyResult } from "./audit-trail/verifier.js";
+// Opt-in Community file writer: owns key material, prepends the trail.started genesis,
+// and exposes only the sink plus its public key (the raw signer/writer stay internal).
+export {
+  createCommunityAuditTrailWriter,
+  type CommunityAuditTrailOptions,
+  type CommunityAuditTrailWriter,
+} from "./audit-trail/community-writer.js";

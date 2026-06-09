@@ -37,6 +37,10 @@ import {
   MemoryAuditTrailSink,
   verifyAuditTrail,
   type VerifyResult,
+  // Opt-in Community audit-trail writer
+  createCommunityAuditTrailWriter,
+  type CommunityAuditTrailOptions,
+  type CommunityAuditTrailWriter,
 } from "@sovri/compliance";
 ```
 
@@ -68,14 +72,19 @@ import {
 - `verifyAuditTrail(entries, publicKey)`: offline hash-chain + Ed25519 verification
   of a `SignedAuditTrailEntry[]`, returning a discriminated `VerifyResult`.
 - `VerifyResult`: `{ valid: true }` or `{ valid: false, failAt, reason }`.
+- `createCommunityAuditTrailWriter(options)` / `CommunityAuditTrailOptions` /
+  `CommunityAuditTrailWriter`: an opt-in, file-backed `AuditTrailSink`. It prepends the
+  `trail.started` genesis the review orchestrator does not emit and owns its Ed25519 key
+  (operator-provided PEM, or an ephemeral key per trail), returning the sink plus its
+  public key so the resulting trail verifies offline.
 
-### Internal in v0.3 (not exported)
+### Internal (not exported)
 
 `createSigner` (`./audit-trail/signer.js`) and `createFileAuditTrailWriter`
-(`./audit-trail/writer.js`) are **internal in v0.3** and intentionally not exported
-from the package barrel. They are reserved for the Cloud writer, which owns the
-Ed25519 key material and the `trail_id`; keeping them off the public surface keeps
-the v0.3 attack surface small.
+(`./audit-trail/writer.js`) stay **internal** and are intentionally not exported from the
+package barrel. The public `createCommunityAuditTrailWriter` wraps them so callers never
+handle the raw signer or key material directly; the Cloud writer is the other caller.
+Keeping the low-level factories off the public surface keeps the attack surface small.
 
 ## Status
 

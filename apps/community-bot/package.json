@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@opentelemetry/auto-instrumentations-node": "0.76.0",
+    "@sovri/compliance": "workspace:*",
     "@sovri/config": "workspace:*",
     "@sovri/core": "workspace:*",
     "@sovri/llm-providers": "workspace:*",

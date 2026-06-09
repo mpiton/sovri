@@ -11,6 +11,7 @@
   "include": ["src/**/*.ts"],
   "exclude": ["dist", ".tsbuild", "node_modules", "**/*.test.ts", "**/*.spec.ts"],
   "references": [
+    { "path": "../../packages/compliance" },
     { "path": "../../packages/config" },
     { "path": "../../packages/llm-providers" },
     { "path": "../../packages/observability" },

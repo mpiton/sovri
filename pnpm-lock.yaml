@@ -44,6 +44,9 @@ importers:
       '@opentelemetry/auto-instrumentations-node':
         specifier: 0.76.0
         version: 0.76.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.1))
+      '@sovri/compliance':
+        specifier: workspace:*
+        version: link:../../packages/compliance
       '@sovri/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -94,6 +97,22 @@ importers:
       '@sovri/core':
         specifier: workspace:*
         version: link:../core
+      '@types/node':
+        specifier: 24.12.4
+        version: 24.12.4
+      tsup:
+        specifier: 8.5.1
+        version: 8.5.1(jiti@2.7.0)(postcss@8.5.15)(typescript@6.0.3)(yaml@2.9.0)
+      vitest:
+        specifier: 4.1.8
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-istanbul@4.1.8)(@vitest/coverage-v8@4.1.8)(msw@2.14.6(@types/node@24.12.4)(typescript@6.0.3))(vite@8.0.12(@types/node@24.12.4)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.0))
+
+  packages/cli:
+    dependencies:
+      '@sovri/compliance':
+        specifier: workspace:*
+        version: link:../compliance
+    devDependencies:
       '@types/node':
         specifier: 24.12.4
         version: 24.12.4

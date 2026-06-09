@@ -4,6 +4,7 @@
   "files": [],
   "references": [
     { "path": "./packages/brand" },
+    { "path": "./packages/cli" },
     { "path": "./packages/compliance" },
     { "path": "./packages/config" },
     { "path": "./packages/core" },
