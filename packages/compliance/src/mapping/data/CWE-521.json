@@ -1,0 +1,30 @@
+{
+  "cwe_id": "CWE-521",
+  "title": "Weak Password Requirements",
+  "mitre_url": "https://cwe.mitre.org/data/definitions/521.html",
+  "impacts": ["Account takeover", "Credential compromise"],
+  "references": [
+    {
+      "framework": "CWE",
+      "identifier": "CWE-521",
+      "description": "Weak Password Requirements",
+      "source_url": "https://cwe.mitre.org/data/definitions/521.html",
+      "applicability": "informational"
+    },
+    {
+      "framework": "NIS2",
+      "identifier": "Art. 21(2)(i)",
+      "description": "Authentication and access control measures requiring strong password policies.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022L2555",
+      "applicability": "applicable_if",
+      "condition": "The entity is an essential or important entity subject to NIS2"
+    },
+    {
+      "framework": "ISO27001-2022",
+      "identifier": "A.5.17",
+      "description": "Authentication information management requiring strong password requirements and enforcement.",
+      "source_url": "https://www.iso.org/standard/82875.html",
+      "applicability": "informational"
+    }
+  ]
+}

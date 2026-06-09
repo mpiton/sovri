@@ -21,6 +21,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- compliance mappings for authentication CWEs (307, 521) and Tier-2 crypto CWEs (327, 916).
 - compliance mappings for resilience and logging CWEs (674, 754, 778, 223).
 - compliance mappings for credential-protection and sensitive-info-exposure CWEs (256, 522, 359, 209).
 - compliance mappings for cleartext storage/transmission and weak-hash CWEs (312, 319, 313, 328).

@@ -18,6 +18,10 @@ interface ReferenceLike {
 // exact article/control identifiers.
 const requiredReferencesByCwe: Record<string, readonly RequiredReference[]> = {
   "CWE-200": [{ framework: "GDPR", identifier: "Art. 32" }],
+  "CWE-307": [{ framework: "NIS2", identifier: "Art. 21(2)(i)" }],
+  "CWE-327": [{ framework: "GDPR", identifier: "Art. 32" }],
+  "CWE-521": [{ framework: "NIS2", identifier: "Art. 21(2)(i)" }],
+  "CWE-916": [{ framework: "GDPR", identifier: "Art. 32" }],
   "CWE-223": [{ framework: "NIS2", identifier: "Art. 21(2)(g)" }],
   "CWE-209": [{ framework: "GDPR", identifier: "Art. 32" }],
   "CWE-256": [{ framework: "GDPR", identifier: "Art. 32" }],

@@ -1,0 +1,30 @@
+{
+  "cwe_id": "CWE-916",
+  "title": "Use of Password Hash With Insufficient Computational Effort",
+  "mitre_url": "https://cwe.mitre.org/data/definitions/916.html",
+  "impacts": ["Credential compromise", "Offline brute-force attack"],
+  "references": [
+    {
+      "framework": "CWE",
+      "identifier": "CWE-916",
+      "description": "Use of Password Hash With Insufficient Computational Effort",
+      "source_url": "https://cwe.mitre.org/data/definitions/916.html",
+      "applicability": "informational"
+    },
+    {
+      "framework": "GDPR",
+      "identifier": "Art. 32",
+      "description": "Security of processing when personal data passwords are stored with insufficient hashing cost.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679#d1e3316-1-1",
+      "applicability": "applicable_if",
+      "condition": "The affected system processes personal data as defined by GDPR Art. 4"
+    },
+    {
+      "framework": "ISO27001-2022",
+      "identifier": "A.8.24",
+      "description": "Use of cryptography controls requiring password hashing with adequate computational effort.",
+      "source_url": "https://www.iso.org/standard/82875.html",
+      "applicability": "informational"
+    }
+  ]
+}

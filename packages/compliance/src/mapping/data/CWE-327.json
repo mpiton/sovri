@@ -1,0 +1,38 @@
+{
+  "cwe_id": "CWE-327",
+  "title": "Use of a Broken or Risky Cryptographic Algorithm",
+  "mitre_url": "https://cwe.mitre.org/data/definitions/327.html",
+  "impacts": ["Confidentiality breach", "Integrity failure"],
+  "references": [
+    {
+      "framework": "CWE",
+      "identifier": "CWE-327",
+      "description": "Use of a Broken or Risky Cryptographic Algorithm",
+      "source_url": "https://cwe.mitre.org/data/definitions/327.html",
+      "applicability": "informational"
+    },
+    {
+      "framework": "GDPR",
+      "identifier": "Art. 32",
+      "description": "Security of processing when personal data is protected with a broken or risky cryptographic algorithm.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679#d1e3316-1-1",
+      "applicability": "applicable_if",
+      "condition": "The affected system processes personal data as defined by GDPR Art. 4"
+    },
+    {
+      "framework": "NIS2",
+      "identifier": "Art. 21(2)(h)",
+      "description": "Encryption and cryptography policies prohibiting the use of broken or risky cryptographic algorithms.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022L2555",
+      "applicability": "applicable_if",
+      "condition": "The entity is an essential or important entity subject to NIS2"
+    },
+    {
+      "framework": "ISO27001-2022",
+      "identifier": "A.8.24",
+      "description": "Use of cryptography controls requiring approved and strong cryptographic algorithms.",
+      "source_url": "https://www.iso.org/standard/82875.html",
+      "applicability": "informational"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "cwe_id": "CWE-307",
+  "title": "Improper Restriction of Excessive Authentication Attempts",
+  "mitre_url": "https://cwe.mitre.org/data/definitions/307.html",
+  "impacts": ["Account takeover", "Credential brute-force"],
+  "references": [
+    {
+      "framework": "CWE",
+      "identifier": "CWE-307",
+      "description": "Improper Restriction of Excessive Authentication Attempts",
+      "source_url": "https://cwe.mitre.org/data/definitions/307.html",
+      "applicability": "informational"
+    },
+    {
+      "framework": "NIS2",
+      "identifier": "Art. 21(2)(i)",
+      "description": "Authentication and access control measures requiring protection against excessive authentication attempts.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022L2555",
+      "applicability": "applicable_if",
+      "condition": "The entity is an essential or important entity subject to NIS2"
+    },
+    {
+      "framework": "DORA",
+      "identifier": "Art. 9",
+      "description": "ICT risk management protection and prevention controls requiring rate-limiting on authentication endpoints.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022R2554",
+      "applicability": "applicable_if",
+      "condition": "The affected system is part of the ICT infrastructure of a financial entity subject to DORA"
+    },
+    {
+      "framework": "ISO27001-2022",
+      "identifier": "A.8.5",
+      "description": "Secure authentication controls requiring lockout or rate-limiting after repeated failed attempts.",
+      "source_url": "https://www.iso.org/standard/82875.html",
+      "applicability": "informational"
+    }
+  ]
+}
