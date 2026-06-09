@@ -1,0 +1,38 @@
+{
+  "cwe_id": "CWE-328",
+  "title": "Use of Weak Hash",
+  "mitre_url": "https://cwe.mitre.org/data/definitions/328.html",
+  "impacts": ["Integrity failure", "Confidentiality breach"],
+  "references": [
+    {
+      "framework": "CWE",
+      "identifier": "CWE-328",
+      "description": "Use of Weak Hash",
+      "source_url": "https://cwe.mitre.org/data/definitions/328.html",
+      "applicability": "informational"
+    },
+    {
+      "framework": "GDPR",
+      "identifier": "Art. 32",
+      "description": "Security of processing when personal data is protected with a broken or weak hash.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679#d1e3316-1-1",
+      "applicability": "applicable_if",
+      "condition": "The affected system processes personal data as defined by GDPR Art. 4"
+    },
+    {
+      "framework": "NIS2",
+      "identifier": "Art. 21(2)(h)",
+      "description": "Encryption and cryptography policies requiring the use of strong hashing algorithms.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022L2555",
+      "applicability": "applicable_if",
+      "condition": "The entity is an essential or important entity subject to NIS2"
+    },
+    {
+      "framework": "ISO27001-2022",
+      "identifier": "A.8.24",
+      "description": "Use of cryptography controls requiring strong hash algorithms.",
+      "source_url": "https://www.iso.org/standard/82875.html",
+      "applicability": "informational"
+    }
+  ]
+}

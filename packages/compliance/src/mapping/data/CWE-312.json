@@ -1,0 +1,38 @@
+{
+  "cwe_id": "CWE-312",
+  "title": "Cleartext Storage of Sensitive Information",
+  "mitre_url": "https://cwe.mitre.org/data/definitions/312.html",
+  "impacts": ["Sensitive data exposure", "Confidentiality breach"],
+  "references": [
+    {
+      "framework": "CWE",
+      "identifier": "CWE-312",
+      "description": "Cleartext Storage of Sensitive Information",
+      "source_url": "https://cwe.mitre.org/data/definitions/312.html",
+      "applicability": "informational"
+    },
+    {
+      "framework": "GDPR",
+      "identifier": "Art. 32",
+      "description": "Security of processing when sensitive data is stored without encryption.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679#d1e3316-1-1",
+      "applicability": "applicable_if",
+      "condition": "The affected system processes personal data as defined by GDPR Art. 4"
+    },
+    {
+      "framework": "DORA",
+      "identifier": "Art. 9",
+      "description": "ICT security requiring encryption of data at rest for financial entities.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022R2554",
+      "applicability": "applicable_if",
+      "condition": "The affected system is part of the ICT infrastructure of a financial entity subject to DORA"
+    },
+    {
+      "framework": "ISO27001-2022",
+      "identifier": "A.8.24",
+      "description": "Use of cryptography controls to protect stored sensitive information.",
+      "source_url": "https://www.iso.org/standard/82875.html",
+      "applicability": "informational"
+    }
+  ]
+}

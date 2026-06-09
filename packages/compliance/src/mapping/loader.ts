@@ -24,6 +24,10 @@ import cwe122Entry from "./data/CWE-122.json" with { type: "json" };
 import cwe200Entry from "./data/CWE-200.json" with { type: "json" };
 import cwe284Entry from "./data/CWE-284.json" with { type: "json" };
 import cwe306Entry from "./data/CWE-306.json" with { type: "json" };
+import cwe312Entry from "./data/CWE-312.json" with { type: "json" };
+import cwe313Entry from "./data/CWE-313.json" with { type: "json" };
+import cwe319Entry from "./data/CWE-319.json" with { type: "json" };
+import cwe328Entry from "./data/CWE-328.json" with { type: "json" };
 import cwe502Entry from "./data/CWE-502.json" with { type: "json" };
 import cwe532Entry from "./data/CWE-532.json" with { type: "json" };
 import cwe639Entry from "./data/CWE-639.json" with { type: "json" };
@@ -53,6 +57,10 @@ const mappingEntries = [
   cwe200Entry,
   cwe284Entry,
   cwe306Entry,
+  cwe312Entry,
+  cwe313Entry,
+  cwe319Entry,
+  cwe328Entry,
   cwe502Entry,
   cwe532Entry,
   cwe639Entry,

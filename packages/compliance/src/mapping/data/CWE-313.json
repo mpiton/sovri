@@ -1,0 +1,30 @@
+{
+  "cwe_id": "CWE-313",
+  "title": "Cleartext Storage in a File or on Disk",
+  "mitre_url": "https://cwe.mitre.org/data/definitions/313.html",
+  "impacts": ["Sensitive data exposure", "Confidentiality breach"],
+  "references": [
+    {
+      "framework": "CWE",
+      "identifier": "CWE-313",
+      "description": "Cleartext Storage in a File or on Disk",
+      "source_url": "https://cwe.mitre.org/data/definitions/313.html",
+      "applicability": "informational"
+    },
+    {
+      "framework": "GDPR",
+      "identifier": "Art. 32",
+      "description": "Security of processing when personal data is stored unencrypted on disk.",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679#d1e3316-1-1",
+      "applicability": "applicable_if",
+      "condition": "The affected system processes personal data as defined by GDPR Art. 4"
+    },
+    {
+      "framework": "ISO27001-2022",
+      "identifier": "A.8.24",
+      "description": "Use of cryptography controls to protect sensitive files stored on disk.",
+      "source_url": "https://www.iso.org/standard/82875.html",
+      "applicability": "informational"
+    }
+  ]
+}
