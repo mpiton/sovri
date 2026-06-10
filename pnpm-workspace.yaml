@@ -1,6 +1,6 @@
 # Sovri pnpm workspaces — see docs/adr/002.
 # Apache 2.0 packages live in packages/*; runnable surfaces in apps/*
-# (apps/community-bot is Apache 2.0; apps/cloud-api is proprietary, v0.5+).
+# (apps/community-bot is Apache 2.0; apps/cloud-api is proprietary, v1.0+).
 packages:
   - "packages/*"
   - "apps/*"

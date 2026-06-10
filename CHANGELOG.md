@@ -13,7 +13,7 @@ Categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
 
 Scope of this changelog: the Community edition (`packages/*` + `apps/community-bot/`).
 The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
-(not published) starting at v0.5+.
+(not published) starting at v1.0+, when that directory is created.
 
 ---
 
@@ -83,6 +83,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Changed
 
 - review-engine: clarify the SARIF `no-physical-location` drop contract — only a result with no primary `physicalLocation` is dropped; a present-but-partial location still maps with defensive defaults (R-05 owns uri resolution).
+- docs: harmonize the `apps/cloud-api/` creation timing on v1.0+ across versioned sources (ADR-002, `pnpm-workspace.yaml`, this changelog). The directory is not created yet at v0.7; v1.0 is when the Cloud edition starts (see ADR-002 and the v1.0 roadmap).
 
 ### Deprecated
 

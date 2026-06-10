@@ -25,7 +25,7 @@ sovri/
 │   └── observability
 └── apps/
     ├── community-bot   ← public, Apache 2.0
-    └── cloud-api       ← PRIVATE (v0.5+)
+    └── cloud-api       ← PRIVATE (v1.0+)
 ```
 
 ## Rationale
@@ -40,7 +40,7 @@ sovri/
 
 - Slightly heavier initial setup than a single flat repo (~1 hour of configuration).
 - Requires discipline on boundaries between packages: a package must not import an internal module from another package, only its public API.
-- Private Cloud managed from v0.5+: either `apps/cloud-api/` folder in a separate repo as git submodule, or via `.gitignore` depending on organizational evolution.
+- Private Cloud managed from v1.0+: either `apps/cloud-api/` folder in a separate repo as git submodule, or via `.gitignore` depending on organizational evolution.
 - Single pnpm lockfile for the entire project: changing a dependency in one package triggers a global `pnpm install`.
 
 ## Rejected alternatives
