@@ -26,6 +26,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   is optional and ignored) and rejecting malformed or wrong-version reports with a typed
   `SarifParseError` that preserves the underlying JSON/Zod error as `cause` (rule R-01, part of
   SARIF ingestion).
+- SARIF input bounds in `@sovri/review-engine`: a report over 10 MiB or nested beyond depth 64 is
+  skipped before parsing (UTF-8 byte size plus a string-aware, non-recursive bracket-depth scan
+  that never calls `JSON.parse`), and mapped SARIF findings are capped at 1000 per review with a
+  deterministic overflow drop (rule R-02).
 - `@sovri/cli` package with a `sovri verify <trail.jsonl>` command that verifies an audit trail
   offline (Ed25519 hash chain + signatures), reading the verification public key from the trail's
   `trail.started` entry or a `--public-key` PEM file; exits non-zero on tamper or malformed input.
