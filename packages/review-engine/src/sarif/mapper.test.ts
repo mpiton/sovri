@@ -8,8 +8,28 @@
 
 import { describe, expect, it } from "vitest";
 
-import { ingestReport } from "./mapper.js";
+import { ingestReport, mapSarifResult } from "./mapper.js";
 import { SarifParseError } from "./reader.js";
+
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const AUDIT_REF = /^SOVRI-[A-Z]{2}-[A-F0-9]{4}-[A-F0-9]{4}$/u;
+
+function resultAt(
+  uri: string,
+  startLine: number,
+  endLine: number,
+  message: string,
+  level = "error",
+): Record<string, unknown> {
+  return {
+    ruleId: "rule-1",
+    level,
+    message: { text: message },
+    locations: [
+      { physicalLocation: { artifactLocation: { uri }, region: { startLine, endLine } } },
+    ],
+  };
+}
 
 function resultWithLocation(uri: string): Record<string, unknown> {
   return {
@@ -72,5 +92,119 @@ describe("ingestReport — R-03 corrupt-report vs off-spec-result isolation", ()
     expect(summary.mapped).toBe(3);
     expect(summary.skipped).toBe(2);
     expect(summary.skippedReasons).toEqual({ "no-physical-location": 2 });
+  });
+});
+
+describe("mapSarifResult — R-04 result to core Finding", () => {
+  it("maps a result to a Finding with source sarif and all required fields populated", () => {
+    // Given a SARIF result on "src/api/users.ts" lines 40 to 44 with level "error"
+    // And the result message text is "SQL string built from user input"
+    const result = resultAt("src/api/users.ts", 40, 44, "SQL string built from user input");
+
+    // When the result is mapped
+    const finding = mapSarifResult(result, { id: "rule-1" });
+
+    // Then a Finding is produced with source "sarif" and every required field populated
+    expect(finding.source).toBe("sarif");
+    expect(finding.file).toBe("src/api/users.ts");
+    expect(finding.line_start).toBe(40);
+    expect(finding.line_end).toBe(44);
+    expect(finding.severity).toBe("major");
+    expect(finding.category.length).toBeGreaterThan(0);
+    expect(finding.title.length).toBeGreaterThan(0);
+    expect(finding.body).toContain("SQL string built from user input");
+    expect(finding.recommendation.length).toBeGreaterThan(0);
+    expect(finding.confidence).toBeGreaterThan(0);
+    // And the Finding has a generated id and audit_reference
+    expect(finding.id).toMatch(UUID_V4);
+    expect(finding.audit_reference).toMatch(AUDIT_REF);
+  });
+
+  it("truncates an over-long title to 200 rather than dropping the result", () => {
+    // Given a SARIF result whose title source text is 250 characters long
+    const result = resultAt("src/a.ts", 1, 1, "m");
+    const rule = { id: "rule-1", shortDescription: { text: "T".repeat(250) } };
+
+    // When the result is mapped
+    const finding = mapSarifResult(result, rule);
+
+    // Then the Finding title is exactly 200 characters long
+    expect(finding.title).toHaveLength(200);
+  });
+
+  it("truncates an over-long body to 2000 rather than dropping the result", () => {
+    // Given a SARIF result whose body source text is 2500 characters long
+    const result = resultAt("src/a.ts", 1, 1, "B".repeat(2500));
+
+    // When the result is mapped
+    const finding = mapSarifResult(result, { id: "rule-1" });
+
+    // Then the Finding body is exactly 2000 characters long
+    expect(finding.body).toHaveLength(2000);
+  });
+
+  it("truncates an over-long recommendation to 1000 rather than dropping the result", () => {
+    // Given a SARIF result whose recommendation source text is 1200 characters long
+    const result = resultAt("src/a.ts", 1, 1, "m");
+    const rule = { id: "rule-1", help: { text: "R".repeat(1200) } };
+
+    // When the result is mapped
+    const finding = mapSarifResult(result, rule);
+
+    // Then the Finding recommendation is exactly 1000 characters long
+    expect(finding.recommendation).toHaveLength(1000);
+  });
+
+  it("resolves the human message from result.message.text first", () => {
+    // Given a SARIF result whose message.text is "Hardcoded credential detected"
+    const result = resultAt("src/a.ts", 5, 5, "Hardcoded credential detected");
+
+    // When the result is mapped
+    const finding = mapSarifResult(result, { id: "rule-1" });
+
+    // Then the Finding body is derived from "Hardcoded credential detected"
+    expect(finding.body).toContain("Hardcoded credential detected");
+  });
+
+  it("falls back to the rule messageString with argument substitution", () => {
+    // Given a SARIF result with no message.text and message.id "default"
+    // And the rule defines messageStrings.default.text "Tainted data reaches {0} via {1}"
+    // And the result message arguments are ["exec", "req.body"]
+    const result = {
+      ruleId: "rule-1",
+      level: "error",
+      message: { id: "default", arguments: ["exec", "req.body"] },
+      locations: [
+        { physicalLocation: { artifactLocation: { uri: "src/a.ts" }, region: { startLine: 5 } } },
+      ],
+    };
+    const rule = {
+      id: "rule-1",
+      messageStrings: { default: { text: "Tainted data reaches {0} via {1}" } },
+    };
+
+    // When the result is mapped
+    const finding = mapSarifResult(result, rule);
+
+    // Then the Finding body contains "Tainted data reaches exec via req.body"
+    expect(finding.body).toContain("Tainted data reaches exec via req.body");
+  });
+
+  it("falls back to a deterministic placeholder when no message is resolvable", () => {
+    // Given a SARIF result with no message.text and no resolvable rule messageString
+    const result = {
+      ruleId: "no-msg-rule",
+      level: "error",
+      locations: [
+        { physicalLocation: { artifactLocation: { uri: "src/a.ts" }, region: { startLine: 5 } } },
+      ],
+    };
+
+    // When the result is mapped
+    // Then the Finding body is a deterministic fallback referencing the rule id
+    const firstBody = mapSarifResult(result, { id: "no-msg-rule" }).body;
+    expect(firstBody).toContain("no-msg-rule");
+    // And mapping the same result again produces the identical body
+    expect(mapSarifResult(result, { id: "no-msg-rule" }).body).toBe(firstBody);
   });
 });

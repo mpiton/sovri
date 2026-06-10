@@ -34,6 +34,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   whole-report failure throws `SarifParseError`) then walks each result, dropping an off-spec one
   (e.g. a result with no physical location) with a counted reason while its siblings still ingest,
   and returns an ingestion summary of results seen / mapped / skipped (rule R-03).
+- SARIF result-to-Finding mapping in `@sovri/review-engine`: `mapSarifResult` projects a mappable
+  SARIF result onto a core `Finding` (`source: "sarif"`) with a generated id and audit reference,
+  resolving the human message from `result.message.text`, else the rule's `messageStrings[id]` with
+  `{n}` argument substitution, else a deterministic fallback, and truncating over-long
+  title / body / recommendation to the schema caps rather than dropping the result (rule R-04).
 - `@sovri/cli` package with a `sovri verify <trail.jsonl>` command that verifies an audit trail
   offline (Ed25519 hash chain + signatures), reading the verification public key from the trail's
   `trail.started` entry or a `--public-key` PEM file; exits non-zero on tamper or malformed input.
