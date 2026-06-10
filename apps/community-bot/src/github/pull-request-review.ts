@@ -25,6 +25,7 @@ import type {
   ReviewPostTarget,
 } from "../handlers/pull-request.js";
 import { fetchDiff as fetchPullRequestDiff } from "./diff-fetcher.js";
+import { createAuditTrailSinkFactory } from "../audit-trail.js";
 import { buildDeploymentDefaultConfig } from "../runtime-env.js";
 
 const logger = createLogger("community-bot.pull-request");
@@ -37,6 +38,7 @@ export function createPullRequestHandlerDependencies(
   const botLogin = readBotLogin(env);
   return {
     buildReviewOptions: (config) => buildReviewOptions(config, env),
+    createAuditTrailSink: createAuditTrailSinkFactory(env),
     fetchDiff: (target) =>
       fetchPullRequestDiff(
         context.octokit,

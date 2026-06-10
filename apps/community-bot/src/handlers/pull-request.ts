@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+import type { AuditTrailSink } from "@sovri/compliance";
 import type { SovriConfig } from "@sovri/config";
 import { MissingApiKeyError } from "@sovri/llm-providers";
 import {
@@ -113,6 +114,12 @@ export type PullRequestHandlerDependencies = {
   ) => Promise<Review>;
   readonly buildReviewOptions?: (config: SovriConfig) => ReviewPullRequestOptions;
   readonly reviewOptions?: ReviewPullRequestOptions;
+  // Opt-in audit trail (MAT-7): builds a per-review sink, or undefined when disabled. When present,
+  // it is merged into the review options so the orchestrator records a signed trail to disk.
+  readonly createAuditTrailSink?: (input: {
+    readonly deliveryId: string;
+    readonly target: ReviewPostTarget;
+  }) => AuditTrailSink | undefined;
   // Reconciliation (issue #1965). Optional so the handler degrades to the
   // pre-reconciliation behaviour when an adapter does not supply them.
   readonly fetchPostedFindings?: (target: ReviewPostTarget) => Promise<PostedFindingsState>;
@@ -262,7 +269,10 @@ async function runPullRequestReview(
 
   state.failureStage = "diff_fetch";
   const diff = await dependencies.fetchDiff(target);
-  const reviewOptions = buildEffectiveReviewOptions(dependencies, config);
+  const reviewOptions = withAuditTrailSink(
+    buildEffectiveReviewOptions(dependencies, config),
+    dependencies.createAuditTrailSink?.({ deliveryId: context.id, target }),
+  );
   state.failureStage = "pull_request_input_validation";
   const pullRequest = buildPullRequest(context);
   state.failureStage = "review_engine";
@@ -288,6 +298,13 @@ function buildEffectiveReviewOptions(
   return (
     dependencies.buildReviewOptions?.(config) ?? dependencies.reviewOptions ?? DefaultReviewOptions
   );
+}
+
+function withAuditTrailSink(
+  options: ReviewPullRequestOptions,
+  auditTrailSink: AuditTrailSink | undefined,
+): ReviewPullRequestOptions {
+  return auditTrailSink === undefined ? options : { ...options, auditTrailSink };
 }
 
 async function postReconciledReview(

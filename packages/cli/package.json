@@ -1,0 +1,45 @@
+{
+  "name": "@sovri/cli",
+  "version": "0.7.0",
+  "private": true,
+  "description": "Sovri command-line tools — offline audit-trail verification (sovri verify).",
+  "homepage": "https://github.com/mpiton/sovri/tree/main/packages/cli#readme",
+  "bugs": {
+    "url": "https://github.com/mpiton/sovri/issues"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mpiton/sovri.git",
+    "directory": "packages/cli"
+  },
+  "bin": {
+    "sovri": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run --root . --passWithNoTests",
+    "lint": "oxlint . --max-warnings=0 --no-error-on-unmatched-pattern",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "@sovri/compliance": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.12.4",
+    "tsup": "8.5.1",
+    "vitest": "4.1.8"
+  },
+  "engines": {
+    "node": ">=24.8.0 <25.0.0",
+    "pnpm": ">=10.0.0 <11.0.0"
+  }
+}

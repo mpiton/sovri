@@ -23,6 +23,7 @@ const EXPECTED_VALUE_EXPORTS = [
   "SignedAuditTrailEntrySchema",
   "MemoryAuditTrailSink",
   "verifyAuditTrail",
+  "createCommunityAuditTrailWriter",
 ] as const;
 
 const EXPECTED_TYPE_EXPORTS = [
@@ -34,6 +35,8 @@ const EXPECTED_TYPE_EXPORTS = [
   "SignedAuditTrailEntry",
   "AuditTrailSink",
   "VerifyResult",
+  "CommunityAuditTrailOptions",
+  "CommunityAuditTrailWriter",
 ] as const;
 
 const EXPECTED_SPECIFIERS = [
@@ -42,6 +45,7 @@ const EXPECTED_SPECIFIERS = [
   "./audit-trail/schema.js",
   "./audit-trail/sink.js",
   "./audit-trail/verifier.js",
+  "./audit-trail/community-writer.js",
 ] as const;
 
 // Internal (signer/writer factories), scaffold noise, and internal helpers that
@@ -90,12 +94,12 @@ const parsed = parseExports(indexSource);
 const expectedAll = [...EXPECTED_VALUE_EXPORTS, ...EXPECTED_TYPE_EXPORTS];
 
 describe("@sovri/compliance public export surface (R-01)", () => {
-  it("exports exactly the 17 canonical identifiers", () => {
+  it("exports exactly the 20 canonical identifiers", () => {
     expect([...parsed.names].toSorted()).toEqual([...expectedAll].toSorted());
   });
 
-  it("counts 9 value exports plus 8 type exports", () => {
-    expect(parsed.names.size).toBe(17);
+  it("counts 10 value exports plus 10 type exports", () => {
+    expect(parsed.names.size).toBe(20);
     expect(Object.keys(compliance).toSorted()).toEqual([...EXPECTED_VALUE_EXPORTS].toSorted());
   });
 });
@@ -113,7 +117,7 @@ describe("internal factories, scaffold and helpers stay internal (R-02)", () => 
 });
 
 describe("re-export specifiers are relative ESM .js (R-03)", () => {
-  it("uses exactly the five expected specifiers", () => {
+  it("uses exactly the six expected specifiers", () => {
     expect([...parsed.specifiers].toSorted()).toEqual([...EXPECTED_SPECIFIERS].toSorted());
   });
 
