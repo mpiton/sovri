@@ -58,6 +58,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   under-review suppression still maps), and `countScanFailures` counts a run's failed invocations
   (`executionSuccessful: false`) and error-level tool notifications so a failed scan is not
   presented as clean; tool notifications never become Findings (rule R-08).
+- SARIF/LLM finding merge in `@sovri/review-engine`: `mergeSarifFindings` appends SARIF findings
+  after the LLM findings and deduplicates — a SARIF finding colliding with an LLM finding (same
+  file, same CWE, overlapping lines) collapses to the LLM one, and cross-tool SARIF duplicates
+  collapse first-wins — surfaces SARIF only when its file is in the diff's changed-files set,
+  applies the severity threshold and ignore rules, and orders the merged set by a stable tie-break
+  (severity, source, file, line, id) for reproducible output (rule R-09).
 - `@sovri/cli` package with a `sovri verify <trail.jsonl>` command that verifies an audit trail
   offline (Ed25519 hash chain + signatures), reading the verification public key from the trail's
   `trail.started` entry or a `--public-key` PEM file; exits non-zero on tamper or malformed input.
