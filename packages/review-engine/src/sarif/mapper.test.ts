@@ -8,8 +8,24 @@
 
 import { describe, expect, it } from "vitest";
 
-import { ingestReport, mapSarifResult } from "./mapper.js";
+import { ingestReport, mapSarifResult, resultKindReason } from "./mapper.js";
 import { SarifParseError } from "./reader.js";
+
+function resultWithKind(kind: string | undefined, level?: string): Record<string, unknown> {
+  const base: Record<string, unknown> = {
+    ruleId: "rule-1",
+    locations: [
+      { physicalLocation: { artifactLocation: { uri: "src/a.ts" }, region: { startLine: 1 } } },
+    ],
+  };
+  if (kind !== undefined) {
+    base["kind"] = kind;
+  }
+  if (level !== undefined) {
+    base["level"] = level;
+  }
+  return base;
+}
 
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const AUDIT_REF = /^SOVRI-[A-Z]{2}-[A-F0-9]{4}-[A-F0-9]{4}$/u;
@@ -206,5 +222,58 @@ describe("mapSarifResult — R-04 result to core Finding", () => {
     expect(firstBody).toContain("no-msg-rule");
     // And mapping the same result again produces the identical body
     expect(mapSarifResult(result, { id: "no-msg-rule" }).body).toBe(firstBody);
+  });
+});
+
+describe("severity and kind mapping — R-06", () => {
+  it.each([
+    ["error", "major"],
+    ["warning", "minor"],
+    ["note", "info"],
+    ["none", "nitpick"],
+  ])("maps a failing result with level %s to severity %s", (level, severity) => {
+    // Given a SARIF result with kind "fail" and the given level
+    const result = resultWithKind("fail", level);
+
+    // When the result is mapped / Then the severity matches
+    expect(mapSarifResult(result, { id: "rule-1" }).severity).toBe(severity);
+  });
+
+  it("treats a result with no kind as fail and maps it to a Finding", () => {
+    // Given a SARIF result with no kind field and level "error"
+    const result = resultWithKind(undefined, "error");
+
+    // When the result is checked and mapped
+    // Then it is failing and maps to severity "major"
+    expect(resultKindReason(result)).toBeNull();
+    expect(mapSarifResult(result, { id: "rule-1" }).severity).toBe("major");
+  });
+
+  it.each(["pass", "open", "informational", "notApplicable", "review"])(
+    "drops a non-failing result kind %s",
+    (kind) => {
+      // Given a SARIF result with a non-failing kind
+      const result = resultWithKind(kind);
+
+      // When the result kind is checked / Then it is dropped as non-failing
+      expect(resultKindReason(result)).toBe("non-failing-kind");
+    },
+  );
+
+  it("falls back to the rule defaultConfiguration level when the result has no level", () => {
+    // Given a failing result with no level and a rule whose defaultConfiguration.level is "error"
+    const result = resultWithKind("fail");
+    const rule = { id: "rule-1", defaultConfiguration: { level: "error" } };
+
+    // When the result is mapped / Then the severity comes from the rule default
+    expect(mapSarifResult(result, rule).severity).toBe("major");
+  });
+
+  it("falls back to the default warning severity when nothing else resolves", () => {
+    // Given a failing result with no level and a rule with no defaultConfiguration
+    const result = resultWithKind("fail");
+
+    // When the result is mapped / Then the severity defaults to minor (warning)
+    expect(mapSarifResult(result, { id: "rule-1" }).severity).toBe("minor");
   });
 });

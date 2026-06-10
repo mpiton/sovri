@@ -44,6 +44,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `run.artifacts[index].location.uri`), resolving or refusing `uriBaseId`, percent-decoding, and
   dropping a non-relative scheme, an absolute path, or a repo-escaping traversal — an untrusted
   artifact can never surface a finding outside the repository (rule R-05).
+- SARIF severity and kind mapping in `@sovri/review-engine`: a result's `level` maps to Finding
+  severity (error→major, warning→minor, note→info, none→nitpick) following the precedence
+  `result.level` → `rule.defaultConfiguration.level` → default warning, and `resultKindReason`
+  drops a result whose `kind` is not `fail` (pass / open / informational / notApplicable / review),
+  with kind-absent defaulting to fail (rule R-06).
 - `@sovri/cli` package with a `sovri verify <trail.jsonl>` command that verifies an audit trail
   offline (Ed25519 hash chain + signatures), reading the verification public key from the trail's
   `trail.started` entry or a `--public-key` PEM file; exits non-zero on tamper or malformed input.

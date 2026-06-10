@@ -95,6 +95,7 @@ const SARIF_LEVEL_TO_SEVERITY: Readonly<Record<string, Severity>> = {
 const ResultViewSchema = z.looseObject({
   ruleId: z.string().optional(),
   level: z.string().optional(),
+  kind: z.string().optional(),
   message: z
     .looseObject({
       text: z.string().optional(),
@@ -126,6 +127,7 @@ const RuleViewSchema = z.looseObject({
   shortDescription: z.looseObject({ text: z.string().optional() }).optional(),
   help: z.looseObject({ text: z.string().optional() }).optional(),
   messageStrings: z.record(z.string(), z.looseObject({ text: z.string().optional() })).optional(),
+  defaultConfiguration: z.looseObject({ level: z.string().optional() }).optional(),
 });
 
 type ResultView = z.infer<typeof ResultViewSchema>;
@@ -144,7 +146,7 @@ export function mapSarifResult(result: SarifResult, rule?: Record<string, unknow
   return {
     id: uuidv4(),
     audit_reference: generateAuditReference(SARIF_CATEGORY),
-    severity: resolveSeverity(view),
+    severity: resolveSeverity(view, ruleView),
     category: SARIF_CATEGORY,
     file: location.file,
     line_start: location.lineStart,
@@ -175,9 +177,22 @@ function resolveLocation(view: ResultView): {
   return { file, lineStart, lineEnd };
 }
 
-function resolveSeverity(view: ResultView): Severity {
-  const level = view.level;
-  return (level !== undefined && SARIF_LEVEL_TO_SEVERITY[level]) || "minor";
+// Level precedence: result.level, else the rule's defaultConfiguration.level,
+// else the SARIF default "warning". A non-failing kind never reaches here (it is
+// dropped via resultKindReason before mapping).
+function resolveSeverity(view: ResultView, rule: RuleView): Severity {
+  const level = view.level ?? rule.defaultConfiguration?.level ?? "warning";
+  return SARIF_LEVEL_TO_SEVERITY[level] ?? "minor";
+}
+
+/**
+ * The reason a result is not mappable to a Finding by its SARIF kind, or null
+ * when it is. Only `kind === "fail"` (or kind absent, which defaults to fail)
+ * becomes a Finding; pass / open / informational / notApplicable / review drop.
+ */
+export function resultKindReason(result: SarifResult): "non-failing-kind" | null {
+  const view = parseView(ResultViewSchema, result);
+  return view.kind === undefined || view.kind === "fail" ? null : "non-failing-kind";
 }
 
 function resolveTitle(view: ResultView, rule: RuleView): string {
