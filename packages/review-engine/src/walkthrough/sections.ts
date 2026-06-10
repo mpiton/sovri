@@ -3,7 +3,7 @@
 
 import { computeSeverityRank, type Finding } from "@sovri/core";
 
-import { severityBadge } from "./badge.js";
+import { severityBadge, sourceBadge } from "./badge.js";
 import { formatTableCell } from "./markdown.js";
 import { formatTable } from "./table.js";
 
@@ -29,7 +29,7 @@ export function renderFindings(findings: readonly Finding[]): string[] {
     ordered.map((finding) => [
       severityBadge(finding.severity),
       formatLocation(finding),
-      formatCell(finding.title),
+      formatTitleCell(finding),
       formatCell(finding.body),
     ]),
   );
@@ -121,4 +121,12 @@ function formatLocation(finding: Finding): string {
 
 function formatCell(value: string): string {
   return formatTableCell(value);
+}
+
+// Title cell with a SARIF source badge prefixed for scanner-sourced findings. The
+// badge is trusted markup; the finding's own title is escaped via formatCell.
+function formatTitleCell(finding: Finding): string {
+  const badge = sourceBadge(finding);
+  const title = formatCell(finding.title);
+  return badge === "" ? title : `${badge} ${title}`;
 }

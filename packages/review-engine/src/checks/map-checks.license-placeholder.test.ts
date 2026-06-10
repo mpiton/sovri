@@ -83,9 +83,8 @@ describe("GitHub Checks descriptors - license scan placeholder (R-05)", () => {
     licenseDescriptor(mapChecks(input));
     const source = await readChecksMapperSource();
 
-    // Then no SARIF file is read
+    // Then the checks mapper performs no file I/O of its own
     expect(source).not.toContain("node:fs");
-    expect(source).not.toContain("sarif");
 
     // And no license scanner command is executed
     expect(source).not.toContain("node:child_process");

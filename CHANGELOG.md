@@ -21,6 +21,54 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- SARIF 2.1.0 report reader in `@sovri/review-engine`: validates an untrusted scanner report at
+  the boundary, accepting only valid JSON whose `version` is exactly `2.1.0` (the `$schema` field
+  is optional and ignored) and rejecting malformed or wrong-version reports with a typed
+  `SarifParseError` that preserves the underlying JSON/Zod error as `cause` (rule R-01, part of
+  SARIF ingestion).
+- SARIF input bounds in `@sovri/review-engine`: a report over 10 MiB or nested beyond depth 64 is
+  skipped before parsing (UTF-8 byte size plus a string-aware, non-recursive bracket-depth scan
+  that never calls `JSON.parse`), and mapped SARIF findings are capped at 1000 per review with a
+  deterministic overflow drop (rule R-02).
+- SARIF report ingestion isolation in `@sovri/review-engine`: `ingestReport` parses a report (a
+  whole-report failure throws `SarifParseError`) then walks each result, dropping an off-spec one
+  (e.g. a result with no physical location) with a counted reason while its siblings still ingest,
+  and returns an ingestion summary of results seen / mapped / skipped (rule R-03).
+- SARIF result-to-Finding mapping in `@sovri/review-engine`: `mapSarifResult` projects a mappable
+  SARIF result onto a core `Finding` (`source: "sarif"`) with a generated id and audit reference,
+  resolving the human message from `result.message.text`, else the rule's `messageStrings[id]` with
+  `{n}` argument substitution, else a deterministic fallback, and truncating over-long
+  title / body / recommendation to the schema caps rather than dropping the result (rule R-04).
+- Safe SARIF file resolution in `@sovri/review-engine`: `resolveSarifFile` resolves a result's
+  physical location to a repo-relative path through the uri chain (`artifactLocation.uri`, else
+  `run.artifacts[index].location.uri`), resolving or refusing `uriBaseId`, percent-decoding, and
+  dropping a non-relative scheme, an absolute path, or a repo-escaping traversal — an untrusted
+  artifact can never surface a finding outside the repository (rule R-05).
+- SARIF severity and kind mapping in `@sovri/review-engine`: a result's `level` maps to Finding
+  severity (error→major, warning→minor, note→info, none→nitpick) following the precedence
+  `result.level` → `rule.defaultConfiguration.level` → default warning, and `resultKindReason`
+  drops a result whose `kind` is not `fail` (pass / open / informational / notApplicable / review),
+  with kind-absent defaulting to fail (rule R-06).
+- SARIF CWE extraction in `@sovri/review-engine`: `extractCwe` canonicalizes a CWE id to `CWE-<n>`
+  (no leading zeros) from Semgrep `rule.properties.cwe`, CodeQL zero-padded `external/cwe/cwe-NNN`
+  tags, and `taxa` / `rule.relationships` resolved against `run.taxonomies`, consulted in document
+  order with the first valid id winning; CWE stays optional (rule R-07).
+- SARIF suppressions and scan-failure surfacing in `@sovri/review-engine`: `resultSuppressionReason`
+  drops a result whose `suppressions[]` carries an `accepted` state (an empty array or an
+  under-review suppression still maps), and `countScanFailures` counts a run's failed invocations
+  (`executionSuccessful: false`) and error-level tool notifications so a failed scan is not
+  presented as clean; tool notifications never become Findings (rule R-08).
+- SARIF/LLM finding merge in `@sovri/review-engine`: `mergeSarifFindings` appends SARIF findings
+  after the LLM findings and deduplicates — a SARIF finding colliding with an LLM finding (same
+  file, same CWE, overlapping lines) collapses to the LLM one, and cross-tool SARIF duplicates
+  collapse first-wins — surfaces SARIF only when its file is in the diff's changed-files set,
+  applies the severity threshold and ignore rules, and orders the merged set by a stable tie-break
+  (severity, source, file, line, id) for reproducible output (rule R-09).
+- SARIF output surfacing in `@sovri/review-engine`: SARIF findings are counted in the
+  "Sovri / review" Checks row (the "Sovri / license-scan" row stays the v1.0 neutral placeholder),
+  attributed in the walkthrough findings table via a `SARIF` source badge in the title cell (no core
+  Finding change), with every SARIF-derived string escaped through the existing `formatTableCell`
+  (rule R-10).
 - `@sovri/cli` package with a `sovri verify <trail.jsonl>` command that verifies an audit trail
   offline (Ed25519 hash chain + signatures), reading the verification public key from the trail's
   `trail.started` entry or a `--public-key` PEM file; exits non-zero on tamper or malformed input.
@@ -33,6 +81,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   default. Documented in `docs/audit-trail.md`.
 
 ### Changed
+
+- review-engine: clarify the SARIF `no-physical-location` drop contract — only a result with no primary `physicalLocation` is dropped; a present-but-partial location still maps with defensive defaults (R-05 owns uri resolution).
 
 ### Deprecated
 

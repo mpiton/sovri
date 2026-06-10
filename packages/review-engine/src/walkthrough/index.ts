@@ -114,7 +114,7 @@ export type WalkthroughInput =
   | WithWalkthroughProvenance<Review>
   | WithWalkthroughProvenance<WalkthroughInputWithoutUsage>;
 
-export { categoryBadge, renderAuditReference, severityBadge } from "./badge.js";
+export { categoryBadge, renderAuditReference, severityBadge, sourceBadge } from "./badge.js";
 export { computeVerdict, renderVerdictHeader } from "./verdict.js";
 export type { Verdict } from "./verdict.js";
 export { buildInlineComments, InlineCommentDraftSchema } from "./inline.js";

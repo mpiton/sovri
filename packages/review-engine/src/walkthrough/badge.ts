@@ -25,3 +25,10 @@ export function categoryBadge(category: Category): string {
 export function renderAuditReference(finding: Pick<Finding, "audit_reference">): string {
   return finding.audit_reference ? `\n\n🔍 Audit Reference: ${finding.audit_reference}` : "";
 }
+
+// Source badge marking a SARIF-sourced finding in the walkthrough title cell. The
+// scanner identity is not carried on the core Finding (no tool_name field), so a
+// SARIF finding is attributed by source only; an LLM finding carries no badge.
+export function sourceBadge(finding: Pick<Finding, "source">): string {
+  return finding.source === "sarif" ? "`SARIF`" : "";
+}
