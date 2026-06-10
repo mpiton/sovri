@@ -30,6 +30,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   skipped before parsing (UTF-8 byte size plus a string-aware, non-recursive bracket-depth scan
   that never calls `JSON.parse`), and mapped SARIF findings are capped at 1000 per review with a
   deterministic overflow drop (rule R-02).
+- SARIF report ingestion isolation in `@sovri/review-engine`: `ingestReport` parses a report (a
+  whole-report failure throws `SarifParseError`) then walks each result, dropping an off-spec one
+  (e.g. a result with no physical location) with a counted reason while its siblings still ingest,
+  and returns an ingestion summary of results seen / mapped / skipped (rule R-03).
 - `@sovri/cli` package with a `sovri verify <trail.jsonl>` command that verifies an audit trail
   offline (Ed25519 hash chain + signatures), reading the verification public key from the trail's
   `trail.started` entry or a `--public-key` PEM file; exits non-zero on tamper or malformed input.

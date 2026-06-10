@@ -35,6 +35,7 @@ const SarifLogSchema = z.looseObject({
 });
 
 export type SarifLog = z.infer<typeof SarifLogSchema>;
+export type SarifResult = z.infer<typeof SarifResultSchema>;
 
 /**
  * Validate one untrusted SARIF report string and return the parsed SARIF 2.1.0
