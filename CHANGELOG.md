@@ -49,6 +49,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `result.level` → `rule.defaultConfiguration.level` → default warning, and `resultKindReason`
   drops a result whose `kind` is not `fail` (pass / open / informational / notApplicable / review),
   with kind-absent defaulting to fail (rule R-06).
+- SARIF CWE extraction in `@sovri/review-engine`: `extractCwe` canonicalizes a CWE id to `CWE-<n>`
+  (no leading zeros) from Semgrep `rule.properties.cwe`, CodeQL zero-padded `external/cwe/cwe-NNN`
+  tags, and `taxa` / `rule.relationships` resolved against `run.taxonomies`, consulted in document
+  order with the first valid id winning; CWE stays optional (rule R-07).
 - `@sovri/cli` package with a `sovri verify <trail.jsonl>` command that verifies an audit trail
   offline (Ed25519 hash chain + signatures), reading the verification public key from the trail's
   `trail.started` entry or a `--public-key` PEM file; exits non-zero on tamper or malformed input.
