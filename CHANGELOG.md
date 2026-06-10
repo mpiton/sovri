@@ -21,6 +21,20 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.8.0] - 2026-06-10
+
+### Added
+
 - SARIF 2.1.0 report reader in `@sovri/review-engine`: validates an untrusted scanner report at
   the boundary, accepting only valid JSON whose `version` is exactly `2.1.0` (the `$schema` field
   is optional and ignored) and rejecting malformed or wrong-version reports with a typed

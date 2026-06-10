@@ -1,6 +1,6 @@
 {
   "name": "@sovri/core",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "description": "Sovri core domain types and Zod schemas. Pure — zero I/O, no fs/network/env access.",
   "homepage": "https://github.com/mpiton/sovri/tree/main/packages/core#readme",
