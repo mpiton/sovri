@@ -35,6 +35,9 @@ export const MapChecksInputSchema = z
       .strict(),
     findingCount: z.number().int().nonnegative(),
     hasSignedAuditEntry: z.boolean(),
+    // True once at least one SARIF report was ingested for this review; flips the
+    // license-scan row off its v1.0 placeholder. Defaults false (no scan consumed).
+    sarifIngested: z.boolean().default(false),
   })
   .strict();
 
@@ -83,30 +86,56 @@ export function mapChecks(input: unknown): readonly CheckRunDescriptor[] {
       summary: formatFindingSummary(parsedInput.findingCount),
     },
     mapProvenanceDescriptor(parsedInput.hasSignedAuditEntry),
-    {
+    mapLicenseScanDescriptor(parsedInput.sarifIngested),
+  ];
+}
+
+// The license-scan row doubles as the scanner-ingestion row: when a SARIF report
+// was ingested for this review its conclusion turns success, otherwise it stays
+// the neutral v1.0 placeholder.
+function mapLicenseScanDescriptor(sarifIngested: boolean): CheckRunDescriptor {
+  if (sarifIngested) {
+    return {
       name: "Sovri / license-scan",
       status: "completed",
-      conclusion: "neutral",
-      title: "Sovri license scan pending",
-      summary: "License scan available in v1.0",
-    },
-  ];
+      conclusion: "success",
+      title: "Sovri SARIF scan ingested",
+      summary: "Scanner findings were merged into the review.",
+    };
+  }
+
+  return {
+    name: "Sovri / license-scan",
+    status: "completed",
+    conclusion: "neutral",
+    title: "Sovri license scan pending",
+    summary: "License scan available in v1.0",
+  };
+}
+
+export interface CheckRunDescriptorOptions {
+  readonly sarifIngested?: boolean;
 }
 
 export function buildReviewCheckDescriptors(
   review: ReviewCheckDescriptorInput,
+  options: CheckRunDescriptorOptions = {},
 ): readonly CheckRunDescriptor[] {
   return mapChecks({
     verdict: computeReviewVerdict(review),
     findingCount: review.findings.length,
     hasSignedAuditEntry: reviewHasSignedAuditEntry(review),
+    sarifIngested: options.sarifIngested ?? false,
   });
 }
 
-export function attachCheckRunDescriptors(review: Review): ReviewWithCheckRunDescriptors {
+export function attachCheckRunDescriptors(
+  review: Review,
+  options: CheckRunDescriptorOptions = {},
+): ReviewWithCheckRunDescriptors {
   return {
     ...review,
-    check_run_descriptors: buildReviewCheckDescriptors(review),
+    check_run_descriptors: buildReviewCheckDescriptors(review, options),
   };
 }
 

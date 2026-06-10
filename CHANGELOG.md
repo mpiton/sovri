@@ -65,10 +65,17 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   applies the severity threshold and ignore rules, and orders the merged set by a stable tie-break
   (severity, source, file, line, id) for reproducible output (rule R-09).
 - SARIF output surfacing in `@sovri/review-engine`: SARIF findings are counted in the
-  "Sovri / review" Checks row (the "Sovri / license-scan" row stays the v1.0 neutral placeholder),
-  attributed in the walkthrough findings table via a `SARIF` source badge in the title cell (no core
-  Finding change), with every SARIF-derived string escaped through the existing `formatTableCell`
-  (rule R-10).
+  "Sovri / review" Checks row, attributed in the walkthrough findings table via a `SARIF` source
+  badge in the title cell (no core Finding change), with every SARIF-derived string escaped through
+  the existing `formatTableCell` (rule R-10).
+- SARIF ingestion wired into the review pipeline (`@sovri/review-engine`): `reviewPullRequest` accepts
+  an optional `sarifReports` array of raw scanner reports and ingests each through the new
+  `collectSarifFindings` conductor (bounds → parse → per-result kind / suppression / file-escape drops
+  → rule resolution → mapping → CWE → cap), skipping an invalid report without failing the review.
+  Survivors merge into the review findings (`mergeSarifFindings`), surface in the walkthrough via the
+  `SARIF` badge, and flip the `Sovri / license-scan` Checks row from its neutral placeholder to
+  success once a report is ingested. No reports leaves the LLM-only path unchanged. The SARIF engine
+  and conductor are exported from the package entry point.
 - `@sovri/cli` package with a `sovri verify <trail.jsonl>` command that verifies an audit trail
   offline (Ed25519 hash chain + signatures), reading the verification public key from the trail's
   `trail.started` entry or a `--public-key` PEM file; exits non-zero on tamper or malformed input.

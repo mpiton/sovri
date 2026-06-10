@@ -53,6 +53,9 @@ import {
   type ProviderReviewResponse,
 } from "./parsing/index.js";
 import { shouldEnrichCompliance } from "./compliance-gate.js";
+import { collectSarifFindings } from "./sarif/ingest.js";
+import { mergeSarifFindings } from "./sarif/merge.js";
+import { SarifParseError } from "./sarif/reader.js";
 import { toFindingSuggestion } from "./parsing/suggestion.js";
 import { renderComplianceSection } from "./walkthrough/compliance.js";
 import { composeWalkthrough, type WalkthroughInput } from "./walkthrough/index.js";
@@ -91,6 +94,10 @@ const ReviewPullRequestInputSchema = z.object({
   pullRequest: PullRequestSchema,
   diff: DiffSchema,
   config: ReviewPullRequestConfigSchema,
+  // Raw, untrusted SARIF report strings from upstream scanners. Validated at the
+  // boundary by the ingestion conductor (Zod); absent or empty leaves the
+  // LLM-only path unchanged.
+  sarifReports: z.array(z.string()).optional(),
 });
 
 type TokenUsage = z.infer<typeof TokenUsageSchema>;
@@ -203,6 +210,7 @@ export interface ReviewPullRequestInput {
   readonly pullRequest: PullRequest;
   readonly diff: Diff;
   readonly config: ReviewPullRequestConfig;
+  readonly sarifReports?: readonly string[];
 }
 
 export interface ReviewPullRequestOptions {
@@ -408,7 +416,7 @@ export async function reviewPullRequest(
             return stampFindingsCount(reviewSpan, attachCheckRunDescriptors(failedReview));
           }
 
-          const findings = await withSpan("review.parse_findings", async () => {
+          const llmFindings = await withSpan("review.parse_findings", async () => {
             // Deterministic backstop (issue #2450): drop narration the prompt and schema let through,
             // then map the survivors. Log the dropped count so the reduction is auditable, never silent.
             const { kept, droppedCount } = partitionActionableFindings(generation.parsed.findings);
@@ -429,6 +437,27 @@ export async function reviewPullRequest(
               reviewInput.config.ignores,
             );
           });
+
+          // SARIF ingestion (R-01..R-10): when the caller supplies scanner reports, ingest each
+          // (an invalid one is skipped, never fatal), merge the survivors with the LLM findings —
+          // deduped, changed-files gated, severity/ignore filtered — and surface them in the
+          // walkthrough and the license-scan check. No reports leaves the LLM-only set untouched.
+          const sarifReports = reviewInput.sarifReports ?? [];
+          const sarif =
+            sarifReports.length === 0
+              ? { findings: [], ingested: false }
+              : await withSpan("review.ingest_sarif", async () =>
+                  ingestSarifReports(sarifReports, logger),
+                );
+          const findings = sarif.ingested
+            ? mergeSarifFindings(
+                llmFindings,
+                sarif.findings,
+                filteredDiff,
+                reviewInput.config.review.severityThreshold,
+                reviewInput.config.ignores,
+              )
+            : llmFindings;
 
           // Append findings in order: a chaining sink (the Cloud file writer) links
           // entries by hash, so they must be awaited sequentially, never in parallel.
@@ -475,6 +504,7 @@ export async function reviewPullRequest(
                   ? {}
                   : { promptSha256: generation.promptSha256 },
               ),
+              { sarifIngested: sarif.ingested },
             ),
           );
         })();
@@ -945,6 +975,45 @@ function getFallbackFindingLocation(diff: Diff): { readonly file: string; readon
     file: firstFile?.path ?? "unknown",
     line: Math.max(firstHunk?.new_start ?? firstHunk?.old_start ?? 1, 1),
   };
+}
+
+interface SarifIngestionOutcome {
+  readonly findings: readonly Finding[];
+  readonly ingested: boolean;
+}
+
+// Ingest every supplied SARIF report into core Findings. A report rejected whole
+// (invalid JSON / wrong version / breached bounds) is skipped with a warning, never
+// fatal, so the LLM review still completes. `ingested` is true once at least one
+// report parsed, which is what flips the license-scan check off its placeholder.
+function ingestSarifReports(reports: readonly string[], logger?: Logger): SarifIngestionOutcome {
+  const findings: Finding[] = [];
+  let ingested = false;
+
+  reports.forEach((raw, index) => {
+    try {
+      const result = collectSarifFindings(raw);
+      ingested = true;
+      findings.push(...result.findings);
+      logger?.info(
+        {
+          report_index: index,
+          seen: result.summary.seen,
+          mapped: result.summary.mapped,
+          skipped: result.summary.skipped,
+        },
+        "SARIF report ingested",
+      );
+    } catch (error) {
+      if (error instanceof SarifParseError) {
+        logger?.warn({ report_index: index, err: error.message }, "Skipped invalid SARIF report");
+        return;
+      }
+      throw error;
+    }
+  });
+
+  return { findings, ingested };
 }
 
 function applyReviewFilters(

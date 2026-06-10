@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri SAS
 
+// The license-scan row doubles as the scanner-ingestion row (MAT-6): neutral
+// placeholder until a SARIF report is ingested for the review, then success.
+// Replaces the earlier placeholder test that asserted the SARIF reader was absent.
+
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,70 +27,54 @@ async function readChecksMapperSource(): Promise<string> {
   return readFile(join(directory, "index.ts"), "utf8");
 }
 
-describe("GitHub Checks descriptors - license scan placeholder (R-05)", () => {
+describe("GitHub Checks descriptors - scanner (license-scan) row", () => {
   it.each([
-    {
-      verdict: "approve",
-      label: "Approve",
-      findingCount: 0,
-      hasSignedAuditEntry: false,
-      auditState: "no",
-    },
-    {
-      verdict: "comment",
-      label: "Comment",
-      findingCount: 2,
-      hasSignedAuditEntry: true,
-      auditState: "a",
-    },
+    { verdict: "approve", label: "Approve", findingCount: 0, hasSignedAuditEntry: false },
+    { verdict: "comment", label: "Comment", findingCount: 2, hasSignedAuditEntry: true },
     {
       verdict: "request-changes",
       label: "Request changes",
       findingCount: 5,
       hasSignedAuditEntry: true,
-      auditState: "a",
     },
   ])(
-    "keeps license scan neutral for verdict $verdict with $auditState signed audit entry",
+    "keeps the row neutral when no SARIF report was ingested ($verdict)",
     ({ verdict, label, findingCount, hasSignedAuditEntry }) => {
-      // Given the review verdict is "<verdict>"
-      // And the review has <finding_count> findings
-      // And <audit_state> signed audit entry is available
-      const input = {
-        verdict: { kind: verdict, label },
-        findingCount,
-        hasSignedAuditEntry,
-      };
+      // Given a review with no SARIF report ingested (sarifIngested omitted -> default false)
+      const input = { verdict: { kind: verdict, label }, findingCount, hasSignedAuditEntry };
 
       // When the Sovri check descriptors are mapped
       const descriptor = licenseDescriptor(mapChecks(input));
 
-      // Then the "Sovri / license-scan" descriptor conclusion is "neutral"
+      // Then the "Sovri / license-scan" descriptor stays the neutral v1.0 placeholder
       expect(descriptor.conclusion).toBe("neutral");
-
-      // And its summary is "License scan available in v1.0"
       expect(descriptor.summary).toBe("License scan available in v1.0");
     },
   );
 
-  it("does not include a SARIF reader or license scanner command in the mapper", async () => {
-    // Given the review verdict is "request-changes"
-    // And the review has 5 findings
-    // And a signed audit entry is available
+  it("flips the row to success once a SARIF report is ingested", () => {
+    // Given a review for which at least one SARIF report was ingested
     const input = {
-      verdict: { kind: "request-changes", label: "Request changes" },
-      findingCount: 5,
-      hasSignedAuditEntry: true,
+      verdict: { kind: "comment", label: "Comment" },
+      findingCount: 3,
+      hasSignedAuditEntry: false,
+      sarifIngested: true,
     };
 
     // When the Sovri check descriptors are mapped
-    licenseDescriptor(mapChecks(input));
+    const descriptor = licenseDescriptor(mapChecks(input));
+
+    // Then the "Sovri / license-scan" row reports the ingested scan
+    expect(descriptor.conclusion).toBe("success");
+    expect(descriptor.title).toBe("Sovri SARIF scan ingested");
+  });
+
+  it("keeps the checks mapper free of file or process I/O", async () => {
+    // The mapper turns a Review into descriptors with no side effects: ingestion
+    // happens upstream in the orchestrator, never in this pure mapping layer.
     const source = await readChecksMapperSource();
 
-    // Then the checks mapper performs no file I/O of its own
     expect(source).not.toContain("node:fs");
-
-    // And no license scanner command is executed
     expect(source).not.toContain("node:child_process");
     expect(source).not.toContain("execFile");
     expect(source).not.toContain("spawn");

@@ -32,11 +32,24 @@ export {
 export type {
   CheckRunConclusion,
   CheckRunDescriptor,
+  CheckRunDescriptorOptions,
   CheckRunName,
   CheckRunStatus,
   MapChecksInput,
   ReviewWithCheckRunDescriptors,
 } from "./checks/index.js";
+
+export { capFindings, checkReportBounds } from "./sarif/caps.js";
+export { extractCwe } from "./sarif/cwe.js";
+export { collectSarifFindings } from "./sarif/ingest.js";
+export type { SarifFindingsResult, SarifIngestionSummary } from "./sarif/ingest.js";
+export { resolveSarifFile } from "./sarif/location.js";
+export type { FileResolution } from "./sarif/location.js";
+export { ingestReport, mapSarifResult } from "./sarif/mapper.js";
+export type { IngestionSummary, ReportIngestion } from "./sarif/mapper.js";
+export { mergeSarifFindings } from "./sarif/merge.js";
+export { parseSarifReport, SarifParseError } from "./sarif/reader.js";
+export type { SarifLog, SarifResult } from "./sarif/reader.js";
 
 export {
   parseLLMReviewResponse,
