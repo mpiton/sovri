@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- SARIF 2.1.0 report reader in `@sovri/review-engine`: validates an untrusted scanner report at
+  the boundary, accepting only valid JSON whose `version` is exactly `2.1.0` (the `$schema` field
+  is optional and ignored) and rejecting malformed or wrong-version reports with a typed
+  `SarifParseError` that preserves the underlying JSON/Zod error as `cause` (rule R-01, part of
+  SARIF ingestion).
 - `@sovri/cli` package with a `sovri verify <trail.jsonl>` command that verifies an audit trail
   offline (Ed25519 hash chain + signatures), reading the verification public key from the trail's
   `trail.started` entry or a `--public-key` PEM file; exits non-zero on tamper or malformed input.

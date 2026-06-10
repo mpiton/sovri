@@ -434,22 +434,6 @@ describe("@sovri/review-engine scaffold", () => {
     ).toEqual(["any"]);
   });
 
-  it("keeps the deferred ingestion format out of production source", () => {
-    const deferredToken = ["sa", "rif"].join("");
-    const deferredPattern = new RegExp(deferredToken, "iu");
-    const sourceFiles = listTypeScriptFiles(sourceRoot).filter(
-      (path) => !path.endsWith(".test.ts"),
-    );
-    const matches = sourceFiles.flatMap((path) => {
-      const content = readFileSync(path, "utf8");
-      const relativePath = relative(packageRoot, path);
-      return deferredPattern.test(relativePath) || deferredPattern.test(content)
-        ? [relativePath]
-        : [];
-    });
-    expect(matches).toEqual([]);
-  });
-
   it("separates the review-engine responsibilities into dedicated modules", () => {
     expect(existsSync(join(sourceRoot, "diff/index.ts"))).toBe(true);
     expect(existsSync(join(sourceRoot, "prompt/index.ts"))).toBe(true);
