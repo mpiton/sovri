@@ -111,7 +111,7 @@ stage_file() {
 # Canonical header blocks, matching the live tree (verified packages/core).
 APACHE_HEADER='// SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri contributors'
-PROPRIETARY_HEADER='// Proprietary — Sovri SAS'
+PROPRIETARY_HEADER='// Proprietary — Sovri'
 
 # Pass scenarios.
 
@@ -259,7 +259,7 @@ run_case "BLOCK-3  legacy 'Sovri SAS' entity"           setup_wrong_copyright_en
 run_case "BLOCK-4  proprietary header in packages/"     setup_proprietary_header_in_packages --staged 1 "BLOCKED" \
   "packages/core/src/wrong.ts"
 run_case "BLOCK-5  missing proprietary in cloud-api"    setup_missing_proprietary_in_cloud --staged 1 "BLOCKED" \
-  "apps/cloud-api/src/bare.ts" "Proprietary — Sovri SAS"
+  "apps/cloud-api/src/bare.ts" "Proprietary — Sovri"
 run_case "BLOCK-6  apache header in cloud-api (leak)"   setup_apache_header_in_cloud    --staged 1 "BLOCKED" \
   "apps/cloud-api/src/leak.ts" "leak"
 run_case "BLOCK-7  header buried past scan window"      setup_header_too_deep           --staged 1 "BLOCKED" \

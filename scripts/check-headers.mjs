@@ -10,7 +10,7 @@
 //       // SPDX-License-Identifier: Apache-2.0
 //       // Copyright <year> Sovri contributors
 //   apps/cloud-api/**                    -> Proprietary header
-//       // Proprietary — Sovri SAS
+//       // Proprietary — Sovri
 // A proprietary file must NOT carry an Apache SPDX line (license leak), and an
 // Apache file must carry both header lines within the first lines of the file.
 //
@@ -36,7 +36,7 @@ const SOURCE_EXT = /\.(ts|tsx)$/;
 const HEADER_SCAN_LINES = 5;
 const APACHE_SPDX = /^\/\/ SPDX-License-Identifier: Apache-2\.0$/;
 const APACHE_COPYRIGHT = /^\/\/ Copyright 20\d\d Sovri contributors$/;
-const PROPRIETARY = /^\/\/ Proprietary — Sovri SAS$/;
+const PROPRIETARY = /^\/\/ Proprietary — Sovri$/;
 
 function fatal(message, code) {
   stderr.write(`${message}\n`);
@@ -83,7 +83,7 @@ function checkFile(path, content) {
       return "Apache-2.0 header in proprietary apps/cloud-api/ (license leak)";
     }
     if (!head.some((line) => PROPRIETARY.test(line))) {
-      return 'missing "// Proprietary — Sovri SAS"';
+      return 'missing "// Proprietary — Sovri"';
     }
     return null;
   }
@@ -126,7 +126,7 @@ function main() {
       "  // SPDX-License-Identifier: Apache-2.0",
       "  // Copyright <year> Sovri contributors",
       "apps/cloud-api/** must start with:",
-      "  // Proprietary — Sovri SAS",
+      "  // Proprietary — Sovri",
       "",
       "Add the header to the listed file(s).",
     ];

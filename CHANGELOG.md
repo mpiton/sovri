@@ -21,12 +21,14 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
-- `ci`: per-file license-header gate (`scripts/check-headers.mjs`, fail-closed). `packages/**` and `apps/community-bot/**` must carry the Apache 2.0 header (`SPDX-License-Identifier: Apache-2.0` + `Copyright <year> Sovri contributors`); `apps/cloud-api/**` must carry the `Proprietary — Sovri SAS` header and must not claim Apache (license-leak guard). Runs in lefthook pre-commit (staged blob) and a blocking CI job (full tree), mirroring the import-boundary guard (ADR-010). Covers `apps/cloud-api/**` ahead of its scaffold so the directory is gated the moment it lands.
+- `ci`: per-file license-header gate (`scripts/check-headers.mjs`, fail-closed). `packages/**` and `apps/community-bot/**` must carry the Apache 2.0 header (`SPDX-License-Identifier: Apache-2.0` + `Copyright <year> Sovri contributors`); `apps/cloud-api/**` must carry the `Proprietary — Sovri` header and must not claim Apache (license-leak guard). Runs in lefthook pre-commit (staged blob) and a blocking CI job (full tree), mirroring the import-boundary guard (ADR-010). Covers `apps/cloud-api/**` ahead of its scaffold so the directory is gated the moment it lands.
 - Root `NOTICE` file naming the legal copyright holder (Mathieu Piton, sole proprietor) behind the collective `Sovri contributors` notice.
 
 ### Changed
 
 - Standardize the Apache 2.0 copyright holder across every published source header from `Sovri SAS` to `Sovri contributors`. `Sovri SAS` was inaccurate: Sovri is a sole proprietorship (entreprise individuelle), not an SAS. Header-pinning contract tests and scaffold checks are updated to match.
+
+- Correct the proprietary `apps/cloud-api/**` header from `Proprietary — Sovri SAS` to `Proprietary — Sovri` for the same reason. The directory has no files yet, so this only updates the gate rule and its tests.
 
 - `docs`: make the `apps/cloud-api/` creation timing consistent with the roadmap. The Cloud edition is scaffolded at v0.9 (after the Go/No-Go gate) and reaches Cloud Beta at v1.0, instead of being created at v1.0. The version annotations in ADR-002 and `pnpm-workspace.yaml` are made version-agnostic so the roadmap stays the single source for the timing.
 
