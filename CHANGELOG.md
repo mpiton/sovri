@@ -23,6 +23,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `ci`: per-file license-header gate (`scripts/check-headers.mjs`, fail-closed). `packages/**` and `apps/community-bot/**` must carry the Apache 2.0 header (`SPDX-License-Identifier: Apache-2.0` + `Copyright <year> Sovri contributors`); `apps/cloud-api/**` must carry the `Proprietary — Sovri` header and must not claim Apache (license-leak guard). Runs in lefthook pre-commit (staged blob) and a blocking CI job (full tree), mirroring the import-boundary guard (ADR-010). Covers `apps/cloud-api/**` ahead of its scaffold so the directory is gated the moment it lands.
 - Root `NOTICE` file naming the legal copyright holder (Mathieu Piton, sole proprietor) behind the collective `Sovri contributors` notice.
+- `bot`: review pull requests on `pull_request.ready_for_review`. A draft PR marked ready for review now runs the same review flow as `pull_request.opened`, instead of being skipped until an unrelated `synchronize` push. Draft skip is unchanged: PRs still in draft stay skipped unless `review.autoReviewDrafts` is enabled. (#2505)
 
 ### Changed
 

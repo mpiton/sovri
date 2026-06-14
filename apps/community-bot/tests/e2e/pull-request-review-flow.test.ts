@@ -25,6 +25,7 @@ const PullNumber = 42;
 const CommentId = 98_765;
 const BaseSha = "dddddddddddddddddddddddddddddddddddddddd";
 const OpenedHeadSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const ReadyForReviewHeadSha = "c0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ff";
 const SynchronizedHeadSha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const SecondSynchronizedHeadSha = "cccccccccccccccccccccccccccccccccccccccc";
 const ChecksReviewedHeadSha = "0123456789abcdef0123456789abcdef01234567";
@@ -33,6 +34,7 @@ const ReReviewOrderHeadSha = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const ReReviewSuccessfulHeadSha = "ffffffffffffffffffffffffffffffffffffffff";
 const OpenedDeliveryId = "8f1b9c2d-3e4f-45a6-91b2-123456789abc";
 const SynchronizeDeliveryId = "9f1b9c2d-3e4f-45a6-91b2-123456789abc";
+const ReadyForReviewDeliveryId = "delivery-ready-for-review-001";
 const ReReviewDeliveryId = "delivery-re-review-001";
 const ReReviewOrderDeliveryId = "delivery-re-review-002";
 const ReReviewCurrentHeadDeliveryId = "delivery-re-review-004";
@@ -1073,6 +1075,61 @@ describe("community bot pull request review E2E ATDD", () => {
     expect(runtime.successfulReviewRequests[0]?.body).toContain("Non-draft review complete");
   }, 15_000);
 
+  it("reviews a pull request when it is marked ready for review", async () => {
+    // Rule R-01 — @nominal: A pull request marked ready for review is reviewed
+    // Background:
+    //   Given a repository "acme/payments" with the Sovri Community bot installed
+    //   And the repository config sets "review.autoReviewDrafts" to false
+    // Given pull request #42 was opened as a draft and produced no review
+    // When GitHub delivers a "pull_request.ready_for_review" event for pull request #42 with draft "false"
+    const runtime = await runReviewFlow({
+      action: "ready_for_review",
+      configContent: [
+        "llm:",
+        "  provider: anthropic",
+        "  model: claude-3-5-sonnet-latest",
+        "  apiKeySecret: ANTHROPIC_API_KEY",
+        "review:",
+        "  autoReviewDrafts: false",
+      ].join("\n"),
+      deliveryId: ReadyForReviewDeliveryId,
+      headSha: ReadyForReviewHeadSha,
+    });
+
+    // Then the bot reviews pull request #42
+    expect(runtime.reviewRequests).toHaveLength(1);
+    expect(runtime.successfulReviewRequests).toHaveLength(1);
+    expect(runtime.successfulReviewRequests[0]?.pull_number).toBe(PullNumber);
+    // And the bot posts a walkthrough review comment on pull request #42
+    expect(runtime.successfulReviewRequests[0]?.body).toContain("## Sovri review");
+  }, 15_000);
+
+  it("reviews on ready_for_review without waiting for a later synchronize push", async () => {
+    // Rule R-01 — @technical: Review happens on ready_for_review without waiting for a later push
+    // Given pull request #42 was opened as a draft and produced no review
+    // And no "pull_request.synchronize" event is ever delivered for pull request #42
+    // When GitHub delivers a "pull_request.ready_for_review" event for pull request #42 with draft "false"
+    const runtime = await runReviewFlow({
+      action: "ready_for_review",
+      configContent: [
+        "llm:",
+        "  provider: anthropic",
+        "  model: claude-3-5-sonnet-latest",
+        "  apiKeySecret: ANTHROPIC_API_KEY",
+        "review:",
+        "  autoReviewDrafts: false",
+      ].join("\n"),
+      deliveryId: ReadyForReviewDeliveryId,
+      headSha: ReadyForReviewHeadSha,
+    });
+
+    // Then the bot reviews pull request #42
+    expect(runtime.reviewRequests).toHaveLength(1);
+    // And the bot does not wait for a "pull_request.synchronize" event to trigger the review
+    // (the single review was driven by the ready_for_review head SHA, no synchronize delivered)
+    expect(runtime.reviewRequests[0]?.commit_id).toBe(ReadyForReviewHeadSha);
+  }, 15_000);
+
   it("re-review preserves synchronize collaborator order", async () => {
     // Given issue comment delivery "delivery-re-review-002" targets repository "octo-org/sovri-target"
     // And issue 42 is pull request 42
@@ -1132,7 +1189,7 @@ function publishedOutput(runtime: ObservedRuntime): string {
 }
 
 async function runReviewFlow(values: {
-  readonly action: "opened" | "synchronize";
+  readonly action: "opened" | "synchronize" | "ready_for_review";
   readonly configContent?: string;
   readonly deliveryId?: string;
   readonly headSha: string;
@@ -1750,8 +1807,14 @@ function compareSynchronizeHeadSha(
   return { message: "synchronize review must use the delivered head SHA", valid: false };
 }
 
-function eventDeliveryId(action: "opened" | "synchronize"): string {
-  return action === "opened" ? OpenedDeliveryId : SynchronizeDeliveryId;
+function eventDeliveryId(action: "opened" | "synchronize" | "ready_for_review"): string {
+  if (action === "opened") {
+    return OpenedDeliveryId;
+  }
+  if (action === "ready_for_review") {
+    return ReadyForReviewDeliveryId;
+  }
+  return SynchronizeDeliveryId;
 }
 
 function capitalize(value: string): string {
