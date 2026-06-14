@@ -40,6 +40,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Security
 
+- `deps`: pin `esbuild` to `0.28.1` via a `pnpm.overrides` entry to patch GHSA-gv7w-rqvm-qjhr
+  (high): esbuild's dev server accepted cross-origin requests, enabling remote code execution via
+  `NPM_CONFIG_REGISTRY`. esbuild is a deep transitive dependency (`vitest` → `vite` → `esbuild`)
+  with no direct entry to bump, so an override is the deterministic fix. Dev/test toolchain only;
+  the distroless runtime image ships no esbuild.
+
 ## [0.8.0] - 2026-06-10
 
 ### Added
