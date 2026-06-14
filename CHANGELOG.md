@@ -39,11 +39,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Fixed
 
 - `bot`: detect at boot when the GitHub App is not subscribed to a webhook event the registered
-  handlers require, and log a warning naming the missing event(s) instead of failing silently.
-  Previously a deployment subscribed only to `issues` + `pull_request` (missing `issue_comment`)
-  would drop every `@sovri-bot` command with no delivery, no log, and no error. Startup still
-  continues, and the check itself fails open: if the App's subscribed events cannot be fetched, the
-  bot warns that the check could not run rather than aborting (bug #2504, rules R-01..R-04).
+  handlers require, and log a warning naming the missing event(s) instead of failing silently. The
+  bot reads its subscribed events from the GitHub App API (`GET /app`), compares them against the
+  events its handlers need (`pull_request`, `issue_comment`), and warns on any gap. Previously a
+  deployment subscribed only to `issues` + `pull_request` (missing `issue_comment`) would drop every
+  `@sovri-bot` command with no delivery, no log, and no error. Startup still continues, and the check
+  fails open: if the subscribed events cannot be fetched, the bot warns that the check could not run
+  rather than aborting (bug #2504, rules R-01..R-04).
 
 ### Security
 

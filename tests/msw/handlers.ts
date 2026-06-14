@@ -17,6 +17,10 @@ export const GitHubPullRequestReviewsUrl =
 export const GitHubIssueCommentsUrl =
   "https://api.github.com/repos/octo-org/sovri-target/issues/42/comments";
 export const AnthropicMessagesUrl = "https://api.anthropic.com/v1/messages";
+// GitHub App metadata endpoint the bot queries at boot for its subscribed webhook events
+// (apps/community-bot webhook subscription self-check). Not part of handlerContracts: it is a
+// boot-time self-check seam, not a review-flow contract.
+const GitHubAppUrl = "https://api.github.com/app";
 
 export const handlerContracts: readonly HandlerContract[] = [
   { method: "GET", url: GitHubPullRequestFilesUrl },
@@ -30,6 +34,8 @@ const AnthropicReviewFixture = readJsonFixture("anthropic-review.json");
 const AnthropicEmptyFixture = readJsonFixture("anthropic-empty.json");
 
 export const handlers = [
+  // Boot self-check: report the events the bot's handlers require so the check stays quiet.
+  http.get(GitHubAppUrl, () => HttpResponse.json({ events: ["pull_request", "issue_comment"] })),
   http.get(GitHubPullRequestFilesUrl, () => HttpResponse.json(GhPullRequestFilesFixture)),
   http.post(GitHubPullRequestReviewsUrl, async ({ request }) => {
     const body: unknown = await request.json();
