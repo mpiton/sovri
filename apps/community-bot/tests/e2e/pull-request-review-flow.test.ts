@@ -1130,6 +1130,37 @@ describe("community bot pull request review E2E ATDD", () => {
     expect(runtime.reviewRequests[0]?.commit_id).toBe(ReadyForReviewHeadSha);
   }, 15_000);
 
+  it.each([{ autoReviewDrafts: "false" }, { autoReviewDrafts: "true" }])(
+    "reviews a ready_for_review pull request whatever autoReviewDrafts=$autoReviewDrafts",
+    async ({ autoReviewDrafts }) => {
+      // Rule R-02 — @nominal @limit: ready_for_review proceeds whatever the autoReviewDrafts setting
+      // Background: Given a repository "acme/payments" with the Sovri Community bot installed
+      // Given the repository config sets "review.autoReviewDrafts" to <autoReviewDrafts>
+      // And pull request #42 was opened as a draft and produced no review
+      // When GitHub delivers a "pull_request.ready_for_review" event for pull request #42 with draft "false"
+      const runtime = await runReviewFlow({
+        action: "ready_for_review",
+        configContent: [
+          "llm:",
+          "  provider: anthropic",
+          "  model: claude-3-5-sonnet-latest",
+          "  apiKeySecret: ANTHROPIC_API_KEY",
+          "review:",
+          `  autoReviewDrafts: ${autoReviewDrafts}`,
+        ].join("\n"),
+        deliveryId: `delivery-ready-for-review-r02-${autoReviewDrafts}`,
+        headSha: ReadyForReviewHeadSha,
+      });
+
+      // Then the bot reviews pull request #42
+      expect(runtime.reviewRequests).toHaveLength(1);
+      expect(runtime.successfulReviewRequests[0]?.pull_number).toBe(PullNumber);
+      // And the review is not skipped as a draft
+      expect(runtime.successfulReviewRequests).toHaveLength(1);
+    },
+    15_000,
+  );
+
   it("re-review preserves synchronize collaborator order", async () => {
     // Given issue comment delivery "delivery-re-review-002" targets repository "octo-org/sovri-target"
     // And issue 42 is pull request 42
