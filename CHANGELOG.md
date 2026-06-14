@@ -19,6 +19,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+
+## [0.9.0] - 2026-06-14
 ### Added
 
 - `ci`: per-file license-header gate (`scripts/check-headers.mjs`, fail-closed). `packages/**` and `apps/community-bot/**` must carry the Apache 2.0 header (`SPDX-License-Identifier: Apache-2.0` + `Copyright <year> Sovri contributors`); `apps/cloud-api/**` must carry the `Proprietary — Sovri` header and must not claim Apache (license-leak guard). Runs in lefthook pre-commit (staged blob) and a blocking CI job (full tree), mirroring the import-boundary guard (ADR-010). Covers `apps/cloud-api/**` ahead of its scaffold so the directory is gated the moment it lands.

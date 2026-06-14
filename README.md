@@ -50,19 +50,19 @@ A pull request opens. Sovri reads the diff, runs it through the review engine wi
 
 ## Install
 
-The Community bot ships as a multi-arch container image on the GitHub Container Registry. The current published pre-alpha release is `v0.7.0`:
+The Community bot ships as a multi-arch container image on the GitHub Container Registry. The current published pre-alpha release is `v0.9.0`:
 
 ```bash
-docker pull ghcr.io/mpiton/sovri/community-bot:v0.7.0
+docker pull ghcr.io/mpiton/sovri/community-bot:v0.9.0
 ```
 
-Additional tags follow the [Image tags](#image-tags) section of `Run the Community bot` below (`v0.7`, `v0`, `latest`).
+Additional tags follow the [Image tags](#image-tags) section of `Run the Community bot` below (`v0.9`, `v0`, `latest`).
 
 ---
 
 ## Status
 
-**Pre-alpha.** The `v0.5.0` sprint has shipped the public design system (`@sovri/brand` tokens) and applied it to the bot's review output: a deterministic verdict header, a severity-badged findings table, the review assessment block, refreshed inline findings, the collapsible compliance/provenance block, GitHub Checks status rows, and a light/dark snapshot harness — all GitHub-safe Markdown. The `v0.6.0` sprint shipped observability (OpenTelemetry + a `/metrics` endpoint, see `docs/adr/019-otel-milestone-v0-6.md`) and supply-chain hardening (cosign keyless signing + SLSA build provenance). The `v0.7.0` sprint adds regulatory compliance enrichment: security and bug findings now carry GDPR, DORA, and NIS2 references derived from a CWE-to-regulation mapping, gated on a confidence threshold.
+**Pre-alpha.** The `v0.5.0` sprint has shipped the public design system (`@sovri/brand` tokens) and applied it to the bot's review output: a deterministic verdict header, a severity-badged findings table, the review assessment block, refreshed inline findings, the collapsible compliance/provenance block, GitHub Checks status rows, and a light/dark snapshot harness — all GitHub-safe Markdown. The `v0.6.0` sprint shipped observability (OpenTelemetry + a `/metrics` endpoint, see `docs/adr/019-otel-milestone-v0-6.md`) and supply-chain hardening (cosign keyless signing + SLSA build provenance). The `v0.7.0` sprint adds regulatory compliance enrichment: security and bug findings now carry GDPR, DORA, and NIS2 references derived from a CWE-to-regulation mapping, gated on a confidence threshold. The `v0.8.0` sprint adds SARIF 2.1.0 ingestion: an external scanner report is validated at the boundary, mapped to findings (severity, CWE, file-path safety, suppressions), and merged with the LLM findings with cross-tool dedup, plus a `@sovri/cli` package whose `sovri verify` command checks an audit trail. The `v0.9.0` sprint hardens the release path: a per-file license-header gate, an `esbuild` advisory pin (GHSA-gv7w-rqvm-qjhr), and a boot-time warning when the GitHub App is missing a required webhook subscription.
 
 Track progress through the [issues](https://github.com/mpiton/sovri/issues) and the `[Unreleased]` section of [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -119,10 +119,11 @@ The first install runs `--ignore-scripts` by policy (see [`.npmrc`](.npmrc)); no
 
 ## Run the Community bot
 
-The `v0.7.0` image is published for pre-alpha validation. It is not yet the
-complete self-host Community product; it adds regulatory compliance enrichment
-(GDPR/DORA/NIS2 references on security and bug findings) on top of the v0.6.0
-observability and supply-chain hardening. The bot is distributed as:
+The `v0.9.0` image is published for pre-alpha validation. It is not yet the
+complete self-host Community product; on top of the v0.7.0 compliance enrichment
+it adds SARIF 2.1.0 ingestion (external scanner findings merged into the review)
+and release-path hardening (per-file license-header gate, `esbuild` advisory
+pin). The bot is distributed as:
 
 - a multi-architecture container image on GitHub Container Registry (`ghcr.io/mpiton/sovri/community-bot`),
 - a standalone Node.js process built from source for users who prefer to deploy without Docker.
@@ -154,8 +155,8 @@ supported field, default, and example.
 
 Each release publishes the same image digest under four tags on `ghcr.io/mpiton/sovri/community-bot`:
 
-- `vX.Y.Z` — pinned to the exact SemVer release (e.g. `v0.7.0`).
-- `vX.Y` — moving alias for the latest patch of a minor (e.g. `v0.7`).
+- `vX.Y.Z` — pinned to the exact SemVer release (e.g. `v0.9.0`).
+- `vX.Y` — moving alias for the latest patch of a minor (e.g. `v0.9`).
 - `vX` — moving alias for the latest minor of a major (e.g. `v0`).
 - `latest` — always points at the most recent published release.
 

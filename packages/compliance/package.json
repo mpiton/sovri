@@ -1,6 +1,6 @@
 {
   "name": "@sovri/compliance",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "Sovri compliance mapping and audit trail foundations.",
   "homepage": "https://github.com/mpiton/sovri/tree/main/packages/compliance#readme",
