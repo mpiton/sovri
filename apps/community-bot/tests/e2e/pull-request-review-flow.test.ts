@@ -1101,7 +1101,7 @@ describe("community bot pull request review E2E ATDD", () => {
     expect(runtime.successfulReviewRequests).toHaveLength(1);
     expect(runtime.successfulReviewRequests[0]?.pull_number).toBe(PullNumber);
     // And the bot posts a walkthrough review comment on pull request #42
-    expect(runtime.successfulReviewRequests[0]?.body).toContain("## Sovri review");
+    expect(runtime.successfulReviewRequests[0]?.body).toContain("<!-- sovri:walkthrough -->");
   }, 15_000);
 
   it("reviews on ready_for_review without waiting for a later synchronize push", async () => {

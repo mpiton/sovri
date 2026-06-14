@@ -18,7 +18,10 @@ import {
   type PullRequestWebhookContext,
 } from "./pull-request.js";
 
-type PullRequestEventName = "pull_request.opened" | "pull_request.synchronize";
+type PullRequestEventName =
+  | "pull_request.opened"
+  | "pull_request.synchronize"
+  | "pull_request.ready_for_review";
 type PullRequestWebhookHandler = (context: PullRequestWebhookContext) => Promise<void>;
 type PullRequestDependencyFactory = (
   context: PullRequestWebhookContext,
@@ -52,6 +55,10 @@ export function registerWebhookHandlers(
 
   app.on("pull_request.synchronize", async (context) => {
     await handlePullRequestSynchronize(context, createPullRequestDependencies(context));
+  });
+
+  app.on("pull_request.ready_for_review", async (context) => {
+    await handlePullRequestOpened(context, createPullRequestDependencies(context));
   });
 
   app.on("issue_comment.created", async (context) => {
