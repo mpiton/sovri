@@ -3,10 +3,12 @@
 
 import { describe, expect, it, vi } from "vitest";
 
+import { registerWebhookHandlers, type WebhookRegistrar } from "../handlers/index.js";
 import {
   type AppEventsOctokit,
   computeMissingWebhookEvents,
   fetchAppSubscribedEvents,
+  REQUIRED_WEBHOOK_EVENTS,
   validateWebhookSubscriptions,
 } from "./webhook-subscriptions.js";
 
@@ -179,5 +181,53 @@ describe("validateWebhookSubscriptions (R-04: check cannot run)", () => {
       expect.any(Object),
       expect.stringContaining("could not run"),
     );
+  });
+});
+
+// A 200 OK with no `events` field is a successful fetch, not a fetch failure: it means the App is
+// subscribed to nothing, so every required event is missing. Distinct from R-04 ("could not run").
+describe("validateWebhookSubscriptions (GitHub App reports no events)", () => {
+  it("treats a response without an events field as zero subscribed and warns on every required event", async () => {
+    const request = vi.fn(
+      async (_route: "GET /app"): Promise<{ data: { events?: readonly string[] } }> => ({
+        data: {},
+      }),
+    );
+    const octokit: AppEventsOctokit = { request };
+    const logger = { warn: vi.fn() };
+    await validateWebhookSubscriptions({
+      fetchSubscribedEvents: () => fetchAppSubscribedEvents(octokit),
+      logger,
+      required: REQUIRED,
+    });
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.stringContaining("pull_request"),
+    );
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.stringContaining("issue_comment"),
+    );
+  });
+});
+
+// Drift guard: REQUIRED_WEBHOOK_EVENTS is documented to mirror the events registerWebhookHandlers
+// subscribes to. Enforce it here so adding/removing a handler without updating the constant fails CI.
+describe("REQUIRED_WEBHOOK_EVENTS stays in sync with registered handlers", () => {
+  it("equals the unique event prefixes the bot's handlers register", () => {
+    const registeredEvents: string[] = [];
+    const recordingRegistrar: WebhookRegistrar = {
+      on(eventName): void {
+        registeredEvents.push(eventName);
+      },
+    };
+
+    registerWebhookHandlers(recordingRegistrar);
+
+    const requiredFromHandlers = [
+      ...new Set(registeredEvents.map((eventName) => eventName.split(".")[0] ?? eventName)),
+    ];
+    expect([...REQUIRED_WEBHOOK_EVENTS]).toEqual(requiredFromHandlers);
   });
 });

@@ -45,7 +45,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   deployment subscribed only to `issues` + `pull_request` (missing `issue_comment`) would drop every
   `@sovri-bot` command with no delivery, no log, and no error. Startup still continues, and the check
   fails open: if the subscribed events cannot be fetched, the bot warns that the check could not run
-  rather than aborting (bug #2504, rules R-01..R-04).
+  rather than aborting. A drift-guard test keeps `REQUIRED_WEBHOOK_EVENTS` in sync with the events
+  the handlers actually register (bug #2504, rules R-01..R-04).
 
 ### Security
 
