@@ -1,6 +1,6 @@
 {
   "name": "@sovri/community-bot",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "private": true,
   "description": "Sovri Community GitHub App - thin Probot orchestration layer for AI code review.",
   "homepage": "https://github.com/mpiton/sovri/tree/main/apps/community-bot#readme",

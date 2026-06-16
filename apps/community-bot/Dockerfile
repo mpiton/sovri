@@ -32,16 +32,16 @@ COPY --from=builder /app/packages/ packages/
 COPY --from=builder /app/apps/community-bot/ apps/community-bot/
 
 RUN pnpm install --frozen-lockfile --prod
-# Use the modern deployer (not `--legacy`): the legacy `pnpm deploy` places a
-# workspace package's own dependencies in the store but does not link them into
-# the deployed closure, so `@sovri/llm-providers`' runtime SDKs
-# (@mistralai/mistralai, @anthropic-ai/sdk, openai) end up unresolvable at runtime.
 RUN pnpm deploy --filter @sovri/community-bot --prod /app/deploy/community-bot
-# Fail the build if the deployed closure can't resolve and instantiate the LLM
-# providers. A missing SDK otherwise surfaces only at review time as a swallowed
-# ERR_MODULE_NOT_FOUND, i.e. every review returns a bare "review failed".
-RUN cd /app/deploy/community-bot \
- && node --input-type=module -e "import { createProviderFromConfig } from '@sovri/llm-providers'; const env = { K: 'smoke-test-placeholder' }; for (const provider of ['mistral', 'anthropic', 'openai']) { try { createProviderFromConfig({ llm: { provider, apiKeySecret: 'K', model: 'verify' } }, env); } catch (error) { console.error('community-bot: provider ' + provider + ' failed to load:', error instanceof Error ? error.message : error); process.exit(1); } } console.log('community-bot: LLM provider SDKs resolve');"
+# `pnpm deploy` copies a workspace package's own dependencies into the closure's
+# .pnpm store but does not create the links Node needs to resolve them, so
+# `@sovri/llm-providers`' provider SDKs (@mistralai/mistralai, @anthropic-ai/sdk,
+# openai) are unreachable at runtime. Link them at the closure's node_modules
+# root; Node resolves up to here from the nested @sovri package.
+RUN cd /app/deploy/community-bot/node_modules \
+ && ln -sf "$(ls -d .pnpm/@mistralai+mistralai@*/node_modules/@mistralai | head -1)" @mistralai \
+ && ln -sf "$(ls -d .pnpm/@anthropic-ai+sdk@*/node_modules/@anthropic-ai | head -1)" @anthropic-ai \
+ && ln -sf "$(ls -d .pnpm/openai@*/node_modules/openai | head -1)" openai
 
 FROM node:24-alpine AS runtime
 
@@ -54,6 +54,11 @@ WORKDIR /app
 RUN addgroup -g 1001 -S sovri && adduser -u 1001 -S sovri -G sovri
 
 COPY --from=prod-deps --chown=sovri:sovri /app/deploy/community-bot/ ./
+
+# Smoke-check the SHIPPED closure: this stage holds only the deployed node_modules,
+# so resolution here is exactly what runs in production and cannot be masked by a
+# workspace install. Fails the build if a provider SDK is unresolvable.
+RUN node --input-type=module -e "import { createProviderFromConfig } from '@sovri/llm-providers'; const env = { K: 'smoke-test-placeholder' }; for (const provider of ['mistral', 'anthropic', 'openai']) { try { createProviderFromConfig({ llm: { provider, apiKeySecret: 'K', model: 'verify' } }, env); } catch (error) { console.error('community-bot: provider ' + provider + ' failed to load:', error instanceof Error ? error.message : error); process.exit(1); } } console.log('community-bot: LLM provider SDKs resolve');"
 
 USER sovri
 

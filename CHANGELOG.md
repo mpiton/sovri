@@ -19,6 +19,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-06-16
+
+### Fixed
+
+- `bot`: the v0.9.1 deploy image still shipped the LLM provider SDKs unresolvable. `pnpm deploy` leaves a workspace package's dependencies in the closure's `.pnpm` store without linking them, so `@sovri/llm-providers` threw `ERR_MODULE_NOT_FOUND` and every review failed. Link `@mistralai/mistralai`, `@anthropic-ai/sdk`, and `openai` at the closure's `node_modules` root, and move the provider smoke check into the runtime stage so it validates the shipped closure (the v0.9.1 check ran against the full workspace install and false-passed).
+
 ## [0.9.1] - 2026-06-16
 
 ### Fixed
