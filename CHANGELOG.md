@@ -19,8 +19,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-06-16
+
 ### Fixed
 
+- `bot`: package the LLM provider SDKs (`@mistralai/mistralai`, `@anthropic-ai/sdk`, `openai`) in the deploy image. `pnpm deploy --legacy` left them unlinked in the deployed closure, so the provider threw `ERR_MODULE_NOT_FOUND` at review time, swallowed into a bare `review failed` on every PR. Dropped `--legacy` and added a build-time smoke check that instantiates each provider so a missing SDK fails the build (#2598).
 - `bot`: when a review is declined because the PR exceeds the configured size limit (`maxFilesPerReview` / `maxLinesPerReview`), post the actionable reason on the PR (e.g. `Pull request exceeds review limits: 77 files changed, max 50.`) instead of a bare `review failed`. Previously the handler treated every failed-status review identically and discarded the limit message, so re-reviewing an oversized PR looped on an unexplained `review failed`. Failures that may carry untrusted provider output (`provider_error`, `parse_error`) still post the generic message and never echo the review summary. Backed by a new machine-readable `failure_reason` on the `Review` contract (`@sovri/core`), set by the review engine and consumed by the bot.
 
 ### Added

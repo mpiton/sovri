@@ -1,6 +1,6 @@
 {
   "name": "@sovri/cli",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "Sovri command-line tools — offline audit-trail verification (sovri verify).",
   "homepage": "https://github.com/mpiton/sovri/tree/main/packages/cli#readme",

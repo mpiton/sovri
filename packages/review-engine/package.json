@@ -1,6 +1,6 @@
 {
   "name": "@sovri/review-engine",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "Sovri review orchestration engine — diff, prompts, LLM parsing, walkthrough composition, and orchestration.",
   "homepage": "https://github.com/mpiton/sovri/tree/main/packages/review-engine#readme",
