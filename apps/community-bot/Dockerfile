@@ -32,7 +32,16 @@ COPY --from=builder /app/packages/ packages/
 COPY --from=builder /app/apps/community-bot/ apps/community-bot/
 
 RUN pnpm install --frozen-lockfile --prod
-RUN pnpm deploy --legacy --filter @sovri/community-bot --prod /app/deploy/community-bot
+# Use the modern deployer (not `--legacy`): the legacy `pnpm deploy` places a
+# workspace package's own dependencies in the store but does not link them into
+# the deployed closure, so `@sovri/llm-providers`' runtime SDKs
+# (@mistralai/mistralai, @anthropic-ai/sdk, openai) end up unresolvable at runtime.
+RUN pnpm deploy --filter @sovri/community-bot --prod /app/deploy/community-bot
+# Fail the build if the deployed closure can't resolve and instantiate the LLM
+# providers. A missing SDK otherwise surfaces only at review time as a swallowed
+# ERR_MODULE_NOT_FOUND, i.e. every review returns a bare "review failed".
+RUN cd /app/deploy/community-bot \
+ && node --input-type=module -e "import { createProviderFromConfig } from '@sovri/llm-providers'; const env = { K: 'smoke-test-placeholder' }; for (const provider of ['mistral', 'anthropic', 'openai']) { try { createProviderFromConfig({ llm: { provider, apiKeySecret: 'K', model: 'verify' } }, env); } catch (error) { console.error('community-bot: provider ' + provider + ' failed to load:', error instanceof Error ? error.message : error); process.exit(1); } } console.log('community-bot: LLM provider SDKs resolve');"
 
 FROM node:24-alpine AS runtime
 
