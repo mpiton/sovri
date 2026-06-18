@@ -11,4 +11,4 @@
 const safeHtml = escapeHtml(input);
 ```
 
-<!-- sovri-finding-id: 7c82fe791bbeffc5 -->
+<!-- sovri-finding-id: b8d9fee5b3738b11 -->
