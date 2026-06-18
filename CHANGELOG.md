@@ -24,7 +24,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `review-engine`: keep re-review finding identity stable under normal model
   drift in span, category, and CWE metadata so still-open inline findings are
   not re-posted as duplicates while changed source still receives a new finding;
-  blank-only spans now use an explicit distinct fallback anchor to avoid
+  blank-only spans now use a dedicated, explicit fallback anchor to avoid
   body-only collisions (#2601).
 
 ### Security
