@@ -30,6 +30,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Security
 
+- `deps`: override transitive `@opentelemetry/core` to `2.8.0`,
+  `protobufjs` to `7.6.3`, and `@babel/core` to `7.29.6` to clear
+  Dependabot alerts GHSA-8988-4f7v-96qf, GHSA-f38q-mgvj-vph7, and
+  GHSA-4x5r-pxfx-6jf8 from the workspace lockfile.
 - `deps`: override transitive `vite` to `8.0.16` to clear GHSA-fx2h-pf6j-xcff
   from the Vitest toolchain audit path.
 
