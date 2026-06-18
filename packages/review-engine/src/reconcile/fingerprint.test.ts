@@ -442,4 +442,45 @@ describe("computeFindingFingerprint", () => {
     // And both computations return the same fingerprint
     expect(firstFp).toBe(secondFp);
   });
+
+  it("keeps blank-only spans distinct when the finding body is identical", () => {
+    // Given two findings in "src/util/blank.ts" with the same body over
+    //   different blank-only source spans
+    const first = makeFinding({
+      file: "src/util/blank.ts",
+      line_start: 10,
+      line_end: 10,
+      category: "style",
+      title: "Whitespace",
+      body: "trailing whitespace only line",
+    });
+    const second = makeFinding({
+      file: "src/util/blank.ts",
+      line_start: 20,
+      line_end: 20,
+      category: "style",
+      title: "Whitespace",
+      body: "trailing whitespace only line",
+    });
+    const diff = makeDiff("src/util/blank.ts", 10, [
+      "   ",
+      "const one = true;",
+      "const two = true;",
+      "const three = true;",
+      "const four = true;",
+      "const five = true;",
+      "const six = true;",
+      "const seven = true;",
+      "const eight = true;",
+      "const nine = true;",
+      "   ",
+    ]);
+
+    // When the bot computes the fingerprint of each finding
+    const firstFp = computeFindingFingerprint(first, diff);
+    const secondFp = computeFindingFingerprint(second, diff);
+
+    // Then the blank-only source locations remain distinct
+    expect(firstFp).not.toBe(secondFp);
+  });
 });

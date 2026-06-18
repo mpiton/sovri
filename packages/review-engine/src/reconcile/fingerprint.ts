@@ -13,6 +13,11 @@ const FINGERPRINT_VERSION = "v1";
 const UNIT_SEPARATOR = "\u001F";
 const FINGERPRINT_LENGTH = 16;
 
+type ExtractedAnchor =
+  | { kind: "source"; text: string }
+  | { kind: "blank-source"; lineStart: number; lineEnd: number }
+  | { kind: "missing" };
+
 /**
  * Compute a stable, content-derived fingerprint for a finding, used to
  * reconcile findings across review runs (deduplication and resolution).
@@ -28,8 +33,14 @@ export function computeFindingFingerprint(finding: Finding, diff: Diff): string 
 }
 
 function computeAnchor(finding: Finding, diff: Diff): string {
-  const source = normalizeCode(extractAnchorSource(finding, diff));
-  return source !== "" ? `code:${source}` : `body:${normalizeProse(finding.body)}`;
+  const anchor = extractAnchorSource(finding, diff);
+  if (anchor.kind === "source") {
+    return `code:${normalizeCode(anchor.text)}`;
+  }
+  if (anchor.kind === "blank-source") {
+    return `blank:${anchor.lineStart}:${anchor.lineEnd}`;
+  }
+  return `body:${normalizeProse(finding.body)}`;
 }
 
 // Source code is case- and character-sensitive: canonical-normalize (NFC) and
@@ -46,23 +57,31 @@ function normalizeProse(text: string): string {
   return text.normalize("NFKC").toLowerCase().replace(/\s+/gu, " ").trim();
 }
 
-function extractAnchorSource(finding: Finding, diff: Diff): string {
+function extractAnchorSource(finding: Finding, diff: Diff): ExtractedAnchor {
   const file = diff.files.find((candidate) => candidate.path === finding.file);
   if (file === undefined) {
-    return "";
+    return { kind: "missing" };
   }
 
-  let firstCandidate: string | undefined;
+  let sawCandidate = false;
   for (const hunk of file.hunks) {
     for (const { lineNumber, text } of iterateRightSideLines(hunk)) {
       if (lineNumber >= finding.line_start && lineNumber <= finding.line_end) {
-        firstCandidate ??= text;
+        sawCandidate = true;
         if (text.trim() !== "") {
-          return text;
+          return { kind: "source", text };
         }
       }
     }
   }
 
-  return firstCandidate ?? "";
+  if (sawCandidate) {
+    return {
+      kind: "blank-source",
+      lineStart: finding.line_start,
+      lineEnd: finding.line_end,
+    };
+  }
+
+  return { kind: "missing" };
 }
