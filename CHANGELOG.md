@@ -26,6 +26,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   not re-posted as duplicates while changed source still receives a new finding
   (#2601).
 
+### Security
+
+- `deps`: override transitive `vite` to `8.0.16` to clear GHSA-fx2h-pf6j-xcff
+  from the Vitest toolchain audit path.
+
 ## [0.9.2] - 2026-06-16
 
 ### Fixed
