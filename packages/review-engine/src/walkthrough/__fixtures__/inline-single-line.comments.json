@@ -1,7 +1,7 @@
 [
   {
     "path": "src/handler.ts",
-    "body": "🔴 🐛 Bug\n**Missing payload guard**\n\n**Problem:** `request.body` can be undefined before user access.\n\n**Fix:** Apply the fix for missing payload guard: change the code so the problem no longer occurs.\n\n<!-- sovri-finding-id: a1d779f2be43f6d2 -->",
+    "body": "🔴 🐛 Bug\n**Missing payload guard**\n\n**Problem:** `request.body` can be undefined before user access.\n\n**Fix:** Apply the fix for missing payload guard: change the code so the problem no longer occurs.\n\n<!-- sovri-finding-id: 499b669ec9ae9d87 -->",
     "line": 27,
     "side": "RIGHT"
   }
