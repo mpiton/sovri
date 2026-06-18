@@ -375,6 +375,39 @@ describe("computeFindingFingerprint", () => {
     expect(resolved).toHaveLength(0);
   });
 
+  it("keeps identity stable when line_end drifts before the first non-blank source anchor", () => {
+    // Given a finding whose reported span starts on a blank line immediately
+    //   before source text "db.query(userInput)"
+    const blankOnlySpan = makeFinding({
+      file: "src/db/query.ts",
+      line_start: 49,
+      line_end: 49,
+      category: "security",
+      cwe: "CWE-89",
+      title: "SQL injection risk",
+      body: "User input flows into the query unescaped.",
+    });
+    const diff = makeDiff("src/db/query.ts", 49, ["", "db.query(userInput)"]);
+    // And a later run reports the same location with a span that includes the
+    //   first non-blank source anchor
+    const includesSourceSpan = makeFinding({
+      file: "src/db/query.ts",
+      line_start: 49,
+      line_end: 50,
+      category: "security",
+      cwe: "CWE-89",
+      title: "SQL injection risk",
+      body: "User input flows into the query unescaped.",
+    });
+
+    // When the bot computes both finding fingerprints
+    const blankOnlyFp = computeFindingFingerprint(blankOnlySpan, diff);
+    const includesSourceFp = computeFindingFingerprint(includesSourceSpan, diff);
+
+    // Then line_end drift does not change the finding identity
+    expect(blankOnlyFp).toBe(includesSourceFp);
+  });
+
   it("keeps real source changes identity-bearing", () => {
     // Given a posted finding in "src/db/query.ts" anchored on source text
     //   "db.query(userInput)"

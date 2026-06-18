@@ -25,7 +25,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   drift in span, category, and CWE metadata so still-open inline findings are
   not re-posted as duplicates while changed source still receives a new finding;
   blank-only spans now use a dedicated, explicit fallback anchor to avoid
-  body-only collisions (#2601).
+  body-only collisions, and source anchor selection no longer depends on
+  whether `line_end` includes the first non-blank line (#2601).
 
 ### Security
 

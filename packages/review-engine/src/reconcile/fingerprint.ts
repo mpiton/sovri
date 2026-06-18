@@ -70,11 +70,16 @@ function extractAnchorSource(finding: Finding, diff: Diff): ExtractedAnchor {
   let sawCandidate = false;
   for (const hunk of file.hunks) {
     for (const { lineNumber, text } of iterateRightSideLines(hunk)) {
-      if (lineNumber >= finding.line_start && lineNumber <= finding.line_end) {
+      if (lineNumber < finding.line_start) {
+        continue;
+      }
+
+      if (lineNumber <= finding.line_end) {
         sawCandidate = true;
-        if (text.trim() !== "") {
-          return { kind: "source", text };
-        }
+      }
+
+      if (text.trim() !== "") {
+        return { kind: "source", text };
       }
     }
   }
