@@ -39,7 +39,7 @@
   },
   "devDependencies": {
     "@sovri/core": "workspace:*",
-    "@types/node": "24.12.4",
+    "@types/node": "24.13.2",
     "tsup": "8.5.1",
     "vitest": "4.1.8"
   },

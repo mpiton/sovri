@@ -46,7 +46,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@types/node": "24.12.4",
+    "@types/node": "24.13.2",
     "msw": "2.14.6",
     "tsup": "8.5.1",
     "vitest": "4.1.8"
