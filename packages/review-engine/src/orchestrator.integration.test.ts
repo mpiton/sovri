@@ -721,3 +721,82 @@ index 1111111..2222222 100644
     expect(styleBlock).not.toContain("Potential compliance references");
   });
 });
+
+// Acceptance test for bug-2606 R-03 (scenario sub-issue #2612): a finding that does not clear the
+// gate — non-security/bug category, no mappable CWE, or confidence < 0.7 — renders no framework
+// reference. No false regulatory attribution. Drives the real gate + enricher + composer through
+// reviewPullRequest with the LLM mocked at the provider boundary.
+describe("reviewPullRequest withholds compliance references when the gate is unmet (bug-2606 R-03)", () => {
+  const config = {
+    review: { severityThreshold: "nitpick" as const },
+    ignores: [] as readonly string[],
+    limits: { maxFilesPerReview: 5, maxLinesPerReview: 50 },
+  };
+
+  // @violation Scenario Outline: a non-eligible category never carries a framework reference, even
+  // with a mapped CWE.
+  it.each(["style", "performance", "maintainability"])(
+    "renders no framework reference for a %s finding even with a mapped CWE",
+    async (category) => {
+      // Given the configured LLM returns one finding with category "<category>", cwe "CWE-89", confidence 0.95
+      mockProviderFindings([{ ...findingFor("CWE-89", category, "major"), confidence: 0.95 }]);
+      const diff = parseUnifiedDiff(unifiedDiff);
+
+      // When the review runs
+      const review = await reviewPullRequest(
+        { pullRequest, diff, config },
+        { provider: createHttpProvider() },
+      );
+      expect(review.status).toBe("success");
+
+      // Then the "Compliance & provenance" section lists no framework reference for that finding
+      const walkthrough = composeWalkthrough(review);
+      expect(walkthrough).not.toContain("Potential compliance references");
+      expect(walkthrough).not.toContain("GDPR");
+    },
+  );
+
+  // @violation Scenario: a security finding with an unmapped CWE carries no framework reference
+  it("renders no framework reference for a security finding with an unmapped CWE", async () => {
+    // Given the configured LLM returns one finding with category "security", cwe "CWE-99999", confidence 0.9
+    mockProviderFindings([{ ...findingFor("CWE-99999", "security", "major"), confidence: 0.9 }]);
+    const diff = parseUnifiedDiff(unifiedDiff);
+
+    // When the review runs
+    const review = await reviewPullRequest(
+      { pullRequest, diff, config },
+      { provider: createHttpProvider() },
+    );
+    expect(review.status).toBe("success");
+
+    // Then the "Compliance & provenance" section lists no framework reference for that finding
+    const walkthrough = composeWalkthrough(review);
+    expect(walkthrough).not.toContain("Potential compliance references");
+    expect(walkthrough).not.toContain("GDPR");
+  });
+
+  // @limit Scenario Outline: the confidence floor of 0.70 decides enrichment.
+  it.each([
+    { confidence: 0.7, state: "present" },
+    { confidence: 0.69, state: "absent" },
+  ])("renders references $state at confidence $confidence", async ({ confidence, state }) => {
+    // Given the configured LLM returns one finding with category "security", cwe "CWE-89", confidence <confidence>
+    mockProviderFindings([{ ...findingFor("CWE-89", "security", "major"), confidence }]);
+    const diff = parseUnifiedDiff(unifiedDiff);
+
+    // When the review runs
+    const review = await reviewPullRequest(
+      { pullRequest, diff, config },
+      { provider: createHttpProvider() },
+    );
+    expect(review.status).toBe("success");
+
+    // Then the finding's framework references are <state>
+    const walkthrough = composeWalkthrough(review);
+    if (state === "present") {
+      expect(walkthrough).toContain("GDPR: Art. 32");
+    } else {
+      expect(walkthrough).not.toContain("GDPR");
+    }
+  });
+});
