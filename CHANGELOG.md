@@ -35,6 +35,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   Art. 32) and surfaces informational framework references with no second LLM
   call; ambiguous, low-confidence, or ineligible findings still decline
   (ADR-020, #2610, #2616).
+- `review-engine`: regression guard for the model-supplied CWE path — a finding
+  that already carries a CWE renders exactly as before; derivation never
+  overrides it (CWE-79 / CWE-256 kept, CWE-89 never derived over them) and does
+  not rescue an unmapped model CWE (feat-2610 R-02, #2617).
 
 ### Fixed
 
