@@ -42,4 +42,13 @@ describe("deriveCwe — deterministic CWE derivation from finding signals (ADR-0
       deriveCwe({ title: "inconsistent quote style", body: "Use double quotes throughout." }),
     ).toBeUndefined();
   });
+
+  it("declines (undefined) when the content matches more than one rule (ambiguous)", () => {
+    expect(
+      deriveCwe({
+        title: "unescaped SQL string concatenation rendered into an HTML response",
+        body: "The finding describes unescaped SQL string concatenation rendered into an HTML response.",
+      }),
+    ).toBeUndefined();
+  });
 });

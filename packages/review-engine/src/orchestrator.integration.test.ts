@@ -1085,3 +1085,148 @@ index 1111111..2222222 100644
     expect(walkthrough).not.toContain("GDPR");
   });
 });
+
+// Acceptance test for feat-2610 R-03 (scenario sub-issue #2618): derivation declines when content
+// maps to no specific mapped CWE, when confidence is below 0.7, or when the category is not
+// security/bug. No guess, no false attribution — a wrong GDPR/DORA citation is worse than none.
+// Drives the real gate + enricher + composer through reviewPullRequest with the LLM mocked at the
+// provider boundary.
+describe("reviewPullRequest declines derivation rather than guess a framework reference (feat-2610 R-03)", () => {
+  const config = {
+    review: { severityThreshold: "nitpick" as const },
+    ignores: [] as readonly string[],
+    limits: { maxFilesPerReview: 5, maxLinesPerReview: 50 },
+  };
+
+  // Background: a pull request whose diff touches code that processes personal data.
+  const regulatedDiff = `diff --git a/src/users/repository.ts b/src/users/repository.ts
+index 1111111..2222222 100644
+--- a/src/users/repository.ts
++++ b/src/users/repository.ts
+@@ -10,3 +10,3 @@ export class UserRepository {
+   async findByEmail(email: string) {
+-    return this.db.query(buildParameterizedUserQuery(email));
++    return this.db.query("SELECT * FROM users WHERE email = '" + email + "'");
+   }
+`;
+
+  const noCweFinding = (
+    category: string,
+    content: string,
+    overrides: Record<string, unknown> = {},
+  ) => ({
+    ...findingFor(undefined, category, "major"),
+    file: "src/users/repository.ts",
+    line_start: 11,
+    line_end: 11,
+    title: content,
+    body: `The finding describes ${content}.`,
+    confidence: 0.9,
+    ...overrides,
+  });
+
+  // @violation Scenario: derivation declines when content maps to no specific vulnerability class
+  it("declines when the content maps to no specific vulnerability class", async () => {
+    // Given a security finding with no cwe describing a generic concern with no vulnerability class
+    mockProviderFindings([
+      noCweFinding("security", "possible security concern", {
+        body: "A generic possible security concern with no identifiable vulnerability class.",
+      }),
+    ]);
+    const diff = parseUnifiedDiff(regulatedDiff);
+
+    // When the review runs
+    const review = await reviewPullRequest(
+      { pullRequest, diff, config },
+      { provider: createHttpProvider() },
+    );
+    expect(review.status).toBe("success");
+    const walkthrough = composeWalkthrough(review);
+
+    // Then the "Compliance & provenance" section lists no framework reference for that finding
+    expect(walkthrough).not.toContain("Potential compliance references");
+    expect(walkthrough).not.toContain("GDPR");
+  });
+
+  // @violation Scenario: derivation respects the confidence floor on the no-cwe path
+  it("declines on the no-cwe path when confidence is below the floor", async () => {
+    // Given a security finding with no cwe, confidence 0.5, describing raw SQL string concatenation
+    mockProviderFindings([
+      noCweFinding("security", "raw SQL string concatenation against the users table", {
+        confidence: 0.5,
+      }),
+    ]);
+    const diff = parseUnifiedDiff(regulatedDiff);
+
+    // When the review runs
+    const review = await reviewPullRequest(
+      { pullRequest, diff, config },
+      { provider: createHttpProvider() },
+    );
+    expect(review.status).toBe("success");
+    const walkthrough = composeWalkthrough(review);
+
+    // Then no framework reference is emitted for that finding
+    expect(walkthrough).not.toContain("Potential compliance references");
+    expect(walkthrough).not.toContain("GDPR");
+  });
+
+  // @violation Scenario Outline: a non-eligible category never derives a reference, even with derivable content
+  it.each([{ category: "style" }, { category: "performance" }, { category: "maintainability" }])(
+    "never derives a reference for a $category finding even with derivable content",
+    async ({ category }) => {
+      // Given a no-cwe finding of an ineligible category at confidence 0.95 with derivable content
+      mockProviderFindings([
+        noCweFinding(category, "raw SQL string concatenation against the users table", {
+          confidence: 0.95,
+          severity: "minor",
+        }),
+      ]);
+      const diff = parseUnifiedDiff(regulatedDiff);
+
+      // When the review runs
+      const review = await reviewPullRequest(
+        { pullRequest, diff, config },
+        { provider: createHttpProvider() },
+      );
+      expect(review.status).toBe("success");
+      const walkthrough = composeWalkthrough(review);
+
+      // Then no framework reference is emitted for that finding
+      expect(walkthrough).not.toContain("Potential compliance references");
+      expect(walkthrough).not.toContain("GDPR");
+    },
+  );
+
+  // @limit Scenario Outline: the confidence floor of 0.70 decides derivation on the no-cwe path
+  it.each([
+    { confidence: 0.7, present: true },
+    { confidence: 0.69, present: false },
+  ])(
+    "derives on the no-cwe path at confidence $confidence only when it meets the 0.70 floor",
+    async ({ confidence, present }) => {
+      // Given a security finding with no cwe at the given confidence describing raw SQL string concatenation
+      mockProviderFindings([
+        noCweFinding("security", "raw SQL string concatenation against the users table", {
+          confidence,
+        }),
+      ]);
+      const diff = parseUnifiedDiff(regulatedDiff);
+
+      // When the review runs
+      const review = await reviewPullRequest(
+        { pullRequest, diff, config },
+        { provider: createHttpProvider() },
+      );
+      expect(review.status).toBe("success");
+      const walkthrough = composeWalkthrough(review);
+
+      // Then the finding's framework references are present at >= 0.70 and absent below it
+      if (present) {
+        expect(walkthrough).toContain("GDPR: Art. 32");
+      } else {
+        expect(walkthrough).not.toContain("GDPR");
+      }
+    },
+  );
+});

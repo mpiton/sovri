@@ -39,6 +39,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   that already carries a CWE renders exactly as before; derivation never
   overrides it (CWE-79 / CWE-256 kept, CWE-89 never derived over them) and does
   not rescue an unmapped model CWE (feat-2610 R-02, #2617).
+- `review-engine` / `compliance`: regression guard for the derivation decline path
+  — a no-cwe finding emits no framework reference when its content maps to no
+  vulnerability class, when confidence is below 0.70, or when the category is not
+  security/bug; the deriver also declines when content is ambiguous across rules
+  (feat-2610 R-03, #2618).
 
 ### Fixed
 
