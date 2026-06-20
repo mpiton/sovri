@@ -48,6 +48,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `review-engine`: the LLM review prompt now only shows CWE ids the compliance
+  map resolves — the few-shot worked example (now a SQL-injection finding) and
+  the directive's "for example" use CWE-89 (mapped) instead of the unmapped
+  CWE-287, so a model imitating the example emits a mappable CWE instead of one
+  that renders no compliance reference (#2607, bug-2607 R-01).
 - `review-engine`: keep re-review finding identity stable under normal model
   drift in span, category, and CWE metadata so still-open inline findings are
   not re-posted as duplicates while changed source still receives a new finding;

@@ -14,7 +14,7 @@ const REVIEWER_DIRECTIVES = [
   "Each finding states the problem and its impact in `body` and the concrete fix in `recommendation`.",
   "Write a neutral one-paragraph `summary` separately from the findings.",
   "Return structured JSON findings that match the requested schema.",
-  "For a security or bug finding tied to a known weakness, set `cwe` to its CWE id (for example CWE-287) and `confidence` to a number between 0 and 1 reflecting your honest certainty; omit `cwe` otherwise.",
+  "For a security or bug finding tied to a known weakness, set `cwe` to its CWE id (for example CWE-89) and `confidence` to a number between 0 and 1 reflecting your honest certainty; omit `cwe` otherwise.",
 ];
 
 const FULL_REVIEW_SYSTEM_TEMPLATE = [
@@ -128,10 +128,10 @@ export function buildSystemPrompt(config: unknown): string {
 const FEW_SHOT_PREAMBLE = [
   "Findings flag a problem and its fix — they never narrate the change.",
   "Good finding:",
-  "  title: Unvalidated session token",
-  "  body: The handler trusts req.body.token without a signature check, so a forged token is accepted.",
-  "  recommendation: Verify the token with the existing verifySession helper before use.",
-  "  cwe: CWE-287",
+  "  title: SQL injection in user lookup",
+  "  body: The handler concatenates req.query.email into the SQL string, so a crafted value runs arbitrary SQL.",
+  "  recommendation: Use a parameterized query instead of string concatenation.",
+  "  cwe: CWE-89",
   "  confidence: 0.9",
   "Forbidden narration (emit nothing instead):",
   "  title: Added generateAuthContent function",
