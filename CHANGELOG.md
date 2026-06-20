@@ -58,6 +58,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   otherwise" escape hatch with an omission scoped to style and performance
   findings, so the model is biased to emit a mappable CWE exactly where
   compliance enrichment can fire (#2607, bug-2607 R-02).
+- `review-engine`: the CWE directive now names the target compliance frameworks
+  (GDPR, DORA, AI Act, NIS2) so the model understands why a CWE is load-bearing
+  on a regulated finding (#2607, bug-2607 R-03).
 - `review-engine`: keep re-review finding identity stable under normal model
   drift in span, category, and CWE metadata so still-open inline findings are
   not re-posted as duplicates while changed source still receives a new finding;
