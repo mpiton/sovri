@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { SovriConfigValidationError } from "@sovri/config";
+import { SovriConfigParseError, SovriConfigValidationError } from "@sovri/config";
 import { z } from "@sovri/core";
 
 import { reportPullRequestReviewFailure, type ReviewCommentTarget } from "./pull-request.js";
@@ -82,5 +82,26 @@ describe("describeReviewFailure — SovriConfigValidationError", () => {
 
     // Then the nested path is rendered dot-joined
     expect(comment).toBe("Config error in .sovri.yml: llm.timeout: Required");
+  });
+});
+
+// Rule R-02 — a YAML syntax failure surfaces an actionable, file-named comment
+describe("describeReviewFailure — SovriConfigParseError", () => {
+  // Given a review fails at the config_load stage
+  // And the cause is a SovriConfigParseError for ".sovri.yml"
+
+  it("names the file and is not the generic message", async () => {
+    const error = new SovriConfigParseError(
+      ".sovri.yml",
+      new Error("bad indentation of a mapping entry at line 3"),
+    );
+
+    // When the bot describes the review failure
+    const comment = await failureCommentFor(error);
+
+    // Then the failure comment names ".sovri.yml"
+    expect(comment).toContain(".sovri.yml");
+    // And the failure comment is not "review failed"
+    expect(comment).not.toBe("review failed");
   });
 });

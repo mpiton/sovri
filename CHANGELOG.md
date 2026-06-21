@@ -27,6 +27,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `(root)` (e.g. `Config error in .sovri.yml: limits: Unrecognized key; llm:
   Required`) — instead of the bare `review failed`, so the PR author can fix the
   config without bot-host log access (#2644, R-01).
+- `bot`: a `.sovri.yml` YAML syntax failure now surfaces the parse error's own
+  file-named message (`Failed to parse YAML at .sovri.yml`) instead of the bare
+  `review failed`, without echoing the raw parser cause (which may quote
+  untrusted file bytes); the surfaced message passes through the module's
+  redaction + length cap as defense in depth (#2644, R-02).
 
 ## [0.10.0] - 2026-06-21
 
