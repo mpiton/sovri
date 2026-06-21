@@ -63,8 +63,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   relative to OpenAI (#2638, bug-2609 R-01).
 - `llm-providers`: a Mistral response that returns `cwe: null` (now possible under the R-01
   strict schema) round-trips instead of failing validation — the null is stripped to "no cwe"
-  before parsing, matching `@sovri/core`'s `cwe?: string` contract; an omitted cwe still parses,
-  a malformed cwe is still rejected (#2639, bug-2609 R-02).
+  before parsing (the same null-strip OpenAI already applies), matching `@sovri/core`'s
+  `cwe?: string` contract; an omitted cwe still parses, a malformed cwe is still rejected
+  (#2639, bug-2609 R-02).
 - `review-engine`: the provider finding schema now documents the `cwe` field — the
   generated provider JSON schema exposes a non-empty `description` telling the model
   to emit a CWE for any security or correctness weakness in `CWE-<number>` format.

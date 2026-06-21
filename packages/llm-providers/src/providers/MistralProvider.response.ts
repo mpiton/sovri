@@ -4,6 +4,7 @@
 import { z } from "@sovri/core";
 
 import { zodToProviderJsonSchema } from "../helpers/provider-json-schema.js";
+import { stripOptionalNulls } from "../helpers/strip-optional-nulls.js";
 import { normalizeStrictObjectShapes } from "../helpers/strict-json-schema.js";
 import type { TokenUsage } from "../types/LLMProvider.js";
 import { MistralProviderError } from "./MistralProvider.errors.js";
@@ -22,7 +23,7 @@ export function parseStructuredMistralResponse<T>(
   tokenUsage: TokenUsage,
 ): T {
   const parsedJson = parseJson(extractMistralTextContent(response));
-  const parsedSchema = schema.safeParse(parsedJson);
+  const parsedSchema = schema.safeParse(stripOptionalNulls(parsedJson, schema));
 
   if (!parsedSchema.success) {
     throw new MistralProviderError("Mistral response failed schema validation", {
