@@ -2,7 +2,7 @@
 // Copyright 2026 Sovri contributors
 
 import type { AuditTrailSink } from "@sovri/compliance";
-import type { SovriConfig } from "@sovri/config";
+import { SovriConfigValidationError, type SovriConfig } from "@sovri/config";
 import { MissingApiKeyError } from "@sovri/llm-providers";
 import {
   classifyResolvedComments,
@@ -596,6 +596,22 @@ function describeReviewFailure(error: unknown): {
       logFields: {
         error_type: error.name,
         ...error.diagnostics,
+      },
+    };
+  }
+
+  if (error instanceof SovriConfigValidationError) {
+    // filePath is the trusted literal ".sovri.yml"; issues carry Zod field paths
+    // and static schema messages only — never untrusted file content — so the
+    // offending fields are safe to name in the PR comment instead of "review failed".
+    const details = error.issues
+      .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+      .join("; ");
+    return {
+      commentMessage: `Config error in ${error.filePath}: ${details}`,
+      logFields: {
+        error_message: error.message,
+        error_type: error.name,
       },
     };
   }
