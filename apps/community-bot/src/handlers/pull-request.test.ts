@@ -3,7 +3,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { SovriConfigParseError, SovriConfigValidationError } from "@sovri/config";
+import {
+  SovriConfigParseError,
+  SovriConfigSymlinkError,
+  SovriConfigValidationError,
+} from "@sovri/config";
 import { z } from "@sovri/core";
 
 import { reportPullRequestReviewFailure, type ReviewCommentTarget } from "./pull-request.js";
@@ -198,5 +202,23 @@ describe("describeReviewFailure — secret-shaped fragment redaction", () => {
     // ...while the secret-shaped path in the same comment is redacted.
     expect(comment).toContain("[Redacted]");
     expect(comment).not.toContain("apiKey");
+  });
+});
+
+// Rule R-05 — a symlink rejection keeps the generic comment
+describe("describeReviewFailure — SovriConfigSymlinkError", () => {
+  // Given a review fails at the config_load stage
+  // And the cause is a SovriConfigSymlinkError for ".sovri.yml"
+
+  it("does not surface the symlink rejection to the PR author", async () => {
+    const error = new SovriConfigSymlinkError(".sovri.yml");
+
+    // When the bot describes the review failure
+    const comment = await failureCommentFor(error);
+
+    // Then the failure comment is "review failed"
+    expect(comment).toBe("review failed");
+    // And the failure comment does not contain ".sovri.yml"
+    expect(comment).not.toContain(".sovri.yml");
   });
 });

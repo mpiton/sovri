@@ -45,6 +45,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   config key is never echoed verbatim to the PR author — including when a comment
   mixes ordinary and secret-shaped paths, where only the secret-shaped one is
   redacted (#2644, R-04).
+- `bot`: a `.sovri.yml` symlink rejection (`SovriConfigSymlinkError`) stays on the
+  generic `review failed` comment and never names the file, since its cause may
+  carry attacker-chosen target bytes — guarded so the diagnostic carve-outs for
+  schema/parse errors can't later leak the symlink path (#2644, R-05).
 
 ## [0.10.0] - 2026-06-21
 
