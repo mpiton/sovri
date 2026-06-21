@@ -37,6 +37,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   (`MaxLoggedErrorMessageLength`) — a config with many schema issues truncates to
   240 chars plus `...` rather than posting an oversized comment (#2644, R-03).
 
+### Security
+
+- `bot`: the actionable `.sovri.yml` config-error comment redacts any
+  secret-shaped fragment (a field path matching api-key / token / secret) to
+  `[Redacted]` via the shared `sanitizeErrorMessage` pass, so a credential-named
+  config key is never echoed verbatim to the PR author (#2644, R-04).
+
 ## [0.10.0] - 2026-06-21
 
 ### Added

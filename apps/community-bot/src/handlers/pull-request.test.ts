@@ -148,3 +148,40 @@ describe("describeReviewFailure — actionable comment length cap", () => {
     },
   );
 });
+
+// Rule R-04 — the comment echoes only trusted data, never secret-shaped fragments
+describe("describeReviewFailure — secret-shaped fragment redaction", () => {
+  // Given a review fails at the config_load stage
+  // And the cause is a SovriConfigValidationError for ".sovri.yml"
+
+  it("echoes an ordinary field path unchanged", async () => {
+    // Given the validation issues are: limits | Unrecognized key
+    const error = validationError([{ message: "Unrecognized key", path: ["limits"] }]);
+
+    // When the bot describes the review failure
+    const comment = await failureCommentFor(error);
+
+    // Then the failure comment contains "limits: Unrecognized key"
+    expect(comment).toContain("limits: Unrecognized key");
+    // And the failure comment does not contain "[Redacted]"
+    expect(comment).not.toContain("[Redacted]");
+  });
+
+  it.each([
+    { fragment: "apiKey", path: ["llm", "apiKey"] },
+    { fragment: "api_key", path: ["llm", "api_key"] },
+    { fragment: "token", path: ["llm", "token"] },
+    { fragment: "secret", path: ["secret"] },
+  ])("redacts the secret-shaped path $fragment", async ({ fragment, path }) => {
+    // Given the validation issues are: <path> | Unrecognized key
+    const error = validationError([{ message: "Unrecognized key", path }]);
+
+    // When the bot describes the review failure
+    const comment = await failureCommentFor(error);
+
+    // Then the failure comment contains "[Redacted]"
+    expect(comment).toContain("[Redacted]");
+    // And the failure comment does not contain "<fragment>"
+    expect(comment).not.toContain(fragment);
+  });
+});
