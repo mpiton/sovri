@@ -2,7 +2,7 @@
 // Copyright 2026 Sovri contributors
 
 import type { AuditTrailSink } from "@sovri/compliance";
-import { SovriConfigValidationError, type SovriConfig } from "@sovri/config";
+import { SovriConfigParseError, SovriConfigValidationError, type SovriConfig } from "@sovri/config";
 import { MissingApiKeyError } from "@sovri/llm-providers";
 import {
   classifyResolvedComments,
@@ -609,6 +609,20 @@ function describeReviewFailure(error: unknown): {
       .join("; ");
     return {
       commentMessage: `Config error in ${error.filePath}: ${details}`,
+      logFields: {
+        error_message: error.message,
+        error_type: error.name,
+      },
+    };
+  }
+
+  if (error instanceof SovriConfigParseError) {
+    // The error's own message ("Failed to parse YAML at <filePath>") names the
+    // trusted literal file path and never includes the raw parser cause, which
+    // may quote untrusted file bytes — so it is safe to surface instead of the
+    // bare "review failed".
+    return {
+      commentMessage: error.message,
       logFields: {
         error_message: error.message,
         error_type: error.name,
