@@ -23,7 +23,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `bot`: a `.sovri.yml` schema validation failure now posts a PR comment that
   names each offending field path and its schema message — multiple issues
-  joined with `; `, nested paths dot-joined, a root-level issue rendered as
+  joined with `"; "`, nested paths dot-joined, a root-level issue rendered as
   `(root)` (e.g. `Config error in .sovri.yml: limits: Unrecognized key; llm:
   Required`) — instead of the bare `review failed`, so the PR author can fix the
   config without bot-host log access (#2644, R-01).
