@@ -54,6 +54,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `review-engine`: the provider finding schema now documents the `cwe` field — the
+  generated provider JSON schema exposes a non-empty `description` telling the model
+  to emit a CWE for any security or correctness weakness in `CWE-<number>` format,
+  so providers no longer receive the field with zero guidance on when to populate it
+  (#2608, bug-2608 R-01).
 - `review-engine`: the LLM review prompt now only shows CWE ids the compliance
   map resolves — the few-shot worked example (now a SQL-injection finding) and
   the directive's "for example" use CWE-89 (mapped) instead of the unmapped
