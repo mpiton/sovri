@@ -619,10 +619,11 @@ function describeReviewFailure(error: unknown): {
   if (error instanceof SovriConfigParseError) {
     // The error's own message ("Failed to parse YAML at <filePath>") names the
     // trusted literal file path and never includes the raw parser cause, which
-    // may quote untrusted file bytes — so it is safe to surface instead of the
-    // bare "review failed".
+    // may quote untrusted file bytes. It is routed through the same redaction +
+    // length cap as every other surfaced message as defense in depth, so a
+    // future change to the error's wording cannot leak a secret-shaped fragment.
     return {
-      commentMessage: error.message,
+      commentMessage: safeErrorMessageFrom(error),
       logFields: {
         error_message: error.message,
         error_type: error.name,
