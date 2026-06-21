@@ -4,6 +4,8 @@
 import { z } from "@sovri/core";
 
 import { zodToProviderJsonSchema } from "../helpers/provider-json-schema.js";
+import { stripOptionalNulls } from "../helpers/strip-optional-nulls.js";
+import { normalizeStrictObjectShapes } from "../helpers/strict-json-schema.js";
 import type { TokenUsage } from "../types/LLMProvider.js";
 import { MistralProviderError } from "./MistralProvider.errors.js";
 import type { MistralChatRequest } from "./MistralProvider.retry.js";
@@ -21,7 +23,7 @@ export function parseStructuredMistralResponse<T>(
   tokenUsage: TokenUsage,
 ): T {
   const parsedJson = parseJson(extractMistralTextContent(response));
-  const parsedSchema = schema.safeParse(parsedJson);
+  const parsedSchema = schema.safeParse(stripOptionalNulls(parsedJson, schema));
 
   if (!parsedSchema.success) {
     throw new MistralProviderError("Mistral response failed schema validation", {
@@ -72,7 +74,9 @@ function createJsonSchemaDefinition(schema: z.ZodType): Record<string, unknown> 
       throw new MistralProviderError("Mistral JSON schema root must be an object schema");
     }
 
-    return jsonSchema;
+    // Strict mode at parity with OpenAI: force optional finding fields (notably
+    // `cwe`) into `required` + nullable so the model must decide them per finding.
+    return normalizeStrictObjectShapes(jsonSchema);
   } catch (cause) {
     if (cause instanceof MistralProviderError) throw cause;
 

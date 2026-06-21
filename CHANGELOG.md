@@ -54,6 +54,19 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `llm-providers`: the Mistral structured-response schema now reaches OpenAI parity —
+  it previously sent the raw Zod JSON schema under `strict: true`, leaving optional
+  finding fields (notably `cwe`) out of `required`, so the model was never forced to
+  decide them; optional fields are now promoted into every object node's `required`
+  array and made nullable (enum-typed fields via `anyOf`, so null is actually accepted), so a
+  strict-mode Mistral model must decide `cwe` on every finding
+  instead of silently omitting it, which previously starved compliance enrichment on Mistral
+  relative to OpenAI (#2638, bug-2609 R-01).
+- `llm-providers`: a Mistral response that returns `cwe: null` (now possible under the R-01
+  strict schema) round-trips instead of failing validation — the null is stripped to "no cwe"
+  before parsing (the same null-strip OpenAI already applies), matching `@sovri/core`'s
+  `cwe?: string` contract; an omitted cwe still parses, a malformed cwe is still rejected
+  (#2639, bug-2609 R-02).
 - `review-engine`: the provider finding schema now documents the `cwe` field — the
   generated provider JSON schema exposes a non-empty `description` telling the model
   to emit a CWE for any security or correctness weakness in `CWE-<number>` format.
