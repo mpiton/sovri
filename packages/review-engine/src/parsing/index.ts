@@ -7,7 +7,7 @@ import { z } from "zod";
 export const ProviderFindingSchema = z
   .strictObject({
     severity: z.enum(["blocker", "major", "minor", "info", "nitpick"]),
-    category: CategorySchema.default("maintainability"),
+    category: CategorySchema,
     file: z.string().min(1),
     line_start: z.number().int().positive(),
     line_end: z.number().int().positive(),
