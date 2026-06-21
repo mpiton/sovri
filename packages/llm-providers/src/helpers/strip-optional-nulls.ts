@@ -15,13 +15,16 @@ import { zodToProviderJsonSchema } from "./provider-json-schema.js";
 // resolves `anyOf` unions branch-by-branch; the Sovri response schema has no such
 // unions, so this provider-neutral form walks objects and arrays directly.
 export function stripOptionalNulls(value: unknown, schema: z.ZodType): unknown {
-  return stripValue(value, zodToProviderJsonSchema(schema));
+  return stripOptionalNullsForSchema(value, zodToProviderJsonSchema(schema));
 }
 
-function stripValue(value: unknown, schema: unknown): unknown {
+// Same strip, driven by an already-converted JSON schema. Exposed so the null
+// detection can be unit-tested against schema shapes Zod does not emit directly
+// (const: null, enum members including null).
+export function stripOptionalNullsForSchema(value: unknown, schema: unknown): unknown {
   if (Array.isArray(value)) {
     const items = isRecord(schema) ? schema["items"] : undefined;
-    return value.map((item) => stripValue(item, items));
+    return value.map((item) => stripOptionalNullsForSchema(item, items));
   }
   if (!isRecord(value) || !isRecord(schema)) {
     return value;
@@ -39,7 +42,7 @@ function stripValue(value: unknown, schema: unknown): unknown {
     if (child === null && !required.has(key) && !allowsNull(propertySchema)) {
       continue;
     }
-    result[key] = stripValue(child, propertySchema);
+    result[key] = stripOptionalNullsForSchema(child, propertySchema);
   }
 
   return result;
@@ -55,6 +58,13 @@ function allowsNull(schema: unknown): boolean {
     return true;
   }
   if (Array.isArray(type) && type.includes("null")) {
+    return true;
+  }
+  if (schema["const"] === null) {
+    return true;
+  }
+  const enumValues = schema["enum"];
+  if (Array.isArray(enumValues) && enumValues.includes(null)) {
     return true;
   }
 

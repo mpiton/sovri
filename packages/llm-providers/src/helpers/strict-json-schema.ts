@@ -65,6 +65,14 @@ function allowNull(value: unknown): unknown {
     return value;
   }
 
+  // An `enum` constraint is not widened by adding "null" to `type` (the enum
+  // still rejects null), so an enum schema is wrapped in `anyOf` with a null
+  // alternative instead.
+  const enumValues = value["enum"];
+  if (Array.isArray(enumValues)) {
+    return enumValues.includes(null) ? value : { anyOf: [value, { type: "null" }] };
+  }
+
   const type = value["type"];
   if (typeof type === "string") {
     value["type"] = type === "null" ? type : [type, "null"];

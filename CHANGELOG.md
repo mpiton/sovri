@@ -58,7 +58,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   it previously sent the raw Zod JSON schema under `strict: true`, leaving optional
   finding fields (notably `cwe`) out of `required`, so the model was never forced to
   decide them; optional fields are now promoted into every object node's `required`
-  array and made nullable, so a strict-mode Mistral model must decide `cwe` on every finding
+  array and made nullable (enum-typed fields via `anyOf`, so null is actually accepted), so a
+  strict-mode Mistral model must decide `cwe` on every finding
   instead of silently omitting it, which previously starved compliance enrichment on Mistral
   relative to OpenAI (#2638, bug-2609 R-01).
 - `llm-providers`: a Mistral response that returns `cwe: null` (now possible under the R-01

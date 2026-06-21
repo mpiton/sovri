@@ -4,7 +4,7 @@
 import { z } from "@sovri/core";
 import { describe, expect, it } from "vitest";
 
-import { stripOptionalNulls } from "./strip-optional-nulls.js";
+import { stripOptionalNulls, stripOptionalNullsForSchema } from "./strip-optional-nulls.js";
 
 describe("stripOptionalNulls", () => {
   it("drops a null value on an optional, non-nullable property", () => {
@@ -37,5 +37,25 @@ describe("stripOptionalNulls", () => {
 
   it("passes a non-record top-level value through untouched", () => {
     expect(stripOptionalNulls(42, z.number())).toBe(42);
+  });
+
+  // Schema shapes Zod does not emit directly (const: null, enum members including
+  // null) are exercised through the JSON-schema-driven core.
+  it("keeps a null whose property schema is const null", () => {
+    const schema = { type: "object", properties: { a: { const: null } } };
+
+    expect(stripOptionalNullsForSchema({ a: null }, schema)).toEqual({ a: null });
+  });
+
+  it("keeps a null whose property enum includes null", () => {
+    const schema = { type: "object", properties: { a: { enum: ["x", null] } } };
+
+    expect(stripOptionalNullsForSchema({ a: null }, schema)).toEqual({ a: null });
+  });
+
+  it("drops a null whose property enum does not include null", () => {
+    const schema = { type: "object", properties: { a: { enum: ["x", "y"] } } };
+
+    expect(stripOptionalNullsForSchema({ a: null }, schema)).toEqual({});
   });
 });

@@ -97,6 +97,36 @@ describe("normalizeStrictObjectShapes", () => {
     });
   });
 
+  it("wraps an optional enum-typed property in anyOf rather than widening its type", () => {
+    expect(
+      normalizeStrictObjectShapes({
+        type: "object",
+        properties: { a: { type: "string", enum: ["x", "y"] } },
+        required: [],
+      }),
+    ).toEqual({
+      type: "object",
+      properties: { a: { anyOf: [{ type: "string", enum: ["x", "y"] }, { type: "null" }] } },
+      required: ["a"],
+      additionalProperties: false,
+    });
+  });
+
+  it("leaves an optional enum that already includes null untouched", () => {
+    expect(
+      normalizeStrictObjectShapes({
+        type: "object",
+        properties: { a: { enum: ["x", null] } },
+        required: [],
+      }),
+    ).toEqual({
+      type: "object",
+      properties: { a: { enum: ["x", null] } },
+      required: ["a"],
+      additionalProperties: false,
+    });
+  });
+
   it("normalizes nested object nodes recursively through array items", () => {
     expect(
       normalizeStrictObjectShapes({
