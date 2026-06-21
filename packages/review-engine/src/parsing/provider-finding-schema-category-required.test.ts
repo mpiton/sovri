@@ -63,21 +63,27 @@ describe("ProviderFindingSchema requires a category (bug-2608 R-02)", () => {
     }
   });
 
-  // @nominal — every valid category is accepted as given, none defaulted
-  it.each(["security", "bug", "performance", "maintainability", "documentation"])(
-    "the category %s is accepted as given",
-    (category) => {
-      // Given the finding has category "<category>"
-      const finding = { ...baseFinding, category };
+  // @nominal — every valid category is accepted as given, none defaulted.
+  // Covers all CategorySchema members so "every valid category" matches the enum contract.
+  it.each([
+    "security",
+    "bug",
+    "performance",
+    "maintainability",
+    "style",
+    "documentation",
+    "test-coverage",
+  ])("the category %s is accepted as given", (category) => {
+    // Given the finding has category "<category>"
+    const finding = { ...baseFinding, category };
 
-      // When the provider finding contract parses the finding
-      const result = ProviderFindingSchema.safeParse(finding);
+    // When the provider finding contract parses the finding
+    const result = ProviderFindingSchema.safeParse(finding);
 
-      // Then the finding is accepted with category "<category>"
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.category).toBe(category);
-      }
-    },
-  );
+    // Then the finding is accepted with category "<category>"
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.category).toBe(category);
+    }
+  });
 });

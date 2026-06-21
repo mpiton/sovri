@@ -65,7 +65,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   existing schema-retry re-prompt instead of being silently coerced to
   `maintainability`, an ineligible category that would downgrade a real security
   finding out of compliance enrichment. Aligns the provider schema with the sibling
-  raw-finding schema, which already required `category` (#2608, bug-2608 R-02).
+  raw-finding schema, which already required `category`; the regression test covers
+  every `CategorySchema` member (#2608, bug-2608 R-02).
 - `review-engine`: the LLM review prompt now only shows CWE ids the compliance
   map resolves — the few-shot worked example (now a SQL-injection finding) and
   the directive's "for example" use CWE-89 (mapped) instead of the unmapped
