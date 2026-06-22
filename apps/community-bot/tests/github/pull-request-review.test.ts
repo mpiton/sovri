@@ -40,7 +40,7 @@ review:
         mediaType: { format: "raw" },
         owner: "mpiton",
         path: ".sovri.yml",
-        ref: BaseSha,
+        ref: "heads/main",
         repo: "sovri",
       }),
     ]);
@@ -386,6 +386,7 @@ function buildRuntimeContext(
 
 function buildTarget() {
   return {
+    baseRef: "main",
     baseSha: BaseSha,
     commitSha: HeadSha,
     number: 41,

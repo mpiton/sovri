@@ -75,7 +75,15 @@ async function loadRepositoryConfig(
       },
       owner: repo.owner,
       path: ".sovri.yml",
-      ref: target.baseSha,
+      // Read config from the base branch tip, not the PR's frozen `base.sha`.
+      // `base.sha` is pinned per PR and never advances when the base branch moves,
+      // so a config fix on the base branch would never reach already-open PRs
+      // until their base pointer was bumped manually. Reading `heads/<base.ref>`
+      // keeps the trusted-base guarantee (config never comes from the PR head, so
+      // a PR cannot weaken its own review) while picking up base-branch config
+      // fixes on the next review. The tip can drift slightly from the exact merge
+      // target, but for a repo-level policy file that is the intended behavior.
+      ref: `heads/${target.baseRef}`,
       repo: repo.repo,
     });
 

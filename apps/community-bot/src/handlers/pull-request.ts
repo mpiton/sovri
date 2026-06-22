@@ -81,6 +81,7 @@ export type ReviewCommentTarget = {
 };
 
 export type ReviewPostTarget = ReviewCommentTarget & {
+  readonly baseRef: string;
   readonly baseSha: string;
   readonly commitSha: string;
 };
@@ -424,6 +425,7 @@ async function minimizeResolvedComments(
 function buildTarget(context: PullRequestWebhookContext): ReviewPostTarget {
   const pullRequest = context.payload.pull_request;
   return {
+    baseRef: requireString(pullRequest.base?.ref, "pull_request.base.ref"),
     baseSha: requireString(pullRequest.base?.sha, "pull_request.base.sha"),
     commitSha: requireString(pullRequest.head?.sha, "pull_request.head.sha"),
     number: requireNumber(pullRequest.number, "pull_request.number"),

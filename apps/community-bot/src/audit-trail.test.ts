@@ -19,6 +19,7 @@ import { DeploymentConfigError } from "./runtime-env.js";
 const input: AuditTrailSinkInput = {
   deliveryId: "delivery-123",
   target: {
+    baseRef: "main",
     baseSha: "b".repeat(40),
     commitSha: "a".repeat(40),
     number: 42,

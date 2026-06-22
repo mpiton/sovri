@@ -21,6 +21,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `bot`: `.sovri.yml` is now read from the base branch tip (`heads/<base.ref>`)
+  instead of the per-PR frozen `base.sha`, so a config fix committed to the base
+  branch reaches already-open PRs on the next review without a manual
+  rebase/update-branch; config still never comes from the PR head, preserving the
+  trusted-base guarantee (#2645, R-01/R-02/R-03).
 - `bot`: a `.sovri.yml` schema validation failure now posts a PR comment that
   names each offending field path and its schema message — multiple issues
   joined with `"; "`, nested paths dot-joined, a root-level issue rendered as
