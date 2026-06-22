@@ -19,6 +19,37 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Fixed
+
+- `bot`: a `.sovri.yml` schema validation failure now posts a PR comment that
+  names each offending field path and its schema message — multiple issues
+  joined with `"; "`, nested paths dot-joined, a root-level issue rendered as
+  `(root)` (e.g. `Config error in .sovri.yml: limits: Unrecognized key; llm:
+  Required`) — instead of the bare `review failed`, so the PR author can fix the
+  config without bot-host log access (#2644, R-01).
+- `bot`: a `.sovri.yml` YAML syntax failure now surfaces the parse error's own
+  file-named message (`Failed to parse YAML at .sovri.yml`) instead of the bare
+  `review failed`, without echoing the raw parser cause (which may quote
+  untrusted file bytes); the surfaced message passes through the module's
+  redaction + length cap as defense in depth (#2644, R-02).
+- `bot`: the actionable `.sovri.yml` config-error comment is routed through
+  `sanitizeErrorMessage`, capping it at 240 characters
+  (`MaxLoggedErrorMessageLength`) — a config with many schema issues truncates to
+  240 chars plus `...` rather than posting an oversized comment (#2644, R-03).
+
+### Security
+
+- `bot`: the actionable `.sovri.yml` config-error comment redacts any
+  secret-shaped fragment (a field path matching api-key / token / secret) to
+  `[Redacted]` via the shared `sanitizeErrorMessage` pass, so a credential-named
+  config key is never echoed verbatim to the PR author — including when a comment
+  mixes ordinary and secret-shaped paths, where only the secret-shaped one is
+  redacted (#2644, R-04).
+- `bot`: a `.sovri.yml` symlink rejection (`SovriConfigSymlinkError`) stays on the
+  generic `review failed` comment and never names the file, since its cause may
+  carry attacker-chosen target bytes — guarded so the diagnostic carve-outs for
+  schema/parse errors can't later leak the symlink path (#2644, R-05).
+
 ## [0.10.0] - 2026-06-21
 
 ### Added
