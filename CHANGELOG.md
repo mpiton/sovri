@@ -37,6 +37,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   images, runtime preflight hooks, and the Probot dependency specifier used by
   the bot.
 
+### Fixed
+
+- `ci`: make workspace TypeScript resolution use package source entrypoints so
+  `tsc -b` no longer depends on concurrently generated `dist` declarations
+  during local hooks.
+
 ## [0.10.1] - 2026-06-22
 
 ### Fixed

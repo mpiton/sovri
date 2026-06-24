@@ -3,6 +3,15 @@
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023"],
+    "paths": {
+      "@sovri/brand": ["./packages/brand/src/index.ts"],
+      "@sovri/compliance": ["./packages/compliance/src/index.ts"],
+      "@sovri/config": ["./packages/config/src/index.ts"],
+      "@sovri/core": ["./packages/core/src/index.ts"],
+      "@sovri/llm-providers": ["./packages/llm-providers/src/index.ts"],
+      "@sovri/observability": ["./packages/observability/src/index.ts"],
+      "@sovri/review-engine": ["./packages/review-engine/src/index.ts"]
+    },
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "verbatimModuleSyntax": true,
