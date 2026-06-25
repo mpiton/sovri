@@ -109,15 +109,7 @@ describe("zodToProviderJsonSchema — @sovri/core integration", () => {
     expect(json.properties).toMatchObject({
       severity: { enum: ["blocker", "major", "minor", "info", "nitpick"] },
       category: {
-        enum: [
-          "bug",
-          "security",
-          "performance",
-          "maintainability",
-          "style",
-          "documentation",
-          "test-coverage",
-        ],
+        enum: ["bug", "security"],
       },
     });
     const expectedRequired = [

@@ -15,7 +15,7 @@
   {
     "id": "88888888-8888-4888-8888-888888888888",
     "severity": "minor",
-    "category": "maintainability",
+    "category": "bug",
     "file": "src/a.ts",
     "line_start": 11,
     "line_end": 11,

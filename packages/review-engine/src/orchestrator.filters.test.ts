@@ -752,7 +752,7 @@ describe("reviewPullRequest config filters", () => {
   it("drops narration findings through the full review path while keeping real issues (issue #2450)", async () => {
     // Given the provider returns one narration finding and one real issue at the same severity
     const provider = createProvider([
-      providerFinding("major", "src/app.ts", 4, "Added shared helper function", "maintainability"),
+      providerFinding("major", "src/app.ts", 4, "Added shared helper function", "bug"),
       providerFinding("major", "src/app.ts", 9, "Missing null guard on payload", "bug"),
     ]);
     const reviewPullRequest = getReviewPullRequest();

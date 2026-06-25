@@ -40,9 +40,9 @@ describe("ProviderFindingSchema requires a category (bug-2608 R-02)", () => {
       );
       expect(categoryIssue).toBeDefined();
     } else {
-      // And the finding is not silently parsed with category "maintainability"
-      // (only reachable if the dropped default ever returns — guards the regression)
-      expect(result.data.category).not.toBe("maintainability");
+      // Defensive: a finding with no category must never parse to a defaulted value
+      // (only reachable if a dropped default ever returns — guards the regression).
+      expect(result.data.category).toBeUndefined();
     }
   });
 
@@ -65,15 +65,7 @@ describe("ProviderFindingSchema requires a category (bug-2608 R-02)", () => {
 
   // @nominal — every valid category is accepted as given, none defaulted.
   // Covers all CategorySchema members so "every valid category" matches the enum contract.
-  it.each([
-    "security",
-    "bug",
-    "performance",
-    "maintainability",
-    "style",
-    "documentation",
-    "test-coverage",
-  ])("the category %s is accepted as given", (category) => {
+  it.each(["security", "bug"])("the category %s is accepted as given", (category) => {
     // Given the finding has category "<category>"
     const finding = { ...baseFinding, category };
 
@@ -86,4 +78,26 @@ describe("ProviderFindingSchema requires a category (bug-2608 R-02)", () => {
       expect(result.data.category).toBe(category);
     }
   });
+
+  // @violation — the generic review categories removed in the compliance pivot (ADR-021, MAT-76)
+  // are rejected by the contract, so the model can no longer surface non-compliance noise.
+  it.each(["performance", "maintainability", "style", "documentation", "test-coverage"])(
+    "the removed category %s is rejected",
+    (category) => {
+      // Given the finding carries a generic, non-compliance category
+      const finding = { ...baseFinding, category };
+
+      // When the provider finding contract parses the finding
+      const result = ProviderFindingSchema.safeParse(finding);
+
+      // Then the finding is rejected at the category field
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const categoryIssue = result.error.issues.find(
+          (issue) => issue.path.join(".") === "category",
+        );
+        expect(categoryIssue).toBeDefined();
+      }
+    },
+  );
 });

@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri contributors
 
-import { COMPLIANCE_MIN_CONFIDENCE, type ComplianceReference, type Finding } from "@sovri/core";
+import {
+  CategorySchema,
+  COMPLIANCE_MIN_CONFIDENCE,
+  type ComplianceReference,
+  type Finding,
+} from "@sovri/core";
 import { describe, expect, it } from "vitest";
 
 import { partitionComplianceMappedFindings, shouldEnrichCompliance } from "./compliance-gate.js";
@@ -67,8 +72,12 @@ describe("shouldEnrichCompliance", () => {
     expect(shouldEnrichCompliance(finding({ confidence: 0.69 }))).toBe(false);
   });
 
-  it("skips non-security/bug categories even with a CWE", () => {
-    expect(shouldEnrichCompliance(finding({ category: "maintainability" }))).toBe(false);
+  it("treats every current category as eligible since the taxonomy is the compliance set (ADR-021)", () => {
+    // After the compliance pivot the Category enum is exactly the eligible set, so the allowlist
+    // admits all of it; it remains as defense-in-depth if a non-compliance category is reintroduced.
+    for (const category of CategorySchema.options) {
+      expect(shouldEnrichCompliance(finding({ category }))).toBe(true);
+    }
   });
 
   it("admits an eligible finding with no CWE so the enricher can derive one (ADR-020)", () => {

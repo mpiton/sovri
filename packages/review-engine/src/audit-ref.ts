@@ -7,11 +7,6 @@ import type { Category } from "@sovri/core";
 const CATEGORY_CODES: Record<Category, string> = {
   bug: "BG",
   security: "SC",
-  performance: "PF",
-  maintainability: "MT",
-  style: "ST",
-  documentation: "DC",
-  "test-coverage": "TC",
 };
 
 const hexSegment = (): string => randomBytes(2).toString("hex").toUpperCase();

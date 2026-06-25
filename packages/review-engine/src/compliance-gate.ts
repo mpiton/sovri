@@ -5,10 +5,11 @@ import { COMPLIANCE_MIN_CONFIDENCE, type Category, type Finding } from "@sovri/c
 
 import type { ProviderFinding } from "./parsing/index.js";
 
-// Only security and bug findings are eligible for compliance enrichment. Other categories are
-// excluded even when the model tags them with a CWE, so regulatory references never attach to
-// style or maintainability findings (ADR-013). CWE presence is not gated here: an eligible finding
-// with no model CWE still passes so the enricher can derive one from its signals (ADR-020).
+// Compliance enrichment is gated to the security and bug categories. Since the compliance pivot
+// (ADR-021, MAT-76) the Category enum is exactly this set, so the allowlist now mirrors the whole
+// taxonomy and stands as defense-in-depth should a non-compliance category ever be reintroduced.
+// CWE presence is not gated here: an eligible finding with no model CWE still passes so the enricher
+// can derive one from its signals (ADR-020).
 const COMPLIANCE_ELIGIBLE_CATEGORIES: ReadonlySet<Category> = new Set(["security", "bug"]);
 
 export function shouldEnrichCompliance(finding: ProviderFinding): boolean {

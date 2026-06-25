@@ -7,7 +7,7 @@
   },
   {
     "path": "src/a.ts",
-    "body": "🟡 🔧 Maintainability\n**Validate after load**\n\n**Problem:** `value` should be validated near the load boundary.\n\n**Fix:** Apply the fix for validate after load: change the code so the problem no longer occurs.\n\n<!-- sovri-finding-id: 46f31f699cf69228 -->",
+    "body": "🟡 🐛 Bug\n**Validate after load**\n\n**Problem:** `value` should be validated near the load boundary.\n\n**Fix:** Apply the fix for validate after load: change the code so the problem no longer occurs.\n\n<!-- sovri-finding-id: 46f31f699cf69228 -->",
     "line": 11,
     "side": "RIGHT"
   },

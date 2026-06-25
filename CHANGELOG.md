@@ -32,10 +32,31 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   an unmapped one is dropped. Retained findings keep their `audit_reference`, and
   the dropped count is logged (`dropped_unmapped`) so the reduction is auditable,
   never silent (MAT-75).
+- `review-engine`: the review system prompt is recentred on regulated compliance.
+  All four modes (`full`, `bugs-only`, `strict`, `minimal`) now ask the model only
+  for security and correctness weaknesses that map to a known CWE and no longer
+  solicit generic bug, style, performance, or maintainability review. The shared
+  CWE directive is now unconditional — every finding should carry a `cwe` — which
+  drops the prior "omit `cwe` on style or performance findings" escape hatch. This
+  stops the model from spending effort on findings the compliance-only publication
+  gate (MAT-75) would discard, reducing non-compliance noise at the source
+  (ADR-021, MAT-76).
 - `deps`: align the Community runtime toolchain pins by updating the pnpm
   package manager pin, Node.js CI/runtime floor, digest-pinned Docker base
   images, runtime preflight hooks, and the Probot dependency specifier used by
   the bot.
+
+### Removed
+
+- `core` (**breaking**): the `Category` enum (`CategorySchema`, exported from
+  `@sovri/core`) is trimmed from seven values to the compliance-eligible set
+  `"bug"` and `"security"`. The generic categories `"performance"`,
+  `"maintainability"`, `"style"`, `"documentation"`, and `"test-coverage"` are
+  removed, so a model finding tagged with one is now rejected at the parsing schema
+  (`LLMRawFinding` / `ProviderFinding`) rather than enriched-then-dropped. The
+  `@sovri/brand` category palette and the audit-reference category-code table are
+  reduced to match. Consumers that persist or switch on the removed category
+  strings must migrate to the security/bug taxonomy (ADR-021, MAT-76).
 
 ### Fixed
 

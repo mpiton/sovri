@@ -38,6 +38,7 @@ An ADR is not user documentation. It is a log of technical choices intended for 
 | [018](./018-github-checks-output-surface.md)               | GitHub Checks API as a bot output surface                                  | Accepted | 2026-06-02 |
 | [019](./019-otel-milestone-v0-6.md)                        | OpenTelemetry instrumentation deferred to v0.6 (revises ADR-006)           | Accepted | 2026-06-02 |
 | [020](./020-deterministic-compliance-derivation.md)        | Deterministic compliance reference derivation when the model omits the CWE | Accepted | 2026-06-19 |
+| [021](./021-compliance-only-review-taxonomy.md)            | Compliance-only review taxonomy and prompt                                 | Accepted | 2026-06-24 |
 
 ## Possible statuses
 

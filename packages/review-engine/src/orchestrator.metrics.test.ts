@@ -433,7 +433,7 @@ describe("R-06 — findings.total fires once per emitted Finding", () => {
     expect(findings).toHaveLength(1);
     expect(findings[0]?.tags).toEqual({
       severity: "major",
-      category: "maintainability",
+      category: "bug",
       source: "llm",
     });
     // And reviews.total still records the failed review exactly once

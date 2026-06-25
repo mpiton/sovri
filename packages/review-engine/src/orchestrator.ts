@@ -971,7 +971,7 @@ function buildReviewFailedFinding(diff: Diff, error: string): Finding {
   return {
     id: uuidv4(),
     severity: "major",
-    category: "maintainability",
+    category: "bug",
     file: fallbackLocation.file,
     line_start: fallbackLocation.line,
     line_end: fallbackLocation.line,

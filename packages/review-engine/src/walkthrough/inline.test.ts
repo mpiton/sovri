@@ -99,7 +99,7 @@ describe("buildInlineComments", () => {
       {
         id: "22222222-2222-4222-8222-222222222222",
         severity: "minor",
-        category: "maintainability",
+        category: "bug",
         file: "src/session.ts",
         line_start: 19,
         line_end: 19,
@@ -306,7 +306,7 @@ describe("buildInlineComments — refreshed inline finding header", () => {
     const lines = comments[0]?.body.split("\n") ?? [];
 
     // Then the badge prefix, bold title, blank separator, and Problem/Fix order is exact
-    expect(lines[0]).toBe(`${severityBadge("minor")} ${categoryBadge("maintainability")}`);
+    expect(lines[0]).toBe(`${severityBadge("minor")} ${categoryBadge("bug")}`);
     expect(lines[1]).toBe("**Preserve body markdown**");
     expect(lines[2]).toBe("");
     // Problem label precedes the body text, Fix label follows it
@@ -574,7 +574,7 @@ describe("buildInlineComments — GitHub-safe markdown (R-06)", () => {
       title: "Avoid local CSS in bot output",
       body: "GitHub strips class and style attributes from PR comments.",
       severity: "info",
-      category: "documentation",
+      category: "bug",
       suggestion: { code: suggestionCode, committable: true },
     });
     const diff = makeDiff("src/render.ts", [9]);
@@ -586,7 +586,7 @@ describe("buildInlineComments — GitHub-safe markdown (R-06)", () => {
     const suggestionBlock = ["```suggestion", suggestionCode, "```"].join("\n");
 
     // Then the badge output is emoji and plain label text
-    expect(lines[0]).toBe("ℹ️ 📝 Documentation");
+    expect(lines[0]).toBe("ℹ️ 🐛 Bug");
     // And the suggestion remains a GitHub markdown suggestion fence
     expect(body).toContain(suggestionBlock);
     // And the inline comment emits no local preview CSS or styled HTML vocabulary
@@ -889,7 +889,7 @@ function makeFinding(options: {
     id: options.id ?? "44444444-4444-4444-8444-444444444444",
     ...(options.auditReference === undefined ? {} : { audit_reference: options.auditReference }),
     severity: options.severity ?? "minor",
-    category: options.category ?? "maintainability",
+    category: options.category ?? "bug",
     file: options.file,
     line_start: options.lineStart,
     line_end: options.lineEnd ?? options.lineStart,

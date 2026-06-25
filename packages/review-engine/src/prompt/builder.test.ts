@@ -493,13 +493,34 @@ describe("buildSystemPrompt", () => {
     expect(new Set(Object.values(prompts)).size).toBe(4);
     expect(prompts).toMatchInlineSnapshot(`
       {
-        "bugs-only": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Report only correctness bugs that can change runtime behavior; ignore style, formatting, and performance-only nits. Never describe what the code does; a hunk with no issue yields no finding. Each finding states the problem and its impact in \`body\` and the concrete fix in \`recommendation\`. Write a neutral one-paragraph \`summary\` separately from the findings. Return structured JSON findings that match the requested schema. On every security or bug finding tied to a known weakness, set \`cwe\` to its CWE id (for example CWE-89) and \`confidence\` to a number between 0 and 1 reflecting your honest certainty; omit \`cwe\` on style or performance findings. A resolved \`cwe\` maps the finding to GDPR, DORA, AI Act, and NIS2 references, so a missing one drops that compliance context.",
-        "full": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Report only defects and concrete improvements: bugs, security, performance, real design or maintainability problems, missing tests, and risky edge cases. Never describe what the code does; a hunk with no issue yields no finding. Each finding states the problem and its impact in \`body\` and the concrete fix in \`recommendation\`. Write a neutral one-paragraph \`summary\` separately from the findings. Return structured JSON findings that match the requested schema. On every security or bug finding tied to a known weakness, set \`cwe\` to its CWE id (for example CWE-89) and \`confidence\` to a number between 0 and 1 reflecting your honest certainty; omit \`cwe\` on style or performance findings. A resolved \`cwe\` maps the finding to GDPR, DORA, AI Act, and NIS2 references, so a missing one drops that compliance context.",
-        "minimal": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Report at most 3 findings, blocker or major severity only; suppress nits, style, and minor findings. Never describe what the code does; a hunk with no issue yields no finding. Each finding states the problem and its impact in \`body\` and the concrete fix in \`recommendation\`. Write a neutral one-paragraph \`summary\` separately from the findings. Return structured JSON findings that match the requested schema. On every security or bug finding tied to a known weakness, set \`cwe\` to its CWE id (for example CWE-89) and \`confidence\` to a number between 0 and 1 reflecting your honest certainty; omit \`cwe\` on style or performance findings. A resolved \`cwe\` maps the finding to GDPR, DORA, AI Act, and NIS2 references, so a missing one drops that compliance context.",
-        "strict": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Hold the diff to a high bar: report every valid blocker, major, and minor issue, including maintainability, style, readability, and test-quality problems that justify at least minor severity. Never describe what the code does; a hunk with no issue yields no finding. Each finding states the problem and its impact in \`body\` and the concrete fix in \`recommendation\`. Write a neutral one-paragraph \`summary\` separately from the findings. Return structured JSON findings that match the requested schema. On every security or bug finding tied to a known weakness, set \`cwe\` to its CWE id (for example CWE-89) and \`confidence\` to a number between 0 and 1 reflecting your honest certainty; omit \`cwe\` on style or performance findings. A resolved \`cwe\` maps the finding to GDPR, DORA, AI Act, and NIS2 references, so a missing one drops that compliance context.",
+        "bugs-only": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Report only correctness weaknesses that change runtime behavior and map to a known CWE, such as unsafe input handling, missing validation, and resource-safety defects. Never describe what the code does; a hunk with no issue yields no finding. Each finding states the problem and its impact in \`body\` and the concrete fix in \`recommendation\`. Write a neutral one-paragraph \`summary\` separately from the findings. Return structured JSON findings that match the requested schema. On every finding, set \`cwe\` to its CWE id (for example CWE-89) and \`confidence\` to a number between 0 and 1 reflecting your honest certainty. A resolved \`cwe\` maps the finding to GDPR, DORA, AI Act, and NIS2 references, so a missing one drops that compliance context.",
+        "full": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Report only security and correctness weaknesses that map to a known CWE, such as injection, broken authentication or access control, secret and credential exposure, unsafe cryptography, and memory or resource safety. Never describe what the code does; a hunk with no issue yields no finding. Each finding states the problem and its impact in \`body\` and the concrete fix in \`recommendation\`. Write a neutral one-paragraph \`summary\` separately from the findings. Return structured JSON findings that match the requested schema. On every finding, set \`cwe\` to its CWE id (for example CWE-89) and \`confidence\` to a number between 0 and 1 reflecting your honest certainty. A resolved \`cwe\` maps the finding to GDPR, DORA, AI Act, and NIS2 references, so a missing one drops that compliance context.",
+        "minimal": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Report at most 3 findings, blocker or major severity only, limited to security or correctness weaknesses that map to a known CWE. Never describe what the code does; a hunk with no issue yields no finding. Each finding states the problem and its impact in \`body\` and the concrete fix in \`recommendation\`. Write a neutral one-paragraph \`summary\` separately from the findings. Return structured JSON findings that match the requested schema. On every finding, set \`cwe\` to its CWE id (for example CWE-89) and \`confidence\` to a number between 0 and 1 reflecting your honest certainty. A resolved \`cwe\` maps the finding to GDPR, DORA, AI Act, and NIS2 references, so a missing one drops that compliance context.",
+        "strict": "You are Sovri's review engine. Review only the supplied pull request metadata and unified diff. Hold the diff to a high bar: report every security or correctness weakness that maps to a known CWE at blocker, major, or minor severity. Never describe what the code does; a hunk with no issue yields no finding. Each finding states the problem and its impact in \`body\` and the concrete fix in \`recommendation\`. Write a neutral one-paragraph \`summary\` separately from the findings. Return structured JSON findings that match the requested schema. On every finding, set \`cwe\` to its CWE id (for example CWE-89) and \`confidence\` to a number between 0 and 1 reflecting your honest certainty. A resolved \`cwe\` maps the finding to GDPR, DORA, AI Act, and NIS2 references, so a missing one drops that compliance context.",
       }
     `);
   });
+
+  // MAT-76 noise-reduction contract: every mode is recentred on compliance and stops soliciting the
+  // generic review categories removed from the taxonomy (ADR-021).
+  it.each(["full", "bugs-only", "strict", "minimal"] as const)(
+    "the %s mode solicits only CWE-mappable compliance findings, not generic review noise",
+    (mode) => {
+      const systemPrompt = buildSystemPrompt({ mode });
+      // It positively scopes the review to security/correctness weaknesses anchored to a CWE.
+      expect(systemPrompt).toContain("known CWE");
+      // And it no longer solicits the generic, non-compliance categories removed in the pivot.
+      for (const removed of [
+        "performance",
+        "maintainability",
+        "style",
+        "documentation",
+        "test-coverage",
+      ]) {
+        expect(systemPrompt).not.toContain(removed);
+      }
+    },
+  );
 
   it("emits correctness-focused guidance for bugs-only mode", () => {
     // Given the review mode is "bugs-only".
@@ -507,12 +528,13 @@ describe("buildSystemPrompt", () => {
     // When the maintainer builds the system prompt.
     const systemPrompt = buildSystemPrompt({ mode: "bugs-only" });
 
-    // Then the system prompt instructs the model to focus on correctness bugs.
-    expect(systemPrompt).toContain("correctness bugs");
-    // And the system prompt instructs the model to ignore style findings.
-    expect(systemPrompt).toContain("ignore style");
-    // And the system prompt instructs the model to ignore performance-only findings.
-    expect(systemPrompt).toContain("performance-only");
+    // Then the system prompt instructs the model to focus on correctness weaknesses.
+    expect(systemPrompt).toContain("correctness weaknesses");
+    // And the system prompt keeps the finding scoped to a known CWE.
+    expect(systemPrompt).toContain("map to a known CWE");
+    // And the system prompt no longer solicits generic style or performance review.
+    expect(systemPrompt).not.toContain("style");
+    expect(systemPrompt).not.toContain("performance");
     // And the system prompt does not contain runtime pull request data.
     expect(systemPrompt).not.toContain("src/payment.ts");
   });
@@ -527,9 +549,8 @@ describe("buildSystemPrompt", () => {
     expect(systemPrompt).toContain("at most 3 findings");
     // And the system prompt limits findings to severity "blocker" or "major".
     expect(systemPrompt).toContain("blocker or major");
-    // And the system prompt suppresses nits and minor findings.
-    expect(systemPrompt).toContain("suppress nits");
-    expect(systemPrompt).toContain("minor findings");
+    // And the system prompt keeps even the minimal mode scoped to CWE-mappable weaknesses.
+    expect(systemPrompt).toContain("map to a known CWE");
     // And the system prompt does not contain runtime pull request data.
     expect(systemPrompt).not.toContain("src/payment.ts");
     expect(systemPrompt).not.toContain("Protect high-value transfers");
@@ -551,8 +572,9 @@ describe("buildSystemPrompt", () => {
     );
     // And the prompt contains "minor".
     expect(systemPrompt).toContain("minor");
-    // And the prompt contains "style".
-    expect(systemPrompt).toContain("style");
+    // And the prompt scopes the high bar to CWE-mappable weaknesses, not generic style review.
+    expect(systemPrompt).toContain("known CWE");
+    expect(systemPrompt).not.toContain("style");
     // And the prompt does not request nitpick findings that the default severity filter removes.
     expect(systemPrompt).not.toContain("nits");
     // And the prompt is not equal to the full-mode prompt.

@@ -177,7 +177,7 @@ describe("R-06 category palette", () => {
     const candidate: Record<string, { color: string; glyph: string; label: string }> = {
       ...categoryPalette,
     };
-    delete candidate["test-coverage"];
+    delete candidate["security"];
     expect(() => CategoryPaletteSchema.parse(candidate)).toThrow();
   });
 

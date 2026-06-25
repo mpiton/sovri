@@ -21,11 +21,6 @@ const AUDIT_REFERENCE_PATTERN = /^SOVRI-[A-Z]{2}-[A-F0-9]{4}-[A-F0-9]{4}$/;
 const CATEGORY_CODE_CASES: ReadonlyArray<readonly [Category, string]> = [
   ["bug", "BG"],
   ["security", "SC"],
-  ["performance", "PF"],
-  ["maintainability", "MT"],
-  ["style", "ST"],
-  ["documentation", "DC"],
-  ["test-coverage", "TC"],
 ];
 
 // R-01 + R-03: boundary byte values must still render a well-formed reference.

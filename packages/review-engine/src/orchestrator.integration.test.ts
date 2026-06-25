@@ -388,9 +388,10 @@ describe("reviewPullRequest compliance enrichment", () => {
     expect(review.findings).toHaveLength(0);
   });
 
-  // Rule: ADR-013 + MAT-75 (a non-eligible category is never enriched, so the gate drops it)
-  it("drops a maintainability finding even with a mapped CWE (category gated out of enrichment)", async () => {
-    // Given the LLM provider returns one finding for category "maintainability" with cwe "CWE-89" and confidence 1
+  // Rule: ADR-021 + MAT-76 — the taxonomy is compliance-only, so a non-compliance category from the
+  // model is rejected at the schema boundary rather than published as review noise.
+  it("rejects a non-compliance category from the model rather than publishing it (ADR-021)", async () => {
+    // Given the LLM provider returns one finding tagged with a generic, now-invalid category
     mockProviderFindings([
       {
         ...findingFor("CWE-89", "maintainability", "minor"),
@@ -405,10 +406,14 @@ describe("reviewPullRequest compliance enrichment", () => {
       { provider: createHttpProvider() },
     );
 
-    // Then the returned Review status is "success"
-    expect(review.status).toBe("success");
-    // And the finding is withheld: a maintainability finding is never enriched, so it maps to nothing
-    expect(review.findings).toHaveLength(0);
+    // Then the invalid response is rejected: the parse-failure path fails the review and surfaces a
+    // synthetic review_failed finding, and every published finding stays within the compliance taxonomy.
+    expect(review.status).toBe("failed");
+    expect(review.findings.length).toBeGreaterThan(0);
+    expect(review.findings.some((finding) => finding.title === "review_failed")).toBe(true);
+    for (const finding of review.findings) {
+      expect(["security", "bug"]).toContain(finding.category);
+    }
   });
 
   // Rule: ADR-013 (gate: eligible security finding with mapped CWE gets enriched)
@@ -684,10 +689,10 @@ index 1111111..2222222 100644
   // @technical Scenario: in a mixed review only the eligible finding is published; the ineligible one
   // is dropped entirely by the compliance-only gate (MAT-75).
   it("publishes only the eligible finding in a mixed review, dropping the ineligible one", async () => {
-    // Given the configured LLM returns two findings (security/CWE-89 and style/no-cwe)
+    // Given the configured LLM returns two findings (security/CWE-89 and bug with an unmapped CWE)
     mockProviderFindings([
       regulatedFinding("CWE-89", "security", { title: "SQL injection in query" }),
-      regulatedFinding(undefined, "style", {
+      regulatedFinding("CWE-99999", "bug", {
         title: "Inconsistent quotes",
         severity: "minor",
         confidence: 0.95,
@@ -723,28 +728,10 @@ describe("reviewPullRequest withholds compliance references when the gate is unm
     limits: { maxFilesPerReview: 5, maxLinesPerReview: 50 },
   };
 
-  // @violation Scenario Outline: a non-eligible category never carries a framework reference, even
-  // with a mapped CWE.
-  it.each(["style", "performance", "maintainability"])(
-    "renders no framework reference for a %s finding even with a mapped CWE",
-    async (category) => {
-      // Given the configured LLM returns one finding with category "<category>", cwe "CWE-89", confidence 0.95
-      mockProviderFindings([{ ...findingFor("CWE-89", category, "major"), confidence: 0.95 }]);
-      const diff = parseUnifiedDiff(unifiedDiff);
-
-      // When the review runs
-      const review = await reviewPullRequest(
-        { pullRequest, diff, config },
-        { provider: createHttpProvider() },
-      );
-      expect(review.status).toBe("success");
-
-      // Then the "Compliance & provenance" section lists no framework reference for that finding
-      const walkthrough = composeWalkthrough(review);
-      expect(walkthrough).not.toContain("Potential compliance references");
-      expect(walkthrough).not.toContain("GDPR");
-    },
-  );
+  // Note: the pre-pivot "non-eligible category never carries a framework reference" scenarios were
+  // removed with the generic categories (ADR-021, MAT-76). A non-compliance category is now rejected
+  // at the schema boundary (see parsing/provider-finding-schema-category-required.test.ts), so it can
+  // never reach the enrichment gate. The security-category cases below still exercise the gate.
 
   // @violation Scenario: a security finding with an unmapped CWE carries no framework reference
   it("renders no framework reference for a security finding with an unmapped CWE", async () => {
@@ -936,16 +923,16 @@ index 1111111..2222222 100644
     expect(composeWalkthrough(review)).toContain("GDPR: Art. 32");
   });
 
-  // @technical Scenario: in a mixed review derivation fires only on the eligible no-cwe finding
-  it("attaches the derived reference only to the eligible no-cwe finding in a mixed review", async () => {
+  // @technical Scenario: in a mixed review derivation fires only on the no-cwe finding whose content maps
+  it("attaches the derived reference only to the no-cwe finding whose content maps in a mixed review", async () => {
     // Given the configured LLM returns two findings, each with no cwe field:
     //   | security | 0.9  | raw SQL string concatenation against the users table |
-    //   | style    | 0.95 | inconsistent quote style in the same file            |
+    //   | bug      | 0.95 | inconsistent quote style in the same file            |
     mockProviderFindings([
       noCweFinding("security", "raw SQL string concatenation against the users table", {
         title: "Raw SQL concatenation against users",
       }),
-      noCweFinding("style", "inconsistent quote style in the same file", {
+      noCweFinding("bug", "inconsistent quote style in the same file", {
         title: "Inconsistent quote style",
         severity: "minor",
         confidence: 0.95,
@@ -964,7 +951,7 @@ index 1111111..2222222 100644
     const securityIdx = walkthrough.indexOf("#### Raw SQL concatenation against users");
     expect(securityIdx).toBeGreaterThanOrEqual(0);
     expect(walkthrough.slice(securityIdx)).toContain("GDPR: Art. 32");
-    // And the ineligible style finding is dropped entirely by the compliance-only gate (MAT-75)
+    // And the non-derivable bug finding is dropped entirely by the compliance-only gate (MAT-75)
     expect(walkthrough).not.toContain("#### Inconsistent quote style");
   });
 });
@@ -1156,32 +1143,10 @@ index 1111111..2222222 100644
     expect(walkthrough).not.toContain("GDPR");
   });
 
-  // @violation Scenario Outline: a non-eligible category never derives a reference, even with derivable content
-  it.each([{ category: "style" }, { category: "performance" }, { category: "maintainability" }])(
-    "never derives a reference for a $category finding even with derivable content",
-    async ({ category }) => {
-      // Given a no-cwe finding of an ineligible category at confidence 0.95 with derivable content
-      mockProviderFindings([
-        noCweFinding(category, "raw SQL string concatenation against the users table", {
-          confidence: 0.95,
-          severity: "minor",
-        }),
-      ]);
-      const diff = parseUnifiedDiff(regulatedDiff);
-
-      // When the review runs
-      const review = await reviewPullRequest(
-        { pullRequest, diff, config },
-        { provider: createHttpProvider() },
-      );
-      expect(review.status).toBe("success");
-      const walkthrough = composeWalkthrough(review);
-
-      // Then no framework reference is emitted for that finding
-      expect(walkthrough).not.toContain("Potential compliance references");
-      expect(walkthrough).not.toContain("GDPR");
-    },
-  );
+  // Note: the pre-pivot "non-eligible category never derives a reference" scenarios were removed with
+  // the generic categories (ADR-021, MAT-76); such a category is now rejected at the schema boundary
+  // before derivation can run. The content-maps-to-nothing and confidence-floor cases (above and
+  // below) still exercise decline-by-default on eligible security/bug findings.
 
   // @limit Scenario Outline: the confidence floor of 0.70 decides derivation on the no-cwe path
   it.each([

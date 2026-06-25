@@ -6,15 +6,12 @@ import { z } from "zod";
 export const SeveritySchema = z.enum(["blocker", "major", "minor", "info", "nitpick"]);
 export type Severity = z.infer<typeof SeveritySchema>;
 
-export const CategorySchema = z.enum([
-  "bug",
-  "security",
-  "performance",
-  "maintainability",
-  "style",
-  "documentation",
-  "test-coverage",
-]);
+// Sovri reviews for regulated compliance only: a finding must be a security or correctness weakness
+// that can anchor a CWE → framework reference. The generic review categories (performance, style,
+// maintainability, documentation, test-coverage) were removed in the compliance pivot (ADR-021,
+// MAT-76). They produced only non-compliance noise that the publication gate (MAT-75) already
+// dropped, so the taxonomy is now exactly the compliance-eligible set.
+export const CategorySchema = z.enum(["bug", "security"]);
 export type Category = z.infer<typeof CategorySchema>;
 
 // Minimum LLM-reported confidence for a finding to receive compliance references. Below this, a

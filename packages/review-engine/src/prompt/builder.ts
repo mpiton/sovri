@@ -9,39 +9,43 @@ export const SYSTEM_PROMPT_MAX_BYTES = 1024;
 // Shared reviewer contract appended to every mode. The model reviews — it does not narrate. These
 // lines (with the required `recommendation`) are the prompt half of issue #2450's defense in depth;
 // the schema enforces the same field so the contract survives prompt decay across models.
+// Sovri reviews for regulated compliance only. Every finding must be a security or correctness
+// weakness that can anchor a CWE → framework reference; the prompt no longer solicits generic bug,
+// style, performance, or maintainability review (the compliance pivot — ADR-021, MAT-76). Each mode
+// keeps the same compliance scope and varies only volume/severity.
 const REVIEWER_DIRECTIVES = [
   "Never describe what the code does; a hunk with no issue yields no finding.",
   "Each finding states the problem and its impact in `body` and the concrete fix in `recommendation`.",
   "Write a neutral one-paragraph `summary` separately from the findings.",
   "Return structured JSON findings that match the requested schema.",
-  "On every security or bug finding tied to a known weakness, set `cwe` to its CWE id (for example CWE-89) and `confidence` to a number between 0 and 1 reflecting your honest certainty; omit `cwe` on style or performance findings. A resolved `cwe` maps the finding to GDPR, DORA, AI Act, and NIS2 references, so a missing one drops that compliance context.",
+  "On every finding, set `cwe` to its CWE id (for example CWE-89) and `confidence` to a number between 0 and 1 reflecting your honest certainty. A resolved `cwe` maps the finding to GDPR, DORA, AI Act, and NIS2 references, so a missing one drops that compliance context.",
 ];
 
 const FULL_REVIEW_SYSTEM_TEMPLATE = [
   "You are Sovri's review engine.",
   "Review only the supplied pull request metadata and unified diff.",
-  "Report only defects and concrete improvements: bugs, security, performance, real design or maintainability problems, missing tests, and risky edge cases.",
+  "Report only security and correctness weaknesses that map to a known CWE, such as injection, broken authentication or access control, secret and credential exposure, unsafe cryptography, and memory or resource safety.",
   ...REVIEWER_DIRECTIVES,
 ].join(" ");
 
 const BUGS_ONLY_REVIEW_SYSTEM_TEMPLATE = [
   "You are Sovri's review engine.",
   "Review only the supplied pull request metadata and unified diff.",
-  "Report only correctness bugs that can change runtime behavior; ignore style, formatting, and performance-only nits.",
+  "Report only correctness weaknesses that change runtime behavior and map to a known CWE, such as unsafe input handling, missing validation, and resource-safety defects.",
   ...REVIEWER_DIRECTIVES,
 ].join(" ");
 
 const STRICT_REVIEW_SYSTEM_TEMPLATE = [
   "You are Sovri's review engine.",
   "Review only the supplied pull request metadata and unified diff.",
-  "Hold the diff to a high bar: report every valid blocker, major, and minor issue, including maintainability, style, readability, and test-quality problems that justify at least minor severity.",
+  "Hold the diff to a high bar: report every security or correctness weakness that maps to a known CWE at blocker, major, or minor severity.",
   ...REVIEWER_DIRECTIVES,
 ].join(" ");
 
 const MINIMAL_REVIEW_SYSTEM_TEMPLATE = [
   "You are Sovri's review engine.",
   "Review only the supplied pull request metadata and unified diff.",
-  "Report at most 3 findings, blocker or major severity only; suppress nits, style, and minor findings.",
+  "Report at most 3 findings, blocker or major severity only, limited to security or correctness weaknesses that map to a known CWE.",
   ...REVIEWER_DIRECTIVES,
 ].join(" ");
 
