@@ -19,8 +19,24 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ## [Unreleased]
 
+### Added
+
+- `core`: a `compliance` finding category for an issue that is itself a regulatory
+  concern (for example a missing data-retention or access-control requirement)
+  rather than a code defect. It is compliance-eligible like `security` and `bug`,
+  and ships a brand palette entry (`⚖️ Compliance`) and audit-reference code
+  (`CP`) (MAT-77, ADR-021).
+
 ### Changed
 
+- `core`: the finding `Category` enum is narrowed to the compliance perimeter —
+  `bug`, `security`, and the new `compliance`. `bug` and `security` are the
+  compliance-eligible defect classes (ADR-013/020); the brand category palette,
+  the audit-reference code table, and the review prompt directives move in
+  lockstep, and the compliance-enrichment gate now treats all three categories as
+  eligible. The bot is stateless and finding reconciliation keys on a
+  category-independent fingerprint (#2591), so no stored finding needs migration
+  (MAT-77, ADR-021).
 - `review-engine`: a finding is now published only when it maps to a compliance
   framework. After enrichment, any finding left with an empty
   `compliance_references` list — its CWE resolved to no framework reference, or
@@ -32,6 +48,15 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   an unmapped one is dropped. Retained findings keep their `audit_reference`, and
   the dropped count is logged (`dropped_unmapped`) so the reduction is auditable,
   never silent (MAT-75).
+
+### Removed
+
+- `core`: the finding `Category` values `performance`, `maintainability`, `style`,
+  `documentation`, and `test-coverage` are removed from the public enum. They were
+  never compliance-eligible, so under the compliance-only gate (MAT-75) they could
+  never publish. `FindingSchema` and `ProviderFindingSchema` now reject them. A
+  consumer that branched on one of these categories should treat the finding as
+  `bug` (MAT-77, ADR-021).
 
 ## [0.10.1] - 2026-06-22
 

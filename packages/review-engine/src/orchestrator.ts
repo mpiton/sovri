@@ -971,7 +971,7 @@ function buildReviewFailedFinding(diff: Diff, error: string): Finding {
   return {
     id: uuidv4(),
     severity: "major",
-    category: "maintainability",
+    category: "bug",
     file: fallbackLocation.file,
     line_start: fallbackLocation.line,
     line_end: fallbackLocation.line,
@@ -1083,10 +1083,9 @@ function toFinding(finding: ProviderFinding, logger?: Logger): Finding {
 
 // Enrich a finding with compliance references, degrading gracefully: an enrichment failure logs and
 // returns the finding unchanged (empty references) so the review still completes. Shared by the LLM
-// path (gated by category/confidence) and the SARIF path (scanner findings are category "security",
-// eligible by construction). A finding left with empty references is later dropped by the
-// compliance-only gate, so a transient enrichment failure withholds the finding rather than
-// publishing it unmapped.
+// path (gated by confidence) and the SARIF path (scanner findings are category "security", eligible
+// by construction). A finding left with empty references is later dropped by the compliance-only
+// gate, so a transient enrichment failure withholds the finding rather than publishing it unmapped.
 function enrichFindingSafely(finding: Finding, logger?: Logger): Finding {
   try {
     return enrichFindingCompliance(finding);

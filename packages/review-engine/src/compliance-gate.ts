@@ -1,21 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri contributors
 
-import { COMPLIANCE_MIN_CONFIDENCE, type Category, type Finding } from "@sovri/core";
+import { COMPLIANCE_MIN_CONFIDENCE, type Finding } from "@sovri/core";
 
 import type { ProviderFinding } from "./parsing/index.js";
 
-// Only security and bug findings are eligible for compliance enrichment. Other categories are
-// excluded even when the model tags them with a CWE, so regulatory references never attach to
-// style or maintainability findings (ADR-013). CWE presence is not gated here: an eligible finding
-// with no model CWE still passes so the enricher can derive one from its signals (ADR-020).
-const COMPLIANCE_ELIGIBLE_CATEGORIES: ReadonlySet<Category> = new Set(["security", "bug"]);
-
+// Compliance enrichment is gated on confidence alone (MAT-77). The finding Category enum is now
+// scoped to the compliance perimeter — `bug`, `security`, and `compliance` are all compliance-
+// eligible (ADR-013, ADR-021) — so there is no longer a category to exclude; only a low-confidence
+// finding is withheld here. CWE presence is not gated either: an eligible finding with no model CWE
+// still passes so the enricher can derive one from its signals (ADR-020).
 export function shouldEnrichCompliance(finding: ProviderFinding): boolean {
-  return (
-    COMPLIANCE_ELIGIBLE_CATEGORIES.has(finding.category) &&
-    finding.confidence >= COMPLIANCE_MIN_CONFIDENCE
-  );
+  return finding.confidence >= COMPLIANCE_MIN_CONFIDENCE;
 }
 
 export interface PartitionedComplianceFindings {

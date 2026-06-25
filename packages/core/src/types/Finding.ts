@@ -6,19 +6,16 @@ import { z } from "zod";
 export const SeveritySchema = z.enum(["blocker", "major", "minor", "info", "nitpick"]);
 export type Severity = z.infer<typeof SeveritySchema>;
 
-export const CategorySchema = z.enum([
-  "bug",
-  "security",
-  "performance",
-  "maintainability",
-  "style",
-  "documentation",
-  "test-coverage",
-]);
+// Findings are scoped to the compliance perimeter (MAT-77): `security` and `bug` are the
+// compliance-eligible defect classes (ADR-013, ADR-020), and `compliance` flags an issue that is
+// itself a regulatory concern. Categories outside this perimeter (performance, maintainability,
+// style, documentation, test-coverage) were never enriched with regulatory references and are
+// dropped — Sovri reviews for compliance, not general code quality.
+export const CategorySchema = z.enum(["bug", "security", "compliance"]);
 export type Category = z.infer<typeof CategorySchema>;
 
 // Minimum LLM-reported confidence for a finding to receive compliance references. Below this, a
-// security/bug finding's CWE is treated as too uncertain to anchor a regulatory reference.
+// compliance-eligible finding's CWE is treated as too uncertain to anchor a regulatory reference.
 export const COMPLIANCE_MIN_CONFIDENCE = 0.7;
 
 const SuggestionSchema = z.object({

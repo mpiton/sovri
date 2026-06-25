@@ -129,7 +129,7 @@ describe("reconcileFindings", () => {
       file: "src/util/parse.ts",
       line_start: 10,
       line_end: 10,
-      category: "maintainability",
+      category: "bug",
       title: "Brittle parser",
       body: "splits on comma without quoting",
     });
@@ -137,7 +137,7 @@ describe("reconcileFindings", () => {
       file: "src/util/parse.ts",
       line_start: 10,
       line_end: 10,
-      category: "maintainability",
+      category: "bug",
       title: "Fragile CSV split",
       body: "splits on comma without quoting",
     });

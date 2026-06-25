@@ -122,7 +122,7 @@ export function expectSyntheticFailure(finding: unknown): void {
   expect(FindingSchema.parse(finding)).toEqual(finding);
   expect(finding).toMatchObject({
     severity: "info",
-    category: "documentation",
+    category: "bug",
     source: "llm",
     confidence: 1,
     file: ".sovri/review-response.json",

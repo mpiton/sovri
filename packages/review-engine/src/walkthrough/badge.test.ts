@@ -48,11 +48,7 @@ describe("categoryBadge", () => {
   it.each([
     ["bug", "🐛 Bug"],
     ["security", "🔒 Security"],
-    ["performance", "⚡ Performance"],
-    ["maintainability", "🔧 Maintainability"],
-    ["style", "🎨 Style"],
-    ["documentation", "📝 Documentation"],
-    ["test-coverage", "🧪 Test coverage"],
+    ["compliance", "⚖️ Compliance"],
   ] as const)("returns glyph + space + label for %s", (category, expected) => {
     // When I call categoryBadge with "<category>"
     const badge = categoryBadge(category);
@@ -64,8 +60,8 @@ describe("categoryBadge", () => {
 
   // Scenario: categoryBadge is total over the core Category enum
   it("is total over CategorySchema.options, mapping every value", () => {
-    // Given the 7 values of CategorySchema.options from @sovri/core
-    expect(CategorySchema.options).toHaveLength(7);
+    // Given the 3 values of CategorySchema.options from @sovri/core
+    expect(CategorySchema.options).toHaveLength(3);
     for (const category of CategorySchema.options) {
       // When I call categoryBadge with each value / Then every call returns a non-empty string
       expect(categoryBadge(category).length).toBeGreaterThan(0);
@@ -75,7 +71,7 @@ describe("categoryBadge", () => {
 
 describe("brand category glyph extension (R-00)", () => {
   // Scenario: every categoryPalette entry carries a non-empty glyph emoji
-  it("exposes a non-empty glyph and label for each of the 7 categories", () => {
+  it("exposes a non-empty glyph and label for each of the 3 categories", () => {
     for (const category of CategorySchema.options) {
       const entry = categoryPalette[category];
       expect(entry.glyph.length).toBeGreaterThan(0);

@@ -24,7 +24,7 @@ const baseFinding = {
 
 describe("ProviderFindingSchema requires a category (bug-2608 R-02)", () => {
   // @violation
-  it("a finding with no category is rejected, not coerced to maintainability", () => {
+  it("a finding with no category is rejected, not coerced to a default", () => {
     // Given the finding has no category
     const finding = { ...baseFinding };
 
@@ -40,9 +40,9 @@ describe("ProviderFindingSchema requires a category (bug-2608 R-02)", () => {
       );
       expect(categoryIssue).toBeDefined();
     } else {
-      // And the finding is not silently parsed with category "maintainability"
-      // (only reachable if the dropped default ever returns — guards the regression)
-      expect(result.data.category).not.toBe("maintainability");
+      // A parse success means a missing category was silently coerced to a default instead of
+      // rejected — the bug-2608 regression returning. Fail loudly (the old default was dropped).
+      expect.unreachable("a missing category must be rejected, never coerced to a default");
     }
   });
 
@@ -65,15 +65,7 @@ describe("ProviderFindingSchema requires a category (bug-2608 R-02)", () => {
 
   // @nominal — every valid category is accepted as given, none defaulted.
   // Covers all CategorySchema members so "every valid category" matches the enum contract.
-  it.each([
-    "security",
-    "bug",
-    "performance",
-    "maintainability",
-    "style",
-    "documentation",
-    "test-coverage",
-  ])("the category %s is accepted as given", (category) => {
+  it.each(["security", "bug", "compliance"])("the category %s is accepted as given", (category) => {
     // Given the finding has category "<category>"
     const finding = { ...baseFinding, category };
 

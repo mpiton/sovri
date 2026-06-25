@@ -126,7 +126,7 @@ function buildSyntheticFailureFinding(failure: unknown, retryBudget: number): Fi
   return FindingSchema.parse({
     id: uuidv4(),
     severity: "info",
-    category: "documentation",
+    category: "bug",
     file: ".sovri/review-response.json",
     line_start: 1,
     line_end: 1,

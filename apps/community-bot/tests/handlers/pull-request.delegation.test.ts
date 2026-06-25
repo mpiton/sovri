@@ -1245,7 +1245,7 @@ function buildReview(values: {
         : [
             {
               body: "The handler should delegate review work.",
-              category: "maintainability",
+              category: "bug",
               confidence: 0.95,
               file: "apps/community-bot/src/handlers/pull-request.ts",
               id: "123e4567-e89b-42d3-a456-426614174000",

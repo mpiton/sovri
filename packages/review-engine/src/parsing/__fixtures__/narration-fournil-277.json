@@ -1,7 +1,7 @@
 [
   {
     "severity": "minor",
-    "category": "maintainability",
+    "category": "bug",
     "file": "src/seo/prerender.ts",
     "line_start": 12,
     "line_end": 28,
@@ -11,7 +11,7 @@
   },
   {
     "severity": "minor",
-    "category": "maintainability",
+    "category": "bug",
     "file": "src/seo/types.ts",
     "line_start": 4,
     "line_end": 9,
@@ -21,7 +21,7 @@
   },
   {
     "severity": "minor",
-    "category": "maintainability",
+    "category": "bug",
     "file": "src/seo/prerender.ts",
     "line_start": 40,
     "line_end": 46,
@@ -31,7 +31,7 @@
   },
   {
     "severity": "minor",
-    "category": "maintainability",
+    "category": "bug",
     "file": "src/seo/prerender.ts",
     "line_start": 50,
     "line_end": 55,
@@ -41,7 +41,7 @@
   },
   {
     "severity": "minor",
-    "category": "maintainability",
+    "category": "bug",
     "file": "src/seo/auth-content.ts",
     "line_start": 1,
     "line_end": 20,
@@ -51,7 +51,7 @@
   },
   {
     "severity": "minor",
-    "category": "maintainability",
+    "category": "bug",
     "file": "src/seo/utils.ts",
     "line_start": 8,
     "line_end": 14,
@@ -61,7 +61,7 @@
   },
   {
     "severity": "minor",
-    "category": "maintainability",
+    "category": "bug",
     "file": "src/seo/prerender.ts",
     "line_start": 60,
     "line_end": 64,
@@ -71,7 +71,7 @@
   },
   {
     "severity": "minor",
-    "category": "maintainability",
+    "category": "bug",
     "file": "src/seo/prerender.ts",
     "line_start": 70,
     "line_end": 74,
@@ -81,7 +81,7 @@
   },
   {
     "severity": "minor",
-    "category": "maintainability",
+    "category": "bug",
     "file": "src/seo/prerender.ts",
     "line_start": 80,
     "line_end": 88,
@@ -91,7 +91,7 @@
   },
   {
     "severity": "minor",
-    "category": "maintainability",
+    "category": "bug",
     "file": "tsconfig.json",
     "line_start": 18,
     "line_end": 20,
@@ -101,7 +101,7 @@
   },
   {
     "severity": "minor",
-    "category": "maintainability",
+    "category": "bug",
     "file": "src/seo/prerender.ts",
     "line_start": 90,
     "line_end": 96,
@@ -111,7 +111,7 @@
   },
   {
     "severity": "minor",
-    "category": "maintainability",
+    "category": "bug",
     "file": "src/seo/auth-content.ts",
     "line_start": 22,
     "line_end": 30,

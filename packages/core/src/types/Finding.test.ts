@@ -62,15 +62,7 @@ describe("SeveritySchema", () => {
 });
 
 describe("CategorySchema", () => {
-  const validCategories = [
-    "bug",
-    "security",
-    "performance",
-    "maintainability",
-    "style",
-    "documentation",
-    "test-coverage",
-  ] satisfies readonly Category[];
+  const validCategories = ["bug", "security", "compliance"] satisfies readonly Category[];
 
   it.each(validCategories)("accepts %s", (value) => {
     expect(CategorySchema.parse(value)).toBe(value);
@@ -592,16 +584,8 @@ describe("FindingSchema — backward compatibility (R-06)", () => {
     expect(SeveritySchema.options).toEqual(["blocker", "major", "minor", "info", "nitpick"]);
   });
 
-  it("keeps the category domain unchanged", () => {
-    expect(CategorySchema.options).toEqual([
-      "bug",
-      "security",
-      "performance",
-      "maintainability",
-      "style",
-      "documentation",
-      "test-coverage",
-    ]);
+  it("narrows the category domain to the compliance perimeter", () => {
+    expect(CategorySchema.options).toEqual(["bug", "security", "compliance"]);
   });
 });
 

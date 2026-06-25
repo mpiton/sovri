@@ -188,7 +188,7 @@ describe("computeFindingFingerprint", () => {
       file: "src/util/parse.ts",
       line_start: 10,
       line_end: 10,
-      category: "maintainability",
+      category: "bug",
       title: "Brittle parser",
       body: "splits on comma without quoting",
     });
@@ -199,7 +199,7 @@ describe("computeFindingFingerprint", () => {
       file: "src/util/parse.ts",
       line_start: 10,
       line_end: 10,
-      category: "maintainability",
+      category: "bug",
       title: "Fragile CSV split",
       body: "splits on comma without quoting",
     });
@@ -218,7 +218,7 @@ describe("computeFindingFingerprint", () => {
       file: "src/util/parse.ts",
       line_start: 10,
       line_end: 10,
-      category: "maintainability",
+      category: "bug",
       title: "Parser",
       body: "splits on comma without quoting",
     });
@@ -228,7 +228,7 @@ describe("computeFindingFingerprint", () => {
       file: "src/util/parse.ts",
       line_start: 10,
       line_end: 10,
-      category: "maintainability",
+      category: "bug",
       title: "Parser",
       body: "splits on comma without quoting",
     });
@@ -270,12 +270,12 @@ describe("computeFindingFingerprint", () => {
       variantDiff: makeDiff("src/db/query.ts", 49, ["", "db.query(userInput)", "return row;"]),
     },
     {
-      drift: 'category ("maintainability")',
+      drift: 'category ("compliance")',
       variant: makeFinding({
         file: "src/db/query.ts",
         line_start: 50,
         line_end: 50,
-        category: "maintainability",
+        category: "compliance",
         cwe: "CWE-89",
         title: "SQL injection risk",
         body: "User input flows into the query unescaped.",
@@ -352,12 +352,12 @@ describe("computeFindingFingerprint", () => {
     ];
 
     // And a synchronize re-review produces the same finding with category
-    //   "maintainability" and no cwe over source text "db.query(userInput)"
+    //   "bug" and no cwe over source text "db.query(userInput)"
     const current = makeFinding({
       file: "src/db/query.ts",
       line_start: 49,
       line_end: 51,
-      category: "maintainability",
+      category: "bug",
       title: "SQL injection risk",
       body: "User input flows into the query unescaped.",
     });
@@ -433,7 +433,7 @@ describe("computeFindingFingerprint", () => {
       file: "src/db/query.ts",
       line_start: 50,
       line_end: 50,
-      category: "maintainability",
+      category: "bug",
       cwe: "CWE-20",
       title: "SQL injection risk",
       body: "User input flows into the query unescaped.",
@@ -461,7 +461,7 @@ describe("computeFindingFingerprint", () => {
       file: "src/util/blank.ts",
       line_start: 1,
       line_end: 1,
-      category: "style",
+      category: "bug",
       title: "Whitespace",
       body: "trailing whitespace only line",
     });
@@ -483,7 +483,7 @@ describe("computeFindingFingerprint", () => {
       file: "src/util/blank.ts",
       line_start: 10,
       line_end: 10,
-      category: "style",
+      category: "bug",
       title: "Whitespace",
       body: "trailing whitespace only line",
     });
@@ -491,7 +491,7 @@ describe("computeFindingFingerprint", () => {
       file: "src/util/blank.ts",
       line_start: 20,
       line_end: 20,
-      category: "style",
+      category: "bug",
       title: "Whitespace",
       body: "trailing whitespace only line",
     });

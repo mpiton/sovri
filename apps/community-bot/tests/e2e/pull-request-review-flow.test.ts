@@ -1651,7 +1651,7 @@ function defaultProviderFindings(): ProviderReviewResponse["findings"] {
     },
     {
       severity: "info",
-      category: "documentation",
+      category: "bug",
       file: "packages/review-engine/src/orchestrator.ts",
       line_start: 90,
       line_end: 90,

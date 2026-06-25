@@ -16,7 +16,7 @@ function makeFinding(severity: Severity): Finding {
   return {
     id: `22222222-2222-4222-8222-${hex}`,
     severity,
-    category: "style",
+    category: "bug",
     file: "src/review.ts",
     line_start: findingSeq,
     line_end: findingSeq,

@@ -67,8 +67,8 @@ describe("shouldEnrichCompliance", () => {
     expect(shouldEnrichCompliance(finding({ confidence: 0.69 }))).toBe(false);
   });
 
-  it("skips non-security/bug categories even with a CWE", () => {
-    expect(shouldEnrichCompliance(finding({ category: "maintainability" }))).toBe(false);
+  it("enriches a compliance finding with a CWE", () => {
+    expect(shouldEnrichCompliance(finding({ category: "compliance" }))).toBe(true);
   });
 
   it("admits an eligible finding with no CWE so the enricher can derive one (ADR-020)", () => {

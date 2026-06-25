@@ -86,7 +86,7 @@ describe("LLMRawFindingSchema", () => {
       },
       {
         severity: "minor",
-        category: "maintainability",
+        category: "bug",
         file: "src/auth/session.ts",
         line_start: 7,
         line_end: 7,
@@ -1081,7 +1081,7 @@ describe("parseLLMResponse", () => {
 
   it("returns a committable suggestion for a non-empty single-line replacement", () => {
     // Given the raw finding has severity "minor"
-    // And the raw finding has category "maintainability"
+    // And the raw finding has category "bug"
     // And the raw finding has file "src/totals.ts"
     // And the raw finding has title "Use explicit zero fallback"
     // And the raw finding has body "The total can be undefined before formatting."
@@ -1094,7 +1094,7 @@ describe("parseLLMResponse", () => {
       findings: [
         buildRawFinding({
           severity: "minor",
-          category: "maintainability",
+          category: "bug",
           file: "src/totals.ts",
           line_start: 14,
           line_end: 14,
@@ -1315,7 +1315,7 @@ describe("parseLLMResponse", () => {
         findings: [
           buildRawFinding({
             severity: "minor",
-            category: "maintainability",
+            category: "bug",
             file: "src/totals.ts",
             title: "Use explicit zero fallback",
             body: "The total can be undefined before formatting.",
@@ -1350,7 +1350,7 @@ describe("parseLLMResponse", () => {
       findings: [
         buildRawFinding({
           severity: "minor",
-          category: "maintainability",
+          category: "bug",
           file: "src/totals.ts",
           line_start: 14,
           line_end: 14,
@@ -1383,7 +1383,7 @@ describe("parseLLMResponse", () => {
       findings: [
         buildRawFinding({
           severity: "minor",
-          category: "maintainability",
+          category: "bug",
           file: "src/totals.ts",
           line_start: 14,
           line_end: 14,

@@ -388,29 +388,6 @@ describe("reviewPullRequest compliance enrichment", () => {
     expect(review.findings).toHaveLength(0);
   });
 
-  // Rule: ADR-013 + MAT-75 (a non-eligible category is never enriched, so the gate drops it)
-  it("drops a maintainability finding even with a mapped CWE (category gated out of enrichment)", async () => {
-    // Given the LLM provider returns one finding for category "maintainability" with cwe "CWE-89" and confidence 1
-    mockProviderFindings([
-      {
-        ...findingFor("CWE-89", "maintainability", "minor"),
-        confidence: 1,
-      },
-    ]);
-    const diff = parseUnifiedDiff(unifiedDiff);
-
-    // When reviewPullRequest runs with the injected provider
-    const review = await reviewPullRequest(
-      { pullRequest, diff, config },
-      { provider: createHttpProvider() },
-    );
-
-    // Then the returned Review status is "success"
-    expect(review.status).toBe("success");
-    // And the finding is withheld: a maintainability finding is never enriched, so it maps to nothing
-    expect(review.findings).toHaveLength(0);
-  });
-
   // Rule: ADR-013 (gate: eligible security finding with mapped CWE gets enriched)
   it("populates compliance references for a security finding with a mapped CWE", async () => {
     // Given the LLM provider returns one finding for category "security" with cwe "CWE-89" and confidence 0.9
@@ -681,14 +658,14 @@ index 1111111..2222222 100644
     expect(refsIdx).toBeGreaterThan(auditIdx);
   });
 
-  // @technical Scenario: in a mixed review only the eligible finding is published; the ineligible one
-  // is dropped entirely by the compliance-only gate (MAT-75).
-  it("publishes only the eligible finding in a mixed review, dropping the ineligible one", async () => {
-    // Given the configured LLM returns two findings (security/CWE-89 and style/no-cwe)
+  // @technical Scenario: in a mixed review only the framework-mapped finding is published; the one
+  // with no mappable CWE is dropped entirely by the compliance-only gate (MAT-75).
+  it("publishes only the framework-mapped finding in a mixed review, dropping the unmappable one", async () => {
+    // Given the configured LLM returns two findings (security/CWE-89 and bug/no-cwe)
     mockProviderFindings([
       regulatedFinding("CWE-89", "security", { title: "SQL injection in query" }),
-      regulatedFinding(undefined, "style", {
-        title: "Inconsistent quotes",
+      regulatedFinding(undefined, "bug", {
+        title: "Off-by-one in pagination",
         severity: "minor",
         confidence: 0.95,
       }),
@@ -707,44 +684,21 @@ index 1111111..2222222 100644
     const sqlIdx = walkthrough.indexOf("#### SQL injection in query");
     expect(sqlIdx).toBeGreaterThanOrEqual(0);
     expect(walkthrough.slice(sqlIdx)).toContain("GDPR: Art. 32");
-    // And the ineligible "Inconsistent quotes" finding is dropped entirely by the compliance-only gate
-    expect(walkthrough).not.toContain("#### Inconsistent quotes");
+    // And the "Off-by-one in pagination" finding, carrying no mappable CWE, is dropped by the gate
+    expect(walkthrough).not.toContain("#### Off-by-one in pagination");
   });
 });
 
 // Acceptance test for bug-2606 R-03 (scenario sub-issue #2612): a finding that does not clear the
-// gate — non-security/bug category, no mappable CWE, or confidence < 0.7 — renders no framework
-// reference. No false regulatory attribution. Drives the real gate + enricher + composer through
-// reviewPullRequest with the LLM mocked at the provider boundary.
+// gate — no mappable CWE, or confidence < 0.7 — renders no framework reference. No false regulatory
+// attribution. Drives the real gate + enricher + composer through reviewPullRequest with the LLM
+// mocked at the provider boundary.
 describe("reviewPullRequest withholds compliance references when the gate is unmet (bug-2606 R-03)", () => {
   const config = {
     review: { severityThreshold: "nitpick" as const },
     ignores: [] as readonly string[],
     limits: { maxFilesPerReview: 5, maxLinesPerReview: 50 },
   };
-
-  // @violation Scenario Outline: a non-eligible category never carries a framework reference, even
-  // with a mapped CWE.
-  it.each(["style", "performance", "maintainability"])(
-    "renders no framework reference for a %s finding even with a mapped CWE",
-    async (category) => {
-      // Given the configured LLM returns one finding with category "<category>", cwe "CWE-89", confidence 0.95
-      mockProviderFindings([{ ...findingFor("CWE-89", category, "major"), confidence: 0.95 }]);
-      const diff = parseUnifiedDiff(unifiedDiff);
-
-      // When the review runs
-      const review = await reviewPullRequest(
-        { pullRequest, diff, config },
-        { provider: createHttpProvider() },
-      );
-      expect(review.status).toBe("success");
-
-      // Then the "Compliance & provenance" section lists no framework reference for that finding
-      const walkthrough = composeWalkthrough(review);
-      expect(walkthrough).not.toContain("Potential compliance references");
-      expect(walkthrough).not.toContain("GDPR");
-    },
-  );
 
   // @violation Scenario: a security finding with an unmapped CWE carries no framework reference
   it("renders no framework reference for a security finding with an unmapped CWE", async () => {
@@ -936,17 +890,17 @@ index 1111111..2222222 100644
     expect(composeWalkthrough(review)).toContain("GDPR: Art. 32");
   });
 
-  // @technical Scenario: in a mixed review derivation fires only on the eligible no-cwe finding
-  it("attaches the derived reference only to the eligible no-cwe finding in a mixed review", async () => {
+  // @technical Scenario: in a mixed review derivation fires only on the mappable no-cwe finding
+  it("attaches the derived reference only to the mappable no-cwe finding in a mixed review", async () => {
     // Given the configured LLM returns two findings, each with no cwe field:
     //   | security | 0.9  | raw SQL string concatenation against the users table |
-    //   | style    | 0.95 | inconsistent quote style in the same file            |
+    //   | bug      | 0.95 | an unhandled promise rejection in the same file      |
     mockProviderFindings([
       noCweFinding("security", "raw SQL string concatenation against the users table", {
         title: "Raw SQL concatenation against users",
       }),
-      noCweFinding("style", "inconsistent quote style in the same file", {
-        title: "Inconsistent quote style",
+      noCweFinding("bug", "an unhandled promise rejection in the same file", {
+        title: "Unhandled promise rejection",
         severity: "minor",
         confidence: 0.95,
       }),
@@ -964,8 +918,8 @@ index 1111111..2222222 100644
     const securityIdx = walkthrough.indexOf("#### Raw SQL concatenation against users");
     expect(securityIdx).toBeGreaterThanOrEqual(0);
     expect(walkthrough.slice(securityIdx)).toContain("GDPR: Art. 32");
-    // And the ineligible style finding is dropped entirely by the compliance-only gate (MAT-75)
-    expect(walkthrough).not.toContain("#### Inconsistent quote style");
+    // And the bug finding, deriving no mappable CWE, is dropped by the compliance-only gate (MAT-75)
+    expect(walkthrough).not.toContain("#### Unhandled promise rejection");
   });
 });
 
@@ -1072,8 +1026,8 @@ index 1111111..2222222 100644
 });
 
 // Acceptance test for feat-2610 R-03 (scenario sub-issue #2618): derivation declines when content
-// maps to no specific mapped CWE, when confidence is below 0.7, or when the category is not
-// security/bug. No guess, no false attribution — a wrong GDPR/DORA citation is worse than none.
+// maps to no specific mapped CWE, or when confidence is below 0.7. No guess, no false attribution —
+// a wrong GDPR/DORA citation is worse than none.
 // Drives the real gate + enricher + composer through reviewPullRequest with the LLM mocked at the
 // provider boundary.
 describe("reviewPullRequest declines derivation rather than guess a framework reference (feat-2610 R-03)", () => {
@@ -1155,33 +1109,6 @@ index 1111111..2222222 100644
     expect(walkthrough).not.toContain("Potential compliance references");
     expect(walkthrough).not.toContain("GDPR");
   });
-
-  // @violation Scenario Outline: a non-eligible category never derives a reference, even with derivable content
-  it.each([{ category: "style" }, { category: "performance" }, { category: "maintainability" }])(
-    "never derives a reference for a $category finding even with derivable content",
-    async ({ category }) => {
-      // Given a no-cwe finding of an ineligible category at confidence 0.95 with derivable content
-      mockProviderFindings([
-        noCweFinding(category, "raw SQL string concatenation against the users table", {
-          confidence: 0.95,
-          severity: "minor",
-        }),
-      ]);
-      const diff = parseUnifiedDiff(regulatedDiff);
-
-      // When the review runs
-      const review = await reviewPullRequest(
-        { pullRequest, diff, config },
-        { provider: createHttpProvider() },
-      );
-      expect(review.status).toBe("success");
-      const walkthrough = composeWalkthrough(review);
-
-      // Then no framework reference is emitted for that finding
-      expect(walkthrough).not.toContain("Potential compliance references");
-      expect(walkthrough).not.toContain("GDPR");
-    },
-  );
 
   // @limit Scenario Outline: the confidence floor of 0.70 decides derivation on the no-cwe path
   it.each([
