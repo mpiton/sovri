@@ -284,9 +284,17 @@ function issueScopeBlocks(docs: string, issueId: string): string[] {
       continue;
     }
 
+    const lineIndent = indentationLength(line);
+    const isListItem = line.trimStart().startsWith("-") || line.trimStart().startsWith("*");
     const blockLines = [line];
     for (const nextLine of lines.slice(index + 1)) {
-      if (nextLine.trim() === "" || /^#{1,6}\s+/.test(nextLine) || /^\s*[-*]\s+/.test(nextLine)) {
+      if (
+        !isListItem ||
+        nextLine.trim() === "" ||
+        /^#{1,6}\s+/.test(nextLine) ||
+        /^\s*[-*]\s+/.test(nextLine) ||
+        indentationLength(nextLine) <= lineIndent
+      ) {
         break;
       }
 
@@ -297,6 +305,10 @@ function issueScopeBlocks(docs: string, issueId: string): string[] {
   }
 
   return blocks;
+}
+
+function indentationLength(line: string): number {
+  return line.length - line.trimStart().length;
 }
 
 function issueReferenceBlocks(docs: string, issueId: string): string[] {
