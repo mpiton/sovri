@@ -112,7 +112,13 @@ function findingCategoryFailureMessages(_docs: string): string[] {
 }
 
 function modelSplitFailureMessages(_docs: string): string[] {
-  return [];
+  const hasSourceModel = _docs.includes(modelSplitStatements.sourceModel);
+  const hasComplianceGapOutput = _docs.includes(modelSplitStatements.complianceGapOutput);
+  const hasPrProjection = _docs.includes(modelSplitStatements.prProjection);
+
+  return hasSourceModel && hasComplianceGapOutput && !hasPrProjection
+    ? [modelSplitStatements.missingPrProjectionFailure]
+    : [];
 }
 
 describe("MAT-80 compliance pivot vocabulary docs", () => {
