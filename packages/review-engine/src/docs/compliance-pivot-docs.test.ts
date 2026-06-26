@@ -253,18 +253,42 @@ function issueScopeDescriptions(_docs: string, _issueId: string): string[] {
     return [];
   }
 
-  const issueLines = _docs.split(/\r?\n/).filter((line) => line.includes(_issueId));
+  const issueBlocks = issueScopeBlocks(_docs, _issueId);
   const descriptions: string[] = [];
 
-  if (issueLines.some((line) => line.toLowerCase().includes(issueScope.requiredScope))) {
+  if (issueBlocks.some((block) => block.toLowerCase().includes(issueScope.requiredScope))) {
     descriptions.push(issueScope.requiredScope);
   }
 
-  if (issueLines.some((line) => describesForbiddenScope(line, issueScope.forbiddenScope))) {
+  if (issueBlocks.some((block) => describesForbiddenScope(block, issueScope.forbiddenScope))) {
     descriptions.push(issueScope.forbiddenScope);
   }
 
   return descriptions;
+}
+
+function issueScopeBlocks(docs: string, issueId: string): string[] {
+  const lines = docs.split(/\r?\n/);
+  const blocks: string[] = [];
+
+  for (const [index, line] of lines.entries()) {
+    if (!line.includes(issueId)) {
+      continue;
+    }
+
+    const blockLines = [line];
+    for (const nextLine of lines.slice(index + 1)) {
+      if (nextLine.trim() === "" || /^#{1,6}\s+/.test(nextLine) || /^\s*[-*]\s+/.test(nextLine)) {
+        break;
+      }
+
+      blockLines.push(nextLine);
+    }
+
+    blocks.push(blockLines.join("\n"));
+  }
+
+  return blocks;
 }
 
 function describesForbiddenScope(line: string, forbiddenScope: string): boolean {
