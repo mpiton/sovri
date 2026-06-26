@@ -75,6 +75,10 @@ function missingRequiredDefinitionTerms(_docs: string): string[] {
   return requiredProjectLevelTerms.filter((term) => findDefinitionLines(_docs, term).length === 0);
 }
 
+function findingCategoryFailureMessages(_docs: string): string[] {
+  return [];
+}
+
 describe("MAT-80 compliance pivot vocabulary docs", () => {
   it("defines each required project-level compliance term explicitly", () => {
     // When the compliance vocabulary is reviewed
@@ -132,5 +136,23 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
 
     // And the missing terms are "ComplianceGap, ControlResult"
     expect(missingTerms.join(", ")).toBe(requiredProjectLevelTerms.join(", "));
+  });
+
+  it("fails when ComplianceGap is documented as a Finding category", () => {
+    // Given "ARCHI.md" says "ComplianceGap is a Finding category emitted by PR review"
+    const docs = ["# ARCHI.md", "ComplianceGap is a Finding category emitted by PR review"].join(
+      "\n",
+    );
+
+    // When the compliance vocabulary is reviewed
+    const failureMessages = findingCategoryFailureMessages(docs);
+
+    // Then the vocabulary check fails
+    expect(failureMessages.length).toBeGreaterThan(0);
+
+    // And the failure explains that "ComplianceGap" must be project-level compliance output
+    expect(failureMessages.join("\n")).toContain(
+      "ComplianceGap must be project-level compliance output",
+    );
   });
 });
