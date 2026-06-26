@@ -194,7 +194,7 @@ V0.3 pose les fondations suivantes :
 - `HDS` et `PCI-DSS` ne sont pas exposés en v0.3.
 - Une référence `applicable_if` doit toujours porter une condition explicite.
 - Aucune référence générée automatiquement n'est marquée `confirmed`. Ce niveau est réservé à une intervention humaine explicite future.
-- Un CWE valide mais non mappé ne bloque pas le finding : le finding sort avec `compliance_references: []`.
+- Un CWE valide mais non mappé ne bloque pas la review : le finding est enrichi avec `compliance_references: []`, puis retiré de la sortie PR par le gate compliance-only avec un compteur de drop loggé.
 
 #### 4.1.2 Audit Trail (foundation v0.3, produit v1.0)
 

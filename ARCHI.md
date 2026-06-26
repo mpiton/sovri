@@ -769,15 +769,7 @@ export const SeveritySchema = z.enum([
 ]);
 export type Severity = z.infer<typeof SeveritySchema>;
 
-export const CategorySchema = z.enum([
-  "bug",
-  "security",
-  "performance",
-  "maintainability",
-  "style",
-  "documentation",
-  "test-coverage",
-]);
+export const CategorySchema = z.enum(["bug", "security"]);
 export type Category = z.infer<typeof CategorySchema>;
 
 export const ComplianceFrameworkSchema = z.enum([
@@ -879,26 +871,20 @@ Le LLM ne retourne **jamais** directement une `Review`. Il retourne un objet plu
 
 ```typescript
 // packages/review-engine/src/parsing/schema.ts
+import { CategorySchema, SeveritySchema } from "@sovri/core";
 import { z } from "zod";
 
-export const LLMRawFindingSchema = z.object({
-  severity: z.enum(["blocker", "major", "minor", "info", "nitpick"]),
-  category: z.enum([
-    "bug",
-    "security",
-    "performance",
-    "maintainability",
-    "style",
-    "documentation",
-    "test-coverage",
-  ]),
+export const LLMRawFindingSchema = z.strictObject({
+  severity: SeveritySchema,
+  category: CategorySchema,
   file: z.string(),
   line_start: z.number().int().positive(),
   line_end: z.number().int().positive(),
   title: z.string().max(200),
   body: z.string().max(2000),
-  suggested_code: z.string().nullable(),
-  confidence: z.number().min(0).max(1),
+  recommendation: z.string().min(1).max(1000),
+  suggested_code: z.string().nullable().optional(),
+  confidence: z.number().min(0).max(1).default(1),
   cwe: z
     .string()
     .regex(/^CWE-\d{1,7}$/)
@@ -908,6 +894,7 @@ export const LLMRawFindingSchema = z.object({
 export const LLMResponseSchema = z.object({
   summary: z.string().max(2000),
   findings: z.array(LLMRawFindingSchema).max(100),
+  walkthrough_markdown: z.string().optional(),
 });
 export type LLMResponse = z.infer<typeof LLMResponseSchema>;
 ```
