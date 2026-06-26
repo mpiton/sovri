@@ -80,6 +80,18 @@ const issueScopeStatements = {
   mat112OutputContractFailure: "MAT-112 is output contract, not core domain model",
   mat112MissingOutputContractFailure: "MAT-112 missing from output contract map",
 } as const;
+const issueScopeExamples = [
+  {
+    issueId: "MAT-112",
+    requiredScope: "output contract",
+    forbiddenScope: "core domain model",
+  },
+  {
+    issueId: "MAT-113",
+    requiredScope: "project compliance rules engine work",
+    forbiddenScope: "PR output contract",
+  },
+] as const;
 const modelSplitStatements = {
   sourceModel: "project compliance scans evaluate Framework -> Control -> Rule -> Evidence",
   complianceGapOutput: "project compliance scan produces ComplianceGap output",
@@ -233,6 +245,10 @@ function issueScopeFailureMessages(_docs: string): string[] {
   }
 
   return failureMessages;
+}
+
+function issueScopeDescriptions(_docs: string, _issueId: string): string[] {
+  return [];
 }
 
 function formatStaleSnapshotFailure(input: { sourcePath: string; snapshotPath: string }): string {
@@ -800,5 +816,28 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       failureMessages.join("\n"),
       "issue history check must identify MAT-77 as missing from supersession history",
     ).toContain(activeImplementationStatements.missingMat77HistoryFailure);
+  });
+
+  it("keeps issue scopes separated across the pivot docs", () => {
+    const docs = readCompliancePivotDocs();
+
+    for (const { issueId, requiredScope, forbiddenScope } of issueScopeExamples) {
+      // Given the docs reference "<issue_id>"
+      expect(docs, `compliance pivot docs must reference ${issueId}`).toContain(issueId);
+
+      // When the compliance pivot issue map is reviewed
+      const scopeDescriptions = issueScopeDescriptions(docs, issueId).join("\n");
+
+      // Then the docs describe "<issue_id>" as "<required_scope>"
+      expect(scopeDescriptions, `${issueId} must be described as ${requiredScope}`).toContain(
+        requiredScope,
+      );
+
+      // And the docs do not describe "<issue_id>" as "<forbidden_scope>"
+      expect(
+        scopeDescriptions,
+        `${issueId} must not be described as ${forbiddenScope}`,
+      ).not.toContain(forbiddenScope);
+    }
   });
 });
