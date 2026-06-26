@@ -43,6 +43,7 @@ const modelSplitStatements = {
   sourceModel: "project compliance scans evaluate Framework -> Control -> Rule -> Evidence",
   complianceGapOutput: "project compliance scan produces ComplianceGap output",
   prProjection: "PR review may project relevant compliance gaps into pull request output",
+  missingPrProjectionFailure: "missing PR review projection statement",
 } as const;
 const complianceGapFindingCategoryMisuse = {
   term: "ComplianceGap",
@@ -108,6 +109,16 @@ function findingCategoryFailureMessages(_docs: string): string[] {
     .split(/\r?\n/)
     .filter((line) => complianceGapFindingCategoryMisuse.pattern.test(line))
     .map(() => complianceGapFindingCategoryMisuse.explanation);
+}
+
+function modelSplitFailureMessages(_docs: string): string[] {
+  const hasSourceModel = _docs.includes(modelSplitStatements.sourceModel);
+  const hasComplianceGapOutput = _docs.includes(modelSplitStatements.complianceGapOutput);
+  const hasPrProjection = _docs.includes(modelSplitStatements.prProjection);
+
+  return hasSourceModel && hasComplianceGapOutput && !hasPrProjection
+    ? [modelSplitStatements.missingPrProjectionFailure]
+    : [];
 }
 
 describe("MAT-80 compliance pivot vocabulary docs", () => {
@@ -222,6 +233,41 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     expect(docs, `${docPath} must name the PR review projection`).toContain(
       modelSplitStatements.prProjection,
     );
+  });
+
+  it("fails when the source model is documented without the PR projection", () => {
+    // Given "ARCHI.md" states that project compliance scans evaluate "Framework -> Control -> Rule -> Evidence"
+    const docs = [
+      "# ARCHI.md",
+      modelSplitStatements.sourceModel,
+      modelSplitStatements.complianceGapOutput,
+    ].join("\n");
+
+    expect(docs, "fixture must name the project compliance source model").toContain(
+      modelSplitStatements.sourceModel,
+    );
+
+    // And "ARCHI.md" states that the project compliance scan produces "ComplianceGap" output
+    expect(docs, "fixture must name ComplianceGap as project compliance scan output").toContain(
+      modelSplitStatements.complianceGapOutput,
+    );
+
+    // And the docs do not state that PR review may project relevant compliance gaps into pull request output
+    expect(docs, "fixture must omit the PR review projection").not.toContain(
+      modelSplitStatements.prProjection,
+    );
+
+    // When the compliance model documentation is reviewed
+    const failureMessages = modelSplitFailureMessages(docs);
+
+    // Then the model split check fails
+    expect(failureMessages.length, "model split check must fail").toBeGreaterThan(0);
+
+    // And the failure identifies the missing PR review projection statement
+    expect(
+      failureMessages.join("\n"),
+      "model split check must identify the missing PR review projection statement",
+    ).toContain(modelSplitStatements.missingPrProjectionFailure);
   });
 
   it("keeps Finding separate from ComplianceGap in CONTEXT.md", () => {
