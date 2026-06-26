@@ -142,16 +142,25 @@ function modelSplitFailureMessages(_docs: string): string[] {
 }
 
 function issueHistoryFailureMessages(_docs: string): string[] {
+  const failureMessages: string[] = [];
   const hasActiveMat77 =
     _docs.includes(activeImplementationStatements.activeMat77) ||
     (_docs.includes("MAT-77") && _docs.includes("Active compliance implementation work"));
   const hasMat77SupersededByMat113 = _docs.includes(
     activeImplementationStatements.mat77IsSupersededByMat113,
   );
+  const hasMat113RulesEngineHistory = _docs.includes(traceabilityStatements.mat113RulesEngine);
+  const hasMat77History = _docs.includes("MAT-77");
 
-  return hasActiveMat77 && !hasMat77SupersededByMat113
-    ? [activeImplementationStatements.missingMat77SupersessionFailure]
-    : [];
+  if (hasActiveMat77 && !hasMat77SupersededByMat113) {
+    failureMessages.push(activeImplementationStatements.missingMat77SupersessionFailure);
+  }
+
+  if (hasMat113RulesEngineHistory && !hasMat77History) {
+    failureMessages.push(activeImplementationStatements.missingMat77HistoryFailure);
+  }
+
+  return failureMessages;
 }
 
 describe("MAT-80 compliance pivot vocabulary docs", () => {

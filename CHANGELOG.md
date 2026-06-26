@@ -33,7 +33,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   output, records the MAT-77 to MAT-113 supersession, and adds traceability
   coverage for the superseded and rules-engine issue identifiers, plus
   helper-backed active-history violation detection for fixtures and project docs,
-  plus unmentioned-MAT-77 supersession-history coverage.
+  plus helper-backed unmentioned-MAT-77 supersession-history coverage.
 
 ### Changed
 
