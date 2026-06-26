@@ -27,8 +27,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   missing-vocabulary and regex-backed affirmative finding-category misuse
   detection, including a project-level output explanation backed by a shared
   required-terms source, plus model-split coverage for the source compliance model
-  and PR review projection, plus glossary-scoped `CONTEXT.md` coverage that
-  keeps `Finding` separate from project-level `ComplianceGap` output.
+  and PR review projection, plus glossary-scoped, assertion-consistent
+  `CONTEXT.md` coverage that keeps `Finding` separate from project-level
+  `ComplianceGap` output.
 
 ### Changed
 

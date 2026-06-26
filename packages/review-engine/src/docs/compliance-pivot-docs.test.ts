@@ -194,22 +194,19 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     // When the compliance model documentation is reviewed
 
     // Then "<doc_path>" states that project compliance scans evaluate "Framework -> Control -> Rule -> Evidence"
-    expect(
-      docs.includes(modelSplitStatements.sourceModel),
-      `${docPath} must name the project compliance source model`,
-    ).toBe(true);
+    expect(docs, `${docPath} must name the project compliance source model`).toContain(
+      modelSplitStatements.sourceModel,
+    );
 
     // And "<doc_path>" states that the project compliance scan produces "ComplianceGap" output
-    expect(
-      docs.includes(modelSplitStatements.complianceGapOutput),
-      `${docPath} must name ComplianceGap as project compliance scan output`,
-    ).toBe(true);
+    expect(docs, `${docPath} must name ComplianceGap as project compliance scan output`).toContain(
+      modelSplitStatements.complianceGapOutput,
+    );
 
     // And "<doc_path>" states that PR review may project relevant compliance gaps into pull request output
-    expect(
-      docs.includes(modelSplitStatements.prProjection),
-      `${docPath} must name the PR review projection`,
-    ).toBe(true);
+    expect(docs, `${docPath} must name the PR review projection`).toContain(
+      modelSplitStatements.prProjection,
+    );
   });
 
   it("keeps Finding separate from ComplianceGap in CONTEXT.md", () => {
