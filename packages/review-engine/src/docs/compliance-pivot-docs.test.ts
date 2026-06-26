@@ -288,12 +288,13 @@ function issueScopeBlocks(docs: string, issueId: string): string[] {
     const isListItem = line.trimStart().startsWith("-") || line.trimStart().startsWith("*");
     const blockLines = [line];
     for (const nextLine of lines.slice(index + 1)) {
+      const nextLineIndent = indentationLength(nextLine);
+
       if (
         !isListItem ||
         nextLine.trim() === "" ||
-        /^#{1,6}\s+/.test(nextLine) ||
-        /^\s*[-*]\s+/.test(nextLine) ||
-        indentationLength(nextLine) <= lineIndent
+        nextLine.trimStart().startsWith("#") ||
+        nextLineIndent <= lineIndent
       ) {
         break;
       }
@@ -874,6 +875,22 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       issueModelStatements.prReviewOutput,
     );
     expect(mat112IssueMap, "MAT-112 must not carry the core model reference").not.toContain(
+      issueModelStatements.coreModel,
+    );
+  });
+
+  it("keeps nested issue-map details with their parent issue", () => {
+    // Given the docs keep "MAT-112" scoped to PR/review output
+    const docs = [
+      `- ${issueModelStatements.mat112} is scoped to ${issueModelStatements.prReviewOutput}.`,
+      `  - Nested detail mentions ${issueModelStatements.coreModel}.`,
+    ].join("\n");
+
+    // When the compliance pivot issue map is reviewed
+    const mat112IssueMap = issueReferenceBlocks(docs, issueModelStatements.mat112).join("\n");
+
+    // Then nested details remain associated with "MAT-112"
+    expect(mat112IssueMap, "MAT-112 nested details must remain in the issue block").toContain(
       issueModelStatements.coreModel,
     );
   });
