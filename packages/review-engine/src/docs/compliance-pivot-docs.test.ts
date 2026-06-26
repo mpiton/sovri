@@ -163,7 +163,7 @@ function modelSplitFailureMessages(_docs: string): string[] {
   const hasComplianceGapOutput = _docs.includes(modelSplitStatements.complianceGapOutput);
   const hasPrProjection = _docs.includes(modelSplitStatements.prProjection);
 
-  if (documentsPrReviewAsSourceModel && !documentsProjectComplianceSourceModel) {
+  if (documentsPrReviewAsSourceModel) {
     failureMessages.push(modelSplitStatements.prReviewProjectionOnlyFailure);
   }
 
@@ -447,6 +447,17 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     expect(
       failureMessages.join("\n"),
       "model split check must explain PR review as a projection",
+    ).toContain(modelSplitStatements.prReviewProjectionOnlyFailure);
+
+    const invalidDocsWithSourceModel = [
+      "# ARCHI.md",
+      modelSplitStatements.sourceModel,
+      modelSplitStatements.prReviewAsSourceModel,
+    ].join("\n");
+
+    expect(
+      modelSplitFailureMessages(invalidDocsWithSourceModel),
+      "model split check must reject PR review as source model even when the project source model is present",
     ).toContain(modelSplitStatements.prReviewProjectionOnlyFailure);
   });
 
