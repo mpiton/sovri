@@ -101,6 +101,13 @@ const modelSplitStatements = {
   prReviewProjectionOnlyFailure:
     "PR review is only a projection of project compliance gaps, not the source compliance model",
 } as const;
+const issueModelStatements = {
+  mat112: "MAT-112",
+  mat113: "MAT-113",
+  mat113RulesEngineWork: "project compliance rules engine work",
+  coreModel: "Framework -> Control -> Rule -> Evidence",
+  prReviewOutput: "PR/review output",
+} as const;
 const complianceGapFindingCategoryMisuse = {
   term: "ComplianceGap",
   statement: "ComplianceGap is a Finding category emitted by PR review",
@@ -290,6 +297,16 @@ function issueScopeBlocks(docs: string, issueId: string): string[] {
   }
 
   return blocks;
+}
+
+function issueReferenceBlocks(docs: string, issueId: string): string[] {
+  return issueScopeBlocks(docs, issueId).map((block) =>
+    block
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .join(" "),
+  );
 }
 
 function issueScopeFragments(block: string): string[] {
@@ -820,6 +837,29 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     // And the failure identifies "docs/adr/020-deterministic-compliance-derivation.md" as unlisted
     expect(failureMessages, "ADR index check must identify the unlisted revised ADR").toContain(
       `${adrPath} is unlisted`,
+    );
+  });
+
+  it("keeps MAT-113 as the core domain model implementation reference", () => {
+    // When the compliance pivot issue map is reviewed
+    const docs = readCompliancePivotDocs();
+    const mat113IssueMap = issueReferenceBlocks(docs, issueModelStatements.mat113).join("\n");
+    const mat112IssueMap = issueReferenceBlocks(docs, issueModelStatements.mat112).join("\n");
+
+    // Then the docs identify "MAT-113" as the project compliance rules engine work
+    expect(
+      mat113IssueMap.toLowerCase(),
+      "MAT-113 must be identified as project compliance rules engine work",
+    ).toContain(issueModelStatements.mat113RulesEngineWork);
+
+    // And the docs associate the core model with "Framework -> Control -> Rule -> Evidence"
+    expect(mat113IssueMap, "MAT-113 must carry the core model reference").toContain(
+      issueModelStatements.coreModel,
+    );
+
+    // And the docs keep "MAT-112" scoped to PR/review output
+    expect(mat112IssueMap, "MAT-112 must stay scoped to PR/review output").toContain(
+      issueModelStatements.prReviewOutput,
     );
   });
 
