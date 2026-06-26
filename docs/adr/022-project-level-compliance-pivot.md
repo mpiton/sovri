@@ -44,7 +44,8 @@ catalogs, never LLM output.
   compliance categories are too narrow for the project compliance rules engine.
 - MAT-112 is the review output contract for projecting compliance gaps into PR
   output. It is not the core domain model.
-- MAT-113 owns the core rules-engine implementation shape.
+- MAT-113 owns the project compliance rules engine work and core
+  rules-engine implementation shape.
 - Framework catalogs must be versioned inputs to the engine.
 
 ## Rejected alternatives
