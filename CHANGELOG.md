@@ -31,8 +31,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   glossary-scoped, assertion-consistent docs-test
   coverage that keeps `Finding` separate from project-level `ComplianceGap`
   output, covers rejection of PR review findings as the source compliance model,
-  including when the project source model is also documented, records the
-  MAT-77 to MAT-113 supersession, and adds traceability
+  including across real project docs where the project source model is also
+  documented, records the MAT-77 to MAT-113 supersession, and adds traceability
   coverage for the superseded and rules-engine issue identifiers, plus
   helper-backed MAT-112 core-domain-model violation detection with project-doc
   coverage, real-doc-backed output-contract-entry detection, and explanatory

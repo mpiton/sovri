@@ -370,7 +370,7 @@ export interface ReviewEngine {
 - project compliance scans evaluate Framework -> Control -> Rule -> Evidence.
 - project compliance scan produces ComplianceGap output.
 - PR review may project relevant compliance gaps into pull request output.
-- PR review findings are projections of compliance gaps, not the source model.
+- PR review findings are projections of compliance gaps, which are derived from the core compliance model (Framework -> Control -> Rule -> Evidence).
 - Le review engine transforme toutes ses sorties publiques en `Review` core enrichi.
 - L'enrichissement compliance est déterministe via `@sovri/compliance`.
 - Les `Potential compliance references` sont rendues dans le walkthrough uniquement.
