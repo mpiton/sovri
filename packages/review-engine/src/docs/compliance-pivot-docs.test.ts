@@ -55,6 +55,11 @@ const activeImplementationStatements = {
   missingMat77SupersessionFailure: "MAT-77 missing superseded-by-MAT-113 relationship",
   missingMat77HistoryFailure: "MAT-77 missing from supersession history",
 } as const;
+const issueScopeStatements = {
+  mat112CoreDomainModel: "MAT-112 defines the core compliance domain model",
+  mat113RulesEngineImplementationWork: "MAT-113 is the rules engine implementation work",
+  mat112OutputContractFailure: "MAT-112 is output contract, not core domain model",
+} as const;
 const modelSplitStatements = {
   sourceModel: "project compliance scans evaluate Framework -> Control -> Rule -> Evidence",
   complianceGapOutput: "project compliance scan produces ComplianceGap output",
@@ -161,6 +166,20 @@ function issueHistoryFailureMessages(_docs: string): string[] {
   }
 
   return failureMessages;
+}
+
+function issueScopeFailureMessages(_docs: string): string[] {
+  const normalizedDocs = _docs.toLowerCase();
+  const mat112ClaimsCoreModel = normalizedDocs.includes(
+    issueScopeStatements.mat112CoreDomainModel.toLowerCase(),
+  );
+  const mat113RulesEngineWorkIsMissing = !normalizedDocs.includes(
+    issueScopeStatements.mat113RulesEngineImplementationWork.toLowerCase(),
+  );
+
+  return mat112ClaimsCoreModel && mat113RulesEngineWorkIsMissing
+    ? [issueScopeStatements.mat112OutputContractFailure]
+    : [];
 }
 
 describe("MAT-80 compliance pivot vocabulary docs", () => {
@@ -385,6 +404,40 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     expect(docs, "compliance pivot docs must keep the MAT-113 rules-engine issue trace").toContain(
       traceabilityStatements.mat113RulesEngine,
     );
+  });
+
+  it("fails when MAT-112 replaces the project compliance source model", () => {
+    // Given the docs say "MAT-112 defines the core compliance domain model"
+    const docs = [
+      "# Compliance pivot issue map",
+      `- ${issueScopeStatements.mat112CoreDomainModel}`,
+    ].join("\n");
+
+    expect(docs, "fixture must put MAT-112 in the core domain model role").toContain(
+      issueScopeStatements.mat112CoreDomainModel,
+    );
+
+    // And the docs do not identify "MAT-113" as the rules engine implementation work
+    expect(docs, "fixture must omit MAT-113 as the rules engine implementation work").not.toContain(
+      issueScopeStatements.mat113RulesEngineImplementationWork,
+    );
+
+    // When the compliance pivot issue map is reviewed
+    const failureMessages = issueScopeFailureMessages(docs);
+
+    // Then the issue scope check fails
+    expect(failureMessages.length, "issue scope check must fail").toBeGreaterThan(0);
+
+    // And the failure explains that "MAT-112" is output contract, not core domain model
+    expect(
+      failureMessages.join("\n"),
+      "issue scope failure must explain MAT-112's output-contract scope",
+    ).toContain(issueScopeStatements.mat112OutputContractFailure);
+
+    expect(
+      issueScopeFailureMessages(readCompliancePivotDocs()),
+      "project docs must not identify MAT-112 as the project compliance source model",
+    ).toEqual([]);
   });
 
   it("fails when MAT-77 remains active without its supersession relationship", () => {
