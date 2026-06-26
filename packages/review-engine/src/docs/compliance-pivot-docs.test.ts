@@ -141,7 +141,16 @@ function modelSplitFailureMessages(_docs: string): string[] {
 }
 
 function issueHistoryFailureMessages(_docs: string): string[] {
-  return [];
+  const hasActiveMat77 =
+    _docs.includes(activeImplementationStatements.activeMat77) ||
+    (_docs.includes("MAT-77") && _docs.includes("Active compliance implementation work"));
+  const hasMat77SupersededByMat113 = _docs.includes(
+    activeImplementationStatements.mat77IsSupersededByMat113,
+  );
+
+  return hasActiveMat77 && !hasMat77SupersededByMat113
+    ? [activeImplementationStatements.missingMat77SupersessionFailure]
+    : [];
 }
 
 describe("MAT-80 compliance pivot vocabulary docs", () => {
