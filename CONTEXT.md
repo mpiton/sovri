@@ -6,7 +6,7 @@
 ## Core entities
 
 - **Review** — automated PR analysis producing findings + walkthrough markdown comment.
-- **Finding** — single issue raised on a diff hunk: severity, category, location, rationale, and audit identity.
+- **Finding** — diff/code issue raised on a diff hunk: severity, category, location, rationale, and audit identity.
 - **Walkthrough** — top-level PR comment summarising findings, grouped by severity.
 - **Provider** — LLM backend adapter (Anthropic, Mistral, OpenAI, OAI-compatible). BYOK only.
 - **Config** — `.sovri.yml` parsed by `@sovri/config`, governs review behavior per repo.
@@ -15,6 +15,7 @@
 
 - **Compliance Trail** — audit-oriented evidence layer that combines compliance references, a signed review trail, and future organisational learning.
 - **Compliance Reference** — potential mapping from a finding to a technical, security, or regulatory framework reference.
+- **ComplianceGap** — project-level compliance output for an unmet control or missing evidence.
 - **Audit Trail** — tamper-evident chronological record of a review, intended for offline verification by an auditor.
 - **Organisational Learning** — future capability that adapts review prioritisation from human accept/dismiss decisions without hiding findings in strict audit mode.
 - project compliance scans evaluate Framework -> Control -> Rule -> Evidence.

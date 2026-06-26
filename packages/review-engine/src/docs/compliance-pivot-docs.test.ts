@@ -83,9 +83,20 @@ function readProjectDoc(docPath: string): string {
   return readFileSync(join(projectRoot, docPath), "utf8");
 }
 
-function findDefinitionLines(docs: string, term: string): string[] {
+function findDefinitionLines(
+  docs: string,
+  term: string,
+  options: { glossaryOnly?: boolean } = {},
+): string[] {
   const definitionMarker = `**${term.toLowerCase()}**`;
-  return docs.split(/\r?\n/).filter((line) => line.toLowerCase().includes(definitionMarker));
+  const glossaryDefinitionPrefix = `- ${definitionMarker}`;
+
+  return docs.split(/\r?\n/).filter((line) => {
+    const normalizedLine = line.trimStart().toLowerCase();
+    return options.glossaryOnly === true
+      ? normalizedLine.startsWith(glossaryDefinitionPrefix)
+      : normalizedLine.includes(definitionMarker);
+  });
 }
 
 function missingRequiredDefinitionTerms(_docs: string): string[] {
@@ -105,11 +116,13 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     const docs = readDocs();
     const pivotAdr = readPivotAdr();
 
-    expect(pivotAdr).toContain("# ADR-022 - Project-level compliance pivot vocabulary");
-    expect(pivotAdr).toContain("**Status:** Accepted");
-    expect(pivotAdr).toContain("## Context");
-    expect(pivotAdr).toContain("## Decision");
-    expect(pivotAdr).toContain("## Consequences");
+    expect(pivotAdr, "pivot ADR must have the expected title").toContain(
+      "# ADR-022 - Project-level compliance pivot vocabulary",
+    );
+    expect(pivotAdr, "pivot ADR must be accepted").toContain("**Status:** Accepted");
+    expect(pivotAdr, "pivot ADR must explain context").toContain("## Context");
+    expect(pivotAdr, "pivot ADR must record the decision").toContain("## Decision");
+    expect(pivotAdr, "pivot ADR must record consequences").toContain("## Consequences");
     expect(
       findingCategoryFailureMessages(docs),
       `${complianceGapFindingCategoryMisuse.term} must not be documented as a Finding category`,
@@ -136,9 +149,17 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       expect(definitionText, `${term} must be defined with meaning: ${meaning}`).toContain(meaning);
 
       // And the definition does not describe "<term>" as an enum-only review category
-      expect(normalizedDefinitionText).not.toContain("enum-only review category");
-      expect(normalizedDefinitionText).not.toContain("finding category");
-      expect(normalizedDefinitionText).not.toContain("category emitted by pr review");
+      expect(
+        normalizedDefinitionText,
+        `${term} must not be an enum-only review category`,
+      ).not.toContain("enum-only review category");
+      expect(normalizedDefinitionText, `${term} must not be a finding category`).not.toContain(
+        "finding category",
+      );
+      expect(
+        normalizedDefinitionText,
+        `${term} must not be a category emitted by PR review`,
+      ).not.toContain("category emitted by pr review");
     }
   });
 
@@ -147,19 +168,21 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     const docs = ["# CONTEXT.md", "**Finding** - diff/code issue"].join("\n");
 
     // And the documentation set has no definition for "ComplianceGap"
-    expect(docs).not.toMatch(/\*\*ComplianceGap\*\*/i);
+    expect(docs, "fixture must omit ComplianceGap").not.toMatch(/\*\*ComplianceGap\*\*/i);
 
     // And the documentation set has no definition for "ControlResult"
-    expect(docs).not.toMatch(/\*\*ControlResult\*\*/i);
+    expect(docs, "fixture must omit ControlResult").not.toMatch(/\*\*ControlResult\*\*/i);
 
     // When the compliance vocabulary is reviewed
     const missingTerms = missingRequiredDefinitionTerms(docs);
 
     // Then the vocabulary check fails
-    expect(missingTerms.length).toBeGreaterThan(0);
+    expect(missingTerms.length, "vocabulary check must report missing terms").toBeGreaterThan(0);
 
     // And the missing terms are "ComplianceGap, ControlResult"
-    expect(missingTerms.join(", ")).toBe(requiredProjectLevelTerms.join(", "));
+    expect(missingTerms.join(", "), "vocabulary check must report the required missing terms").toBe(
+      requiredProjectLevelTerms.join(", "),
+    );
   });
 
   it("fails when ComplianceGap is documented as a Finding category", () => {
@@ -170,10 +193,13 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     const failureMessages = findingCategoryFailureMessages(docs);
 
     // Then the vocabulary check fails
-    expect(failureMessages.length).toBeGreaterThan(0);
+    expect(failureMessages.length, "finding-category misuse check must fail").toBeGreaterThan(0);
 
     // And the failure explains that "ComplianceGap" must be project-level compliance output
-    expect(failureMessages.join("\n")).toContain(complianceGapFindingCategoryMisuse.explanation);
+    expect(
+      failureMessages.join("\n"),
+      "finding-category misuse check must explain the failure",
+    ).toContain(complianceGapFindingCategoryMisuse.explanation);
   });
 
   it.each(modelSplitDocPaths)("names the source model and PR projection in %s", (docPath) => {
@@ -183,21 +209,54 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     // When the compliance model documentation is reviewed
 
     // Then "<doc_path>" states that project compliance scans evaluate "Framework -> Control -> Rule -> Evidence"
-    expect(
-      docs.includes(modelSplitStatements.sourceModel),
-      `${docPath} must name the project compliance source model`,
-    ).toBe(true);
+    expect(docs, `${docPath} must name the project compliance source model`).toContain(
+      modelSplitStatements.sourceModel,
+    );
 
     // And "<doc_path>" states that the project compliance scan produces "ComplianceGap" output
-    expect(
-      docs.includes(modelSplitStatements.complianceGapOutput),
-      `${docPath} must name ComplianceGap as project compliance scan output`,
-    ).toBe(true);
+    expect(docs, `${docPath} must name ComplianceGap as project compliance scan output`).toContain(
+      modelSplitStatements.complianceGapOutput,
+    );
 
     // And "<doc_path>" states that PR review may project relevant compliance gaps into pull request output
+    expect(docs, `${docPath} must name the PR review projection`).toContain(
+      modelSplitStatements.prProjection,
+    );
+  });
+
+  it("keeps Finding separate from ComplianceGap in CONTEXT.md", () => {
+    // Given "CONTEXT.md" defines "Finding" as a diff/code issue
+    const docs = readProjectDoc("CONTEXT.md");
+    const findingDefinitions = findDefinitionLines(docs, "Finding", { glossaryOnly: true });
+
+    expect(findingDefinitions.length, "CONTEXT.md must define Finding").toBeGreaterThan(0);
+    const findingDefinition = findingDefinitions[0] ?? "";
+    expect(findingDefinition, "CONTEXT.md must define Finding as a diff/code issue").toContain(
+      "diff/code issue",
+    );
+
+    // When the compliance model documentation is reviewed
+    const complianceGapDefinitions = findDefinitionLines(docs, "ComplianceGap", {
+      glossaryOnly: true,
+    });
+
+    // Then it keeps "Finding" separate from "ComplianceGap"
+    expect(complianceGapDefinitions.length, "CONTEXT.md must define ComplianceGap").toBeGreaterThan(
+      0,
+    );
+    const complianceGapDefinition = complianceGapDefinitions[0] ?? "";
+    expect(complianceGapDefinition, "CONTEXT.md must define ComplianceGap").toContain(
+      "**ComplianceGap**",
+    );
     expect(
-      docs.includes(modelSplitStatements.prProjection),
-      `${docPath} must name the PR review projection`,
-    ).toBe(true);
+      findingDefinition,
+      "CONTEXT.md must keep Finding and ComplianceGap definitions separate",
+    ).not.toBe(complianceGapDefinition);
+
+    // And it identifies "ComplianceGap" as project-level compliance output
+    expect(
+      complianceGapDefinition,
+      "CONTEXT.md must identify ComplianceGap as project-level compliance output",
+    ).toContain("project-level compliance output");
   });
 });
