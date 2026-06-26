@@ -24,9 +24,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `review-engine`: add an ATDD guard for MAT-80 project-level compliance
   vocabulary definitions across tracked ADR docs with explicit assertion
   diagnostics, ADR-022 content checks, duplicate-term detection, and
-  missing-vocabulary and regex-backed finding-category misuse failure detection,
-  including a project-level output explanation backed by a shared required-terms
-  source.
+  missing-vocabulary and regex-backed affirmative finding-category misuse
+  detection, including a project-level output explanation backed by a shared
+  required-terms source.
 
 ### Changed
 

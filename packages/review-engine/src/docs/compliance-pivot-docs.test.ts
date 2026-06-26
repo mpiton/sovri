@@ -41,7 +41,7 @@ const complianceGapFindingCategoryMisuse = {
   term: "ComplianceGap",
   statement: "ComplianceGap is a Finding category emitted by PR review",
   explanation: "ComplianceGap must be project-level compliance output",
-  pattern: /\bComplianceGap\b\s+(?:is|as)\s+a\s+Finding\s+category\s+emitted\s+by\s+PR\s+review\b/i,
+  pattern: /\bComplianceGap\b\s+is\s+a\s+Finding\s+category\b(?:\s+emitted\s+by\s+PR\s+review\b)?/i,
 } as const;
 
 function findAdrDocsRoot(startDir: string): string {
