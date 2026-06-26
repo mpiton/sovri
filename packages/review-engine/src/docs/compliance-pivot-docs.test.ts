@@ -433,6 +433,11 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       failureMessages.join("\n"),
       "issue scope failure must explain MAT-112's output-contract scope",
     ).toContain(issueScopeStatements.mat112OutputContractFailure);
+
+    expect(
+      issueScopeFailureMessages(readCompliancePivotDocs()),
+      "project docs must not identify MAT-112 as the project compliance source model",
+    ).toEqual([]);
   });
 
   it("fails when MAT-77 remains active without its supersession relationship", () => {
