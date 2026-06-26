@@ -40,10 +40,12 @@ catalogs, never LLM output.
 
 - MAT-77: Superseded - enum-only compliance category scope is too narrow.
 - MAT-113: Project compliance rules engine - framework controls, evidence, gaps.
+  MAT-113 is the project compliance rules engine work for the core model
+  `Framework -> Control -> Rule -> Evidence`.
 - MAT-113 supersedes MAT-77: MAT-77 is superseded because enum-only
   compliance categories are too narrow for the project compliance rules engine.
 - MAT-112 is the review output contract for projecting compliance gaps into PR
-  output. It is not the core domain model.
+  output. It is scoped to PR/review output and is not the core domain model.
 - MAT-113 owns the project compliance rules engine work and core
   rules-engine implementation shape.
 - Framework catalogs must be versioned inputs to the engine.
