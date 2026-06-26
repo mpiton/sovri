@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const adrDocsRoot = findAdrDocsRoot(dirname(fileURLToPath(import.meta.url)));
+const projectRoot = dirname(dirname(adrDocsRoot));
 const pivotAdrPath = join(adrDocsRoot, "022-project-level-compliance-pivot-vocabulary.md");
 
 // These literals are the MAT-80 acceptance contract, not reusable product configuration.
@@ -37,6 +38,12 @@ const requiredDefinitions = [
   },
 ] as const;
 const requiredProjectLevelTerms = ["ComplianceGap", "ControlResult"] as const;
+const modelSplitDocPaths = ["PRD.md", "ARCHI.md", "CONTEXT.md"] as const;
+const modelSplitStatements = {
+  sourceModel: "project compliance scans evaluate Framework -> Control -> Rule -> Evidence",
+  complianceGapOutput: "project compliance scan produces ComplianceGap output",
+  prProjection: "PR review may project relevant compliance gaps into pull request output",
+} as const;
 const complianceGapFindingCategoryMisuse = {
   term: "ComplianceGap",
   statement: "ComplianceGap is a Finding category emitted by PR review",
@@ -70,6 +77,10 @@ function readDocs(): string {
 
 function readPivotAdr(): string {
   return readFileSync(pivotAdrPath, "utf8");
+}
+
+function readProjectDoc(docPath: string): string {
+  return readFileSync(join(projectRoot, docPath), "utf8");
 }
 
 function findDefinitionLines(docs: string, term: string): string[] {
@@ -163,5 +174,30 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
 
     // And the failure explains that "ComplianceGap" must be project-level compliance output
     expect(failureMessages.join("\n")).toContain(complianceGapFindingCategoryMisuse.explanation);
+  });
+
+  it.each(modelSplitDocPaths)("names the source model and PR projection in %s", (docPath) => {
+    // Given "<doc_path>" is part of the compliance pivot documentation set
+    const docs = readProjectDoc(docPath);
+
+    // When the compliance model documentation is reviewed
+
+    // Then "<doc_path>" states that project compliance scans evaluate "Framework -> Control -> Rule -> Evidence"
+    expect(
+      docs.includes(modelSplitStatements.sourceModel),
+      `${docPath} must name the project compliance source model`,
+    ).toBe(true);
+
+    // And "<doc_path>" states that the project compliance scan produces "ComplianceGap" output
+    expect(
+      docs.includes(modelSplitStatements.complianceGapOutput),
+      `${docPath} must name ComplianceGap as project compliance scan output`,
+    ).toBe(true);
+
+    // And "<doc_path>" states that PR review may project relevant compliance gaps into pull request output
+    expect(
+      docs.includes(modelSplitStatements.prProjection),
+      `${docPath} must name the PR review projection`,
+    ).toBe(true);
   });
 });
