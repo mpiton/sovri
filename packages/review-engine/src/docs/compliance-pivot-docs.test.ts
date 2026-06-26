@@ -257,13 +257,11 @@ function issueScopeDescriptions(_docs: string, _issueId: string): string[] {
   const issueFragments = issueBlocks.flatMap(issueScopeFragments);
   const descriptions: string[] = [];
 
-  if (issueBlocks.some((block) => block.toLowerCase().includes(issueScope.requiredScope))) {
+  if (issueFragments.some((fragment) => describesScope(fragment, issueScope.requiredScope))) {
     descriptions.push(issueScope.requiredScope);
   }
 
-  if (
-    issueFragments.some((fragment) => describesForbiddenScope(fragment, issueScope.forbiddenScope))
-  ) {
+  if (issueFragments.some((fragment) => describesScope(fragment, issueScope.forbiddenScope))) {
     descriptions.push(issueScope.forbiddenScope);
   }
 
@@ -302,15 +300,23 @@ function issueScopeFragments(block: string): string[] {
     .filter((fragment) => fragment.length > 0);
 }
 
-function describesForbiddenScope(line: string, forbiddenScope: string): boolean {
+function describesScope(line: string, scope: string): boolean {
   const normalizedLine = line.toLowerCase();
-  const normalizedScope = forbiddenScope.toLowerCase();
+  const normalizedScope = scope.toLowerCase();
 
-  return (
-    normalizedLine.includes(normalizedScope) &&
-    !normalizedLine.includes(`not the ${normalizedScope}`) &&
-    !normalizedLine.includes(`not ${normalizedScope}`)
-  );
+  return normalizedLine.includes(normalizedScope) && !negatesScope(normalizedLine, normalizedScope);
+}
+
+function negatesScope(normalizedLine: string, normalizedScope: string): boolean {
+  const negationPatterns = [
+    `not the ${normalizedScope}`,
+    `not ${normalizedScope}`,
+    `never the ${normalizedScope}`,
+    `does not include ${normalizedScope}`,
+    `excludes ${normalizedScope}`,
+  ];
+
+  return negationPatterns.some((pattern) => normalizedLine.includes(pattern));
 }
 
 function formatStaleSnapshotFailure(input: { sourcePath: string; snapshotPath: string }): string {
