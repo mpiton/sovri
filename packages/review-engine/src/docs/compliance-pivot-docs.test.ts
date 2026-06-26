@@ -39,6 +39,11 @@ const requiredDefinitions = [
 ] as const;
 const requiredProjectLevelTerms = ["ComplianceGap", "ControlResult"] as const;
 const modelSplitDocPaths = ["PRD.md", "ARCHI.md", "CONTEXT.md"] as const;
+const supersessionStatements = {
+  mat77: "MAT-77",
+  superseded: "superseded",
+  mat113SupersedesMat77: "MAT-113 supersedes MAT-77",
+} as const;
 const modelSplitStatements = {
   sourceModel: "project compliance scans evaluate Framework -> Control -> Rule -> Evidence",
   complianceGapOutput: "project compliance scan produces ComplianceGap output",
@@ -74,6 +79,10 @@ function readDocs(): string {
     .filter((docPath) => docPath.endsWith(".md"))
     .map((docPath) => readFileSync(join(adrDocsRoot, docPath), "utf8"))
     .join("\n");
+}
+
+function readCompliancePivotDocs(): string {
+  return [...modelSplitDocPaths.map(readProjectDoc), readDocs()].join("\n");
 }
 
 function readPivotAdr(): string {
@@ -304,5 +313,29 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       complianceGapDefinition,
       "CONTEXT.md must identify ComplianceGap as project-level compliance output",
     ).toContain("project-level compliance output");
+  });
+
+  it("records MAT-77 as superseded by MAT-113", () => {
+    // When the compliance pivot history is reviewed
+    const docs = readCompliancePivotDocs();
+    const mat77Lines = docs
+      .split(/\r?\n/)
+      .filter((line) => line.includes(supersessionStatements.mat77));
+
+    // Then the docs reference "MAT-77"
+    expect(docs, "compliance pivot docs must reference MAT-77").toContain(
+      supersessionStatements.mat77,
+    );
+
+    // And the docs describe "MAT-77" as "superseded"
+    expect(
+      mat77Lines.join("\n").toLowerCase(),
+      "compliance pivot docs must describe MAT-77 as superseded",
+    ).toContain(supersessionStatements.superseded);
+
+    // And the docs state that "MAT-113" supersedes "MAT-77"
+    expect(docs, "compliance pivot docs must state that MAT-113 supersedes MAT-77").toContain(
+      supersessionStatements.mat113SupersedesMat77,
+    );
   });
 });

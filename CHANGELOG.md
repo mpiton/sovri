@@ -30,7 +30,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   and PR review projection, including helper-backed missing-projection detection, plus
   glossary-scoped, assertion-consistent docs-test
   coverage that keeps `Finding` separate from project-level `ComplianceGap`
-  output.
+  output and records the MAT-77 to MAT-113 supersession.
 
 ### Changed
 
