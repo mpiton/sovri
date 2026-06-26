@@ -254,13 +254,16 @@ function issueScopeDescriptions(_docs: string, _issueId: string): string[] {
   }
 
   const issueBlocks = issueScopeBlocks(_docs, _issueId);
+  const issueFragments = issueBlocks.flatMap(issueScopeFragments);
   const descriptions: string[] = [];
 
   if (issueBlocks.some((block) => block.toLowerCase().includes(issueScope.requiredScope))) {
     descriptions.push(issueScope.requiredScope);
   }
 
-  if (issueBlocks.some((block) => describesForbiddenScope(block, issueScope.forbiddenScope))) {
+  if (
+    issueFragments.some((fragment) => describesForbiddenScope(fragment, issueScope.forbiddenScope))
+  ) {
     descriptions.push(issueScope.forbiddenScope);
   }
 
@@ -289,6 +292,14 @@ function issueScopeBlocks(docs: string, issueId: string): string[] {
   }
 
   return blocks;
+}
+
+function issueScopeFragments(block: string): string[] {
+  return block
+    .split(/\r?\n/)
+    .flatMap((line) => line.split(/(?<=[.!?])\s+/))
+    .map((fragment) => fragment.trim())
+    .filter((fragment) => fragment.length > 0);
 }
 
 function describesForbiddenScope(line: string, forbiddenScope: string): boolean {
