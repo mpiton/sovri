@@ -45,7 +45,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   violation detection with formatted failure messaging for source/snapshot docs
   change sets, plus flexible unchanged-source coverage that avoids snapshot
   churn for ADR-only changes, plus helper-backed ADR-index coverage for new or
-  revised ADR entries and missing new/revised ADR failures.
+  revised ADR entries and missing new/revised ADR failures, plus helper-backed
+  MAT-113 core-model issue-map coverage that keeps MAT-112 scoped to PR/review
+  output.
 
 ### Changed
 
