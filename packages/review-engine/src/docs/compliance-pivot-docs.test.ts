@@ -248,7 +248,34 @@ function issueScopeFailureMessages(_docs: string): string[] {
 }
 
 function issueScopeDescriptions(_docs: string, _issueId: string): string[] {
-  return [];
+  const issueScope = issueScopeExamples.find(({ issueId }) => issueId === _issueId);
+  if (!issueScope) {
+    return [];
+  }
+
+  const issueLines = _docs.split(/\r?\n/).filter((line) => line.includes(_issueId));
+  const descriptions: string[] = [];
+
+  if (issueLines.some((line) => line.toLowerCase().includes(issueScope.requiredScope))) {
+    descriptions.push(issueScope.requiredScope);
+  }
+
+  if (issueLines.some((line) => describesForbiddenScope(line, issueScope.forbiddenScope))) {
+    descriptions.push(issueScope.forbiddenScope);
+  }
+
+  return descriptions;
+}
+
+function describesForbiddenScope(line: string, forbiddenScope: string): boolean {
+  const normalizedLine = line.toLowerCase();
+  const normalizedScope = forbiddenScope.toLowerCase();
+
+  return (
+    normalizedLine.includes(normalizedScope) &&
+    !normalizedLine.includes(`not the ${normalizedScope}`) &&
+    !normalizedLine.includes(`not ${normalizedScope}`)
+  );
 }
 
 function formatStaleSnapshotFailure(input: { sourcePath: string; snapshotPath: string }): string {
