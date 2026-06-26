@@ -26,7 +26,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   diagnostics, ADR-022 content checks, duplicate-term detection, and
   missing-vocabulary and regex-backed affirmative finding-category misuse
   detection, including a project-level output explanation backed by a shared
-  required-terms source.
+  required-terms source, plus model-split coverage for the source compliance model
+  and PR review projection.
 
 ### Changed
 
