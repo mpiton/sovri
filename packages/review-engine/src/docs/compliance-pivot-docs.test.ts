@@ -36,6 +36,7 @@ const requiredDefinitions = [
     meaning: "versioned framework citation with official text or source URL from a catalog",
   },
 ] as const;
+const requiredProjectLevelTerms = ["ComplianceGap", "ControlResult"] as const;
 
 function findAdrDocsRoot(startDir: string): string {
   let currentDir = startDir;
@@ -68,6 +69,10 @@ function readPivotAdr(): string {
 function findDefinitionLines(docs: string, term: string): string[] {
   const definitionMarker = `**${term.toLowerCase()}**`;
   return docs.split(/\r?\n/).filter((line) => line.toLowerCase().includes(definitionMarker));
+}
+
+function missingRequiredDefinitionTerms(_docs: string): string[] {
+  return requiredProjectLevelTerms.filter((term) => findDefinitionLines(_docs, term).length === 0);
 }
 
 describe("MAT-80 compliance pivot vocabulary docs", () => {
@@ -107,5 +112,25 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       expect(normalizedDefinitionText).not.toContain("finding category");
       expect(normalizedDefinitionText).not.toContain("category emitted by pr review");
     }
+  });
+
+  it("fails the vocabulary check when project-level vocabulary is missing", () => {
+    // Given "CONTEXT.md" defines "Finding" as a diff/code issue
+    const docs = ["# CONTEXT.md", "**Finding** - diff/code issue"].join("\n");
+
+    // And the documentation set has no definition for "ComplianceGap"
+    expect(docs).not.toMatch(/\*\*ComplianceGap\*\*/i);
+
+    // And the documentation set has no definition for "ControlResult"
+    expect(docs).not.toMatch(/\*\*ControlResult\*\*/i);
+
+    // When the compliance vocabulary is reviewed
+    const missingTerms = missingRequiredDefinitionTerms(docs);
+
+    // Then the vocabulary check fails
+    expect(missingTerms.length).toBeGreaterThan(0);
+
+    // And the missing terms are "ComplianceGap, ControlResult"
+    expect(missingTerms.join(", ")).toBe(requiredProjectLevelTerms.join(", "));
   });
 });
