@@ -39,8 +39,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   failure messaging, plus
   helper-backed active-history violation detection for fixtures and project docs,
   plus helper-backed unmentioned-MAT-77 supersession-history coverage,
-  helper-backed issue-scope separation coverage for MAT-112 and MAT-113, and
-  helper-backed path-normalized stale-snapshot violation detection with
+  helper-backed issue-scope separation coverage for MAT-112 and MAT-113,
+  including wrapped ADR bullet continuation lines, and helper-backed
+  path-normalized stale-snapshot violation detection with
   formatted failure messaging for source/snapshot docs change sets, plus
   flexible unchanged-source coverage that avoids snapshot churn for ADR-only
   changes, plus helper-backed ADR-index coverage for new or revised ADR
