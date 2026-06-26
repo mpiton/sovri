@@ -88,6 +88,12 @@ function findDefinitionLines(docs: string, term: string): string[] {
   return docs.split(/\r?\n/).filter((line) => line.toLowerCase().includes(definitionMarker));
 }
 
+function findGlossaryDefinitionLines(docs: string, term: string): string[] {
+  const definitionPrefix = `- **${term}**`;
+
+  return docs.split(/\r?\n/).filter((line) => line.trimStart().startsWith(definitionPrefix));
+}
+
 function missingRequiredDefinitionTerms(_docs: string): string[] {
   return requiredProjectLevelTerms.filter((term) => findDefinitionLines(_docs, term).length === 0);
 }
@@ -199,5 +205,34 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       docs.includes(modelSplitStatements.prProjection),
       `${docPath} must name the PR review projection`,
     ).toBe(true);
+  });
+
+  it("keeps Finding separate from ComplianceGap in CONTEXT.md", () => {
+    // Given "CONTEXT.md" defines "Finding" as a diff/code issue
+    const docs = readProjectDoc("CONTEXT.md");
+    const findingDefinitions = findGlossaryDefinitionLines(docs, "Finding");
+
+    expect(findingDefinitions.length, "CONTEXT.md must define Finding").toBeGreaterThan(0);
+    const findingDefinition = findingDefinitions[0] ?? "";
+    expect(findingDefinition, "CONTEXT.md must define Finding as a diff/code issue").toContain(
+      "diff/code issue",
+    );
+
+    // When the compliance model documentation is reviewed
+    const complianceGapDefinitions = findGlossaryDefinitionLines(docs, "ComplianceGap");
+
+    // Then it keeps "Finding" separate from "ComplianceGap"
+    expect(complianceGapDefinitions.length, "CONTEXT.md must define ComplianceGap").toBeGreaterThan(
+      0,
+    );
+    const complianceGapDefinition = complianceGapDefinitions[0] ?? "";
+    expect(complianceGapDefinition).toContain("**ComplianceGap**");
+    expect(findingDefinition).not.toBe(complianceGapDefinition);
+
+    // And it identifies "ComplianceGap" as project-level compliance output
+    expect(
+      complianceGapDefinition,
+      "CONTEXT.md must identify ComplianceGap as project-level compliance output",
+    ).toContain("project-level compliance output");
   });
 });
