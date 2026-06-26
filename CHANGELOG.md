@@ -31,7 +31,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   glossary-scoped, assertion-consistent docs-test
   coverage that keeps `Finding` separate from project-level `ComplianceGap`
   output, records the MAT-77 to MAT-113 supersession, and adds traceability
-  coverage for the superseded and rules-engine issue identifiers.
+  coverage for the superseded and rules-engine issue identifiers, plus
+  active-history violation detection.
 
 ### Changed
 

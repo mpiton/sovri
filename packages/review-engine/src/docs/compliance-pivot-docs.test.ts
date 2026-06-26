@@ -49,6 +49,11 @@ const traceabilityStatements = {
   mat113RulesEngine:
     "MAT-113: Project compliance rules engine - framework controls, evidence, gaps",
 } as const;
+const activeImplementationStatements = {
+  activeMat77: "MAT-77: Active - enum-only compliance category scope",
+  mat77IsSupersededByMat113: "MAT-77 is superseded by MAT-113",
+  missingMat77SupersessionFailure: "MAT-77 missing superseded-by-MAT-113 relationship",
+} as const;
 const modelSplitStatements = {
   sourceModel: "project compliance scans evaluate Framework -> Control -> Rule -> Evidence",
   complianceGapOutput: "project compliance scan produces ComplianceGap output",
@@ -133,6 +138,10 @@ function modelSplitFailureMessages(_docs: string): string[] {
   return hasSourceModel && hasComplianceGapOutput && !hasPrProjection
     ? [modelSplitStatements.missingPrProjectionFailure]
     : [];
+}
+
+function issueHistoryFailureMessages(_docs: string): string[] {
+  return [];
 }
 
 describe("MAT-80 compliance pivot vocabulary docs", () => {
@@ -357,5 +366,36 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     expect(docs, "compliance pivot docs must keep the MAT-113 rules-engine issue trace").toContain(
       traceabilityStatements.mat113RulesEngine,
     );
+  });
+
+  it("fails when MAT-77 remains active without its supersession relationship", () => {
+    // Given the docs list "MAT-77" under active compliance implementation work
+    const docs = [
+      "# Compliance implementation history",
+      "Active compliance implementation work:",
+      `- ${activeImplementationStatements.activeMat77}`,
+    ].join("\n");
+
+    expect(docs, "fixture must list MAT-77").toContain("MAT-77");
+    expect(docs, "fixture must list active compliance implementation work").toContain(
+      "Active compliance implementation work",
+    );
+
+    // And the docs do not say "MAT-77 is superseded by MAT-113"
+    expect(docs, "fixture must omit the MAT-77 superseded-by-MAT-113 relationship").not.toContain(
+      activeImplementationStatements.mat77IsSupersededByMat113,
+    );
+
+    // When the compliance pivot history is reviewed
+    const failureMessages = issueHistoryFailureMessages(docs);
+
+    // Then the issue history check fails
+    expect(failureMessages.length, "issue history check must fail").toBeGreaterThan(0);
+
+    // And the failure identifies "MAT-77" as missing its superseded-by-MAT-113 relationship
+    expect(
+      failureMessages.join("\n"),
+      "issue history check must identify MAT-77's missing supersession relationship",
+    ).toContain(activeImplementationStatements.missingMat77SupersessionFailure);
   });
 });
