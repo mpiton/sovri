@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 const adrDocsRoot = findAdrDocsRoot(dirname(fileURLToPath(import.meta.url)));
 const pivotAdrPath = join(adrDocsRoot, "022-project-level-compliance-pivot-vocabulary.md");
 
+// These literals are the MAT-80 acceptance contract, not reusable product configuration.
 const requiredDefinitions = [
   {
     term: "ComplianceGap",
@@ -64,8 +65,9 @@ function readPivotAdr(): string {
   return readFileSync(pivotAdrPath, "utf8");
 }
 
-function findDefinitionLine(docs: string, term: string): string | undefined {
-  return docs.split(/\r?\n/).find((line) => line.includes(`**${term}**`));
+function findDefinitionLines(docs: string, term: string): string[] {
+  const definitionMarker = `**${term.toLowerCase()}**`;
+  return docs.split(/\r?\n/).filter((line) => line.toLowerCase().includes(definitionMarker));
 }
 
 describe("MAT-80 compliance pivot vocabulary docs", () => {
@@ -80,9 +82,21 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     expect(pivotAdr).toContain("## Decision");
     expect(pivotAdr).toContain("## Consequences");
 
+    const requiredTermKeys = requiredDefinitions.map(({ term }) => term.toLowerCase());
+    expect(
+      new Set(requiredTermKeys).size,
+      "required definitions must not contain case-insensitive duplicate terms",
+    ).toBe(requiredDefinitions.length);
+
     for (const { term, meaning } of requiredDefinitions) {
-      const definitionLine = findDefinitionLine(docs, term);
-      const definitionText = definitionLine ?? "";
+      const definitionLines = findDefinitionLines(docs, term);
+
+      expect(
+        definitionLines,
+        `${term} must have exactly one case-insensitive definition`,
+      ).toHaveLength(1);
+
+      const definitionText = definitionLines[0] ?? "";
       const normalizedDefinitionText = definitionText.toLowerCase();
 
       // Then the term "<term>" is defined with the meaning "<meaning>"
