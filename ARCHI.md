@@ -508,12 +508,6 @@ export const SovriConfigSchema = z.object({
     severityThreshold: z.enum(["blocker", "major", "minor"]).default("minor"),
   }),
   ignores: z.array(z.string()).default([]),
-  sarif: z
-    .object({
-      enabled: z.boolean().default(false),
-      paths: z.array(z.string()).default([]),
-    })
-    .default({}),
   limits: z
     .object({
       maxFilesPerReview: z.number().int().positive().default(50),
@@ -817,6 +811,7 @@ export const FindingSchema = z.object({
   line_end: z.number().int().positive(),
   title: z.string().min(1).max(200),
   body: z.string().min(1).max(2000),
+  recommendation: z.string().min(1).max(1000),
   suggestion: z
     .object({
       code: z.string(),
