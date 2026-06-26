@@ -83,15 +83,20 @@ function readProjectDoc(docPath: string): string {
   return readFileSync(join(projectRoot, docPath), "utf8");
 }
 
-function findDefinitionLines(docs: string, term: string): string[] {
+function findDefinitionLines(
+  docs: string,
+  term: string,
+  options: { glossaryOnly?: boolean } = {},
+): string[] {
   const definitionMarker = `**${term.toLowerCase()}**`;
-  return docs.split(/\r?\n/).filter((line) => line.toLowerCase().includes(definitionMarker));
-}
+  const glossaryDefinitionPrefix = `- ${definitionMarker}`;
 
-function findGlossaryDefinitionLines(docs: string, term: string): string[] {
-  const definitionPrefix = `- **${term}**`;
-
-  return docs.split(/\r?\n/).filter((line) => line.trimStart().startsWith(definitionPrefix));
+  return docs.split(/\r?\n/).filter((line) => {
+    const normalizedLine = line.trimStart().toLowerCase();
+    return options.glossaryOnly === true
+      ? normalizedLine.startsWith(glossaryDefinitionPrefix)
+      : normalizedLine.includes(definitionMarker);
+  });
 }
 
 function missingRequiredDefinitionTerms(_docs: string): string[] {
@@ -210,7 +215,7 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
   it("keeps Finding separate from ComplianceGap in CONTEXT.md", () => {
     // Given "CONTEXT.md" defines "Finding" as a diff/code issue
     const docs = readProjectDoc("CONTEXT.md");
-    const findingDefinitions = findGlossaryDefinitionLines(docs, "Finding");
+    const findingDefinitions = findDefinitionLines(docs, "Finding", { glossaryOnly: true });
 
     expect(findingDefinitions.length, "CONTEXT.md must define Finding").toBeGreaterThan(0);
     const findingDefinition = findingDefinitions[0] ?? "";
@@ -219,7 +224,9 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     );
 
     // When the compliance model documentation is reviewed
-    const complianceGapDefinitions = findGlossaryDefinitionLines(docs, "ComplianceGap");
+    const complianceGapDefinitions = findDefinitionLines(docs, "ComplianceGap", {
+      glossaryOnly: true,
+    });
 
     // Then it keeps "Finding" separate from "ComplianceGap"
     expect(complianceGapDefinitions.length, "CONTEXT.md must define ComplianceGap").toBeGreaterThan(
