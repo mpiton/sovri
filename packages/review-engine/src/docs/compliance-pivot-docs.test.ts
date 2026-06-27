@@ -548,6 +548,32 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     },
   );
 
+  it("does not require snapshot churn when source docs are unchanged", () => {
+    // Given the compliance pivot change modifies only "docs/adr/README.md"
+    // And the change set does not modify "PRD.md"
+    // And the change set does not modify "ARCHI.md"
+    // And the change set does not modify "CONTEXT.md"
+    const changedPaths = ["docs/adr/README.md"] as const;
+
+    expect(changedPaths, "fixture must include docs/adr/README.md").toEqual(
+      expect.arrayContaining(["docs/adr/README.md"]),
+    );
+
+    // When the documentation sync is reviewed
+    const failureMessages = snapshotDocPairs.flatMap(({ sourcePath, snapshotPath }) =>
+      staleSnapshotFailureMessages({
+        changedPaths,
+        sourcePath,
+        snapshotPath,
+      }),
+    );
+
+    // Then the snapshot sync check succeeds without modifying "../sovri-docs/PRD.md"
+    // And the snapshot sync check succeeds without modifying "../sovri-docs/ARCHI.md"
+    // And the snapshot sync check succeeds without modifying "../sovri-docs/glossary.md"
+    expect(failureMessages, "snapshot sync check must succeed").toEqual([]);
+  });
+
   it("fails when MAT-77 remains active without its supersession relationship", () => {
     // Given the docs list "MAT-77" under active compliance implementation work
     const docs = [

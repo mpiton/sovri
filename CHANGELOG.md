@@ -38,7 +38,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   helper-backed active-history violation detection for fixtures and project docs,
   plus helper-backed unmentioned-MAT-77 supersession-history coverage, and
   helper-backed path-normalized stale-snapshot violation detection with
-  formatted failure messaging for source/snapshot docs change sets.
+  formatted failure messaging for source/snapshot docs change sets, plus
+  flexible unchanged-source coverage that avoids snapshot churn for ADR-only
+  changes.
 
 ### Changed
 
