@@ -245,6 +245,27 @@ describe("PR output filters gaps by change relation while reports show all gaps"
     );
   });
 
+  it("rejects compliance gap blocks that omit a gap id", () => {
+    const evaluation = expectPlainObject(
+      callExport("evaluateComplianceGapPullRequestProjection", projectGaps, {
+        catalog: cataloguedControls,
+        changed_files: ["web/app/layout.tsx"],
+        relations: [{ gap_id: "gap-tracker-consent-008", file: "web/app/layout.tsx" }],
+        pull_request_output: [
+          "potential compliance gap",
+          "Framework reference: GDPR Art. 5(1)(a)",
+          "Evidence: web/app/layout.tsx imports analytics before consent",
+        ].join("\n"),
+      }),
+    );
+
+    expect(Reflect.get(evaluation, "output_contract_check")).toBe("failed");
+    expect(Reflect.get(evaluation, "rejected_gap_id")).toBe("unknown");
+    expect(Reflect.get(evaluation, "explanation")).toContain(
+      "compliance gap blocks require a Gap id",
+    );
+  });
+
   it("uses the same PR filter for route and dependency relations", () => {
     const routeAndDependencyGaps = [
       {

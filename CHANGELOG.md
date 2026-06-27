@@ -133,7 +133,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `review-engine`: tighten PR compliance-gap projection feedback by matching
   published `Gap id:` lines exactly and removing redundant relation-option
   spreading in the projection renderer, while rejecting unknown published gaps
-  and treating null relation metadata as unavailable.
+  or anonymous gap blocks and treating null relation metadata as unavailable.
 - `review-engine`: address MAT-80 docs review feedback by centralizing
   compliance-pivot literals, tightening issue-scope and supersession checks, and
   validating ADR index row structure, with the docs-test contract loaded from a

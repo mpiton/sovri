@@ -200,6 +200,15 @@ export function evaluateComplianceGapPullRequestProjection(
   const pullRequestOutput =
     options.pull_request_output ?? renderComplianceGapPullRequestProjection(gaps, options);
   const publishedGapIds = extractPublishedGapIds(pullRequestOutput);
+
+  if (hasAnonymousComplianceGapBlock(pullRequestOutput)) {
+    return {
+      output_contract_check: "failed",
+      rejected_gap_id: "unknown",
+      explanation: "compliance gap blocks require a Gap id before publication",
+    };
+  }
+
   const knownGapIds = new Set(gaps.map((gap) => gap.id));
   const unknownPublishedGapId = [...publishedGapIds].find((gapId) => !knownGapIds.has(gapId));
 
@@ -294,17 +303,11 @@ function relationMatchesChange(
   options: ComplianceGapPullRequestProjectionOptions,
 ): boolean {
   return (
-    relationValueChanged(relation.file, options.changed_files) ||
-    relationValueChanged(relation.route, options.changed_routes) ||
-    relationValueChanged(relation.dependency, options.changed_dependencies)
+    (relation.file !== undefined && options.changed_files?.includes(relation.file) === true) ||
+    (relation.route !== undefined && options.changed_routes?.includes(relation.route) === true) ||
+    (relation.dependency !== undefined &&
+      options.changed_dependencies?.includes(relation.dependency) === true)
   );
-}
-
-function relationValueChanged(
-  value: string | undefined,
-  changedValues: readonly string[] = [],
-): boolean {
-  return value !== undefined && changedValues.includes(value);
 }
 
 function relationsUnavailable(
@@ -330,4 +333,42 @@ function extractPublishedGapIds(output: string): ReadonlySet<string> {
   }
 
   return gapIds;
+}
+
+function hasAnonymousComplianceGapBlock(output: string): boolean {
+  const lines = output.split(/\r?\n/u).map((line) => line.trim());
+
+  return lines.some((line, index) => {
+    if (line !== "potential compliance gap") {
+      return false;
+    }
+
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      const previousLine = lines[cursor] ?? "";
+
+      if (previousLine === "") {
+        continue;
+      }
+
+      if (previousLine.startsWith("Gap id:")) {
+        return false;
+      }
+
+      break;
+    }
+
+    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+      const followingLine = lines[cursor] ?? "";
+
+      if (followingLine === "" || followingLine === "potential compliance gap") {
+        return true;
+      }
+
+      if (followingLine.startsWith("Gap id:")) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 }
