@@ -133,6 +133,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `review-engine`: tighten the compliance output contract reviewer for missing
   term definitions, Markdown-wrapped `ComplianceGap` misuse, and equivalent
   prompt requests for LLM-authored regulatory source URLs.
+- `review-engine`: reject compliance output schema artifacts that omit
+  distinguishing fields and gap-first source URL prompt requests.
 - `review-engine`: address MAT-80 docs review feedback by centralizing
   compliance-pivot literals, tightening issue-scope and supersession checks, and
   validating ADR index row structure, with the docs-test contract loaded from a

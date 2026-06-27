@@ -27,11 +27,21 @@ export interface ComplianceOutputContractReviewResult {
   };
 }
 
-const COMPLIANCE_OUTPUT_TERMS = ["Finding", "ComplianceGap", "ControlResult"] as const;
-const COMPLIANCE_GAP_FINDING_CATEGORY_PATTERN =
-  /(?:^|\s)(?:`|\*\*)?\bComplianceGap\b(?:`|\*\*)?\s+is\s+a\s+\bFinding\b\s+category\b(?:\s+emitted\s+by\s+PR\s+review\b)?/i;
-const LLM_SOURCE_REFERENCE_REQUEST_PATTERN =
-  /\b(?:write|provide|generate)\b.*\b(?:gdpr|dora|nis2|ai act)\b.*\bsource\s+urls?\b.*\bcompliance\s+gap\b/i;
+const COMPLIANCE_OUTPUT_TERMS: readonly ComplianceOutputTerm[] = [
+  "Finding",
+  "ComplianceGap",
+  "ControlResult",
+];
+const REQUIRED_SCHEMA_FIELDS: Readonly<Record<ComplianceOutputTerm, string>> = {
+  Finding: "cwe",
+  ComplianceGap: "control_id",
+  ControlResult: "status",
+};
+const FINDING_CATEGORY_MISUSE_PATTERN =
+  /(?:^|\s)(?:`|\*\*)?\b(ComplianceGap|ControlResult)\b(?:`|\*\*)?\s+is\s+a\s+\bFinding\b\s+category\b(?:\s+emitted\s+by\s+PR\s+review\b)?/i;
+const SOURCE_REFERENCE_REQUEST_VERB_PATTERN = /\b(?:write|provide|generate|author)\b/i;
+const SOURCE_URL_PATTERN = /\bsource\s+urls?\b/i;
+const COMPLIANCE_GAP_REFERENCE_PATTERN = /\bcompliance\s*gaps?\b|\bComplianceGap\b/i;
 
 export function reviewComplianceOutputContract(
   artifactSet: ComplianceOutputContractArtifactSet,
@@ -42,6 +52,7 @@ export function reviewComplianceOutputContract(
     ...definitionFailures(definitions),
     ...findingCategoryFailures(artifactSet.docs),
     ...promptSourceReferenceFailures(artifactSet.prompts),
+    ...schemaFieldFailures(artifactSet.schemas),
     ...schemaFailures(schema),
   ];
 
@@ -64,10 +75,12 @@ function collectDefinitions(
 }
 
 function findDefinition(docs: readonly string[], term: ComplianceOutputTerm): string {
-  for (const line of docs.join("\n").split(/\r?\n/)) {
-    const definition = parseDefinitionLine(line, term);
-    if (definition !== undefined) {
-      return definition;
+  for (const doc of docs) {
+    for (const line of doc.split(/\r?\n/)) {
+      const definition = parseDefinitionLine(line, term);
+      if (definition !== undefined) {
+        return definition;
+      }
     }
   }
 
@@ -98,15 +111,33 @@ function reviewSchemaContract(schemas: readonly ComplianceOutputContractSchema[]
 }
 
 function findingCategoryFailures(docs: readonly string[]): readonly string[] {
-  return docs.some((doc) => COMPLIANCE_GAP_FINDING_CATEGORY_PATTERN.test(doc))
-    ? ["ComplianceGap is project-level compliance output"]
-    : [];
+  const failures: string[] = [];
+
+  for (const doc of docs) {
+    const match = doc.match(FINDING_CATEGORY_MISUSE_PATTERN);
+    if (match?.[1] === "ComplianceGap") {
+      failures.push("ComplianceGap is project-level compliance output");
+    }
+    if (match?.[1] === "ControlResult") {
+      failures.push("ControlResult is a control evaluation result");
+    }
+  }
+
+  return failures;
 }
 
 function promptSourceReferenceFailures(prompts: readonly string[]): readonly string[] {
-  return prompts.some((prompt) => LLM_SOURCE_REFERENCE_REQUEST_PATTERN.test(prompt))
+  return prompts.some((prompt) => promptRequestsSourceReference(prompt))
     ? ["framework references and source URLs must come from the catalog"]
     : [];
+}
+
+function promptRequestsSourceReference(prompt: string): boolean {
+  return (
+    SOURCE_REFERENCE_REQUEST_VERB_PATTERN.test(prompt) &&
+    SOURCE_URL_PATTERN.test(prompt) &&
+    COMPLIANCE_GAP_REFERENCE_PATTERN.test(prompt)
+  );
 }
 
 function definitionFailures(
@@ -115,6 +146,23 @@ function definitionFailures(
   return COMPLIANCE_OUTPUT_TERMS.filter((term) => definitions[term] === "").map(
     (term) => `${term} definition is required`,
   );
+}
+
+function schemaFieldFailures(
+  schemas: readonly ComplianceOutputContractSchema[],
+): readonly string[] {
+  const schemaByName = new Map(schemas.map((schema) => [schema.name, schema]));
+  const failures: string[] = [];
+
+  for (const term of COMPLIANCE_OUTPUT_TERMS) {
+    const requiredField = REQUIRED_SCHEMA_FIELDS[term];
+    const schema = schemaByName.get(term);
+    if (schema !== undefined && !schema.fields.includes(requiredField)) {
+      failures.push(`${term} schema must define field "${requiredField}"`);
+    }
+  }
+
+  return failures;
 }
 
 function schemaFailures(schema: ComplianceOutputContractReviewResult["schema"]): readonly string[] {

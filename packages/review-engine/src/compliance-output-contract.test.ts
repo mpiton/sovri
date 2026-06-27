@@ -126,6 +126,15 @@ describe("R-06: Prompt, schema, and docs distinguish Finding from ComplianceGap 
     );
   });
 
+  it("rejects Markdown-wrapped ControlResult Finding-category misuse", () => {
+    const artifactSet = appendDocs(["`ControlResult` is a Finding category emitted by PR review"]);
+
+    const review = reviewComplianceOutputContract(artifactSet);
+
+    expect(review.passed).toBe(false);
+    expect(review.failures).toContain("ControlResult is a control evaluation result");
+  });
+
   it("rejects missing required term definitions before passing", () => {
     const artifactSet = replaceDocs([
       "Finding - diff/code issue raised during review",
@@ -157,6 +166,8 @@ describe("R-06: Prompt, schema, and docs distinguish Finding from ComplianceGap 
   it.each([
     "provide the GDPR source URL for each compliance gap",
     "generate the DORA source URL for each compliance gap",
+    "For each ComplianceGap, provide its GDPR source URL",
+    "provide source URLs for compliance gaps",
   ])("rejects equivalent prompt source-reference request: %s", (prompt) => {
     const artifactSet = replacePrompts([prompt]);
 
@@ -165,6 +176,37 @@ describe("R-06: Prompt, schema, and docs distinguish Finding from ComplianceGap 
     expect(review.passed).toBe(false);
     expect(review.failures.join("\n")).toContain(
       "framework references and source URLs must come from the catalog",
+    );
+  });
+
+  it("rejects schema artifacts that omit required distinguishing fields", () => {
+    const artifactSet = replaceSchemas([
+      {
+        name: "Finding",
+        fields: ["cwe"],
+        required: [],
+        categories: ["bug", "security"],
+      },
+      {
+        name: "ComplianceGap",
+        fields: ["evidence", "status"],
+        required: [],
+      },
+      {
+        name: "ControlResult",
+        fields: ["control_id", "evidence"],
+        required: [],
+      },
+    ]);
+
+    const review = reviewComplianceOutputContract(artifactSet);
+
+    expect(review.passed).toBe(false);
+    expect(review.failures).toEqual(
+      expect.arrayContaining([
+        'ComplianceGap schema must define field "control_id"',
+        'ControlResult schema must define field "status"',
+      ]),
     );
   });
 });
@@ -185,6 +227,16 @@ function replaceDocs(docs: readonly string[]): ComplianceOutputContractArtifactS
   return { ...VALID_CONTRACT_ARTIFACTS, docs };
 }
 
+function appendDocs(docs: readonly string[]): ComplianceOutputContractArtifactSet {
+  return { ...VALID_CONTRACT_ARTIFACTS, docs: [...VALID_CONTRACT_ARTIFACTS.docs, ...docs] };
+}
+
 function replacePrompts(prompts: readonly string[]): ComplianceOutputContractArtifactSet {
   return { ...VALID_CONTRACT_ARTIFACTS, prompts };
+}
+
+function replaceSchemas(
+  schemas: readonly ComplianceOutputContractSchema[],
+): ComplianceOutputContractArtifactSet {
+  return { ...VALID_CONTRACT_ARTIFACTS, schemas };
 }
