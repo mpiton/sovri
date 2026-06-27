@@ -39,6 +39,11 @@ const requiredDefinitions = [
 ] as const;
 const requiredProjectLevelTerms = ["ComplianceGap", "ControlResult"] as const;
 const modelSplitDocPaths = ["PRD.md", "ARCHI.md", "CONTEXT.md"] as const;
+const snapshotDocPairs = [
+  { sourcePath: "PRD.md", snapshotPath: "../sovri-docs/PRD.md" },
+  { sourcePath: "ARCHI.md", snapshotPath: "../sovri-docs/ARCHI.md" },
+  { sourcePath: "CONTEXT.md", snapshotPath: "../sovri-docs/glossary.md" },
+] as const;
 const supersessionStatements = {
   mat77: "MAT-77",
   superseded: "superseded",
@@ -201,6 +206,14 @@ function issueScopeFailureMessages(_docs: string): string[] {
   }
 
   return failureMessages;
+}
+
+function staleSnapshotFailureMessages(_input: {
+  changedPaths: readonly string[];
+  sourcePath: string;
+  snapshotPath: string;
+}): string[] {
+  return ["snapshot sync check not implemented"];
 }
 
 describe("MAT-80 compliance pivot vocabulary docs", () => {
@@ -492,6 +505,35 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       "project docs must include MAT-112 in the output contract map",
     ).toEqual([]);
   });
+
+  it.each(snapshotDocPairs)(
+    "fails when %s changes without its matching snapshot",
+    ({ sourcePath, snapshotPath }) => {
+      // Given the compliance pivot change modifies "<source_path>"
+      const changedPaths = [sourcePath] as const;
+
+      // And the change set does not modify "<snapshot_path>"
+      expect(changedPaths, "fixture must omit the matching snapshot path").not.toContain(
+        snapshotPath,
+      );
+
+      // When the documentation sync is reviewed
+      const failureMessages = staleSnapshotFailureMessages({
+        changedPaths,
+        sourcePath,
+        snapshotPath,
+      });
+
+      // Then the snapshot sync check fails
+      expect(failureMessages.length, "snapshot sync check must fail").toBeGreaterThan(0);
+
+      // And the failure identifies "<snapshot_path>" as stale
+      expect(
+        failureMessages.join("\n"),
+        "snapshot sync failure must identify the stale snapshot path",
+      ).toContain(`${snapshotPath} is stale`);
+    },
+  );
 
   it("fails when MAT-77 remains active without its supersession relationship", () => {
     // Given the docs list "MAT-77" under active compliance implementation work
