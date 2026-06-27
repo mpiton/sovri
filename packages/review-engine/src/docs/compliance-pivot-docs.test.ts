@@ -179,9 +179,10 @@ function issueScopeFailureMessages(_docs: string): string[] {
   const mat113RulesEngineWorkIsMissing = !normalizedDocs.includes(
     issueScopeStatements.mat113RulesEngineImplementationWork.toLowerCase(),
   );
-  const mat113IdentifiesProjectComplianceRulesEngine = normalizedDocs.includes(
-    issueScopeStatements.mat113ProjectComplianceRulesEngineWork.toLowerCase(),
-  );
+  const mat113IdentifiesProjectComplianceRulesEngine =
+    normalizedDocs.includes(
+      issueScopeStatements.mat113ProjectComplianceRulesEngineWork.toLowerCase(),
+    ) || normalizedDocs.includes(traceabilityStatements.mat113RulesEngine.toLowerCase());
   const mat112IsMissing = !normalizedDocs.includes("mat-112");
 
   if (mat112ClaimsCoreModel) {
@@ -469,7 +470,7 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     );
 
     // And the docs do not reference "MAT-112"
-    expect(docs, "fixture must omit MAT-112").not.toContain("MAT-112");
+    expect(docs.toLowerCase(), "fixture must omit MAT-112").not.toContain("mat-112");
 
     // When the compliance pivot issue map is reviewed
     const failureMessages = issueScopeFailureMessages(docs);
@@ -482,6 +483,11 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       failureMessages.join("\n"),
       "issue scope failure must identify MAT-112 as missing from the output contract map",
     ).toContain(issueScopeStatements.mat112MissingOutputContractFailure);
+
+    expect(
+      issueScopeFailureMessages(readCompliancePivotDocs()),
+      "project docs must include MAT-112 in the output contract map",
+    ).toEqual([]);
   });
 
   it("fails when MAT-77 remains active without its supersession relationship", () => {
