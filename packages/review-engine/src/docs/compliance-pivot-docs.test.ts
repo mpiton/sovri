@@ -208,7 +208,7 @@ function issueScopeFailureMessages(_docs: string): string[] {
   return failureMessages;
 }
 
-function staleSnapshotFailureMessage(input: { sourcePath: string; snapshotPath: string }): string {
+function formatStaleSnapshotFailure(input: { sourcePath: string; snapshotPath: string }): string {
   return `${input.snapshotPath} is stale because ${input.sourcePath} changed without a matching snapshot change`;
 }
 
@@ -220,7 +220,7 @@ function staleSnapshotFailureMessages(input: {
   const sourceChanged = input.changedPaths.includes(input.sourcePath);
   const snapshotChanged = input.changedPaths.includes(input.snapshotPath);
 
-  return sourceChanged && !snapshotChanged ? [staleSnapshotFailureMessage(input)] : [];
+  return sourceChanged && !snapshotChanged ? [formatStaleSnapshotFailure(input)] : [];
 }
 
 describe("MAT-80 compliance pivot vocabulary docs", () => {
