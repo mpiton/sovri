@@ -24,6 +24,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `review-engine`: add MAT-112 ATDD coverage for uncatalogued compliance gaps
   staying out of regulatory output while remaining available as internal
   diagnostics.
+- `review-engine`: keep uncatalogued compliance gaps out of regulatory
+  PR/report output while rendering them as internal diagnostics and rejecting
+  uncatalogued regulatory publication claims.
 - `review-engine`: add MAT-112 ATDD coverage for catalogued compliance gap
   references rendering in project report and pull request output without CWE
   requirements.

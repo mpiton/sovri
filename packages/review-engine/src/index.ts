@@ -98,6 +98,7 @@ export { generateAuditReference } from "./audit-ref.js";
 
 export {
   evaluateComplianceGapPublishability,
+  renderInternalComplianceDiagnostics,
   renderComplianceGapProjectReportOutput,
   renderComplianceGapPullRequestOutput,
 } from "./compliance-gap-rendering.js";
