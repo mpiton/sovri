@@ -150,7 +150,15 @@ function findSchemaFieldLabel(issues: readonly z.core.$ZodIssue[]): string {
     }
   }
 
-  return "invalid compliance gap output";
+  const firstIssue = issues[0];
+
+  if (firstIssue === undefined) {
+    return "invalid compliance gap output";
+  }
+
+  const path = firstIssue.path.map(String).join(".");
+
+  return path.length === 0 ? firstIssue.message : `${path}: ${firstIssue.message}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -5662,6 +5662,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `review-engine`: include the first schema validation issue in generic
+  `ComplianceGap` output validation failures and cover provided blank gap ids.
+
 - `@sovri/observability`: `NODE_ENV` is now compared case-insensitively against `"production"` so mixed-case values disable the pretty transport, and `pino-pretty` resolvability is probed before enabling the transport so production-pruned installs fall back to JSON instead of crashing the worker. (#85)
 
 - `knip.json` now treats `lefthook` as an intentional root tooling dependency,

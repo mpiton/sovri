@@ -241,6 +241,24 @@ describe("Non-CWE compliance gaps have a complete output contract", () => {
     expect(Reflect.get(validation, "publishable")).toBe(false);
     expect(Reflect.get(validation, "missing_field")).toBe("catalogued control reference");
   });
+
+  it("rejects a non-CWE gap with a provided blank id", () => {
+    const gap = {
+      id: " ",
+      ...cataloguedControl,
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      status: "WARNING",
+      severity: "major",
+      remediation_guidance: remediationGuidance,
+    };
+
+    const validation = expectPlainObject(
+      callExport("validateComplianceGapOutput", gap, { catalog }),
+    );
+
+    expect(Reflect.get(validation, "publishable")).toBe(false);
+    expect(Reflect.get(validation, "missing_field")).toEqual(expect.stringMatching(/^id: .+/));
+  });
 });
 
 function callExport(name: string, ...args: readonly unknown[]): unknown {
