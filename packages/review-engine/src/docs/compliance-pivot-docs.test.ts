@@ -39,7 +39,13 @@ const requiredDefinitions = [
 ] as const;
 const requiredProjectLevelTerms = ["ComplianceGap", "ControlResult"] as const;
 const modelSplitDocPaths = ["PRD.md", "ARCHI.md", "CONTEXT.md"] as const;
-const ignoredProjectDocFixtureMarker = "<!-- CI fixture: ignored project planning doc -->";
+const COMPLIANCE_MODEL = "Framework -> Control -> Rule -> Evidence";
+const ISSUE_SCOPE_OUTPUT_CONTRACT = "output contract";
+const ISSUE_SCOPE_CORE_DOMAIN_MODEL = "core domain model";
+const ISSUE_SCOPE_PROJECT_COMPLIANCE_RULES_ENGINE_WORK = "project compliance rules engine work";
+const ISSUE_SCOPE_PR_OUTPUT_CONTRACT = "PR output contract";
+const IGNORED_PROJECT_DOC_FIXTURE_MARKER = "<!-- CI fixture: ignored project planning doc -->";
+const ADR_INDEX_STATUS_PATTERN = /^(?:Accepted|Proposed|Deprecated|Superseded by ADR-\d{3})$/;
 const snapshotDocPairs = [
   { sourcePath: "PRD.md", snapshotPath: "../sovri-docs/PRD.md" },
   { sourcePath: "ARCHI.md", snapshotPath: "../sovri-docs/ARCHI.md" },
@@ -74,27 +80,27 @@ const activeImplementationStatements = {
   missingMat77HistoryFailure: "MAT-77 missing from supersession history",
 } as const;
 const issueScopeStatements = {
-  mat112CoreDomainModel: "MAT-112 defines the core compliance domain model",
-  mat112ReviewOutputContract: "MAT-112 is the review output contract",
+  mat112CoreDomainModel: `MAT-112 defines the ${ISSUE_SCOPE_CORE_DOMAIN_MODEL}`,
+  mat112ReviewOutputContract: `MAT-112 is the review ${ISSUE_SCOPE_OUTPUT_CONTRACT}`,
   mat113RulesEngineImplementationWork: "MAT-113 is the rules engine implementation work",
-  mat113ProjectComplianceRulesEngineWork: "MAT-113 is the project compliance rules engine work",
-  mat112OutputContractFailure: "MAT-112 is output contract, not core domain model",
-  mat112MissingOutputContractFailure: "MAT-112 missing from output contract map",
+  mat113ProjectComplianceRulesEngineWork: `MAT-113 is the ${ISSUE_SCOPE_PROJECT_COMPLIANCE_RULES_ENGINE_WORK}`,
+  mat112OutputContractFailure: `MAT-112 is ${ISSUE_SCOPE_OUTPUT_CONTRACT}, not ${ISSUE_SCOPE_CORE_DOMAIN_MODEL}`,
+  mat112MissingOutputContractFailure: `MAT-112 missing from ${ISSUE_SCOPE_OUTPUT_CONTRACT} map`,
 } as const;
 const issueScopeExamples = [
   {
     issueId: "MAT-112",
-    requiredScope: "output contract",
-    forbiddenScope: "core domain model",
+    requiredScope: ISSUE_SCOPE_OUTPUT_CONTRACT,
+    forbiddenScope: ISSUE_SCOPE_CORE_DOMAIN_MODEL,
   },
   {
     issueId: "MAT-113",
-    requiredScope: "project compliance rules engine work",
-    forbiddenScope: "PR output contract",
+    requiredScope: ISSUE_SCOPE_PROJECT_COMPLIANCE_RULES_ENGINE_WORK,
+    forbiddenScope: ISSUE_SCOPE_PR_OUTPUT_CONTRACT,
   },
 ] as const;
 const modelSplitStatements = {
-  sourceModel: "project compliance scans evaluate Framework -> Control -> Rule -> Evidence",
+  sourceModel: `project compliance scans evaluate ${COMPLIANCE_MODEL}`,
   complianceGapOutput: "project compliance scan produces ComplianceGap output",
   prProjection: "PR review may project relevant compliance gaps into pull request output",
   missingPrProjectionFailure: "missing PR review projection statement",
@@ -105,8 +111,8 @@ const modelSplitStatements = {
 const issueModelStatements = {
   mat112: "MAT-112",
   mat113: "MAT-113",
-  mat113RulesEngineWork: "project compliance rules engine work",
-  coreModel: "Framework -> Control -> Rule -> Evidence",
+  mat113RulesEngineWork: ISSUE_SCOPE_PROJECT_COMPLIANCE_RULES_ENGINE_WORK,
+  coreModel: COMPLIANCE_MODEL,
   prReviewOutput: "PR/review output",
 } as const;
 const complianceGapFindingCategoryMisuse = {
@@ -221,7 +227,7 @@ function ignoredProjectDocFixture(docPath: string): string | undefined {
 
   return [
     `# ${docPath}`,
-    ignoredProjectDocFixtureMarker,
+    IGNORED_PROJECT_DOC_FIXTURE_MARKER,
     ...glossaryLines,
     modelSplitStatements.sourceModel,
     modelSplitStatements.complianceGapOutput,
@@ -286,9 +292,9 @@ function issueHistoryFailureMessages(_docs: string): string[] {
   const hasActiveMat77 =
     _docs.includes(activeImplementationStatements.activeMat77) ||
     (_docs.includes("MAT-77") && _docs.includes("Active compliance implementation work"));
-  const hasMat77SupersededByMat113 = _docs.includes(
-    activeImplementationStatements.mat77IsSupersededByMat113,
-  );
+  const hasMat77SupersededByMat113 =
+    _docs.includes(activeImplementationStatements.mat77IsSupersededByMat113) ||
+    _docs.includes(supersessionStatements.mat113SupersedesMat77);
   const hasMat113RulesEngineHistory = _docs.includes(traceabilityStatements.mat113RulesEngine);
   const hasMat77History = _docs.includes("MAT-77");
 
@@ -309,9 +315,6 @@ function issueScopeFailureMessages(_docs: string): string[] {
   const mat112ClaimsCoreModel = normalizedDocs.includes(
     issueScopeStatements.mat112CoreDomainModel.toLowerCase(),
   );
-  const mat113RulesEngineWorkIsMissing = !normalizedDocs.includes(
-    issueScopeStatements.mat113RulesEngineImplementationWork.toLowerCase(),
-  );
   const mat113IdentifiesProjectComplianceRulesEngine =
     normalizedDocs.includes(
       issueScopeStatements.mat113ProjectComplianceRulesEngineWork.toLowerCase(),
@@ -321,9 +324,7 @@ function issueScopeFailureMessages(_docs: string): string[] {
   );
 
   if (mat112ClaimsCoreModel) {
-    if (mat113RulesEngineWorkIsMissing) {
-      failureMessages.push(issueScopeStatements.mat112OutputContractFailure);
-    }
+    failureMessages.push(issueScopeStatements.mat112OutputContractFailure);
   }
 
   if (mat113IdentifiesProjectComplianceRulesEngine) {
@@ -545,7 +546,8 @@ function shouldUseIgnoredProjectDocSnapshotFixture(
   sourceDocs: string,
 ): boolean {
   return (
-    snapshotPath.startsWith("../sovri-docs/") && sourceDocs.includes(ignoredProjectDocFixtureMarker)
+    snapshotPath.startsWith("../sovri-docs/") &&
+    sourceDocs.includes(IGNORED_PROJECT_DOC_FIXTURE_MARKER)
   );
 }
 
@@ -567,7 +569,7 @@ function adrIndexFailureMessages(_input: {
   adrTitle: string;
 }): string[] {
   const relativeAdrPath = `./${_input.adrPath.replace(/^docs\/adr\//, "")}`;
-  const failureMessages: string[] = [];
+  const failureMessages = adrIndexTableFailureMessages(_input.indexMarkdown);
 
   if (!_input.indexMarkdown.includes(relativeAdrPath)) {
     failureMessages.push(`${_input.adrPath} is unlisted`);
@@ -575,6 +577,41 @@ function adrIndexFailureMessages(_input: {
 
   if (!_input.indexMarkdown.includes(_input.adrTitle)) {
     failureMessages.push(`${_input.adrPath} title is missing: ${_input.adrTitle}`);
+  }
+
+  return failureMessages;
+}
+
+function adrIndexTableFailureMessages(indexMarkdown: string): string[] {
+  const failureMessages: string[] = [];
+  const tableRows = indexMarkdown.split(/\r?\n/).filter((line) => line.trim().startsWith("|"));
+  const dataRows = tableRows.filter((line) => /^\s*\| \[\d{3}\]/.test(line));
+
+  for (const row of dataRows) {
+    const trimmedRow = row.trim();
+    const cells = trimmedRow
+      .split("|")
+      .slice(1, -1)
+      .map((cell) => cell.trim());
+    const status = cells[2] ?? "";
+    const date = cells[3] ?? "";
+
+    if (!row.startsWith("| [")) {
+      failureMessages.push("ADR index rows must start at column 1 with a linked ADR id");
+    }
+
+    if (cells.length !== 4) {
+      failureMessages.push("ADR index rows must have exactly 4 columns");
+      continue;
+    }
+
+    if (!ADR_INDEX_STATUS_PATTERN.test(status)) {
+      failureMessages.push(`ADR index row has unsupported status: ${status}`);
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      failureMessages.push("ADR index row must have an ISO date");
+    }
   }
 
   return failureMessages;
@@ -840,14 +877,15 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     const docs = [
       "# Compliance pivot issue map",
       `- ${issueScopeStatements.mat112CoreDomainModel}`,
+      `- ${issueScopeStatements.mat113RulesEngineImplementationWork}`,
     ].join("\n");
 
     expect(docs, "fixture must put MAT-112 in the core domain model role").toContain(
       issueScopeStatements.mat112CoreDomainModel,
     );
 
-    // And the docs do not identify "MAT-113" as the rules engine implementation work
-    expect(docs, "fixture must omit MAT-113 as the rules engine implementation work").not.toContain(
+    // And the docs identify "MAT-113" as the rules engine implementation work
+    expect(docs, "fixture must include MAT-113 as the rules engine implementation work").toContain(
       issueScopeStatements.mat113RulesEngineImplementationWork,
     );
 
@@ -907,10 +945,12 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       // Given the compliance pivot change modifies "<source_path>"
       const changedPaths = [sourcePath, snapshotPath] as const;
       const docsByPath = syncedSnapshotDocs(sourcePath, snapshotPath);
-      expect(
-        docsByPath[snapshotPath],
-        "fixture must not mirror source docs as snapshot docs",
-      ).not.toBe(docsByPath[sourcePath]);
+      if (docsByPath[sourcePath]?.includes(IGNORED_PROJECT_DOC_FIXTURE_MARKER)) {
+        expect(
+          docsByPath[snapshotPath],
+          "CI fixture snapshots must not mirror source docs verbatim",
+        ).not.toBe(docsByPath[sourcePath]);
+      }
 
       // When the documentation sync is reviewed
       const failureMessages = snapshotSyncFailureMessages({
@@ -1156,6 +1196,31 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     );
   });
 
+  it("fails when ADR index table rows are malformed", () => {
+    // Given the ADR index contains indented, extra-column, invalid-status, and non-ISO-date rows
+    const indexMarkdown = [
+      "# ADRs",
+      "| # | Title | Status | Date |",
+      "| --- | --- | --- | --- |",
+      "  | [020](./020-deterministic-compliance-derivation.md) | Deterministic compliance derivation | Accepted | 2026-06-19 |",
+      "| [021](./021-compliance-only-review-taxonomy.md) | Compliance-only review taxonomy and prompt | Accepted | 2026-06-24 | extra |",
+      "| [022](./022-project-level-compliance-pivot.md) | Project-level compliance pivot vocabulary | Active | 2026/06/26 |",
+    ].join("\n");
+
+    // When the ADR index is reviewed
+    const failureMessages = adrIndexFailureMessages({
+      indexMarkdown,
+      adrPath: "docs/adr/022-project-level-compliance-pivot.md",
+      adrTitle: "Project-level compliance pivot vocabulary",
+    });
+
+    // Then the ADR index check reports structural table drift
+    expect(failureMessages).toContain("ADR index rows must start at column 1 with a linked ADR id");
+    expect(failureMessages).toContain("ADR index rows must have exactly 4 columns");
+    expect(failureMessages).toContain("ADR index row has unsupported status: Active");
+    expect(failureMessages).toContain("ADR index row must have an ISO date");
+  });
+
   it("keeps MAT-113 as the core domain model implementation reference", () => {
     // When the compliance pivot issue map is reviewed
     const docs = readCompliancePivotDocs();
@@ -1232,6 +1297,29 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       issueHistoryFailureMessages(readCompliancePivotDocs()),
       "project docs must not list MAT-77 as active without its supersession relationship",
     ).toEqual([]);
+  });
+
+  it("accepts canonical MAT-113 supersedes MAT-77 wording for active MAT-77 history", () => {
+    // Given the docs list "MAT-77" under active compliance implementation work
+    const docs = [
+      "# Compliance implementation history",
+      "Active compliance implementation work:",
+      `- ${activeImplementationStatements.activeMat77}`,
+      `- ${supersessionStatements.mat113SupersedesMat77}`,
+    ].join("\n");
+
+    expect(docs, "fixture must list MAT-77 as active").toContain(
+      activeImplementationStatements.activeMat77,
+    );
+    expect(docs, "fixture must use the canonical supersession wording").toContain(
+      supersessionStatements.mat113SupersedesMat77,
+    );
+
+    // When the compliance pivot history is reviewed
+    const failureMessages = issueHistoryFailureMessages(docs);
+
+    // Then the issue history check accepts the canonical supersession wording
+    expect(failureMessages).toEqual([]);
   });
 
   it("fails when MAT-113 supersedes an unmentioned MAT-77", () => {

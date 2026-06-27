@@ -17,7 +17,8 @@ continues.
 
 Use the project-level compliance model `Framework -> Control -> Rule -> Evidence`
 as the source language for compliance engineering. PR review output can project
-relevant results from that model, but it is not the source model.
+`ComplianceGap` instances derived from that model, but it is not the source
+model.
 
 The core vocabulary is:
 
@@ -26,7 +27,7 @@ The core vocabulary is:
 - **Control** - framework requirement that the project must satisfy.
 - **Rule** - technical verification attached to a control.
 - **Evidence** - collected proof or observation used to support a control result or compliance gap.
-- **FrameworkReference** - versioned framework citation with official text or source URL from a catalog.
+- **FrameworkReference** - versioned framework citation with official text or source URL from a catalog, for example `GDPR Art. 5(1)(a)` with `https://gdpr-info.eu/art-5-gdpr/`.
 
 `Finding` remains a diff/code issue raised during review. A `ComplianceGap` is
 project-level compliance output and must not be modeled as a `Finding` category
@@ -54,5 +55,8 @@ catalogs, never LLM output.
 
 - **Treat ComplianceGap as a Finding category:** keeps the PR review projection as
   the source model and loses project-level control/evidence semantics.
+- **Treat PR review findings as the source compliance model:** collapses the PR
+  projection into the source model and loses project-level control/evidence
+  semantics.
 - **Let the LLM provide framework text:** breaks source traceability and risks
   invented regulatory language.
