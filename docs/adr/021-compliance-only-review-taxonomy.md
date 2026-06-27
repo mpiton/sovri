@@ -49,6 +49,9 @@ Make compliance-only the taxonomy and the prompt, not just the publication gate.
 - Make the shared CWE directive unconditional: every finding should carry a `cwe`,
   dropping the "omit on style or performance findings" clause, which referenced
   categories that no longer exist.
+- Keep non-CWE `ComplianceGap` output separate from the CWE-backed `Finding`
+  path. `ComplianceGap` remains project-level output from control/evidence
+  checks, not part of the PR review taxonomy.
 
 The compliance gate's eligibility allowlist (`{security, bug}`) is kept. It now
 mirrors the whole enum, so it is a no-op in practice but remains as defense in
