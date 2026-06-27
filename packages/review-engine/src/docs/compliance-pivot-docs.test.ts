@@ -135,12 +135,15 @@ function uniqueStrings(values: readonly string[]): readonly string[] {
   const seen = new Set<string>();
   const uniqueValues: string[] = [];
 
-  for (const value of values
-    .map(normalizeVocabularyTerm)
-    .filter((candidate) => candidate.length > 0)) {
-    const key = value.toUpperCase();
+  for (const value of values) {
+    const normalized = normalizeVocabularyTerm(value);
+    if (normalized.length === 0) {
+      continue;
+    }
+
+    const key = normalized.toUpperCase();
     if (!seen.has(key)) {
-      uniqueValues.push(value);
+      uniqueValues.push(normalized);
       seen.add(key);
     }
   }
@@ -474,7 +477,7 @@ function readSnapshotDoc(snapshotPath: string, sourceDocs: string): string {
   try {
     return readFileSync(absoluteSnapshotPath, "utf8");
   } catch (error) {
-    if (isNotFoundError(error)) {
+    if (isNotFoundError(error) && shouldUseSnapshotFixtureFallback(snapshotPath)) {
       return snapshotVocabularyFixtureDoc(snapshotPath, sourceDocs);
     }
 
@@ -485,6 +488,11 @@ function readSnapshotDoc(snapshotPath: string, sourceDocs: string): string {
 
 function isNotFoundError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+}
+
+function shouldUseSnapshotFixtureFallback(snapshotPath: string): boolean {
+  // Only the absent sibling checkout gets a fixture; missing files inside a real checkout must fail.
+  return !existsSync(join(projectRoot, dirname(snapshotPath)));
 }
 
 function snapshotVocabularyFixtureDoc(snapshotPath: string, sourceDocs: string): string {
@@ -870,6 +878,20 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       ).toEqual([]);
     },
   );
+
+  it("fails when a real snapshot directory exists but an expected snapshot file is missing", () => {
+    // Given the snapshot directory exists
+    const snapshotPath = "docs/__missing-compliance-pivot-snapshot__.md";
+    const snapshotDir = join(projectRoot, dirname(snapshotPath));
+    expect(existsSync(snapshotDir), "fixture snapshot directory must exist").toBe(true);
+
+    // When a required snapshot file is missing inside it
+    const readMissingSnapshot = () =>
+      readSnapshotDoc(snapshotPath, modelSplitStatements.sourceModel);
+
+    // Then the real snapshot verification fails instead of fabricating a fixture
+    expect(readMissingSnapshot).toThrow(`Could not read snapshot doc ${snapshotPath}:`);
+  });
 
   it("fails when snapshot docs carry vocabulary absent from the changed source doc", () => {
     // Given the compliance pivot change modifies "PRD.md"

@@ -47,6 +47,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   Set-backed boundary-aware missing/extra vocabulary drift detection derived
   from the shared MAT-80 contract fixtures through a regex-free explicit term
   registry instead of a second static vocabulary list, plus
+  missing-real-snapshot-file failure coverage that keeps the CI fixture fallback
+  limited to absent sibling checkouts, plus
   helper-backed path-normalized stale-snapshot violation detection with
   formatted failure messaging for source/snapshot docs change sets, plus
   flexible unchanged-source coverage that avoids snapshot churn for ADR-only
