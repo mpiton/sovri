@@ -44,7 +44,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   affirmative scope checks, helper-backed source/snapshot vocabulary sync
   coverage with real snapshot verification when the sibling `../sovri-docs`
   checkout is present, CI-safe fixture-backed fallback coverage, and
-  Set-backed boundary-aware missing/extra vocabulary drift detection, plus
+  Set-backed boundary-aware missing/extra vocabulary drift detection derived
+  from the shared MAT-80 contract fixtures instead of a second static vocabulary list, plus
   helper-backed path-normalized stale-snapshot violation detection with
   formatted failure messaging for source/snapshot docs change sets, plus
   flexible unchanged-source coverage that avoids snapshot churn for ADR-only

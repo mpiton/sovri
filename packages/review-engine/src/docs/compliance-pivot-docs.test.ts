@@ -108,30 +108,71 @@ const issueModelStatements = {
   coreModel: "Framework -> Control -> Rule -> Evidence",
   prReviewOutput: "PR/review output",
 } as const;
-const findingTerm = "Finding";
-const snapshotIssueIdentifiers = [
-  supersessionStatements.mat77,
-  ...issueScopeExamples.map(({ issueId }) => issueId),
-] as const;
-const snapshotVocabulary = [
-  findingTerm,
-  ...requiredDefinitions.map(({ term }) => term),
-  ...snapshotIssueIdentifiers,
-  supersessionStatements.mat113SupersedesMat77,
-  traceabilityStatements.mat77Superseded,
-  traceabilityStatements.mat113RulesEngine,
-  issueScopeStatements.mat112ReviewOutputContract,
-  issueScopeStatements.mat113ProjectComplianceRulesEngineWork,
-  modelSplitStatements.sourceModel,
-  modelSplitStatements.complianceGapOutput,
-  modelSplitStatements.prProjection,
-] as const;
 const complianceGapFindingCategoryMisuse = {
   term: "ComplianceGap",
   statement: "ComplianceGap is a Finding category emitted by PR review",
   explanation: "ComplianceGap must be project-level compliance output",
   pattern: /\bComplianceGap\b\s+is\s+a\s+Finding\s+category\b(?:\s+emitted\s+by\s+PR\s+review\b)?/i,
 } as const;
+
+function snapshotVocabularyTerms(): readonly string[] {
+  return uniqueStrings(
+    flattenContractStrings(snapshotVocabularySources()).flatMap(vocabularyCandidates),
+  );
+}
+
+function snapshotVocabularySources(): readonly unknown[] {
+  return [
+    requiredDefinitions,
+    issueScopeExamples,
+    supersessionStatements,
+    traceabilityStatements,
+    issueScopeStatements,
+    modelSplitStatements,
+    issueModelStatements,
+    complianceGapFindingCategoryMisuse,
+  ];
+}
+
+function flattenContractStrings(input: unknown): string[] {
+  if (typeof input === "string") {
+    return [input];
+  }
+
+  if (Array.isArray(input)) {
+    return input.flatMap(flattenContractStrings);
+  }
+
+  if (typeof input === "object" && input !== null) {
+    return Object.values(input).flatMap(flattenContractStrings);
+  }
+
+  return [];
+}
+
+function vocabularyCandidates(value: string): readonly string[] {
+  return [
+    value,
+    ...(value.match(/\bMAT-\d+\b/g) ?? []),
+    ...(value.match(/\b[A-Z][A-Za-z]+(?:[A-Z][A-Za-z]+)*\b/g) ?? []),
+  ];
+}
+
+function uniqueStrings(values: readonly string[]): readonly string[] {
+  const seen = new Set<string>();
+  const uniqueValues: string[] = [];
+
+  for (const value of values
+    .map((candidate) => candidate.trim())
+    .filter((candidate) => candidate.length > 0)) {
+    if (!seen.has(value)) {
+      uniqueValues.push(value);
+      seen.add(value);
+    }
+  }
+
+  return uniqueValues;
+}
 
 function findAdrDocsRoot(startDir: string): string {
   let currentDir = startDir;
@@ -397,12 +438,13 @@ function snapshotSyncFailureMessages(input: {
   const failureMessages = staleSnapshotFailureMessages(input);
   const sourceDocs = input.docsByPath[input.sourcePath] ?? "";
   const snapshotDocs = input.docsByPath[input.snapshotPath] ?? "";
+  const vocabulary = snapshotVocabularyTerms();
   const sourceVocabulary = snapshotVocabularyTermSet(sourceDocs);
   const snapshotVocabularyInDocs = snapshotVocabularyTermSet(snapshotDocs);
-  const missingVocabulary = snapshotVocabulary.filter(
+  const missingVocabulary = vocabulary.filter(
     (term) => sourceVocabulary.has(term) && !snapshotVocabularyInDocs.has(term),
   );
-  const extraVocabulary = snapshotVocabulary.filter(
+  const extraVocabulary = vocabulary.filter(
     (term) => snapshotVocabularyInDocs.has(term) && !sourceVocabulary.has(term),
   );
 
@@ -422,7 +464,7 @@ function snapshotSyncFailureMessages(input: {
 }
 
 function snapshotVocabularyTermSet(docs: string): ReadonlySet<string> {
-  return new Set(snapshotVocabulary.filter((term) => containsVocabularyTerm(docs, term)));
+  return new Set(snapshotVocabularyTerms().filter((term) => containsVocabularyTerm(docs, term)));
 }
 
 function containsVocabularyTerm(docs: string, term: string): boolean {
@@ -473,7 +515,9 @@ function snapshotVocabularyFixtureDoc(snapshotPath: string, sourceDocs: string):
 
   return [
     heading,
-    ...snapshotVocabulary.filter((term) => sourceVocabulary.has(term)).map((term) => `- ${term}`),
+    ...snapshotVocabularyTerms()
+      .filter((term) => sourceVocabulary.has(term))
+      .map((term) => `- ${term}`),
   ].join("\n");
 }
 
