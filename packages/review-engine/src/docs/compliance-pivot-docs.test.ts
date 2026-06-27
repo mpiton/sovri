@@ -784,6 +784,10 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       // Given the compliance pivot change modifies "<source_path>"
       const changedPaths = [sourcePath, snapshotPath] as const;
       const docsByPath = syncedSnapshotDocs(sourcePath, snapshotPath);
+      expect(
+        docsByPath[snapshotPath],
+        "fixture must not mirror source docs as snapshot docs",
+      ).not.toBe(docsByPath[sourcePath]);
 
       // When the documentation sync is reviewed
       const failureMessages = snapshotSyncFailureMessages({
