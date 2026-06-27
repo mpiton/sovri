@@ -57,8 +57,11 @@ const activeImplementationStatements = {
 } as const;
 const issueScopeStatements = {
   mat112CoreDomainModel: "MAT-112 defines the core compliance domain model",
+  mat112ReviewOutputContract: "MAT-112 is the review output contract",
   mat113RulesEngineImplementationWork: "MAT-113 is the rules engine implementation work",
+  mat113ProjectComplianceRulesEngineWork: "MAT-113 is the project compliance rules engine work",
   mat112OutputContractFailure: "MAT-112 is output contract, not core domain model",
+  mat112MissingOutputContractFailure: "MAT-112 missing from output contract map",
 } as const;
 const modelSplitStatements = {
   sourceModel: "project compliance scans evaluate Framework -> Control -> Rule -> Evidence",
@@ -170,16 +173,34 @@ function issueHistoryFailureMessages(_docs: string): string[] {
 
 function issueScopeFailureMessages(_docs: string): string[] {
   const normalizedDocs = _docs.toLowerCase();
+  const failureMessages: string[] = [];
   const mat112ClaimsCoreModel = normalizedDocs.includes(
     issueScopeStatements.mat112CoreDomainModel.toLowerCase(),
   );
   const mat113RulesEngineWorkIsMissing = !normalizedDocs.includes(
     issueScopeStatements.mat113RulesEngineImplementationWork.toLowerCase(),
   );
+  const mat113IdentifiesProjectComplianceRulesEngine =
+    normalizedDocs.includes(
+      issueScopeStatements.mat113ProjectComplianceRulesEngineWork.toLowerCase(),
+    ) || normalizedDocs.includes(traceabilityStatements.mat113RulesEngine.toLowerCase());
+  const mat112OutputContractEntryIsMissing = !normalizedDocs.includes(
+    issueScopeStatements.mat112ReviewOutputContract.toLowerCase(),
+  );
 
-  return mat112ClaimsCoreModel && mat113RulesEngineWorkIsMissing
-    ? [issueScopeStatements.mat112OutputContractFailure]
-    : [];
+  if (mat112ClaimsCoreModel) {
+    if (mat113RulesEngineWorkIsMissing) {
+      failureMessages.push(issueScopeStatements.mat112OutputContractFailure);
+    }
+  }
+
+  if (mat113IdentifiesProjectComplianceRulesEngine) {
+    if (mat112OutputContractEntryIsMissing) {
+      failureMessages.push(issueScopeStatements.mat112MissingOutputContractFailure);
+    }
+  }
+
+  return failureMessages;
 }
 
 describe("MAT-80 compliance pivot vocabulary docs", () => {
@@ -437,6 +458,38 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     expect(
       issueScopeFailureMessages(readCompliancePivotDocs()),
       "project docs must not identify MAT-112 as the project compliance source model",
+    ).toEqual([]);
+  });
+
+  it("fails when MAT-112 is omitted from the output contract map", () => {
+    // Given the docs identify "MAT-113" as the project compliance rules engine work
+    const docs = [
+      "# Compliance pivot issue map",
+      `- ${issueScopeStatements.mat113ProjectComplianceRulesEngineWork}`,
+    ].join("\n");
+
+    expect(docs, "fixture must identify MAT-113 as project compliance rules engine work").toContain(
+      issueScopeStatements.mat113ProjectComplianceRulesEngineWork,
+    );
+
+    // And the docs do not reference "MAT-112"
+    expect(docs.toLowerCase(), "fixture must omit MAT-112").not.toContain("mat-112");
+
+    // When the compliance pivot issue map is reviewed
+    const failureMessages = issueScopeFailureMessages(docs);
+
+    // Then the issue scope check fails
+    expect(failureMessages.length, "issue scope check must fail").toBeGreaterThan(0);
+
+    // And the failure identifies "MAT-112" as missing from the output contract map
+    expect(
+      failureMessages.join("\n"),
+      "issue scope failure must identify MAT-112 as missing from the output contract map",
+    ).toContain(issueScopeStatements.mat112MissingOutputContractFailure);
+
+    expect(
+      issueScopeFailureMessages(readCompliancePivotDocs()),
+      "project docs must include MAT-112 in the output contract map",
     ).toEqual([]);
   });
 
