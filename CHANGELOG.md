@@ -62,7 +62,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   vocabulary-term uniqueness, authority-path existence checks, existing
   snapshot-root validation, explicit vocabulary boundary scanning, malformed
   snapshot fallback rejection, ADR index header-alignment validation, and
-  Markdown-formatted finding-category misuse detection, plus bounded CI
+  Markdown-formatted finding-category misuse detection, plus authenticated bounded CI
   base-history fetches for PR/base diffing
   and missing new/revised ADR failures, plus helper-backed MAT-113 core-model
   issue-map coverage that keeps MAT-112 scoped to PR/review output instead of
@@ -122,7 +122,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   snapshot-pair coverage, validating CI fixture markers, keeping ADR assertions
   independent from ignored planning-doc fixtures, and allowing changed source
   docs to run without a sibling snapshot checkout, with runtime contract
-  authority-path validation and ADR index checks derived from changed ADR files.
+  authority-path validation and ADR index checks derived from changed ADR files,
+  including compact-row table validation.
 - `ci`: make workspace TypeScript resolution use package source entrypoints so
   `tsc -b` no longer depends on concurrently generated `dist` declarations
   during local hooks.

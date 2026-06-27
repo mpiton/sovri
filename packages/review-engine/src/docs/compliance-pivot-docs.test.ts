@@ -1051,7 +1051,7 @@ function adrIndexTableFailureMessages(indexMarkdown: string): string[] {
   const separatorCells =
     headerRowIndex === -1 ? [] : markdownTableCells(tableRows[headerRowIndex + 1] ?? "");
   const separatorAlignments = separatorCells.map(markdownTableSeparatorAlignment);
-  const dataRows = tableRows.filter((line) => /^\s*\| \[\d{3}\]/.test(line));
+  const dataRows = tableRows.filter(isAdrIndexDataRow);
 
   if (
     separatorCells.length !== headerColumnCount ||
@@ -1098,6 +1098,10 @@ function markdownTableCells(row: string): string[] {
     .split("|")
     .slice(1, -1)
     .map((cell) => cell.trim());
+}
+
+function isAdrIndexDataRow(row: string): boolean {
+  return /^\[\d{3}\]\(\.\/\d{3}-.+\.md\)$/.test(markdownTableCells(row)[0] ?? "");
 }
 
 function isMarkdownTableSeparatorCell(cell: string): boolean {
@@ -2008,6 +2012,7 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       "\t| [019](./019-otel-milestone-v0-6.md) | OpenTelemetry instrumentation deferred to v0.6 (revises ADR-006) | Accepted | 2026-06-02 |",
       " \t| [018](./018-github-checks-output-surface.md) | GitHub Checks API as a bot output surface | Accepted | 2026-06-02 |",
       "| [021](./021-compliance-only-review-taxonomy.md) | Compliance-only review taxonomy and prompt | Accepted | 2026-06-24 | extra |",
+      "|[023](./023-compact-row.md)|Compact row|Active|2026/06/27|",
       "| [022](./022-project-level-compliance-pivot.md) | Project-level compliance pivot vocabulary | Active | 2026/06/26 |",
     ].join("\n");
 
@@ -2023,7 +2028,7 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       failureMessages.filter(
         (message) => message === "ADR index rows must start at column 1 with a linked ADR id",
       ),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
     expect(failureMessages).toContain(
       "ADR index header separator must use GitHub Markdown alignment markers",
     );

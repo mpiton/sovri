@@ -24,7 +24,12 @@ jobs:
 
       - name: Fetch PR base history
         if: github.event_name == 'pull_request'
-        run: git fetch --no-tags --depth=100 origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          auth_header="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
+            fetch --no-tags --depth=100 origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
 
       - name: Enable pnpm for setup-node cache
         run: corepack enable

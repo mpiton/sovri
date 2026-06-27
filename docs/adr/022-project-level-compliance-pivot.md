@@ -27,7 +27,7 @@ The core vocabulary is:
 - **Control** - framework requirement that the project must satisfy.
 - **Rule** - technical verification attached to a control.
 - **Evidence** - collected proof or observation used to support a control result or compliance gap.
-- **FrameworkReference** - versioned framework citation with official text or source URL from a catalog, for example `GDPR Art. 5(1)(a)` with `https://gdpr-info.eu/art-5-gdpr/`.
+- **FrameworkReference** - versioned framework citation with official text or source URL from a catalog, for example `GDPR Art. 5(1)(a)` with `https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng`.
 
 `Finding` remains a diff/code issue raised during review. A `ComplianceGap` is
 project-level compliance output and must not be modeled as a `Finding` category
