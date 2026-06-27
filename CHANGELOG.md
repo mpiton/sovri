@@ -134,6 +134,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   omit uncatalogued ComplianceGaps from combined review output.
 - `review-engine`: compare Finding output CWE presence and value explicitly in
   the MAT-112 output-contract helper.
+- `review-engine`: harden MAT-112 Finding output-contract checks for malformed
+  rendered output, invalid CWE strings, and missing rendered compliance
+  references.
 - `review-engine`: address MAT-80 docs review feedback by centralizing
   compliance-pivot literals, tightening issue-scope and supersession checks, and
   validating ADR index row structure, with the docs-test contract loaded from a

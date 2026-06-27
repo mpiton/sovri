@@ -10,15 +10,17 @@ import type {
 } from "./compliance-gap-rendering.js";
 import { shouldEnrichCompliance } from "./compliance-gate.js";
 
+const CwePattern = /^CWE-\d+$/u;
+
 export interface FindingOutputContractOptions {
   readonly rendered_finding: RenderedFindingOutput;
 }
 
 export interface RenderedFindingOutput {
   readonly id: string;
-  readonly kind?: "Finding" | "ComplianceGap";
   readonly cwe?: string;
   readonly control_id?: string;
+  readonly reference_labels?: readonly string[];
 }
 
 export interface FindingOutputContractResult {
@@ -48,7 +50,18 @@ export function evaluateFindingOutputContract(
   finding: Finding,
   options: FindingOutputContractOptions,
 ): FindingOutputContractResult {
-  if (options.rendered_finding.id !== finding.id) {
+  const renderedFinding = (options as Partial<FindingOutputContractOptions> | undefined)
+    ?.rendered_finding;
+
+  if (!isRenderedFindingOutput(renderedFinding)) {
+    return failedFindingContract(
+      finding,
+      "rendered finding is malformed",
+      "Finding output contract checks require a rendered Finding object with an id",
+    );
+  }
+
+  if (renderedFinding.id !== finding.id) {
     return failedFindingContract(
       finding,
       "rendered finding id mismatch",
@@ -56,7 +69,7 @@ export function evaluateFindingOutputContract(
     );
   }
 
-  if (isRenderedComplianceGap(options.rendered_finding)) {
+  if (isRenderedComplianceGap(renderedFinding)) {
     return failedFindingContract(
       finding,
       "finding rendered only as a ComplianceGap",
@@ -64,11 +77,19 @@ export function evaluateFindingOutputContract(
     );
   }
 
-  if (!hasMatchingCwe(finding, options.rendered_finding)) {
+  if (!hasMatchingCwe(finding, renderedFinding)) {
     return failedFindingContract(
       finding,
       "CWE enrichment changed",
       "Finding output must preserve the source Finding CWE state and value",
+    );
+  }
+
+  if (!hasRenderedComplianceReferences(finding, renderedFinding)) {
+    return failedFindingContract(
+      finding,
+      "compliance references were lost",
+      "CWE-backed Findings must render the compliance references from the Finding enrichment path",
     );
   }
 
@@ -92,8 +113,9 @@ function buildFindingOutputItems(finding: Finding): readonly CombinedReviewOutpu
   }
 
   const enrichedFinding = enrichFindingCompliance(finding);
+  const referenceLabels = referenceLabelsFor(enrichedFinding);
 
-  if (enrichedFinding.compliance_references.length === 0) {
+  if (referenceLabels.length === 0) {
     return [];
   }
 
@@ -101,9 +123,7 @@ function buildFindingOutputItems(finding: Finding): readonly CombinedReviewOutpu
     {
       id: finding.id,
       path: "Finding enrichment path",
-      reference_labels: enrichedFinding.compliance_references.map((reference) =>
-        [reference.framework, reference.identifier].join(" "),
-      ),
+      reference_labels: referenceLabels,
     },
   ];
 }
@@ -128,15 +148,53 @@ function buildComplianceGapOutputItems(
 }
 
 function isRenderedComplianceGap(renderedFinding: RenderedFindingOutput): boolean {
-  return renderedFinding.kind === "ComplianceGap" || renderedFinding.control_id !== undefined;
+  return renderedFinding.control_id !== undefined;
 }
 
 function hasMatchingCwe(finding: Finding, renderedFinding: RenderedFindingOutput): boolean {
-  if (finding.cwe === undefined) {
-    return renderedFinding.cwe === undefined;
+  if (!hasValidOptionalCwe(finding.cwe) || !hasValidOptionalCwe(renderedFinding.cwe)) {
+    return false;
   }
 
   return renderedFinding.cwe === finding.cwe;
+}
+
+function hasRenderedComplianceReferences(
+  finding: Finding,
+  renderedFinding: RenderedFindingOutput,
+): boolean {
+  const expectedLabels = shouldEnrichCompliance(finding)
+    ? referenceLabelsFor(enrichFindingCompliance(finding))
+    : [];
+
+  if (expectedLabels.length === 0) {
+    return (
+      renderedFinding.reference_labels === undefined ||
+      renderedFinding.reference_labels.length === 0
+    );
+  }
+
+  return expectedLabels.every((expectedLabel) =>
+    (renderedFinding.reference_labels ?? []).includes(expectedLabel),
+  );
+}
+
+function hasValidOptionalCwe(cwe: string | undefined): boolean {
+  return cwe === undefined || CwePattern.test(cwe);
+}
+
+function isRenderedFindingOutput(value: unknown): value is RenderedFindingOutput {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  return typeof Reflect.get(value, "id") === "string";
+}
+
+function referenceLabelsFor(finding: Finding): readonly string[] {
+  return finding.compliance_references.map((reference) =>
+    [reference.framework, reference.identifier].join(" "),
+  );
 }
 
 function failedFindingContract(
