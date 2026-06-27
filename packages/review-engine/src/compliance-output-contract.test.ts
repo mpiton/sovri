@@ -257,7 +257,27 @@ describe("Non-CWE compliance gaps have a complete output contract", () => {
     );
 
     expect(Reflect.get(validation, "publishable")).toBe(false);
-    expect(Reflect.get(validation, "missing_field")).toEqual(expect.stringMatching(/^id: .+/));
+    expect(Reflect.get(validation, "missing_field")).toBe("id: must not be blank");
+  });
+
+  it("rejects a CWE-bearing Finding-shaped input instead of stripping Finding fields", () => {
+    const gap = {
+      id: "gap-tracker-consent-015",
+      ...cataloguedControl,
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      status: "WARNING",
+      severity: "major",
+      remediation_guidance: remediationGuidance,
+      cwe: "CWE-79",
+      category: "security",
+    };
+
+    const validation = expectPlainObject(
+      callExport("validateComplianceGapOutput", gap, { catalog }),
+    );
+
+    expect(Reflect.get(validation, "publishable")).toBe(false);
+    expect(Reflect.get(validation, "missing_field")).toEqual(expect.stringContaining("cwe"));
   });
 });
 

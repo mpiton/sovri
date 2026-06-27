@@ -6,7 +6,7 @@ import { z } from "zod";
 const RequiredStringSchema = z.string().trim().min(1);
 const SourceUrlSchema = z.string().trim().url();
 
-const ComplianceGapInputSchema = z.object({
+const ComplianceGapInputSchema = z.strictObject({
   id: RequiredStringSchema.optional(),
   framework_id: RequiredStringSchema,
   control_id: RequiredStringSchema,
@@ -109,7 +109,7 @@ export function serializeComplianceGapOutput(
 }
 
 function buildOutput(input: ComplianceGapInput): ComplianceGapOutput {
-  return ComplianceGapOutputSchema.parse({
+  return {
     type: "ComplianceGap",
     framework_id: input.framework_id,
     control_id: input.control_id,
@@ -118,12 +118,16 @@ function buildOutput(input: ComplianceGapInput): ComplianceGapOutput {
     status: input.status,
     severity: input.severity,
     remediation_guidance: input.remediation_guidance,
-  });
+  };
 }
 
 function findMissingRequiredField(input: unknown): string | undefined {
   if (!isRecord(input)) {
     return "framework id";
+  }
+
+  if (typeof input.id === "string" && input.id.trim().length === 0) {
+    return "id: must not be blank";
   }
 
   for (const property of ComplianceGapInputSchema.keyof().options) {

@@ -5664,6 +5664,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `review-engine`: include the first schema validation issue in generic
   `ComplianceGap` output validation failures and cover provided blank gap ids.
+- `review-engine`: reject CWE-bearing or otherwise Finding-shaped inputs from
+  the non-CWE `ComplianceGap` output contract.
 
 - `@sovri/observability`: `NODE_ENV` is now compared case-insensitively against `"production"` so mixed-case values disable the pretty transport, and `pino-pretty` resolvability is probed before enabling the transport so production-pruned installs fall back to JSON instead of crashing the worker. (#85)
 
