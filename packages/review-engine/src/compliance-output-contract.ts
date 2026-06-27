@@ -29,8 +29,9 @@ export interface ComplianceOutputContractReviewResult {
 
 const COMPLIANCE_OUTPUT_TERMS = ["Finding", "ComplianceGap", "ControlResult"] as const;
 const COMPLIANCE_GAP_FINDING_CATEGORY_PATTERN =
-  /\bComplianceGap\b\s+is\s+a\s+Finding\s+category\b(?:\s+emitted\s+by\s+PR\s+review\b)?/i;
-const LLM_SOURCE_REFERENCE_REQUEST = "write the gdpr source url for each compliance gap";
+  /(?:^|\s)(?:`|\*\*)?\bComplianceGap\b(?:`|\*\*)?\s+is\s+a\s+\bFinding\b\s+category\b(?:\s+emitted\s+by\s+PR\s+review\b)?/i;
+const LLM_SOURCE_REFERENCE_REQUEST_PATTERN =
+  /\b(?:write|provide|generate)\b.*\b(?:gdpr|dora|nis2|ai act)\b.*\bsource\s+urls?\b.*\bcompliance\s+gap\b/i;
 
 export function reviewComplianceOutputContract(
   artifactSet: ComplianceOutputContractArtifactSet,
@@ -38,6 +39,7 @@ export function reviewComplianceOutputContract(
   const definitions = collectDefinitions(artifactSet.docs);
   const schema = reviewSchemaContract(artifactSet.schemas);
   const failures = [
+    ...definitionFailures(definitions),
     ...findingCategoryFailures(artifactSet.docs),
     ...promptSourceReferenceFailures(artifactSet.prompts),
     ...schemaFailures(schema),
@@ -102,9 +104,17 @@ function findingCategoryFailures(docs: readonly string[]): readonly string[] {
 }
 
 function promptSourceReferenceFailures(prompts: readonly string[]): readonly string[] {
-  return prompts.some((prompt) => prompt.toLowerCase().includes(LLM_SOURCE_REFERENCE_REQUEST))
+  return prompts.some((prompt) => LLM_SOURCE_REFERENCE_REQUEST_PATTERN.test(prompt))
     ? ["framework references and source URLs must come from the catalog"]
     : [];
+}
+
+function definitionFailures(
+  definitions: Readonly<Record<ComplianceOutputTerm, string>>,
+): readonly string[] {
+  return COMPLIANCE_OUTPUT_TERMS.filter((term) => definitions[term] === "").map(
+    (term) => `${term} definition is required`,
+  );
 }
 
 function schemaFailures(schema: ComplianceOutputContractReviewResult["schema"]): readonly string[] {

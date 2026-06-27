@@ -3,33 +3,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import * as reviewEngine from "./index.js";
-
-type ComplianceOutputTerm = "Finding" | "ComplianceGap" | "ControlResult";
-
-interface ComplianceOutputContractSchema {
-  readonly name: ComplianceOutputTerm;
-  readonly fields: readonly string[];
-  readonly required?: readonly string[];
-  readonly categories?: readonly string[];
-}
-
-interface ComplianceOutputContractArtifactSet {
-  readonly prompts: readonly string[];
-  readonly schemas: readonly ComplianceOutputContractSchema[];
-  readonly docs: readonly string[];
-}
-
-interface ComplianceOutputContractReviewResult {
-  readonly passed: boolean;
-  readonly definitions: Readonly<Record<ComplianceOutputTerm, string>>;
-  readonly failures: readonly string[];
-  readonly schema: {
-    readonly separate_contract_types: boolean;
-    readonly compliance_gap_requires_cwe: boolean;
-    readonly finding_has_compliance_category: boolean;
-  };
-}
+import {
+  reviewComplianceOutputContract,
+  type ComplianceOutputContractArtifactSet,
+  type ComplianceOutputContractSchema,
+  type ComplianceOutputTerm,
+} from "./index.js";
 
 const VALID_CONTRACT_ARTIFACTS = {
   prompts: [
@@ -136,6 +115,29 @@ describe("R-06: Prompt, schema, and docs distinguish Finding from ComplianceGap 
     );
   });
 
+  it("rejects Markdown-wrapped ComplianceGap Finding-category misuse", () => {
+    const artifactSet = replaceDocs(["`ComplianceGap` is a Finding category emitted by PR review"]);
+
+    const review = reviewComplianceOutputContract(artifactSet);
+
+    expect(review.passed).toBe(false);
+    expect(review.failures.join("\n")).toContain(
+      "ComplianceGap is project-level compliance output",
+    );
+  });
+
+  it("rejects missing required term definitions before passing", () => {
+    const artifactSet = replaceDocs([
+      "Finding - diff/code issue raised during review",
+      "ComplianceGap - project-level compliance output for an unmet control or missing evidence",
+    ]);
+
+    const review = reviewComplianceOutputContract(artifactSet);
+
+    expect(review.passed).toBe(false);
+    expect(review.failures).toContain("ControlResult definition is required");
+  });
+
   it("rejects prompts that ask the LLM to author regulatory source references", () => {
     // Given the prompt says "write the GDPR source URL for each compliance gap"
     const artifactSet = replacePrompts(["write the GDPR source URL for each compliance gap"]);
@@ -151,26 +153,21 @@ describe("R-06: Prompt, schema, and docs distinguish Finding from ComplianceGap 
       "framework references and source URLs must come from the catalog",
     );
   });
+
+  it.each([
+    "provide the GDPR source URL for each compliance gap",
+    "generate the DORA source URL for each compliance gap",
+  ])("rejects equivalent prompt source-reference request: %s", (prompt) => {
+    const artifactSet = replacePrompts([prompt]);
+
+    const review = reviewComplianceOutputContract(artifactSet);
+
+    expect(review.passed).toBe(false);
+    expect(review.failures.join("\n")).toContain(
+      "framework references and source URLs must come from the catalog",
+    );
+  });
 });
-
-function reviewComplianceOutputContract(
-  artifactSet: ComplianceOutputContractArtifactSet,
-): ComplianceOutputContractReviewResult {
-  const candidate = (
-    reviewEngine as {
-      readonly reviewComplianceOutputContract?: (
-        artifactSet: ComplianceOutputContractArtifactSet,
-      ) => ComplianceOutputContractReviewResult;
-    }
-  ).reviewComplianceOutputContract;
-
-  if (typeof candidate !== "function") {
-    expect(candidate, "reviewComplianceOutputContract export is required").toBeTypeOf("function");
-    throw new Error("reviewComplianceOutputContract export is required");
-  }
-
-  return candidate(artifactSet);
-}
 
 function findContractSchema(
   artifactSet: ComplianceOutputContractArtifactSet,
