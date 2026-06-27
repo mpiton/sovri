@@ -102,7 +102,24 @@ export {
   renderComplianceGapProjectReportOutput,
   renderComplianceGapPullRequestOutput,
 } from "./compliance-gap-rendering.js";
-export type { ComplianceGapPublishabilityResult } from "./compliance-gap-rendering.js";
+export type {
+  CataloguedControlReference,
+  ComplianceGapPublishabilityResult,
+  ComplianceGapRenderInput,
+} from "./compliance-gap-rendering.js";
+
+export {
+  buildCombinedReviewOutputModel,
+  evaluateFindingOutputContract,
+} from "./finding-output-contract.js";
+export type {
+  CombinedReviewOutputItem,
+  CombinedReviewOutputModel,
+  CombinedReviewOutputModelInput,
+  FindingOutputContractOptions,
+  FindingOutputContractResult,
+  RenderedFindingOutput,
+} from "./finding-output-contract.js";
 
 export {
   classifyResolvedComments,

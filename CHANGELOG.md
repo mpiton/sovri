@@ -21,6 +21,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `review-engine`: add output-contract helpers that keep CWE-backed Findings on
+  the existing enrichment path while non-CWE ComplianceGaps use catalogued
+  control references.
 - `review-engine`: add MAT-112 ATDD coverage proving CWE-backed Findings keep
   the existing enrichment path alongside non-CWE ComplianceGap output.
 - `review-engine`: add MAT-112 ATDD coverage for uncatalogued compliance gaps
