@@ -2,7 +2,7 @@
 // Copyright 2026 Sovri contributors
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -212,13 +212,19 @@ function formatStaleSnapshotFailure(input: { sourcePath: string; snapshotPath: s
   return `${input.snapshotPath} is stale because ${input.sourcePath} changed without a matching snapshot change`;
 }
 
+function hasChangedPath(changedPaths: readonly string[], docPath: string): boolean {
+  const resolvedDocPath = resolve(projectRoot, docPath);
+
+  return changedPaths.some((changedPath) => resolve(projectRoot, changedPath) === resolvedDocPath);
+}
+
 function staleSnapshotFailureMessages(input: {
   changedPaths: readonly string[];
   sourcePath: string;
   snapshotPath: string;
 }): string[] {
-  const sourceChanged = input.changedPaths.includes(input.sourcePath);
-  const snapshotChanged = input.changedPaths.includes(input.snapshotPath);
+  const sourceChanged = hasChangedPath(input.changedPaths, input.sourcePath);
+  const snapshotChanged = hasChangedPath(input.changedPaths, input.snapshotPath);
 
   return sourceChanged && !snapshotChanged ? [formatStaleSnapshotFailure(input)] : [];
 }
