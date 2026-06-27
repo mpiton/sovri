@@ -41,14 +41,17 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   plus helper-backed unmentioned-MAT-77 supersession-history coverage,
   helper-backed issue-scope separation coverage for MAT-112 and MAT-113,
   including wrapped ADR bullet continuation lines and sentence-level
-  affirmative scope checks, and helper-backed path-normalized stale-snapshot
-  violation detection with formatted failure messaging for source/snapshot docs
-  change sets, plus flexible unchanged-source coverage that avoids snapshot
-  churn for ADR-only changes, plus helper-backed ADR-index coverage for new or
-  revised ADR entries and missing new/revised ADR failures, plus helper-backed
-  MAT-113 core-model issue-map coverage that keeps MAT-112 scoped to PR/review
-  output instead of the core model, with indentation-bound issue block parsing
-  that preserves nested issue-map details.
+  affirmative scope checks, helper-backed source/snapshot vocabulary sync
+  coverage with real snapshot verification when the sibling `../sovri-docs`
+  checkout is present and CI-safe fixture-backed fallback coverage, and
+  helper-backed path-normalized stale-snapshot violation detection with
+  formatted failure messaging for source/snapshot docs change sets, plus
+  flexible unchanged-source coverage that avoids snapshot churn for ADR-only
+  changes, plus helper-backed ADR-index coverage for new or revised ADR entries
+  and missing new/revised ADR failures, plus helper-backed MAT-113 core-model
+  issue-map coverage that keeps MAT-112 scoped to PR/review output instead of
+  the core model, with indentation-bound issue block parsing that preserves
+  nested issue-map details.
 
 ### Changed
 
