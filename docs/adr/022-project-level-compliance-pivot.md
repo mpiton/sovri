@@ -35,7 +35,10 @@ or an enum-only review category.
 
 Automatic output must say "potential compliance gap" or "requires review", not
 "legal violation". Official framework text and source URLs come from versioned
-catalogs, never LLM output.
+catalogs, never LLM output. Catalog changes are reviewed as versioned source
+updates: each entry must carry the upstream framework version or publication
+date plus an official source URL, and the catalog review must refresh stale
+citations before the rules engine consumes new framework text.
 
 ## Consequences
 
@@ -49,7 +52,9 @@ catalogs, never LLM output.
   output. It is scoped to PR/review output and is not the core domain model.
 - MAT-113 owns the project compliance rules engine work and core
   rules-engine implementation shape.
-- Framework catalogs must be versioned inputs to the engine.
+- Framework catalogs must be versioned inputs to the engine, with catalog
+  freshness and source-url checks handled during catalog update review rather
+  than by LLM-generated text.
 
 ## Rejected alternatives
 

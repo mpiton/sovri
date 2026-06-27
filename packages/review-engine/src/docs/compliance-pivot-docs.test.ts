@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri contributors
 
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +16,7 @@ const compliancePivotContract = readCompliancePivotContract();
 const {
   activeImplementationStatements,
   adrIndexExamples,
+  contractSource,
   issueModelStatements,
   issueScopeExamples,
   issueScopeStatements,
@@ -29,6 +31,7 @@ const {
 const pivotAdrIndexExample = findRequiredAdrIndexExample(
   "docs/adr/022-project-level-compliance-pivot.md",
 );
+const pullRequestChangedPaths = readPrChangedPaths();
 const complianceGapFindingCategoryMisuse = {
   ...compliancePivotContract.complianceGapFindingCategoryMisuse,
   pattern: new RegExp(compliancePivotContract.complianceGapFindingCategoryMisuse.pattern, "i"),
@@ -36,6 +39,10 @@ const complianceGapFindingCategoryMisuse = {
 
 type CompliancePivotContract = {
   activeImplementationStatements: Record<string, string>;
+  contractSource: {
+    authorityPath: string;
+    updateRule: string;
+  };
   adrIndexExamples: readonly {
     changeType: string;
     adrPath: string;
@@ -86,8 +93,7 @@ function snapshotVocabularyTerms(): readonly string[] {
 }
 
 function uniqueStrings(values: readonly string[]): readonly string[] {
-  const seen = new Set<string>();
-  const uniqueValues: string[] = [];
+  const uniqueValuesByKey = new Map<string, string>();
 
   for (const value of values) {
     const normalized = normalizeVocabularyTerm(value);
@@ -96,13 +102,12 @@ function uniqueStrings(values: readonly string[]): readonly string[] {
     }
 
     const key = normalized.toUpperCase();
-    if (!seen.has(key)) {
-      uniqueValues.push(normalized);
-      seen.add(key);
+    if (!uniqueValuesByKey.has(key)) {
+      uniqueValuesByKey.set(key, normalized);
     }
   }
 
-  return uniqueValues;
+  return [...uniqueValuesByKey.values()];
 }
 
 function normalizeVocabularyTerm(value: string): string {
@@ -166,6 +171,39 @@ function readCompliancePivotContract(): CompliancePivotContract {
   return JSON.parse(
     readFileSync(join(adrDocsRoot, "compliance-pivot-contract.json"), "utf8"),
   ) as CompliancePivotContract;
+}
+
+function readPrChangedPaths(): readonly string[] {
+  const baseRefCandidates = uniqueStrings([
+    process.env.GITHUB_BASE_REF ? `origin/${process.env.GITHUB_BASE_REF}` : "",
+    process.env.GITHUB_BASE_REF ?? "",
+    "origin/main",
+    "main",
+  ]);
+  const failures: string[] = [];
+
+  for (const baseRef of baseRefCandidates) {
+    try {
+      const mergeBase = execGit(["merge-base", baseRef, "HEAD"]);
+      return execGit(["diff", "--name-only", `${mergeBase}...HEAD`])
+        .split(/\r?\n/)
+        .map((changedPath) => changedPath.trim())
+        .filter((changedPath) => changedPath.length > 0);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      failures.push(`${baseRef}: ${message}`);
+    }
+  }
+
+  throw new Error(`Could not read PR changed paths: ${failures.join("; ")}`);
+}
+
+function execGit(args: readonly string[]): string {
+  return execFileSync("git", args, {
+    cwd: projectRoot,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
 }
 
 function readProjectDoc(docPath: string): string {
@@ -261,7 +299,9 @@ function issueHistoryFailureMessages(_docs: string): string[] {
   const failureMessages: string[] = [];
   const hasActiveMat77 =
     _docs.includes(activeMat77Statement()) ||
-    (_docs.includes("MAT-77") && _docs.includes("Active compliance implementation work"));
+    activeImplementationWorkBlocks(_docs).some((block) =>
+      block.includes(supersessionStatements.mat77),
+    );
   const hasMat77SupersededByMat113 =
     _docs.includes(activeImplementationStatements.mat77IsSupersededByMat113) ||
     _docs.includes(supersessionStatements.mat113SupersedesMat77);
@@ -281,6 +321,47 @@ function issueHistoryFailureMessages(_docs: string): string[] {
   }
 
   return failureMessages;
+}
+
+function activeImplementationWorkBlocks(docs: string): string[] {
+  const lines = docs.split(/\r?\n/);
+  const blocks: string[] = [];
+
+  for (const [index, line] of lines.entries()) {
+    if (!isActiveImplementationWorkHeading(line)) {
+      continue;
+    }
+
+    const blockLines = [line];
+    for (const nextLine of lines.slice(index + 1)) {
+      const trimmedLine = nextLine.trim();
+      if (
+        trimmedLine.length === 0 ||
+        trimmedLine.startsWith("#") ||
+        (!trimmedLine.startsWith("-") &&
+          !trimmedLine.startsWith("*") &&
+          indentationLength(nextLine) === 0)
+      ) {
+        break;
+      }
+
+      blockLines.push(nextLine);
+    }
+
+    blocks.push(blockLines.join("\n"));
+  }
+
+  return blocks;
+}
+
+function isActiveImplementationWorkHeading(line: string): boolean {
+  const normalizedLine = line
+    .trim()
+    .replace(/^#+\s*/, "")
+    .replace(/:$/, "")
+    .toLowerCase();
+
+  return normalizedLine === "active compliance implementation work";
 }
 
 function issueScopeFailureMessages(_docs: string): string[] {
@@ -420,10 +501,20 @@ function staleSnapshotFailureMessages(input: {
   sourcePath: string;
   snapshotPath: string;
 }): string[] {
-  const sourceChanged = hasChangedPath(input.changedPaths, input.sourcePath);
-  const snapshotChanged = hasChangedPath(input.changedPaths, input.snapshotPath);
+  const { sourceChanged, snapshotChanged } = snapshotChangeState(input);
 
   return sourceChanged && !snapshotChanged ? [formatStaleSnapshotFailure(input)] : [];
+}
+
+function snapshotChangeState(input: {
+  changedPaths: readonly string[];
+  sourcePath: string;
+  snapshotPath: string;
+}): { sourceChanged: boolean; snapshotChanged: boolean } {
+  return {
+    sourceChanged: hasChangedPath(input.changedPaths, input.sourcePath),
+    snapshotChanged: hasChangedPath(input.changedPaths, input.snapshotPath),
+  };
 }
 
 function snapshotSyncFailureMessages(input: {
@@ -432,7 +523,12 @@ function snapshotSyncFailureMessages(input: {
   snapshotPath: string;
   docsByPath: Readonly<Record<string, string>>;
 }): string[] {
+  const { sourceChanged, snapshotChanged } = snapshotChangeState(input);
   const failureMessages = staleSnapshotFailureMessages(input);
+  if (!sourceChanged && !snapshotChanged) {
+    return failureMessages;
+  }
+
   const sourceDocs = input.docsByPath[input.sourcePath] ?? "";
   const snapshotDocs = input.docsByPath[input.snapshotPath] ?? "";
   const vocabulary = snapshotVocabularyTerms();
@@ -529,12 +625,23 @@ function shouldUseIgnoredProjectDocSnapshotFixture(
 function snapshotVocabularyFixtureDoc(snapshotPath: string, sourceDocs: string): string {
   const heading = `# ${basename(snapshotPath)}`;
   const sourceVocabulary = snapshotVocabularyTermSet(sourceDocs);
+  const vocabularyLines = snapshotVocabularyTerms()
+    .filter((term) => sourceVocabulary.has(term))
+    .map((term) => `- ${term}`);
 
   return [
     heading,
-    ...snapshotVocabularyTerms()
-      .filter((term) => sourceVocabulary.has(term))
-      .map((term) => `- ${term}`),
+    "",
+    "## Compliance pivot vocabulary",
+    "",
+    "This CI fixture mirrors the compliance pivot vocabulary from the ignored source document.",
+    "",
+    ...vocabularyLines,
+    "",
+    "## Snapshot scope",
+    "",
+    `- Source fixture: ${IGNORED_PROJECT_DOC_FIXTURE_MARKER}`,
+    `- Snapshot target: ${snapshotPath}`,
   ].join("\n");
 }
 
@@ -605,6 +712,14 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     expect(pivotAdr, "pivot ADR must explain context").toContain("## Context");
     expect(pivotAdr, "pivot ADR must record the decision").toContain("## Decision");
     expect(pivotAdr, "pivot ADR must record consequences").toContain("## Consequences");
+    expect(
+      pivotAdr,
+      "contract authority must be the ADR that defines the compliance pivot vocabulary",
+    ).toContain(`# ADR-${adrNumberFromPath(contractSource.authorityPath)}`);
+    expect(
+      contractSource.updateRule,
+      "contract update rule must require vocabulary changes and contract changes to stay together",
+    ).toContain("same PR");
     expect(
       findingCategoryFailureMessages(docs),
       `${complianceGapFindingCategoryMisuse.term} must not be documented as a Finding category`,
@@ -915,10 +1030,10 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
   });
 
   it.each(snapshotDocPairs)(
-    "requires a matching snapshot change when %s changes",
+    "requires a matching snapshot change in the real PR change set when %s changes",
     ({ sourcePath, snapshotPath }) => {
-      // Given the compliance pivot change modifies "<source_path>"
-      const changedPaths = [sourcePath, snapshotPath] as const;
+      // Given the real pull request change set is reviewed
+      const changedPaths = pullRequestChangedPaths;
       const docsByPath = syncedSnapshotDocs(sourcePath, snapshotPath);
       if (docsByPath[sourcePath]?.includes(IGNORED_PROJECT_DOC_FIXTURE_MARKER)) {
         expect(
@@ -935,12 +1050,15 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
         docsByPath,
       });
 
-      // Then the change set also modifies "<snapshot_path>"
-      expect(changedPaths, `${snapshotPath} must be part of the change set`).toContain(
-        snapshotPath,
-      );
+      // Then any real "<source_path>" change also modifies "<snapshot_path>"
+      if (hasChangedPath(changedPaths, sourcePath)) {
+        expect(
+          hasChangedPath(changedPaths, snapshotPath),
+          `${snapshotPath} must be part of the real pull request change set`,
+        ).toBe(true);
+      }
 
-      // And "<snapshot_path>" contains the same compliance pivot vocabulary as "<source_path>"
+      // And changed snapshot/source pairs carry the same compliance pivot vocabulary
       expect(
         failureMessages,
         `${snapshotPath} must contain the source compliance vocabulary`,
@@ -1026,6 +1144,21 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       failureMessages.join("\n"),
       "snapshot sync failure must not use substring matching for vocabulary terms",
     ).toContain("Control");
+  });
+
+  it("detects vocabulary terms only at explicit text boundaries", () => {
+    expect(containsVocabularyTerm("Control.", "Control"), "punctuation must end a term").toBe(true);
+    expect(containsVocabularyTerm("(Control)", "Control"), "punctuation must wrap a term").toBe(
+      true,
+    );
+    expect(
+      containsVocabularyTerm("ControlResult", "Control"),
+      "overlapping terms must not satisfy shorter terms",
+    ).toBe(false);
+    expect(
+      containsVocabularyTerm("control", "Control"),
+      "term matching must stay case-sensitive",
+    ).toBe(false);
   });
 
   it.each(snapshotDocPairs)(
@@ -1299,6 +1432,36 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
 
     // Then the issue history check still fails because MAT-77 must not remain active
     expect(failureMessages).toContain(activeImplementationStatements.mat77StillActiveFailure);
+  });
+
+  it("keeps superseded MAT-77 history separate from another active implementation block", () => {
+    // Given the docs list active implementation work without MAT-77
+    const docs = [
+      "# Compliance implementation history",
+      "Active compliance implementation work:",
+      `- ${traceabilityStatements.mat113RulesEngine}`,
+      "",
+      "Supersession history:",
+      `- ${traceabilityStatements.mat77Superseded}`,
+      `- ${supersessionStatements.mat113SupersedesMat77}`,
+    ].join("\n");
+
+    expect(
+      activeImplementationWorkBlocks(docs).join("\n"),
+      "active block must omit MAT-77",
+    ).not.toContain(supersessionStatements.mat77);
+    expect(docs, "fixture must keep MAT-77 in supersession history").toContain(
+      traceabilityStatements.mat77Superseded,
+    );
+
+    // When the compliance pivot history is reviewed
+    const failureMessages = issueHistoryFailureMessages(docs);
+
+    // Then the active-work check does not treat superseded history as active work
+    expect(
+      failureMessages,
+      "superseded MAT-77 history must not fail the active-work guard",
+    ).toEqual([]);
   });
 
   it("fails when MAT-113 supersedes an unmentioned MAT-77", () => {

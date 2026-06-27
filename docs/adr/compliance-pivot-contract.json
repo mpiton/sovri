@@ -5,6 +5,10 @@
     "missingMat77SupersessionFailure": "MAT-77 missing superseded-by-MAT-113 relationship",
     "missingMat77HistoryFailure": "MAT-77 missing from supersession history"
   },
+  "contractSource": {
+    "authorityPath": "docs/adr/022-project-level-compliance-pivot.md",
+    "updateRule": "Update this contract in the same PR as MAT-80 vocabulary or issue-map documentation changes"
+  },
   "adrIndexExamples": [
     {
       "changeType": "creates",

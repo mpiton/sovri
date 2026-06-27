@@ -51,8 +51,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   limited to absent sibling checkouts, plus
   helper-backed path-normalized stale-snapshot violation detection with
   formatted failure messaging for source/snapshot docs change sets, plus
-  flexible unchanged-source coverage that avoids snapshot churn for ADR-only
-  changes, plus helper-backed ADR-index coverage for new or revised ADR entries
+  real PR change-set snapshot enforcement, flexible unchanged-source coverage
+  that avoids snapshot churn for ADR-only changes, plus direct vocabulary-boundary
+  coverage, structured snapshot fixtures, scoped active-work MAT-77 detection,
+  and helper-backed ADR-index coverage for new or revised ADR entries
   and missing new/revised ADR failures, plus helper-backed MAT-113 core-model
   issue-map coverage that keeps MAT-112 scoped to PR/review output instead of
   the core model, with indentation-bound issue block parsing that preserves
