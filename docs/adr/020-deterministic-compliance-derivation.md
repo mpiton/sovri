@@ -1,4 +1,4 @@
-# ADR-020 — Deterministic compliance reference derivation when the model omits the CWE
+# ADR-020 — Deterministic compliance derivation
 
 **Status:** Accepted
 **Date:** 2026-06-19
