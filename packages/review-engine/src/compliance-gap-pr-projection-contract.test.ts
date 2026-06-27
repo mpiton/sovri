@@ -150,7 +150,7 @@ describe("PR output filters gaps by change relation while reports show all gaps"
         catalog: cataloguedControls,
         changed_files: ["web/app/layout.tsx"],
         relations: [{ gap_id: "gap-audit-logging-001", file: "api/audit/log.ts" }],
-        pull_request_output: "potential compliance gap\ngap-audit-logging-001",
+        pull_request_output: "potential compliance gap\nGap id: gap-audit-logging-001",
       }),
     );
 
@@ -162,6 +162,32 @@ describe("PR output filters gaps by change relation while reports show all gaps"
     expect(Reflect.get(evaluation, "explanation")).toContain(
       "PR output is limited to change-related compliance gaps",
     );
+  });
+
+  it("matches published gap ids exactly when checking PR projection output", () => {
+    const prefixGaps = [
+      {
+        id: "gap-audit-logging-001",
+        control_id: "internal-critical-audit-logging",
+        evidence: "api/audit/log.ts does not persist critical operation events",
+      },
+      {
+        id: "gap-audit-logging-001-extra",
+        control_id: "internal-critical-audit-logging",
+        evidence: "web/app/layout.tsx writes the related audit event",
+      },
+    ] as const;
+
+    const evaluation = expectPlainObject(
+      callExport("evaluateComplianceGapPullRequestProjection", prefixGaps, {
+        catalog: cataloguedControls,
+        changed_files: ["web/app/layout.tsx"],
+        relations: [{ gap_id: "gap-audit-logging-001-extra", file: "web/app/layout.tsx" }],
+        pull_request_output: "potential compliance gap\nGap id: gap-audit-logging-001-extra",
+      }),
+    );
+
+    expect(Reflect.get(evaluation, "output_contract_check")).toBe("passed");
   });
 
   it("uses the same PR filter for route and dependency relations", () => {

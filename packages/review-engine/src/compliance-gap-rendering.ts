@@ -121,15 +121,10 @@ export function renderComplianceGapPullRequestProjection(
     return "";
   }
 
-  const relations = options.relations;
+  const renderOptions = buildPullRequestRenderOptions(options, options.relations);
 
   return gaps
-    .map((gap) =>
-      renderPullRequestProjectionItem(gap, {
-        ...options,
-        relations,
-      }),
-    )
+    .map((gap) => renderPullRequestProjectionItem(gap, renderOptions))
     .filter((output) => output.length > 0)
     .join("\n\n");
 }
@@ -204,9 +199,10 @@ export function evaluateComplianceGapPullRequestProjection(
 ): ComplianceGapPullRequestProjectionEvaluationResult {
   const pullRequestOutput =
     options.pull_request_output ?? renderComplianceGapPullRequestProjection(gaps, options);
+  const publishedGapIds = extractPublishedGapIds(pullRequestOutput);
 
   const unrelatedPublishedGap = gaps.find(
-    (gap) => pullRequestOutput.includes(gap.id) && !isRelatedToChangedEntity(gap, options),
+    (gap) => publishedGapIds.has(gap.id) && !isRelatedToChangedEntity(gap, options),
   );
 
   if (unrelatedPublishedGap !== undefined) {
@@ -219,6 +215,21 @@ export function evaluateComplianceGapPullRequestProjection(
 
   return {
     output_contract_check: "passed",
+  };
+}
+
+function buildPullRequestRenderOptions(
+  options: ComplianceGapPullRequestProjectionOptions,
+  relations: readonly ComplianceGapRelation[],
+): ComplianceGapPullRequestRenderOptions {
+  return {
+    catalog: options.catalog,
+    relations,
+    ...(options.changed_files === undefined ? {} : { changed_files: options.changed_files }),
+    ...(options.changed_routes === undefined ? {} : { changed_routes: options.changed_routes }),
+    ...(options.changed_dependencies === undefined
+      ? {}
+      : { changed_dependencies: options.changed_dependencies }),
   };
 }
 
@@ -284,4 +295,23 @@ function relationValueChanged(
   changedValues: readonly string[] = [],
 ): boolean {
   return value !== undefined && changedValues.includes(value);
+}
+
+function extractPublishedGapIds(output: string): ReadonlySet<string> {
+  const gapIds = new Set<string>();
+
+  for (const line of output.split(/\r?\n/u)) {
+    const trimmedLine = line.trim();
+    const gapIdPrefix = "Gap id:";
+
+    if (trimmedLine.startsWith(gapIdPrefix)) {
+      const gapId = trimmedLine.slice(gapIdPrefix.length).trim();
+
+      if (gapId.length > 0) {
+        gapIds.add(gapId);
+      }
+    }
+  }
+
+  return gapIds;
 }
