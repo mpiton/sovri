@@ -108,6 +108,21 @@ const issueModelStatements = {
   coreModel: "Framework -> Control -> Rule -> Evidence",
   prReviewOutput: "PR/review output",
 } as const;
+const snapshotVocabulary = [
+  "Finding",
+  ...requiredDefinitions.map(({ term }) => term),
+  "MAT-77",
+  "MAT-112",
+  "MAT-113",
+  supersessionStatements.mat113SupersedesMat77,
+  traceabilityStatements.mat77Superseded,
+  traceabilityStatements.mat113RulesEngine,
+  issueScopeStatements.mat112ReviewOutputContract,
+  issueScopeStatements.mat113ProjectComplianceRulesEngineWork,
+  modelSplitStatements.sourceModel,
+  modelSplitStatements.complianceGapOutput,
+  modelSplitStatements.prProjection,
+] as const;
 const complianceGapFindingCategoryMisuse = {
   term: "ComplianceGap",
   statement: "ComplianceGap is a Finding category emitted by PR review",
@@ -368,6 +383,59 @@ function staleSnapshotFailureMessages(input: {
   const snapshotChanged = hasChangedPath(input.changedPaths, input.snapshotPath);
 
   return sourceChanged && !snapshotChanged ? [formatStaleSnapshotFailure(input)] : [];
+}
+
+function snapshotSyncFailureMessages(input: {
+  changedPaths: readonly string[];
+  sourcePath: string;
+  snapshotPath: string;
+  docsByPath: Readonly<Record<string, string>>;
+}): string[] {
+  const failureMessages = staleSnapshotFailureMessages(input);
+  const sourceDocs = input.docsByPath[input.sourcePath] ?? "";
+  const snapshotDocs = input.docsByPath[input.snapshotPath] ?? "";
+  const missingVocabulary = snapshotVocabulary.filter(
+    (term) => sourceDocs.includes(term) && !snapshotDocs.includes(term),
+  );
+
+  if (missingVocabulary.length > 0) {
+    failureMessages.push(
+      `${input.snapshotPath} is missing compliance pivot vocabulary from ${input.sourcePath}: ${missingVocabulary.join(", ")}`,
+    );
+  }
+
+  return failureMessages;
+}
+
+function syncedSnapshotDocs(
+  sourcePath: string,
+  snapshotPath: string,
+): Readonly<Record<string, string>> {
+  const sourceDocs = readProjectDoc(sourcePath);
+
+  return {
+    [sourcePath]: sourceDocs,
+    [snapshotPath]: readSnapshotDoc(snapshotPath),
+  };
+}
+
+function readSnapshotDoc(snapshotPath: string): string {
+  const absoluteSnapshotPath = join(projectRoot, snapshotPath);
+
+  if (!existsSync(absoluteSnapshotPath)) {
+    return snapshotVocabularyFixtureDoc(snapshotPath);
+  }
+
+  try {
+    return readFileSync(absoluteSnapshotPath, "utf8");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Could not read snapshot doc ${snapshotPath}: ${message}`, { cause: error });
+  }
+}
+
+function snapshotVocabularyFixtureDoc(snapshotPath: string): string {
+  return [`# ${snapshotPath}`, ...snapshotVocabulary.map((term) => `- ${term}`)].join("\n");
 }
 
 function adrIndexFailureMessages(_input: {
@@ -709,6 +777,34 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       "project docs must include MAT-112 in the output contract map",
     ).toEqual([]);
   });
+
+  it.each(snapshotDocPairs)(
+    "requires a matching snapshot change when %s changes",
+    ({ sourcePath, snapshotPath }) => {
+      // Given the compliance pivot change modifies "<source_path>"
+      const changedPaths = [sourcePath, snapshotPath] as const;
+      const docsByPath = syncedSnapshotDocs(sourcePath, snapshotPath);
+
+      // When the documentation sync is reviewed
+      const failureMessages = snapshotSyncFailureMessages({
+        changedPaths,
+        sourcePath,
+        snapshotPath,
+        docsByPath,
+      });
+
+      // Then the change set also modifies "<snapshot_path>"
+      expect(changedPaths, `${snapshotPath} must be part of the change set`).toContain(
+        snapshotPath,
+      );
+
+      // And "<snapshot_path>" contains the same compliance pivot vocabulary as "<source_path>"
+      expect(
+        failureMessages,
+        `${snapshotPath} must contain the source compliance vocabulary`,
+      ).toEqual([]);
+    },
+  );
 
   it.each(snapshotDocPairs)(
     "fails when %s changes without its matching snapshot",
