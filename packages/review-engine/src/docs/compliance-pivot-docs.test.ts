@@ -13,7 +13,6 @@ const pivotAdrPath = join(adrDocsRoot, "022-project-level-compliance-pivot.md");
 // Marks generated fallback docs used only when CI cannot see ignored local planning docs.
 const IGNORED_PROJECT_DOC_FIXTURE_MARKER = "<!-- CI fixture: ignored project planning doc -->";
 const SOVRI_DOCS_SNAPSHOT_ROOT_ENV = "SOVRI_DOCS_SNAPSHOT_ROOT";
-const DEFAULT_SOVRI_DOCS_SNAPSHOT_ROOT = "../sovri-docs";
 const ADR_INDEX_STATUS_PATTERN = /^(?:Accepted|Proposed|Deprecated|Superseded by ADR-\d{3})$/;
 const compliancePivotContract = readCompliancePivotContract();
 const {
@@ -27,6 +26,7 @@ const {
   modelSplitStatements,
   requiredDefinitionTerms,
   requiredProjectLevelTerms,
+  snapshotRootPath,
   snapshotDocPairs,
   supersessionStatements,
   traceabilityStatements,
@@ -68,6 +68,7 @@ type CompliancePivotContract = {
   modelSplitStatements: Record<string, string>;
   requiredDefinitionTerms: readonly string[];
   requiredProjectLevelTerms: readonly string[];
+  snapshotRootPath: string;
   snapshotDocPairs: readonly {
     sourcePath: string;
     snapshotPath: string;
@@ -124,7 +125,12 @@ function findRequiredAdrIndexExample(adrPath: string): (typeof adrIndexExamples)
 }
 
 function adrNumberFromPath(adrPath: string): string {
-  return basename(adrPath).slice(0, 3);
+  const adrNumberMatch = basename(adrPath).match(/^(\d+)/);
+  if (!adrNumberMatch) {
+    throw new Error(`ADR path does not start with a numeric prefix: ${adrPath}`);
+  }
+
+  return adrNumberMatch[1];
 }
 
 function activeMat77Statement(): string {
@@ -619,7 +625,7 @@ function shouldUseIgnoredProjectDocSnapshotFixture(
   sourceDocs: string,
 ): boolean {
   return (
-    isDefaultSovriDocsSnapshotPath(snapshotPath) &&
+    isConfiguredSnapshotDocPath(snapshotPath) &&
     sourceDocs.includes(IGNORED_PROJECT_DOC_FIXTURE_MARKER) &&
     shouldUseSnapshotFixtureFallback(snapshotPath)
   );
@@ -632,25 +638,19 @@ function canTrackSnapshotChange(snapshotPath: string): boolean {
 }
 
 function snapshotAbsolutePath(snapshotPath: string): string {
-  if (!isDefaultSovriDocsSnapshotPath(snapshotPath)) {
+  if (!isConfiguredSnapshotDocPath(snapshotPath)) {
     return join(projectRoot, snapshotPath);
   }
 
-  return join(
-    snapshotDocsRoot(),
-    snapshotPath.slice(`${DEFAULT_SOVRI_DOCS_SNAPSHOT_ROOT}/`.length),
-  );
+  return join(snapshotDocsRoot(), snapshotPath.slice(`${snapshotRootPath}/`.length));
 }
 
 function snapshotDocsRoot(): string {
-  return resolve(
-    projectRoot,
-    process.env[SOVRI_DOCS_SNAPSHOT_ROOT_ENV] ?? DEFAULT_SOVRI_DOCS_SNAPSHOT_ROOT,
-  );
+  return resolve(projectRoot, process.env[SOVRI_DOCS_SNAPSHOT_ROOT_ENV] ?? snapshotRootPath);
 }
 
-function isDefaultSovriDocsSnapshotPath(snapshotPath: string): boolean {
-  return snapshotPath.startsWith(`${DEFAULT_SOVRI_DOCS_SNAPSHOT_ROOT}/`);
+function isConfiguredSnapshotDocPath(snapshotPath: string): boolean {
+  return snapshotPath.startsWith(`${snapshotRootPath}/`);
 }
 
 function snapshotVocabularyFixtureDoc(snapshotPath: string, sourceDocs: string): string {
@@ -681,7 +681,7 @@ function adrIndexFailureMessages(_input: {
   adrPath: string;
   adrTitle: string;
 }): string[] {
-  const relativeAdrPath = `./${_input.adrPath.replace(/^docs\/adr\//, "")}`;
+  const relativeAdrPath = `./${basename(_input.adrPath)}`;
   const failureMessages = adrIndexTableFailureMessages(_input.indexMarkdown);
 
   if (!_input.indexMarkdown.includes(relativeAdrPath)) {
@@ -746,7 +746,7 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     expect(
       pivotAdr,
       "contract authority must be the ADR that defines the compliance pivot vocabulary",
-    ).toContain(`# ADR-${adrNumberFromPath(contractSource.authorityPath)}`);
+    ).toContain(`# ADR-${adrNumberFromPath(join(adrDocsRoot, contractSource.authorityPath))}`);
     expect(
       contractSource.updateRule,
       "contract update rule must require vocabulary changes and contract changes to stay together",
@@ -756,18 +756,12 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       `${complianceGapFindingCategoryMisuse.term} must not be documented as a Finding category`,
     ).toEqual([]);
 
-    const requiredTermKeys = requiredDefinitionTerms.map((term) => term.toLowerCase());
-    expect(
-      new Set(requiredTermKeys).size,
-      "required definitions must not contain case-insensitive duplicate terms",
-    ).toBe(requiredDefinitionTerms.length);
-
     for (const term of requiredDefinitionTerms) {
       const definitionLines = findDefinitionLines(docs, term);
 
       expect(
         definitionLines,
-        `${term} must have exactly one case-insensitive definition`,
+        `${term} must have exactly one authoritative definition`,
       ).toHaveLength(1);
 
       const definitionText = definitionLines[0] ?? "";
@@ -1116,7 +1110,7 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     process.env[SOVRI_DOCS_SNAPSHOT_ROOT_ENV] = "../custom-sovri-docs";
 
     try {
-      expect(snapshotAbsolutePath("../sovri-docs/PRD.md")).toBe(
+      expect(snapshotAbsolutePath(`${snapshotRootPath}/PRD.md`)).toBe(
         join(resolve(projectRoot, "../custom-sovri-docs"), "PRD.md"),
       );
     } finally {

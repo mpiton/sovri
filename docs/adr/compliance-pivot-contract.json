@@ -6,7 +6,7 @@
     "missingMat77HistoryFailure": "MAT-77 missing from supersession history"
   },
   "contractSource": {
-    "authorityPath": "docs/adr/022-project-level-compliance-pivot.md",
+    "authorityPath": "022-project-level-compliance-pivot.md",
     "updateRule": "Update this contract in the same PR as MAT-80 vocabulary or issue-map documentation changes"
   },
   "adrIndexExamples": [
@@ -72,6 +72,7 @@
     "FrameworkReference"
   ],
   "requiredProjectLevelTerms": ["ComplianceGap", "ControlResult"],
+  "snapshotRootPath": "../sovri-docs",
   "snapshotDocPairs": [
     {
       "sourcePath": "PRD.md",
