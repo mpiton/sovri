@@ -631,6 +631,39 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     },
   );
 
+  it("fails when a new ADR is absent from the ADR index", () => {
+    // Given the compliance pivot change creates "docs/adr/022-project-level-compliance-pivot.md"
+    const adrPath = "docs/adr/022-project-level-compliance-pivot.md";
+    const adrTitle = "Project-level compliance pivot vocabulary";
+
+    // And "docs/adr/README.md" does not list "docs/adr/022-project-level-compliance-pivot.md"
+    const indexMarkdown = [
+      "# ADRs",
+      "| # | Title | Status | Date |",
+      "| --- | --- | --- | --- |",
+      `| [021](./021-compliance-only-review-taxonomy.md) | ${adrTitle} | Accepted | 2026-06-26 |`,
+    ].join("\n");
+
+    expect(indexMarkdown, "fixture must omit the new ADR path").not.toContain(
+      "./022-project-level-compliance-pivot.md",
+    );
+
+    // When the ADR index is reviewed
+    const failureMessages = adrIndexFailureMessages({
+      indexMarkdown,
+      adrPath,
+      adrTitle,
+    });
+
+    // Then the ADR index check fails
+    expect(failureMessages.length, "ADR index check must fail").toBeGreaterThan(0);
+
+    // And the failure identifies "docs/adr/022-project-level-compliance-pivot.md" as unlisted
+    expect(failureMessages, "ADR index check must identify the unlisted new ADR").toContain(
+      `${adrPath} is unlisted`,
+    );
+  });
+
   it("fails when MAT-77 remains active without its supersession relationship", () => {
     // Given the docs list "MAT-77" under active compliance implementation work
     const docs = [
