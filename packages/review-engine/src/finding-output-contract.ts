@@ -64,11 +64,11 @@ export function evaluateFindingOutputContract(
     );
   }
 
-  if (finding.cwe !== undefined && options.rendered_finding.cwe !== finding.cwe) {
+  if (!hasMatchingCwe(finding, options.rendered_finding)) {
     return failedFindingContract(
       finding,
-      "CWE enrichment was lost",
-      "CWE-backed Findings must keep their CWE in review output",
+      "CWE enrichment changed",
+      "Finding output must preserve the source Finding CWE state and value",
     );
   }
 
@@ -129,6 +129,14 @@ function buildComplianceGapOutputItems(
 
 function isRenderedComplianceGap(renderedFinding: RenderedFindingOutput): boolean {
   return renderedFinding.kind === "ComplianceGap" || renderedFinding.control_id !== undefined;
+}
+
+function hasMatchingCwe(finding: Finding, renderedFinding: RenderedFindingOutput): boolean {
+  if (finding.cwe === undefined) {
+    return renderedFinding.cwe === undefined;
+  }
+
+  return renderedFinding.cwe === finding.cwe;
 }
 
 function failedFindingContract(
