@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri contributors
 
-import { readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
+const projectRoot = findProjectRoot(dirname(fileURLToPath(import.meta.url)));
 const ADR_021_PATH = "docs/adr/021-compliance-only-review-taxonomy.md";
 const ADR_022_PATH = "docs/adr/022-project-level-compliance-pivot.md";
 const SOURCE_MODEL = "Framework -> Control -> Rule -> Evidence";
@@ -98,28 +98,59 @@ describe("R-07: ADR-021 and ADR-022 reflect the project compliance output model"
     // And the failure identifies MAT-112 output-contract scope as missing
     expect(failures).toContain(MISSING_MAT_112_SCOPE_FAILURE);
   });
+
+  it("fails when ADR-022 negates MAT-112's output-contract scope", () => {
+    const adr022 = [
+      "MAT-113 is the project compliance rules engine work.",
+      "MAT-112 is not the PR/report output contract.",
+    ].join("\n");
+
+    const failures = adrConsistencyFailures({ adr021: readProjectFile(ADR_021_PATH), adr022 });
+
+    expect(failures).toContain(MISSING_MAT_112_SCOPE_FAILURE);
+  });
 });
+
+function findProjectRoot(startDir: string): string {
+  let currentDir = startDir;
+
+  while (true) {
+    if (existsSync(join(currentDir, "pnpm-workspace.yaml"))) {
+      return currentDir;
+    }
+
+    const parentDir = dirname(currentDir);
+    if (parentDir === currentDir) {
+      throw new Error(`Could not find project root from ${startDir}`);
+    }
+
+    currentDir = parentDir;
+  }
+}
 
 function readProjectFile(path: string): string {
   return readFileSync(join(projectRoot, path), "utf8");
 }
 
 function prReviewSourceModelFailures(adr022: string): readonly string[] {
-  return /PR review (?:output|findings?) (?:is|are) the source (?:model|compliance model)/i.test(
-    adr022,
-  )
-    ? ["PR review output must be a projection, not the source model"]
-    : [];
+  return lines(adr022)
+    .filter((line) =>
+      lineContainsAny(line, [
+        "PR review output is the source model",
+        "PR review findings are the source compliance model",
+      ]),
+    )
+    .map(() => "PR review output must be a projection, not the source model");
 }
 
 function complianceGapFindingCategoryFailures(adr: string): readonly string[] {
-  return /\bComplianceGap\b.{0,80}\bFinding\b.{0,40}\bcategory\b/i.test(adr)
-    ? ["ComplianceGap must not be a Finding category"]
-    : [];
+  return lines(adr)
+    .filter((line) => lineContainsAll(line, ["ComplianceGap", "Finding category"]))
+    .map(() => "ComplianceGap must not be a Finding category");
 }
 
 function acknowledgesNonCweComplianceGaps(adr021: string): boolean {
-  return /\bnon-CWE\b[^.\n]*\bComplianceGap\b/i.test(adr021);
+  return lines(adr021).some((line) => lineContainsAll(line, ["non-CWE", "ComplianceGap"]));
 }
 
 function adrConsistencyFailures({
@@ -132,19 +163,55 @@ function adrConsistencyFailures({
   const failures: string[] = [];
 
   if (
-    /all compliance output must be rendered as CWE-backed Findings/i.test(adr021) &&
-    /\bComplianceGap\b/i.test(adr022) &&
-    /\bproject-level\b/i.test(adr022)
+    lineContainsAny(adr021, ["all compliance output must be rendered as CWE-backed Findings"]) &&
+    lines(adr022).some((line) => lineContainsAll(line, ["ComplianceGap", "project-level"]))
   ) {
     failures.push(CONFLICT_FAILURE);
   }
 
-  if (
-    /\bMAT-113\b/i.test(adr022) &&
-    !/\bMAT-112\b[^.\n]*(?:PR\/report|PR\/review|output contract)/i.test(adr022)
-  ) {
+  if (mentionsMat113RulesEngine(adr022) && !hasAffirmativeMat112OutputScope(adr022)) {
     failures.push(MISSING_MAT_112_SCOPE_FAILURE);
   }
 
   return failures;
+}
+
+function mentionsMat113RulesEngine(adr022: string): boolean {
+  return lines(adr022).some((line) => lineContainsAll(line, ["MAT-113", "rules engine"]));
+}
+
+function hasAffirmativeMat112OutputScope(adr022: string): boolean {
+  return lines(adr022).some((line) => {
+    if (lineNegatesMat112OutputScope(line)) {
+      return false;
+    }
+
+    return (
+      lineContainsAll(line, ["MAT-112", "review output contract"]) ||
+      lineContainsAll(line, ["MAT-112", "PR/report output contract"]) ||
+      lineContainsAll(line, ["MAT-112", "scoped to PR/review output"])
+    );
+  });
+}
+
+function lineNegatesMat112OutputScope(line: string): boolean {
+  return lineContainsAny(line, [
+    "MAT-112 is not the review output contract",
+    "MAT-112 is not the PR/report output contract",
+    "MAT-112 is not scoped to PR/review output",
+  ]);
+}
+
+function lines(text: string): readonly string[] {
+  return text.split(/\r?\n/);
+}
+
+function lineContainsAll(line: string, values: readonly string[]): boolean {
+  const normalizedLine = line.toLowerCase();
+  return values.every((value) => normalizedLine.includes(value.toLowerCase()));
+}
+
+function lineContainsAny(line: string, values: readonly string[]): boolean {
+  const normalizedLine = line.toLowerCase();
+  return values.some((value) => normalizedLine.includes(value.toLowerCase()));
 }

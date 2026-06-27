@@ -126,6 +126,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `review-engine`: tighten MAT-112 ADR output-contract acceptance helpers with
+  project-root discovery and affirmative MAT-112 scope validation.
 - `review-engine`: address MAT-80 docs review feedback by centralizing
   compliance-pivot literals, tightening issue-scope and supersession checks, and
   validating ADR index row structure, with the docs-test contract loaded from a
