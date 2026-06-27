@@ -123,7 +123,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   independent from ignored planning-doc fixtures, and allowing changed source
   docs to run without a sibling snapshot checkout, with runtime contract
   authority-path validation and ADR index checks derived from changed ADR files,
-  including compact-row table validation.
+  including compact-row table validation and row-scoped link/title matching,
+  plus Finding-category misuse checks across configured project docs.
 - `ci`: make workspace TypeScript resolution use package source entrypoints so
   `tsc -b` no longer depends on concurrently generated `dist` declarations
   during local hooks.

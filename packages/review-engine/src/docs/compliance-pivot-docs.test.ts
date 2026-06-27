@@ -1028,14 +1028,12 @@ function adrIndexFailureMessages(_input: {
   adrPath: string;
   adrTitle: string;
 }): string[] {
-  const relativeAdrPath = `./${basename(_input.adrPath)}`;
   const failureMessages = adrIndexTableFailureMessages(_input.indexMarkdown);
+  const matchingAdrRow = findAdrIndexRow(_input.indexMarkdown, _input.adrPath);
 
-  if (!_input.indexMarkdown.includes(relativeAdrPath)) {
+  if (matchingAdrRow === undefined) {
     failureMessages.push(`${_input.adrPath} is unlisted`);
-  }
-
-  if (!_input.indexMarkdown.includes(_input.adrTitle)) {
+  } else if (!markdownTableCells(matchingAdrRow).includes(_input.adrTitle)) {
     failureMessages.push(`${_input.adrPath} title is missing: ${_input.adrTitle}`);
   }
 
@@ -1044,7 +1042,7 @@ function adrIndexFailureMessages(_input: {
 
 function adrIndexTableFailureMessages(indexMarkdown: string): string[] {
   const failureMessages: string[] = [];
-  const tableRows = indexMarkdown.split(/\r?\n/).filter((line) => line.trim().startsWith("|"));
+  const tableRows = markdownTableRows(indexMarkdown);
   const headerRowIndex = tableRows.findIndex((line) => markdownTableCells(line)[0] === "#");
   const headerRow = headerRowIndex === -1 ? undefined : tableRows[headerRowIndex];
   const headerColumnCount = headerRow === undefined ? 4 : markdownTableCells(headerRow).length;
@@ -1090,6 +1088,18 @@ function adrIndexTableFailureMessages(indexMarkdown: string): string[] {
   }
 
   return failureMessages;
+}
+
+function findAdrIndexRow(indexMarkdown: string, adrPath: string): string | undefined {
+  const relativeAdrPath = `./${basename(adrPath)}`;
+
+  return markdownTableRows(indexMarkdown)
+    .filter(isAdrIndexDataRow)
+    .find((row) => (markdownTableCells(row)[0] ?? "").includes(`](${relativeAdrPath})`));
+}
+
+function markdownTableRows(indexMarkdown: string): string[] {
+  return indexMarkdown.split(/\r?\n/).filter((line) => line.trim().startsWith("|"));
 }
 
 function markdownTableCells(row: string): string[] {
@@ -1377,6 +1387,10 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     expect(
       modelSplitFailureMessages(docs),
       `${docPath} must not document PR review findings as the source compliance model`,
+    ).toEqual([]);
+    expect(
+      findingCategoryFailureMessages(docs),
+      `${docPath} must not document ComplianceGap as a Finding category`,
     ).toEqual([]);
   });
 
@@ -2000,6 +2014,27 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     expect(failureMessages, "ADR index check must identify the unlisted revised ADR").toContain(
       `${adrPath} is unlisted`,
     );
+  });
+
+  it("fails when an ADR index link and title are not in the same row", () => {
+    const adrPath = "docs/adr/022-project-level-compliance-pivot.md";
+    const adrTitle = "Project-level compliance pivot vocabulary";
+    const indexMarkdown = [
+      "# ADRs",
+      "| # | Title | Status | Date |",
+      "| --- | --- | --- | --- |",
+      "| [022](./022-project-level-compliance-pivot.md) | Wrong title | Accepted | 2026-06-26 |",
+      "",
+      `See ${adrTitle} for the current pivot.`,
+    ].join("\n");
+
+    const failureMessages = adrIndexFailureMessages({
+      indexMarkdown,
+      adrPath,
+      adrTitle,
+    });
+
+    expect(failureMessages).toContain(`${adrPath} title is missing: ${adrTitle}`);
   });
 
   it("fails when ADR index table rows are malformed", () => {
