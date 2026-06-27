@@ -19,8 +19,12 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
-          # Docs tests diff the PR against its base; full history avoids shallow merge-base gaps.
-          fetch-depth: 0
+          # Docs tests diff the PR against its base; keep enough history without fetching the full repo.
+          fetch-depth: 100
+
+      - name: Fetch PR base history
+        if: github.event_name == 'pull_request'
+        run: git fetch --no-tags --depth=100 origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
 
       - name: Enable pnpm for setup-node cache
         run: corepack enable

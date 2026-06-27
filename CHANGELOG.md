@@ -62,8 +62,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   vocabulary-term uniqueness, authority-path existence checks, existing
   snapshot-root validation, explicit vocabulary boundary scanning, malformed
   snapshot fallback rejection, ADR index header-alignment validation, and
-  Markdown-formatted finding-category misuse detection, plus full-history CI
-  checkout for PR/base diffing
+  Markdown-formatted finding-category misuse detection, plus bounded CI
+  base-history fetches for PR/base diffing
   and missing new/revised ADR failures, plus helper-backed MAT-113 core-model
   issue-map coverage that keeps MAT-112 scoped to PR/review output instead of
   the core model, with indentation-bound issue block parsing that preserves
@@ -118,6 +118,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `review-engine`: keep MAT-80 docs acceptance tests green in CI when root
   planning docs are intentionally ignored locally by using contract fixtures for
   absent `PRD.md`, `ARCHI.md`, and `CONTEXT.md`.
+- `review-engine`: tighten MAT-80 docs review guards by enforcing exact
+  snapshot-pair coverage, validating CI fixture markers, keeping ADR assertions
+  independent from ignored planning-doc fixtures, and allowing changed source
+  docs to run without a sibling snapshot checkout.
 - `ci`: make workspace TypeScript resolution use package source entrypoints so
   `tsc -b` no longer depends on concurrently generated `dist` declarations
   during local hooks.

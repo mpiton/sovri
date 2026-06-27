@@ -153,6 +153,23 @@ const CompliancePivotContractSchema = z
   .strict()
   .superRefine((contract, context) => {
     const sourceDocs = new Set(contract.modelSplitDocPaths);
+    const snapshotPairSourcePaths = new Map<string, number>();
+    const snapshotPairPaths = new Map<string, number>();
+    const modelSplitSourcePaths = new Map<string, number>();
+
+    for (const [index, sourcePath] of contract.modelSplitDocPaths.entries()) {
+      const firstIndex = modelSplitSourcePaths.get(sourcePath);
+      if (firstIndex !== undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["modelSplitDocPaths", index],
+          message: `duplicates source path at index ${firstIndex}`,
+        });
+        continue;
+      }
+
+      modelSplitSourcePaths.set(sourcePath, index);
+    }
 
     if (!contract.contractSource.authorityPath.endsWith(".md")) {
       context.addIssue({
@@ -163,6 +180,26 @@ const CompliancePivotContractSchema = z
     }
 
     for (const [index, pair] of contract.snapshotDocPairs.entries()) {
+      const firstSourceIndex = snapshotPairSourcePaths.get(pair.sourcePath);
+      if (firstSourceIndex !== undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["snapshotDocPairs", index, "sourcePath"],
+          message: `duplicates source path at index ${firstSourceIndex}`,
+        });
+      }
+      snapshotPairSourcePaths.set(pair.sourcePath, index);
+
+      const firstSnapshotIndex = snapshotPairPaths.get(pair.snapshotPath);
+      if (firstSnapshotIndex !== undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["snapshotDocPairs", index, "snapshotPath"],
+          message: `duplicates snapshot path at index ${firstSnapshotIndex}`,
+        });
+      }
+      snapshotPairPaths.set(pair.snapshotPath, index);
+
       if (!sourceDocs.has(pair.sourcePath)) {
         context.addIssue({
           code: "custom",
@@ -176,6 +213,16 @@ const CompliancePivotContractSchema = z
           code: "custom",
           path: ["snapshotDocPairs", index, "snapshotPath"],
           message: "must live under snapshotRootPath",
+        });
+      }
+    }
+
+    for (const sourcePath of sourceDocs) {
+      if (!snapshotPairSourcePaths.has(sourcePath)) {
+        context.addIssue({
+          code: "custom",
+          path: ["snapshotDocPairs"],
+          message: `must include a snapshot pair for ${sourcePath}`,
         });
       }
     }
@@ -291,10 +338,6 @@ function readDocs(): string {
     .filter((docPath) => docPath.endsWith(".md"))
     .map((docPath) => readFileSync(join(adrDocsRoot, docPath), "utf8"))
     .join("\n");
-}
-
-function readCompliancePivotDocs(): string {
-  return [...modelSplitDocPaths.map(readProjectDoc), readDocs()].join("\n");
 }
 
 function readPivotAdr(): string {
@@ -793,12 +836,24 @@ function syncedSnapshotDocs(
 
   return {
     [sourcePath]: sourceDocs,
-    [snapshotPath]: readSnapshotDoc(snapshotPath, sourceDocs),
+    [snapshotPath]: readSnapshotDoc(snapshotPath, sourceDocs, {
+      changedPaths: pullRequestChangedPaths,
+      sourcePath,
+    }),
   };
 }
 
-function readSnapshotDoc(snapshotPath: string, sourceDocs: string): string {
-  if (shouldUseIgnoredProjectDocSnapshotFixture(snapshotPath, sourceDocs)) {
+type SnapshotFixtureOptions = {
+  readonly changedPaths?: readonly string[];
+  readonly sourcePath?: string;
+};
+
+function readSnapshotDoc(
+  snapshotPath: string,
+  sourceDocs: string,
+  options: SnapshotFixtureOptions = {},
+): string {
+  if (shouldUseSnapshotFixtureFallback({ snapshotPath, sourceDocs, ...options })) {
     return snapshotVocabularyFixtureDoc(snapshotPath, sourceDocs);
   }
 
@@ -807,7 +862,10 @@ function readSnapshotDoc(snapshotPath: string, sourceDocs: string): string {
   try {
     return readFileSync(absoluteSnapshotPath, "utf8");
   } catch (error) {
-    if (isNotFoundError(error) && shouldUseSnapshotFixtureFallback(snapshotPath, sourceDocs)) {
+    if (
+      isNotFoundError(error) &&
+      shouldUseSnapshotFixtureFallback({ snapshotPath, sourceDocs, ...options })
+    ) {
       return snapshotVocabularyFixtureDoc(snapshotPath, sourceDocs);
     }
 
@@ -820,22 +878,36 @@ function isNotFoundError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
 }
 
-function shouldUseSnapshotFixtureFallback(snapshotPath: string, sourceDocs: string): boolean {
+function shouldUseSnapshotFixtureFallback(input: {
+  readonly changedPaths?: readonly string[];
+  readonly snapshotPath: string;
+  readonly sourceDocs: string;
+  readonly sourcePath?: string;
+}): boolean {
   return (
-    isConfiguredSnapshotDocPath(snapshotPath) &&
-    sourceDocs.includes(IGNORED_PROJECT_DOC_FIXTURE_MARKER) &&
-    !existsSync(dirname(snapshotAbsolutePath(snapshotPath)))
+    isConfiguredSnapshotDocPath(input.snapshotPath) &&
+    !existsSync(dirname(snapshotAbsolutePath(input.snapshotPath))) &&
+    (hasValidIgnoredProjectDocFixtureMarker(input.sourceDocs) ||
+      isChangedConfiguredSourceDoc(input.sourcePath, input.changedPaths))
   );
 }
 
-function shouldUseIgnoredProjectDocSnapshotFixture(
-  snapshotPath: string,
-  sourceDocs: string,
+function hasValidIgnoredProjectDocFixtureMarker(sourceDocs: string): boolean {
+  return sourceDocs
+    .split(/\r?\n/)
+    .slice(0, 10)
+    .some((line) => line.trim() === IGNORED_PROJECT_DOC_FIXTURE_MARKER);
+}
+
+function isChangedConfiguredSourceDoc(
+  sourcePath: string | undefined,
+  changedPaths: readonly string[] | undefined,
 ): boolean {
   return (
-    isConfiguredSnapshotDocPath(snapshotPath) &&
-    sourceDocs.includes(IGNORED_PROJECT_DOC_FIXTURE_MARKER) &&
-    shouldUseSnapshotFixtureFallback(snapshotPath, sourceDocs)
+    sourcePath !== undefined &&
+    changedPaths !== undefined &&
+    modelSplitDocPaths.includes(sourcePath) &&
+    hasChangedPath(changedPaths, sourcePath)
   );
 }
 
@@ -926,13 +998,16 @@ function adrIndexTableFailureMessages(indexMarkdown: string): string[] {
   const headerColumnCount = headerRow === undefined ? 4 : markdownTableCells(headerRow).length;
   const separatorCells =
     headerRowIndex === -1 ? [] : markdownTableCells(tableRows[headerRowIndex + 1] ?? "");
+  const separatorAlignments = separatorCells.map(markdownTableSeparatorAlignment);
   const dataRows = tableRows.filter((line) => /^\s*\| \[\d{3}\]/.test(line));
 
   if (
     separatorCells.length !== headerColumnCount ||
-    separatorCells.some((cell) => !isMarkdownTableSeparatorCell(cell))
+    separatorAlignments.some((alignment) => alignment === undefined)
   ) {
     failureMessages.push("ADR index header separator must use GitHub Markdown alignment markers");
+  } else if (new Set(separatorAlignments).size > 1) {
+    failureMessages.push("ADR index header separator cells must use consistent alignment");
   }
 
   for (const row of dataRows) {
@@ -975,6 +1050,24 @@ function markdownTableCells(row: string): string[] {
 
 function isMarkdownTableSeparatorCell(cell: string): boolean {
   return /^:?-{3,}:?$/.test(cell);
+}
+
+type MarkdownTableAlignment = "center" | "default" | "left" | "right";
+
+function markdownTableSeparatorAlignment(cell: string): MarkdownTableAlignment | undefined {
+  if (!isMarkdownTableSeparatorCell(cell)) {
+    return undefined;
+  }
+
+  if (cell.startsWith(":") && cell.endsWith(":")) {
+    return "center";
+  }
+
+  if (cell.startsWith(":")) {
+    return "left";
+  }
+
+  return cell.endsWith(":") ? "right" : "default";
 }
 
 describe("MAT-80 compliance pivot vocabulary docs", () => {
@@ -1088,6 +1181,45 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       () => validateExistingSnapshotRoot("docs/adr/compliance-pivot-contract.json"),
       "snapshot root must be a directory when it exists",
     ).toThrow("not a directory");
+
+    const [firstSnapshotPair, secondSnapshotPair, ...remainingSnapshotPairs] = snapshotDocPairs;
+    if (firstSnapshotPair === undefined || secondSnapshotPair === undefined) {
+      throw new Error("Contract fixture must define at least two snapshot pairs");
+    }
+
+    const missingSnapshotPairResult = CompliancePivotContractSchema.safeParse({
+      ...compliancePivotContract,
+      snapshotDocPairs: snapshotDocPairs.slice(1),
+    });
+    expect(
+      missingSnapshotPairResult.success,
+      "contract must cover every configured model split document with a snapshot pair",
+    ).toBe(false);
+    if (missingSnapshotPairResult.success) {
+      throw new Error("Missing snapshot pair fixture unexpectedly passed validation");
+    }
+    expect(missingSnapshotPairResult.error.issues.map((issue) => issue.path.join("."))).toContain(
+      "snapshotDocPairs",
+    );
+
+    const duplicateSnapshotPairResult = CompliancePivotContractSchema.safeParse({
+      ...compliancePivotContract,
+      snapshotDocPairs: [
+        firstSnapshotPair,
+        { ...secondSnapshotPair, sourcePath: firstSnapshotPair.sourcePath },
+        ...remainingSnapshotPairs,
+      ],
+    });
+    expect(
+      duplicateSnapshotPairResult.success,
+      "contract must reject duplicate snapshot pair source paths",
+    ).toBe(false);
+    if (duplicateSnapshotPairResult.success) {
+      throw new Error("Duplicate snapshot pair fixture unexpectedly passed validation");
+    }
+    expect(duplicateSnapshotPairResult.error.issues.map((issue) => issue.path.join("."))).toContain(
+      "snapshotDocPairs.1.sourcePath",
+    );
   });
 
   it("fails the vocabulary check when project-level vocabulary is missing", () => {
@@ -1279,7 +1411,7 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
 
   it("records MAT-77 as superseded by MAT-113", () => {
     // When the compliance pivot history is reviewed
-    const docs = readCompliancePivotDocs();
+    const docs = readDocs();
     const mat77Lines = docs
       .split(/\r?\n/)
       .filter((line) => line.includes(supersessionStatements.mat77));
@@ -1303,7 +1435,7 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
 
   it("keeps both supersession issue identifiers traceable", () => {
     // When the compliance pivot history is reviewed
-    const docs = readCompliancePivotDocs();
+    const docs = readDocs();
 
     // Then the docs reference "MAT-77: Superseded - enum-only compliance category scope is too narrow"
     expect(docs, "compliance pivot docs must keep the MAT-77 superseded issue trace").toContain(
@@ -1346,7 +1478,7 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     ).toContain(issueScopeStatements.mat112OutputContractFailure);
 
     expect(
-      issueScopeFailureMessages(readCompliancePivotDocs()),
+      issueScopeFailureMessages(readDocs()),
       "project docs must not identify MAT-112 as the project compliance source model",
     ).toEqual([]);
   });
@@ -1378,7 +1510,7 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     ).toContain(issueScopeStatements.mat112MissingOutputContractFailure);
 
     expect(
-      issueScopeFailureMessages(readCompliancePivotDocs()),
+      issueScopeFailureMessages(readDocs()),
       "project docs must include MAT-112 in the output contract map",
     ).toEqual([]);
   });
@@ -1446,9 +1578,45 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     );
   });
 
+  it("generates snapshot fixtures for changed source docs when the sibling checkout is absent", () => {
+    const snapshotPath = `${snapshotRootPath}/PRD.md`;
+    const sourceDocs = [
+      "# PRD.md",
+      modelSplitStatements.sourceModel,
+      modelSplitStatements.complianceGapOutput,
+    ].join("\n");
+
+    expect(sourceDocs, "fixture must model a real source doc without the CI marker").not.toContain(
+      IGNORED_PROJECT_DOC_FIXTURE_MARKER,
+    );
+
+    const fixture = withSnapshotDocsRoot("../__missing-sovri-docs-fixture-root__", () =>
+      readSnapshotDoc(snapshotPath, sourceDocs, {
+        changedPaths: ["PRD.md"],
+        sourcePath: "PRD.md",
+      }),
+    );
+
+    expect(fixture, "changed source docs must still run vocabulary parity in CI").toContain(
+      modelSplitStatements.sourceModel,
+    );
+    expect(fixture, "generated snapshot fixture must preserve the snapshot target").toContain(
+      `- Snapshot target: ${snapshotPath}`,
+    );
+  });
+
   it("fails instead of fabricating a snapshot for malformed or unconfigured fixture inputs", () => {
     const malformedSourceDocs = [
       "<!-- missing CI fixture marker -->",
+      modelSplitStatements.sourceModel,
+    ].join("\n");
+    const inlineMarkerSourceDocs = [
+      `prefix ${IGNORED_PROJECT_DOC_FIXTURE_MARKER}`,
+      modelSplitStatements.sourceModel,
+    ].join("\n");
+    const lateMarkerSourceDocs = [
+      ...Array.from({ length: 10 }, (_unused, index) => `line ${index + 1}`),
+      IGNORED_PROJECT_DOC_FIXTURE_MARKER,
       modelSplitStatements.sourceModel,
     ].join("\n");
 
@@ -1456,10 +1624,24 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       withSnapshotDocsRoot("../__missing-sovri-docs-fixture-root__", () =>
         readSnapshotDoc(`${snapshotRootPath}/PRD.md`, malformedSourceDocs),
       );
+    const readInlineMarkerSnapshot = () =>
+      withSnapshotDocsRoot("../__missing-sovri-docs-fixture-root__", () =>
+        readSnapshotDoc(`${snapshotRootPath}/PRD.md`, inlineMarkerSourceDocs),
+      );
+    const readLateMarkerSnapshot = () =>
+      withSnapshotDocsRoot("../__missing-sovri-docs-fixture-root__", () =>
+        readSnapshotDoc(`${snapshotRootPath}/PRD.md`, lateMarkerSourceDocs),
+      );
     const readUnconfiguredSnapshot = () =>
       readSnapshotDoc("../unexpected-docs/PRD.md", ignoredProjectDocFixture("PRD.md") ?? "");
 
     expect(readMalformedConfiguredSnapshot).toThrow(
+      `Could not read snapshot doc ${snapshotRootPath}/PRD.md:`,
+    );
+    expect(readInlineMarkerSnapshot).toThrow(
+      `Could not read snapshot doc ${snapshotRootPath}/PRD.md:`,
+    );
+    expect(readLateMarkerSnapshot).toThrow(
       `Could not read snapshot doc ${snapshotRootPath}/PRD.md:`,
     );
     expect(readUnconfiguredSnapshot).toThrow(
@@ -1765,9 +1947,28 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     expect(failureMessages).toContain("ADR index row must have an ISO date");
   });
 
+  it("fails when ADR index table separator alignment is inconsistent", () => {
+    const indexMarkdown = [
+      "# ADRs",
+      "| # | Title | Status | Date |",
+      "| :--- | :---: | :--- | :--- |",
+      "| [022](./022-project-level-compliance-pivot.md) | Project-level compliance pivot vocabulary | Accepted | 2026-06-26 |",
+    ].join("\n");
+
+    const failureMessages = adrIndexFailureMessages({
+      indexMarkdown,
+      adrPath: "docs/adr/022-project-level-compliance-pivot.md",
+      adrTitle: "Project-level compliance pivot vocabulary",
+    });
+
+    expect(failureMessages).toContain(
+      "ADR index header separator cells must use consistent alignment",
+    );
+  });
+
   it("keeps MAT-113 as the core domain model implementation reference", () => {
     // When the compliance pivot issue map is reviewed
-    const docs = readCompliancePivotDocs();
+    const docs = readDocs();
     const mat113IssueMap = issueReferenceBlocks(docs, issueModelStatements.mat113).join("\n");
     const mat112IssueMap = issueReferenceBlocks(docs, issueModelStatements.mat112).join("\n");
 
@@ -1838,7 +2039,7 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     ).toContain(activeImplementationStatements.mat77StillActiveFailure);
 
     expect(
-      issueHistoryFailureMessages(readCompliancePivotDocs()),
+      issueHistoryFailureMessages(readDocs()),
       "project docs must not list MAT-77 as active without its supersession relationship",
     ).toEqual([]);
   });
@@ -1922,7 +2123,7 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
   });
 
   it("keeps issue scopes separated across the pivot docs", () => {
-    const docs = readCompliancePivotDocs();
+    const docs = readDocs();
 
     for (const { issueId, requiredScope, forbiddenScope } of issueScopeExamples) {
       // Given the docs reference "<issue_id>"
