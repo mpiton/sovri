@@ -2,7 +2,7 @@
 // Copyright 2026 Sovri contributors
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -108,12 +108,15 @@ const issueModelStatements = {
   coreModel: "Framework -> Control -> Rule -> Evidence",
   prReviewOutput: "PR/review output",
 } as const;
+const findingTerm = "Finding";
+const snapshotIssueIdentifiers = [
+  supersessionStatements.mat77,
+  ...issueScopeExamples.map(({ issueId }) => issueId),
+] as const;
 const snapshotVocabulary = [
-  "Finding",
+  findingTerm,
   ...requiredDefinitions.map(({ term }) => term),
-  "MAT-77",
-  "MAT-112",
-  "MAT-113",
+  ...snapshotIssueIdentifiers,
   supersessionStatements.mat113SupersedesMat77,
   traceabilityStatements.mat77Superseded,
   traceabilityStatements.mat113RulesEngine,
@@ -167,14 +170,7 @@ function readAdrIndex(): string {
 }
 
 function readProjectDoc(docPath: string): string {
-  const absoluteDocPath = join(projectRoot, docPath);
-
-  try {
-    return readFileSync(absoluteDocPath, "utf8");
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Could not read project doc ${docPath}: ${message}`, { cause: error });
-  }
+  return readFileSync(join(projectRoot, docPath), "utf8");
 }
 
 function findDefinitionLines(
@@ -401,8 +397,13 @@ function snapshotSyncFailureMessages(input: {
   const failureMessages = staleSnapshotFailureMessages(input);
   const sourceDocs = input.docsByPath[input.sourcePath] ?? "";
   const snapshotDocs = input.docsByPath[input.snapshotPath] ?? "";
-  const missingVocabulary = snapshotVocabulary.filter(
-    (term) => sourceDocs.includes(term) && !snapshotDocs.includes(term),
+  const sourceVocabulary = snapshotVocabularyTerms(sourceDocs);
+  const snapshotVocabularyInDocs = snapshotVocabularyTerms(snapshotDocs);
+  const missingVocabulary = sourceVocabulary.filter(
+    (term) => !snapshotVocabularyInDocs.includes(term),
+  );
+  const extraVocabulary = snapshotVocabularyInDocs.filter(
+    (term) => !sourceVocabulary.includes(term),
   );
 
   if (missingVocabulary.length > 0) {
@@ -411,7 +412,17 @@ function snapshotSyncFailureMessages(input: {
     );
   }
 
+  if (extraVocabulary.length > 0) {
+    failureMessages.push(
+      `${input.snapshotPath} contains compliance pivot vocabulary absent from ${input.sourcePath}: ${extraVocabulary.join(", ")}`,
+    );
+  }
+
   return failureMessages;
+}
+
+function snapshotVocabularyTerms(docs: string): string[] {
+  return snapshotVocabulary.filter((term) => docs.includes(term));
 }
 
 function syncedSnapshotDocs(
@@ -422,27 +433,34 @@ function syncedSnapshotDocs(
 
   return {
     [sourcePath]: sourceDocs,
-    [snapshotPath]: readSnapshotDoc(snapshotPath),
+    [snapshotPath]: readSnapshotDoc(snapshotPath, sourceDocs),
   };
 }
 
-function readSnapshotDoc(snapshotPath: string): string {
+function readSnapshotDoc(snapshotPath: string, sourceDocs: string): string {
   const absoluteSnapshotPath = join(projectRoot, snapshotPath);
-
-  if (!existsSync(absoluteSnapshotPath)) {
-    return snapshotVocabularyFixtureDoc(snapshotPath);
-  }
 
   try {
     return readFileSync(absoluteSnapshotPath, "utf8");
   } catch (error) {
+    if (isNotFoundError(error)) {
+      return snapshotVocabularyFixtureDoc(snapshotPath, sourceDocs);
+    }
+
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Could not read snapshot doc ${snapshotPath}: ${message}`, { cause: error });
   }
 }
 
-function snapshotVocabularyFixtureDoc(snapshotPath: string): string {
-  return [`# ${snapshotPath}`, ...snapshotVocabulary.map((term) => `- ${term}`)].join("\n");
+function isNotFoundError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+}
+
+function snapshotVocabularyFixtureDoc(snapshotPath: string, sourceDocs: string): string {
+  const heading = `# ${basename(snapshotPath)}`;
+  const sourceVocabulary = snapshotVocabularyTerms(sourceDocs);
+
+  return [heading, ...sourceVocabulary.map((term) => `- ${term}`)].join("\n");
 }
 
 function adrIndexFailureMessages(_input: {
@@ -816,6 +834,42 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       ).toEqual([]);
     },
   );
+
+  it("fails when snapshot docs carry vocabulary absent from the changed source doc", () => {
+    // Given the compliance pivot change modifies "PRD.md"
+    const sourcePath = "PRD.md";
+    const snapshotPath = "../sovri-docs/PRD.md";
+    const changedPaths = [sourcePath, snapshotPath] as const;
+    const docsByPath = {
+      [sourcePath]: modelSplitStatements.sourceModel,
+      [snapshotPath]: [
+        modelSplitStatements.sourceModel,
+        issueScopeStatements.mat112ReviewOutputContract,
+      ].join("\n"),
+    } as const;
+
+    expect(
+      docsByPath[sourcePath],
+      "fixture source doc must omit the extra snapshot vocabulary",
+    ).not.toContain(issueScopeStatements.mat112ReviewOutputContract);
+
+    // When the documentation sync is reviewed
+    const failureMessages = snapshotSyncFailureMessages({
+      changedPaths,
+      sourcePath,
+      snapshotPath,
+      docsByPath,
+    });
+
+    // Then the snapshot sync check fails
+    expect(failureMessages.length, "snapshot sync check must fail").toBeGreaterThan(0);
+
+    // And the failure identifies the extra snapshot vocabulary
+    expect(
+      failureMessages.join("\n"),
+      "snapshot sync failure must identify extra snapshot vocabulary",
+    ).toContain(issueScopeStatements.mat112ReviewOutputContract);
+  });
 
   it.each(snapshotDocPairs)(
     "fails when %s changes without its matching snapshot",
