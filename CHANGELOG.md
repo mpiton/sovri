@@ -25,6 +25,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `ComplianceGap` output contract required fields and `Finding` separation.
 - `review-engine`: add the MAT-112 non-CWE `ComplianceGap` validation and
   serialization output contract.
+- `review-engine`: require non-CWE `ComplianceGap` output to match a supplied
+  catalogued control reference before publication.
 - `review-engine`: add an ATDD guard for MAT-80 project-level compliance
   vocabulary definitions across tracked ADR docs with explicit assertion
   diagnostics, ADR-022 content checks, duplicate-term detection, and

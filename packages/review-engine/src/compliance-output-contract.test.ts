@@ -10,6 +10,7 @@ const cataloguedControl = {
   control_id: "gdpr-eprivacy-consent-tracking",
   source_url: "https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng",
 } as const;
+const catalog = [cataloguedControl];
 const sourceUrl = cataloguedControl.source_url;
 const remediationGuidance = "Delay non-essential analytics until consent is recorded";
 
@@ -50,7 +51,9 @@ describe("Non-CWE compliance gaps have a complete output contract", () => {
       };
 
       // When the compliance output contract is validated
-      const validation = expectPlainObject(callExport("validateComplianceGapOutput", gap));
+      const validation = expectPlainObject(
+        callExport("validateComplianceGapOutput", gap, { catalog }),
+      );
       const serialized = expectPlainObject(Reflect.get(validation, "serialized"));
 
       // Then the gap is accepted as a ComplianceGap
@@ -177,7 +180,9 @@ describe("Non-CWE compliance gaps have a complete output contract", () => {
       };
 
       // When the compliance output contract is validated
-      const validation = expectPlainObject(callExport("validateComplianceGapOutput", gap));
+      const validation = expectPlainObject(
+        callExport("validateComplianceGapOutput", gap, { catalog }),
+      );
 
       // Then the gap is rejected for published output
       expect(Reflect.get(validation, "publishable")).toBe(false);
@@ -203,7 +208,9 @@ describe("Non-CWE compliance gaps have a complete output contract", () => {
     };
 
     // When the compliance output contract is serialized
-    const serialized = expectPlainObject(callExport("serializeComplianceGapOutput", gap));
+    const serialized = expectPlainObject(
+      callExport("serializeComplianceGapOutput", gap, { catalog }),
+    );
 
     // Then the serialized object type is "ComplianceGap"
     expect(Reflect.get(serialized, "type")).toBe("ComplianceGap");
@@ -213,6 +220,26 @@ describe("Non-CWE compliance gaps have a complete output contract", () => {
 
     // And no "category: compliance" source model is required
     expect(Object.hasOwn(serialized, "category")).toBe(false);
+  });
+
+  it("rejects a non-CWE gap whose source URL is not catalog-backed", () => {
+    const gap = {
+      id: "gap-tracker-consent-014",
+      framework_id: "GDPR/ePrivacy",
+      control_id: "gdpr-eprivacy-consent-tracking",
+      source_url: "https://example.com/fake",
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      status: "WARNING",
+      severity: "major",
+      remediation_guidance: remediationGuidance,
+    };
+
+    const validation = expectPlainObject(
+      callExport("validateComplianceGapOutput", gap, { catalog }),
+    );
+
+    expect(Reflect.get(validation, "publishable")).toBe(false);
+    expect(Reflect.get(validation, "missing_field")).toBe("catalogued control reference");
   });
 });
 
