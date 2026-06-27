@@ -397,13 +397,13 @@ function snapshotSyncFailureMessages(input: {
   const failureMessages = staleSnapshotFailureMessages(input);
   const sourceDocs = input.docsByPath[input.sourcePath] ?? "";
   const snapshotDocs = input.docsByPath[input.snapshotPath] ?? "";
-  const sourceVocabulary = snapshotVocabularyTerms(sourceDocs);
-  const snapshotVocabularyInDocs = snapshotVocabularyTerms(snapshotDocs);
-  const missingVocabulary = sourceVocabulary.filter(
-    (term) => !snapshotVocabularyInDocs.includes(term),
+  const sourceVocabulary = snapshotVocabularyTermSet(sourceDocs);
+  const snapshotVocabularyInDocs = snapshotVocabularyTermSet(snapshotDocs);
+  const missingVocabulary = snapshotVocabulary.filter(
+    (term) => sourceVocabulary.has(term) && !snapshotVocabularyInDocs.has(term),
   );
-  const extraVocabulary = snapshotVocabularyInDocs.filter(
-    (term) => !sourceVocabulary.includes(term),
+  const extraVocabulary = snapshotVocabulary.filter(
+    (term) => snapshotVocabularyInDocs.has(term) && !sourceVocabulary.has(term),
   );
 
   if (missingVocabulary.length > 0) {
@@ -421,8 +421,19 @@ function snapshotSyncFailureMessages(input: {
   return failureMessages;
 }
 
-function snapshotVocabularyTerms(docs: string): string[] {
-  return snapshotVocabulary.filter((term) => docs.includes(term));
+function snapshotVocabularyTermSet(docs: string): ReadonlySet<string> {
+  return new Set(snapshotVocabulary.filter((term) => containsVocabularyTerm(docs, term)));
+}
+
+function containsVocabularyTerm(docs: string, term: string): boolean {
+  const escapedTerm = escapeRegExp(term);
+  const termPattern = new RegExp(`(?<![A-Za-z0-9])${escapedTerm}(?![A-Za-z0-9])`);
+
+  return termPattern.test(docs);
+}
+
+function escapeRegExp(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function syncedSnapshotDocs(
@@ -458,9 +469,12 @@ function isNotFoundError(error: unknown): boolean {
 
 function snapshotVocabularyFixtureDoc(snapshotPath: string, sourceDocs: string): string {
   const heading = `# ${basename(snapshotPath)}`;
-  const sourceVocabulary = snapshotVocabularyTerms(sourceDocs);
+  const sourceVocabulary = snapshotVocabularyTermSet(sourceDocs);
 
-  return [heading, ...sourceVocabulary.map((term) => `- ${term}`)].join("\n");
+  return [
+    heading,
+    ...snapshotVocabulary.filter((term) => sourceVocabulary.has(term)).map((term) => `- ${term}`),
+  ].join("\n");
 }
 
 function adrIndexFailureMessages(_input: {
@@ -869,6 +883,36 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
       failureMessages.join("\n"),
       "snapshot sync failure must identify extra snapshot vocabulary",
     ).toContain(issueScopeStatements.mat112ReviewOutputContract);
+  });
+
+  it("does not treat overlapping vocabulary substrings as synced terms", () => {
+    // Given the source doc carries "Control"
+    const sourcePath = "ARCHI.md";
+    const snapshotPath = "../sovri-docs/ARCHI.md";
+    const changedPaths = [sourcePath, snapshotPath] as const;
+    const docsByPath = {
+      [sourcePath]: "Control",
+      [snapshotPath]: "ControlResult",
+    } as const;
+
+    expect(
+      docsByPath[snapshotPath],
+      "fixture snapshot must carry an overlapping vocabulary term",
+    ).toContain("ControlResult");
+
+    // When the documentation sync is reviewed
+    const failureMessages = snapshotSyncFailureMessages({
+      changedPaths,
+      sourcePath,
+      snapshotPath,
+      docsByPath,
+    });
+
+    // Then "ControlResult" does not satisfy the missing "Control" term
+    expect(
+      failureMessages.join("\n"),
+      "snapshot sync failure must not use substring matching for vocabulary terms",
+    ).toContain("Control");
   });
 
   it.each(snapshotDocPairs)(
