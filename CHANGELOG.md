@@ -41,7 +41,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   formatted failure messaging for source/snapshot docs change sets, plus
   flexible unchanged-source coverage that avoids snapshot churn for ADR-only
   changes, plus helper-backed ADR-index coverage for new or revised ADR
-  entries and missing-new-ADR failures.
+  entries and missing new/revised ADR failures.
 
 ### Changed
 

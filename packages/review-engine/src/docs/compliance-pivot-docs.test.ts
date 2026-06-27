@@ -664,6 +664,39 @@ describe("MAT-80 compliance pivot vocabulary docs", () => {
     );
   });
 
+  it("fails when a revised ADR disappears from the ADR index", () => {
+    // Given the compliance pivot change revises "docs/adr/020-deterministic-compliance-derivation.md"
+    const adrPath = "docs/adr/020-deterministic-compliance-derivation.md";
+    const adrTitle = "Deterministic compliance derivation";
+
+    // And "docs/adr/README.md" no longer lists "docs/adr/020-deterministic-compliance-derivation.md"
+    const indexMarkdown = [
+      "# ADRs",
+      "| # | Title | Status | Date |",
+      "| --- | --- | --- | --- |",
+      `| [019](./019-otel-milestone-v0-6.md) | ${adrTitle} | Accepted | 2026-06-19 |`,
+    ].join("\n");
+
+    expect(indexMarkdown, "fixture must omit the revised ADR path").not.toContain(
+      "./020-deterministic-compliance-derivation.md",
+    );
+
+    // When the ADR index is reviewed
+    const failureMessages = adrIndexFailureMessages({
+      indexMarkdown,
+      adrPath,
+      adrTitle,
+    });
+
+    // Then the ADR index check fails
+    expect(failureMessages.length, "ADR index check must fail").toBeGreaterThan(0);
+
+    // And the failure identifies "docs/adr/020-deterministic-compliance-derivation.md" as unlisted
+    expect(failureMessages, "ADR index check must identify the unlisted revised ADR").toContain(
+      `${adrPath} is unlisted`,
+    );
+  });
+
   it("fails when MAT-77 remains active without its supersession relationship", () => {
     // Given the docs list "MAT-77" under active compliance implementation work
     const docs = [
