@@ -112,15 +112,20 @@ export type {
 
 export {
   evaluateComplianceGapPublishability,
+  evaluateComplianceGapPullRequestProjection,
+  renderComplianceGapProjectionDiagnostics,
+  renderComplianceGapProjectReportOutput,
+  renderComplianceGapProjectReportProjection,
+  renderComplianceGapPullRequestOutput,
+  renderComplianceGapPullRequestProjection,
   renderControlResultOutput,
   renderControlResultPullRequestOutput,
   renderInternalComplianceDiagnostics,
-  renderComplianceGapProjectReportOutput,
-  renderComplianceGapPullRequestOutput,
 } from "./compliance-gap-rendering.js";
 export type {
   CataloguedControlReference,
   ComplianceGapPublishabilityResult,
+  ComplianceGapPullRequestProjectionEvaluationResult,
   ComplianceGapRenderInput,
 } from "./compliance-gap-rendering.js";
 

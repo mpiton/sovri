@@ -23,8 +23,28 @@ interface ComplianceGapRenderOptions {
 }
 
 interface ComplianceGapPullRequestRenderOptions extends ComplianceGapRenderOptions {
-  readonly changed_files: readonly string[];
-  readonly relations: readonly ComplianceGapFileRelation[];
+  readonly changed_files?: readonly string[];
+  readonly changed_routes?: readonly string[];
+  readonly changed_dependencies?: readonly string[];
+  readonly relations: readonly ComplianceGapRelation[];
+}
+
+interface ComplianceGapPullRequestProjectionOptions extends ComplianceGapRenderOptions {
+  readonly changed_files?: readonly string[];
+  readonly changed_routes?: readonly string[];
+  readonly changed_dependencies?: readonly string[];
+  readonly relations?: readonly ComplianceGapRelation[] | null;
+}
+
+interface ComplianceGapPullRequestProjectionEvaluationOptions extends ComplianceGapPullRequestProjectionOptions {
+  readonly pull_request_output?: string;
+}
+
+interface ComplianceGapRelation {
+  readonly gap_id: string;
+  readonly file?: string;
+  readonly route?: string;
+  readonly dependency?: string;
 }
 
 interface ComplianceGapFileRelation {
@@ -56,6 +76,12 @@ export interface ComplianceGapPublishabilityResult {
   readonly explanation?: string;
 }
 
+export interface ComplianceGapPullRequestProjectionEvaluationResult {
+  readonly output_contract_check: "passed" | "failed";
+  readonly rejected_gap_id?: string;
+  readonly explanation?: string;
+}
+
 export function renderComplianceGapProjectReportOutput(
   gap: ComplianceGapRenderInput,
   options: ComplianceGapRenderOptions,
@@ -78,7 +104,7 @@ export function renderComplianceGapPullRequestOutput(
   gap: ComplianceGapRenderInput,
   options: ComplianceGapPullRequestRenderOptions,
 ): string {
-  if (!isRelatedToChangedFile(gap, options)) {
+  if (!isRelatedToChangedEntity(gap, options)) {
     return "";
   }
 
@@ -93,6 +119,32 @@ export function renderComplianceGapPullRequestOutput(
     `Framework reference: ${control.framework_reference}`,
     `Evidence: ${gap.evidence ?? ""}`,
   ].join("\n");
+}
+
+export function renderComplianceGapProjectReportProjection(
+  gaps: readonly ComplianceGapRenderInput[],
+  options: ComplianceGapRenderOptions,
+): string {
+  return gaps
+    .map((gap) => renderProjectReportProjectionItem(gap, options))
+    .filter((output) => output.length > 0)
+    .join("\n\n");
+}
+
+export function renderComplianceGapPullRequestProjection(
+  gaps: readonly ComplianceGapRenderInput[],
+  options: ComplianceGapPullRequestProjectionOptions,
+): string {
+  if (relationsUnavailable(options.relations)) {
+    return "";
+  }
+
+  const renderOptions = buildPullRequestRenderOptions(options, options.relations);
+
+  return gaps
+    .map((gap) => renderPullRequestProjectionItem(gap, renderOptions))
+    .filter((output) => output.length > 0)
+    .join("\n\n");
 }
 
 export function renderControlResultOutput(
@@ -168,6 +220,20 @@ export function renderInternalComplianceDiagnostics(
   ].join("\n");
 }
 
+export function renderComplianceGapProjectionDiagnostics(
+  gaps: readonly ComplianceGapRenderInput[],
+  options: ComplianceGapPullRequestProjectionOptions,
+): string {
+  if (relationsUnavailable(options.relations)) {
+    return "relation metadata unavailable for PR compliance-gap projection";
+  }
+
+  return gaps
+    .map((gap) => renderInternalComplianceDiagnostics(gap, options))
+    .filter((output) => output.length > 0)
+    .join("\n\n");
+}
+
 export function evaluateComplianceGapPublishability(
   gap: ComplianceGapRenderInput,
   options: ComplianceGapPublishabilityOptions,
@@ -199,6 +265,65 @@ export function evaluateComplianceGapPublishability(
   };
 }
 
+export function evaluateComplianceGapPullRequestProjection(
+  gaps: readonly ComplianceGapRenderInput[],
+  options: ComplianceGapPullRequestProjectionEvaluationOptions,
+): ComplianceGapPullRequestProjectionEvaluationResult {
+  const pullRequestOutput =
+    options.pull_request_output ?? renderComplianceGapPullRequestProjection(gaps, options);
+  const publishedGapIds = extractPublishedGapIds(pullRequestOutput);
+
+  if (hasAnonymousComplianceGapBlock(pullRequestOutput)) {
+    return {
+      output_contract_check: "failed",
+      rejected_gap_id: "unknown",
+      explanation: "compliance gap blocks require a Gap id before publication",
+    };
+  }
+
+  const knownGapIds = new Set(gaps.map((gap) => gap.id));
+  const unknownPublishedGapId = [...publishedGapIds].find((gapId) => !knownGapIds.has(gapId));
+
+  if (unknownPublishedGapId !== undefined) {
+    return {
+      output_contract_check: "failed",
+      rejected_gap_id: unknownPublishedGapId,
+      explanation: "PR output is limited to change-related compliance gaps",
+    };
+  }
+
+  const unrelatedPublishedGap = gaps.find(
+    (gap) => publishedGapIds.has(gap.id) && !isRelatedToChangedEntity(gap, options),
+  );
+
+  if (unrelatedPublishedGap !== undefined) {
+    return {
+      output_contract_check: "failed",
+      rejected_gap_id: unrelatedPublishedGap.id,
+      explanation: "PR output is limited to change-related compliance gaps",
+    };
+  }
+
+  return {
+    output_contract_check: "passed",
+  };
+}
+
+function buildPullRequestRenderOptions(
+  options: ComplianceGapPullRequestProjectionOptions,
+  relations: readonly ComplianceGapRelation[],
+): ComplianceGapPullRequestRenderOptions {
+  return {
+    catalog: options.catalog,
+    relations,
+    ...(options.changed_files === undefined ? {} : { changed_files: options.changed_files }),
+    ...(options.changed_routes === undefined ? {} : { changed_routes: options.changed_routes }),
+    ...(options.changed_dependencies === undefined
+      ? {}
+      : { changed_dependencies: options.changed_dependencies }),
+  };
+}
+
 function findCataloguedControl(
   gap: ComplianceGapRenderInput,
   catalog: readonly CataloguedControlReference[],
@@ -206,11 +331,116 @@ function findCataloguedControl(
   return catalog.find((candidate) => candidate.control_id === gap.control_id);
 }
 
-function isRelatedToChangedFile(
+function renderProjectReportProjectionItem(
+  gap: ComplianceGapRenderInput,
+  options: ComplianceGapRenderOptions,
+): string {
+  const output = renderComplianceGapProjectReportOutput(gap, options);
+
+  if (output.length === 0) {
+    return "";
+  }
+
+  return [`Gap id: ${gap.id}`, output].join("\n");
+}
+
+function renderPullRequestProjectionItem(
   gap: ComplianceGapRenderInput,
   options: ComplianceGapPullRequestRenderOptions,
+): string {
+  const output = renderComplianceGapPullRequestOutput(gap, options);
+
+  if (output.length === 0) {
+    return "";
+  }
+
+  return [`Gap id: ${gap.id}`, output].join("\n");
+}
+
+function isRelatedToChangedEntity(
+  gap: ComplianceGapRenderInput,
+  options: ComplianceGapPullRequestProjectionOptions,
 ): boolean {
+  if (relationsUnavailable(options.relations)) {
+    return false;
+  }
+
   return options.relations.some(
-    (relation) => relation.gap_id === gap.id && options.changed_files.includes(relation.file),
+    (relation) => relation.gap_id === gap.id && relationMatchesChange(relation, options),
   );
+}
+
+function relationMatchesChange(
+  relation: ComplianceGapRelation,
+  options: ComplianceGapPullRequestProjectionOptions,
+): boolean {
+  return (
+    (relation.file !== undefined && options.changed_files?.includes(relation.file) === true) ||
+    (relation.route !== undefined && options.changed_routes?.includes(relation.route) === true) ||
+    (relation.dependency !== undefined &&
+      options.changed_dependencies?.includes(relation.dependency) === true)
+  );
+}
+
+function relationsUnavailable(
+  relations: readonly ComplianceGapRelation[] | null | undefined,
+): relations is null | undefined {
+  return relations === undefined || relations === null;
+}
+
+function extractPublishedGapIds(output: string): ReadonlySet<string> {
+  const gapIds = new Set<string>();
+
+  for (const line of output.split(/\r?\n/u)) {
+    const trimmedLine = line.trim();
+    const gapIdPrefix = "Gap id:";
+
+    if (trimmedLine.startsWith(gapIdPrefix)) {
+      const gapId = trimmedLine.slice(gapIdPrefix.length).trim();
+
+      if (gapId.length > 0) {
+        gapIds.add(gapId);
+      }
+    }
+  }
+
+  return gapIds;
+}
+
+function hasAnonymousComplianceGapBlock(output: string): boolean {
+  const lines = output.split(/\r?\n/u).map((line) => line.trim());
+
+  return lines.some((line, index) => {
+    if (line !== "potential compliance gap") {
+      return false;
+    }
+
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      const previousLine = lines[cursor] ?? "";
+
+      if (previousLine === "") {
+        continue;
+      }
+
+      if (previousLine.startsWith("Gap id:")) {
+        return false;
+      }
+
+      break;
+    }
+
+    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+      const followingLine = lines[cursor] ?? "";
+
+      if (followingLine === "" || followingLine === "potential compliance gap") {
+        return true;
+      }
+
+      if (followingLine.startsWith("Gap id:")) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 }

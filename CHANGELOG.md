@@ -21,6 +21,12 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `review-engine`: add MAT-112 ATDD coverage for PR compliance-gap projection
+  filtering by changed file, route, and dependency relation metadata while
+  project reports render every catalogued gap.
+- `review-engine`: add compliance gap projection helpers that filter pull
+  request output by changed file, route, and dependency relation metadata while
+  keeping project reports unfiltered.
 - `review-engine`: add output-contract helpers that keep CWE-backed Findings on
   the existing enrichment path while non-CWE ComplianceGaps use catalogued
   control references.
@@ -141,6 +147,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `review-engine`: tighten PR compliance-gap projection feedback by matching
+  published `Gap id:` lines exactly and removing redundant relation-option
+  spreading in the projection renderer, while rejecting unknown published gaps
+  or anonymous gap blocks and treating null relation metadata as unavailable.
 - `review-engine`: tighten MAT-112 Finding output-contract helpers to reject
   rendered ComplianceGap shapes, preserve the existing confidence gate, and
   omit uncatalogued ComplianceGaps from combined review output.
