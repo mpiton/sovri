@@ -61,8 +61,8 @@ describe(".sovri.yml public reference", () => {
     expect(reference).toContain("Environment variable name");
 
     // Then review and limits fields document defaults and allowed values
-    expect(reference).toContain("`full`, `bugs-only`, `strict`, `minimal`");
-    expect(reference).toContain("Default: `full`");
+    expect(reference).toContain("`compliance`");
+    expect(reference).toContain("Default: `compliance`");
     expect(reference).toContain("Default: `false`");
     expect(reference).toContain("`blocker`, `major`, `minor`");
     expect(reference).toContain("Default: `minor`");
@@ -97,12 +97,12 @@ describe(".sovri.yml public reference", () => {
 
     // Then it validates against "SovriConfigSchema"
     // And the parsed provider is "mistral"
-    // And the parsed review mode is "minimal"
+    // And the parsed review mode is "compliance"
     // And it contains exactly 5 ignore patterns
     expect(full.llm.provider).toBe("mistral");
     expect(full.llm.model).toBe("mistral-large-latest");
     expect(full.llm.apiKeySecret).toBe("MISTRAL_API_KEY");
-    expect(full.review.mode).toBe("minimal");
+    expect(full.review.mode).toBe("compliance");
     expect(full.ignores).toHaveLength(5);
   });
 

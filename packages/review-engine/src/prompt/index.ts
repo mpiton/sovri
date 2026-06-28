@@ -15,7 +15,7 @@ export { type ReviewPromptMode } from "./builder.js";
 export const ReviewPromptInputSchema = z.strictObject({
   unifiedDiff: z.string(),
   pullRequest: PullRequestPromptContextSchema,
-  mode: ReviewPromptModeSchema.default("full"),
+  mode: ReviewPromptModeSchema.default("compliance"),
   instructions: z.array(z.string().min(1)).default([]),
 });
 

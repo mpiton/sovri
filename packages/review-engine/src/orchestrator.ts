@@ -71,16 +71,13 @@ const ZeroTokenUsage = TokenUsageSchema.parse({ prompt: 0, completion: 0 });
 const FindingBodyMaxLength = 2_000;
 const NoFilesAfterIgnoreFiltersMessage = "No files to review after ignore filters applied";
 
-const ReviewPullRequestConfigModeSchema = z.enum([
-  "full",
-  "bugs-only",
-  "strict",
-  "minimal",
+export const ReviewPullRequestConfigModeSchema = z.enum([
+  "compliance",
 ]) satisfies z.ZodType<ReviewPromptMode>;
 
 const ReviewPullRequestConfigSchema = z.object({
   review: z.object({
-    mode: ReviewPullRequestConfigModeSchema.default("full"),
+    mode: ReviewPullRequestConfigModeSchema.default("compliance"),
     severityThreshold: SeveritySchema,
   }),
   ignores: z.array(z.string()),

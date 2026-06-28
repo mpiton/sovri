@@ -155,7 +155,7 @@ describe("buildDeploymentDefaultConfig", () => {
     const config = buildDeploymentDefaultConfig({ MISTRAL_API_KEY: "mst" });
 
     expect(config.llm.provider).toBe("mistral");
-    expect(config.review.mode).toBe("full");
+    expect(config.review.mode).toBe("compliance");
     expect(config.limits.maxFilesPerReview).toBe(50);
     expect(config.ignores).toEqual([]);
     expect(() => SovriConfigSchema.parse(config)).not.toThrow();

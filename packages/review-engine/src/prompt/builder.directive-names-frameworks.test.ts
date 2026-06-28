@@ -17,8 +17,8 @@ describe("R-03: the CWE directive names the target compliance frameworks", () =>
     it.each(["GDPR", "DORA", "AI Act", "NIS2"] as const)(
       'the CWE directive names the "%s" framework',
       (framework) => {
-        // When the review engine builds the system prompt for the "full" mode
-        const systemPrompt = buildSystemPrompt({ mode: "full" });
+        // When the review engine builds the system prompt for the "compliance" mode
+        const systemPrompt = buildSystemPrompt({ mode: "compliance" });
 
         // Then the CWE directive names the "<framework>" framework
         expect(systemPrompt).toContain(framework);
@@ -27,8 +27,8 @@ describe("R-03: the CWE directive names the target compliance frameworks", () =>
   });
 
   it("every review mode names the target frameworks", () => {
-    // When the review engine builds the system prompt for the "strict" mode
-    const systemPrompt = buildSystemPrompt({ mode: "strict" });
+    // When the review engine builds the system prompt for the "compliance" mode
+    const systemPrompt = buildSystemPrompt({ mode: "compliance" });
 
     // Then the CWE directive names GDPR, DORA, the AI Act, and NIS2
     expect(systemPrompt).toContain("GDPR");

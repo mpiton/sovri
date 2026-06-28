@@ -18,7 +18,7 @@ describe("R-02: the CWE directive tells the model to attach a CWE to every findi
   // Background: Sovri's review engine assembles the LLM review prompt.
 
   describe("Scenario Outline: every review mode carries the positive CWE instruction", () => {
-    it.each(["full", "bugs-only", "strict", "minimal"] as const)(
+    it.each(["compliance"] as const)(
       'the "%s" mode carries the unconditional CWE instruction',
       (mode) => {
         // When the review engine builds the system prompt for the "<mode>" mode
@@ -33,7 +33,7 @@ describe("R-02: the CWE directive tells the model to attach a CWE to every findi
   it("no longer carries the pre-pivot omission escape hatch for non-compliance findings", () => {
     // The generic categories the omission referenced (style, performance) were removed in the
     // compliance pivot, so the prompt must not tell the model to omit a CWE on them.
-    const systemPrompt = buildSystemPrompt({ mode: "full" });
+    const systemPrompt = buildSystemPrompt({ mode: "compliance" });
 
     // Then the prompt carries neither the omission instruction nor the removed category names
     expect(systemPrompt).not.toContain("omit `cwe`");

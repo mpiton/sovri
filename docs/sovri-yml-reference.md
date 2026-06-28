@@ -11,7 +11,7 @@ configured on the bot host. See
 operator sets the default provider once and reviews many repositories without
 committing a `.sovri.yml` to each one. Add a `.sovri.yml` only when a repository
 needs settings that differ from the deployment defaults (a different provider or
-model, custom review mode, ignore patterns, or limits).
+model, ignore patterns, or limits).
 
 When present, the file lives at the root of the reviewed repository:
 
@@ -49,7 +49,7 @@ llm:
   apiKeySecret: MISTRAL_API_KEY
 
 review:
-  mode: minimal
+  mode: compliance
   autoReviewDrafts: false
   severityThreshold: major
 
@@ -67,18 +67,18 @@ limits:
 
 ## Field Reference
 
-| Field                      | Type                      | Required | Default           | Allowed values                                                      | Notes                                                                                                                            |
-| -------------------------- | ------------------------- | -------- | ----------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `llm.provider`             | String                    | Yes      | No schema default | `anthropic`, `mistral`                                              | Selects the active LLM adapter. Only these two providers are accepted in v0.2.                                                   |
-| `llm.model`                | String                    | Yes      | No schema default | Model identifiers containing letters, digits, `.`, `-`, `_`, or `:` | Maximum 256 characters. Control characters and whitespace are rejected.                                                          |
-| `llm.baseUrl`              | Optional HTTPS URL        | No       | Omitted           | Any valid `https://` URL up to 2048 characters                      | Use only when an adapter needs a provider endpoint override. Do not place API keys in URLs.                                      |
-| `llm.apiKeySecret`         | Environment variable name | Yes      | No schema default | Uppercase letters, digits, and `_`; must start with a letter or `_` | Configure `ANTHROPIC_API_KEY` or `MISTRAL_API_KEY` in the bot environment. The YAML value is never the API key value.            |
-| `review.mode`              | String                    | No       | Default: `full`   | `full`, `bugs-only`, `strict`, `minimal`                            | Controls the prompt strategy used for review. Use `strict` for comprehensive regulated-codebase reviews.                         |
-| `review.autoReviewDrafts`  | Boolean                   | No       | Default: `false`  | `true`, `false`                                                     | When `false`, draft pull requests are skipped until they become ready for review.                                                |
-| `review.severityThreshold` | String                    | No       | Default: `minor`  | `blocker`, `major`, `minor`                                         | Findings below the selected threshold are filtered from the final review output.                                                 |
-| `ignores`                  | Array of strings          | No       | Default: `[]`     | Repository-relative POSIX glob patterns                             | A finding is hidden when its file path matches at least one pattern. Each pattern must be non-empty and at most 1024 characters. |
-| `limits.maxFilesPerReview` | Positive integer          | No       | Default: `50`     | `1` to `500`                                                        | Pull requests above this file count are outside the configured review budget.                                                    |
-| `limits.maxLinesPerReview` | Positive integer          | No       | Default: `5000`   | `1` to `50000`                                                      | Pull requests above this changed-line count are outside the configured review budget.                                            |
+| Field                      | Type                      | Required | Default               | Allowed values                                                      | Notes                                                                                                                                                                                 |
+| -------------------------- | ------------------------- | -------- | --------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `llm.provider`             | String                    | Yes      | No schema default     | `anthropic`, `mistral`                                              | Selects the active LLM adapter. Only these two providers are accepted in v0.2.                                                                                                        |
+| `llm.model`                | String                    | Yes      | No schema default     | Model identifiers containing letters, digits, `.`, `-`, `_`, or `:` | Maximum 256 characters. Control characters and whitespace are rejected.                                                                                                               |
+| `llm.baseUrl`              | Optional HTTPS URL        | No       | Omitted               | Any valid `https://` URL up to 2048 characters                      | Use only when an adapter needs a provider endpoint override. Do not place API keys in URLs.                                                                                           |
+| `llm.apiKeySecret`         | Environment variable name | Yes      | No schema default     | Uppercase letters, digits, and `_`; must start with a letter or `_` | Configure `ANTHROPIC_API_KEY` or `MISTRAL_API_KEY` in the bot environment. The YAML value is never the API key value.                                                                 |
+| `review.mode`              | String                    | No       | Default: `compliance` | `compliance`                                                        | Compliance-only is the single review behaviour: Sovri reports security and correctness weaknesses that map to a known CWE. The field is kept for a stable, extensible config surface. |
+| `review.autoReviewDrafts`  | Boolean                   | No       | Default: `false`      | `true`, `false`                                                     | When `false`, draft pull requests are skipped until they become ready for review.                                                                                                     |
+| `review.severityThreshold` | String                    | No       | Default: `minor`      | `blocker`, `major`, `minor`                                         | Findings below the selected threshold are filtered from the final review output.                                                                                                      |
+| `ignores`                  | Array of strings          | No       | Default: `[]`         | Repository-relative POSIX glob patterns                             | A finding is hidden when its file path matches at least one pattern. Each pattern must be non-empty and at most 1024 characters.                                                      |
+| `limits.maxFilesPerReview` | Positive integer          | No       | Default: `50`         | `1` to `500`                                                        | Pull requests above this file count are outside the configured review budget.                                                                                                         |
+| `limits.maxLinesPerReview` | Positive integer          | No       | Default: `5000`       | `1` to `50000`                                                      | Pull requests above this changed-line count are outside the configured review budget.                                                                                                 |
 
 ## Provider Keys
 
@@ -108,7 +108,7 @@ When the `review` block is omitted, Sovri behaves as if the file contained:
 
 ```yaml
 review:
-  mode: full
+  mode: compliance
   autoReviewDrafts: false
   severityThreshold: minor
 ```

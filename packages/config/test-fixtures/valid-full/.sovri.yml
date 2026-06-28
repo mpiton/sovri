@@ -4,7 +4,7 @@ llm:
   baseUrl: https://api.anthropic.com
   apiKeySecret: ANTHROPIC_API_KEY
 review:
-  mode: bugs-only
+  mode: compliance
   autoReviewDrafts: true
   severityThreshold: major
 ignores:

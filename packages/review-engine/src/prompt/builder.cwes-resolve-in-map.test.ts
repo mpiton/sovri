@@ -55,7 +55,7 @@ const ONE_LINE_DIFF = "+  const token = req.body.token;";
 
 describe("R-01: the review prompt only names CWE ids the compliance map resolves", () => {
   describe("Scenario Outline: every CWE id named in the system prompt resolves in the compliance map", () => {
-    it.each(["full", "bugs-only", "strict", "minimal"] as const)(
+    it.each(["compliance"] as const)(
       'the "%s" mode system prompt names only CWE ids the compliance map resolves',
       (mode) => {
         // When the review engine builds the system prompt for the "<mode>" mode
@@ -83,8 +83,8 @@ describe("R-01: the review prompt only names CWE ids the compliance map resolves
   });
 
   it("the retired CWE-287 never appears in any prompt surface", () => {
-    // When the review engine builds the system prompt for the "full" mode
-    const systemPrompt = buildSystemPrompt({ mode: "full" });
+    // When the review engine builds the system prompt for the "compliance" mode
+    const systemPrompt = buildSystemPrompt({ mode: "compliance" });
     // And the review engine builds the user prompt for pull request #42 over a one-line diff
     const userPrompt = buildUserPrompt(ONE_LINE_DIFF, PULL_REQUEST);
 
