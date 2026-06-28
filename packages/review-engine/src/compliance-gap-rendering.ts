@@ -3,6 +3,7 @@
 
 export interface CataloguedControlReference {
   readonly control_id: string;
+  readonly framework?: string;
   readonly framework_reference: string;
   readonly source_url: string;
   readonly remediation_guidance: string;
@@ -33,6 +34,18 @@ interface ComplianceGapFileRelation {
 
 interface ComplianceGapPublishabilityOptions extends ComplianceGapRenderOptions {
   readonly renderer_requires_cwe?: boolean;
+}
+
+interface ControlResultRenderInput {
+  readonly control_id: string;
+  readonly evidence?: string;
+  readonly status?: string;
+  readonly compliance_gap?: ComplianceGapRenderInput;
+}
+
+interface ControlResultPullRequestRenderOptions extends ComplianceGapRenderOptions {
+  readonly changed_files: readonly string[];
+  readonly relations?: readonly ComplianceGapFileRelation[];
 }
 
 export interface ComplianceGapPublishabilityResult {
@@ -80,6 +93,60 @@ export function renderComplianceGapPullRequestOutput(
     `Framework reference: ${control.framework_reference}`,
     `Evidence: ${gap.evidence ?? ""}`,
   ].join("\n");
+}
+
+export function renderControlResultOutput(
+  controlResult: ControlResultRenderInput,
+  options: ComplianceGapRenderOptions,
+): string {
+  if (controlResult.compliance_gap === undefined) {
+    return [
+      "ControlResult",
+      `Status: ${controlResult.status ?? ""}`,
+      `Evidence: ${controlResult.evidence ?? ""}`,
+    ].join("\n");
+  }
+
+  const gap = {
+    ...controlResult.compliance_gap,
+    control_id: controlResult.compliance_gap.control_id ?? controlResult.control_id,
+  };
+  const control = findCataloguedControl(gap, options.catalog);
+
+  if (control === undefined) {
+    return "";
+  }
+
+  return [
+    `ComplianceGap: ${gap.id}`,
+    "potential compliance gap",
+    `Status: ${gap.status ?? controlResult.status ?? ""}`,
+    `Severity: ${gap.severity ?? ""}`,
+    `Framework: ${control.framework ?? control.framework_reference}`,
+    `Framework reference: ${control.framework_reference}`,
+    `Control id: ${control.control_id}`,
+    `Source URL: ${control.source_url}`,
+    `Evidence: ${gap.evidence ?? controlResult.evidence ?? ""}`,
+    `Remediation guidance: ${control.remediation_guidance}`,
+  ].join("\n");
+}
+
+export function renderControlResultPullRequestOutput(
+  controlResult: ControlResultRenderInput,
+  options: ControlResultPullRequestRenderOptions,
+): string {
+  const gap = controlResult.compliance_gap;
+
+  if (
+    gap === undefined ||
+    options.relations?.some(
+      (relation) => relation.gap_id === gap.id && options.changed_files.includes(relation.file),
+    ) !== true
+  ) {
+    return "";
+  }
+
+  return renderControlResultOutput(controlResult, options);
 }
 
 export function renderInternalComplianceDiagnostics(

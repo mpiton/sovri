@@ -88,6 +88,46 @@ describe("Catalogued control references render without a CWE", () => {
     expect(output).toContain("web/app/layout.tsx:12 imports @vercel/analytics/react");
   });
 
+  it("uses the ControlResult control id when a nested ComplianceGap omits it", () => {
+    // Given the catalog contains control "gdpr-eprivacy-consent-tracking"
+    // And a ControlResult references control "gdpr-eprivacy-consent-tracking"
+    // And the nested ComplianceGap "gap-tracker-consent-014" omits a duplicate control id
+    const controlResult = {
+      control_id: "gdpr-eprivacy-consent-tracking",
+      status: "WARNING",
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      compliance_gap: {
+        id: "gap-tracker-consent-014",
+        status: "WARNING",
+        severity: "major",
+        evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      },
+    };
+
+    // When the ControlResult output is rendered
+    const report = expectString(
+      callExport("renderControlResultOutput", controlResult, { catalog }),
+    );
+
+    // Then the report keeps the MAT-112 ComplianceGap output contract
+    expect(report).toContain("ComplianceGap: gap-tracker-consent-014");
+    expect(report).toContain("potential compliance gap");
+    expect(report).toContain("gdpr-eprivacy-consent-tracking");
+
+    // When the PR output is rendered for a related changed file
+    const prOutput = expectString(
+      callExport("renderControlResultPullRequestOutput", controlResult, {
+        catalog,
+        changed_files: ["web/app/layout.tsx"],
+        relations: [{ gap_id: "gap-tracker-consent-014", file: "web/app/layout.tsx" }],
+      }),
+    );
+
+    // Then the PR output also keeps the catalogued gap visible
+    expect(prOutput).toContain("ComplianceGap: gap-tracker-consent-014");
+    expect(prOutput).toContain("potential compliance gap");
+  });
+
   it("fails the output contract check when a legacy renderer requires a CWE", () => {
     // Given the catalog contains control "gdpr-eprivacy-consent-tracking"
     // And the control has framework reference "GDPR Art. 5(1)(a)"
