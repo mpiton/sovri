@@ -92,10 +92,15 @@ function findDefinition(docs: readonly string[], term: ComplianceOutputTerm): st
 }
 
 function parseDefinitionLine(line: string, term: ComplianceOutputTerm): string | undefined {
-  const marker = `${term} - `;
-  const trimmedLine = line.trim();
+  const normalized = line.trim().replace(/^[-*+]\s+/u, "");
 
-  return trimmedLine.startsWith(marker) ? trimmedLine.slice(marker.length) : undefined;
+  for (const marker of [`${term} - `, `**${term}** - `, `\`${term}\` - `]) {
+    if (normalized.startsWith(marker)) {
+      return normalized.slice(marker.length).trim();
+    }
+  }
+
+  return undefined;
 }
 
 function reviewSchemaContract(schemas: readonly ComplianceOutputContractSchema[]): {
@@ -109,9 +114,17 @@ function reviewSchemaContract(schemas: readonly ComplianceOutputContractSchema[]
 
   return {
     separate_contract_types: COMPLIANCE_OUTPUT_TERMS.every((term) => schemaByName.has(term)),
-    compliance_gap_requires_cwe: complianceGapSchema?.required?.includes("cwe") ?? false,
+    compliance_gap_requires_cwe: schemaDeclaresCwe(complianceGapSchema),
     finding_has_compliance_category: findingSchema?.categories?.includes("compliance") ?? false,
   };
+}
+
+function schemaDeclaresCwe(schema: ComplianceOutputContractSchema | undefined): boolean {
+  if (schema === undefined) {
+    return false;
+  }
+
+  return schema.fields.includes("cwe") || (schema.required?.includes("cwe") ?? false);
 }
 
 function findingCategoryFailures(docs: readonly string[]): readonly string[] {
@@ -187,7 +200,7 @@ function schemaFailures(schema: ComplianceOutputContractReviewResult["schema"]):
   }
 
   if (schema.compliance_gap_requires_cwe) {
-    failures.push("ComplianceGap must not require a CWE");
+    failures.push("ComplianceGap must not define a CWE field");
   }
 
   if (schema.finding_has_compliance_category) {

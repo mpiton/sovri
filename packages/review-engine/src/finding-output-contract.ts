@@ -188,7 +188,22 @@ function isRenderedFindingOutput(value: unknown): value is RenderedFindingOutput
     return false;
   }
 
-  return typeof Reflect.get(value, "id") === "string";
+  const cwe = Reflect.get(value, "cwe");
+  const controlId = Reflect.get(value, "control_id");
+
+  return (
+    typeof Reflect.get(value, "id") === "string" &&
+    (cwe === undefined || typeof cwe === "string") &&
+    (controlId === undefined || typeof controlId === "string") &&
+    isOptionalStringArray(Reflect.get(value, "reference_labels"))
+  );
+}
+
+function isOptionalStringArray(value: unknown): value is readonly string[] | undefined {
+  return (
+    value === undefined ||
+    (Array.isArray(value) && value.every((entry) => typeof entry === "string"))
+  );
 }
 
 function referenceLabelsFor(finding: Finding): readonly string[] {

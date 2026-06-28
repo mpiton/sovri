@@ -85,6 +85,26 @@ describe("Security and bug findings keep the CWE enrichment path", () => {
     expect(Reflect.get(complianceGapOnlyEvaluation, "output_contract_check")).toBe("failed");
   });
 
+  it("rejects a rendered Finding whose reference_labels is not a string array", () => {
+    // Given a Finding rendered with reference_labels as a bare string instead of an array
+    const finding = findingFor({
+      id: "finding-sql-injection-004",
+      category: "security",
+      cwe: "CWE-89",
+    });
+
+    // When the output contract evaluates the malformed rendered Finding
+    const evaluation = expectPlainObject(
+      callExport("evaluateFindingOutputContract", finding, {
+        rendered_finding: { id: finding.id, cwe: "CWE-89", reference_labels: "GDPR Art. 32" },
+      }),
+    );
+
+    // Then the contract rejects it as malformed rather than accepting the string
+    expect(Reflect.get(evaluation, "output_contract_check")).toBe("failed");
+    expect(Reflect.get(evaluation, "reason")).toBe("rendered finding is malformed");
+  });
+
   it("keeps CWE Findings and non-CWE ComplianceGaps on separate reference paths in a combined model", () => {
     // Given the CWE compliance mapping contains "CWE-89"
     // And "CWE-89" maps to framework reference "GDPR Art. 32"

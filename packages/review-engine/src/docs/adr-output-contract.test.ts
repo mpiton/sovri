@@ -208,7 +208,11 @@ function prReviewSourceModelFailures(adr022: string): readonly string[] {
 
 function complianceGapFindingCategoryFailures(adr: string): readonly string[] {
   return lines(adr)
-    .filter((line) => lineContainsAll(line, ["ComplianceGap", "Finding category"]))
+    .filter(
+      (line) =>
+        lineContainsAll(line, ["ComplianceGap", "Finding category"]) &&
+        !lineContainsAny(line, ["must not", "never", "is not"]),
+    )
     .map(() => "ComplianceGap must not be a Finding category");
 }
 

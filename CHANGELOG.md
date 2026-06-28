@@ -155,6 +155,15 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `review-engine`: reject rendered Finding output whose `cwe`, `control_id`, or
+  `reference_labels` have the wrong type so a stringified `reference_labels` no
+  longer slips through the runtime guard.
+- `review-engine`: treat a blank or whitespace-only `cwe` as absent in the
+  legacy-renderer publishability gate.
+- `review-engine`: fail the compliance output contract when a `ComplianceGap`
+  schema declares a `cwe` field at all, not only when it marks it required.
+- `review-engine`: parse ADR glossary definitions written as Markdown list items
+  (`- **ComplianceGap** - ...`) in the compliance output contract reviewer.
 - `review-engine`: harden MAT-112 ADR output-contract tests with symlink-safe
   root discovery, fatal UTF-8 decoding, direct negated-scope matching, and
   ambiguous or unrelated scope edge-case coverage.

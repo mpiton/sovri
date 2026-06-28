@@ -163,6 +163,28 @@ describe("Catalogued control references render without a CWE", () => {
       "catalogued control references can render without a CWE",
     );
   });
+
+  it("treats a blank CWE as absent when a legacy renderer requires a CWE", () => {
+    // Given a ComplianceGap whose CWE is whitespace-only rather than undefined
+    const gap = {
+      id: "gap-tracker-consent-006",
+      control_id: "gdpr-eprivacy-consent-tracking",
+      cwe: "   ",
+    };
+
+    // When the renderer evaluates whether the gap can be published
+    const evaluation = expectPlainObject(
+      callExport("evaluateComplianceGapPublishability", gap, {
+        catalog,
+        renderer_requires_cwe: true,
+      }),
+    );
+
+    // Then the blank CWE is rejected the same way an absent CWE is
+    expect(Reflect.get(evaluation, "publishable")).toBe(false);
+    expect(Reflect.get(evaluation, "reason")).toBe("CWE is absent");
+    expect(Reflect.get(evaluation, "output_contract_check")).toBe("failed");
+  });
 });
 
 function callExport(name: string, ...args: readonly unknown[]): unknown {

@@ -157,6 +157,22 @@ describe("R-06: Prompt, schema, and docs distinguish Finding from ComplianceGap 
     expect(review.failures).toContain("ControlResult definition is required");
   });
 
+  it("recognises ADR glossary definitions written as Markdown list items", () => {
+    const artifactSet = replaceDocs([
+      "- **Finding** - diff/code issue raised during review.",
+      "- **ComplianceGap** - project-level compliance output for an unmet control or missing evidence.",
+      "- **ControlResult** - result of evaluating a control against its rules and collected evidence.",
+    ]);
+
+    const review = reviewComplianceOutputContract(artifactSet);
+
+    expect(review.definitions.ComplianceGap).toBe(
+      "project-level compliance output for an unmet control or missing evidence.",
+    );
+    expect(review.failures).not.toContain("ComplianceGap definition is required");
+    expect(review.passed).toBe(true);
+  });
+
   it("rejects prompts that ask the LLM to author regulatory source references", () => {
     // Given the prompt says "write the GDPR source URL for each compliance gap"
     const artifactSet = replacePrompts(["write the GDPR source URL for each compliance gap"]);
@@ -238,6 +254,33 @@ describe("R-06: Prompt, schema, and docs distinguish Finding from ComplianceGap 
         'ControlResult schema must define field "status"',
       ]),
     );
+  });
+
+  it("rejects a ComplianceGap schema that declares a CWE field, required or not", () => {
+    const artifactSet = replaceSchemas([
+      {
+        name: "Finding",
+        fields: ["cwe", "category", "file", "line_start", "line_end"],
+        required: ["category", "file", "line_start", "line_end"],
+        categories: ["bug", "security"],
+      },
+      {
+        name: "ComplianceGap",
+        fields: ["control_id", "evidence", "status", "cwe"],
+        required: ["control_id"],
+      },
+      {
+        name: "ControlResult",
+        fields: ["control_id", "status", "evidence"],
+        required: ["status"],
+      },
+    ]);
+
+    const review = reviewComplianceOutputContract(artifactSet);
+
+    expect(review.schema.compliance_gap_requires_cwe).toBe(true);
+    expect(review.passed).toBe(false);
+    expect(review.failures).toContain("ComplianceGap must not define a CWE field");
   });
 });
 

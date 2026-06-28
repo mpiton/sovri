@@ -249,7 +249,10 @@ export function evaluateComplianceGapPublishability(
     };
   }
 
-  if (options.renderer_requires_cwe === true && gap.cwe === undefined) {
+  if (
+    options.renderer_requires_cwe === true &&
+    (typeof gap.cwe !== "string" || gap.cwe.trim().length === 0)
+  ) {
     return {
       publishable: false,
       rejected_gap_id: gap.id,
