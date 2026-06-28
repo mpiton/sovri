@@ -23,6 +23,36 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 - `review-engine`: add MAT-112 ATDD coverage that keeps ADR-021 and ADR-022
   aligned on the project compliance source model and PR/report output contract.
+- `review-engine`: add MAT-112 ATDD coverage that keeps `Finding`,
+  `ComplianceGap`, and `ControlResult` distinct across review prompts, schemas,
+  and docs.
+- `review-engine`: expose a compliance output contract reviewer for prompt,
+  schema, and docs artifacts that keeps `Finding`, `ComplianceGap`, and
+  `ControlResult` meanings separate.
+- `review-engine`: add MAT-112 ATDD coverage for PR compliance-gap projection
+  filtering by changed file, route, and dependency relation metadata while
+  project reports render every catalogued gap.
+- `review-engine`: add compliance gap projection helpers that filter pull
+  request output by changed file, route, and dependency relation metadata while
+  keeping project reports unfiltered.
+- `review-engine`: add output-contract helpers that keep CWE-backed Findings on
+  the existing enrichment path while non-CWE ComplianceGaps use catalogued
+  control references.
+- `review-engine`: add MAT-112 ATDD coverage proving CWE-backed Findings keep
+  the existing enrichment path alongside non-CWE ComplianceGap output.
+- `review-engine`: add MAT-112 ATDD coverage for the non-CWE
+  `ComplianceGap` output contract required fields and `Finding` separation.
+- `review-engine`: add the MAT-112 non-CWE `ComplianceGap` validation and
+  serialization output contract.
+- `review-engine`: require non-CWE `ComplianceGap` output to match a supplied
+  catalogued control reference before publication.
+- `review-engine`: cover the non-CWE `ComplianceGap` serialization error path so
+  `serializeComplianceGapOutput` throws a typed `ComplianceGapOutputValidationError`
+  carrying the non-publishable validation payload.
+- `review-engine`: render MAT-114 control-result and ComplianceGap output
+  through the MAT-112 output contract.
+- `review-engine`: add MAT-114 fixture acceptance coverage for rendering
+  GDPR/ePrivacy control results through the MAT-112 output contract.
 - `review-engine`: add MAT-112 ATDD coverage for uncatalogued compliance gaps
   staying out of regulatory output while remaining available as internal
   diagnostics.
@@ -36,7 +66,6 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   requirements.
 - `review-engine`: add catalogued `ComplianceGap` rendering helpers for project
   report and pull request output without CWE requirements.
-
 - `review-engine`: add an ATDD guard for MAT-80 project-level compliance
   vocabulary definitions across tracked ADR docs with explicit assertion
   diagnostics, ADR-022 content checks, duplicate-term detection, and
@@ -131,6 +160,28 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   ambiguous or unrelated scope edge-case coverage.
 - `review-engine`: tighten MAT-112 ADR output-contract acceptance helpers with
   project-root discovery and affirmative MAT-112 scope validation.
+- `review-engine`: avoid false positives in compliance output contract checks
+  when docs or prompts explicitly prohibit Finding-category misuse or
+  LLM-authored compliance gap source URLs.
+- `review-engine`: tighten the compliance output contract reviewer for missing
+  term definitions, Markdown-wrapped `ComplianceGap` misuse, and equivalent
+  prompt requests for LLM-authored regulatory source URLs.
+- `review-engine`: reject compliance output schema artifacts that omit
+  distinguishing fields and gap-first source URL prompt requests.
+- `review-engine`: tighten PR compliance-gap projection feedback by matching
+  published `Gap id:` lines exactly and removing redundant relation-option
+  spreading in the projection renderer, while rejecting unknown published gaps
+  or anonymous gap blocks and treating null relation metadata as unavailable.
+- `review-engine`: tighten MAT-112 Finding output-contract helpers to reject
+  rendered ComplianceGap shapes, preserve the existing confidence gate, and
+  omit uncatalogued ComplianceGaps from combined review output.
+- `review-engine`: compare Finding output CWE presence and value explicitly in
+  the MAT-112 output-contract helper.
+- `review-engine`: harden MAT-112 Finding output-contract checks for malformed
+  rendered output, invalid CWE strings, and missing rendered compliance
+  references.
+- `review-engine`: render ControlResult-backed ComplianceGaps when the nested
+  gap omits a duplicate control id and relies on the enclosing control result.
 - `review-engine`: address MAT-80 docs review feedback by centralizing
   compliance-pivot literals, tightening issue-scope and supersession checks, and
   validating ADR index row structure, with the docs-test contract loaded from a
@@ -5676,6 +5727,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `pnpm-workspace.yaml`.
 
 ### Fixed
+
+- `review-engine`: include the first schema validation issue in generic
+  `ComplianceGap` output validation failures and cover provided blank gap ids.
+- `review-engine`: reject CWE-bearing or otherwise Finding-shaped inputs from
+  the non-CWE `ComplianceGap` output contract.
 
 - `@sovri/observability`: `NODE_ENV` is now compared case-insensitively against `"production"` so mixed-case values disable the pretty transport, and `pino-pretty` resolvability is probed before enabling the transport so production-pruned installs fall back to JSON instead of crashing the worker. (#85)
 

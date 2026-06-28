@@ -96,13 +96,59 @@ export type {
 
 export { generateAuditReference } from "./audit-ref.js";
 
+export { reviewComplianceOutputContract } from "./compliance-output-contract-review.js";
+export type {
+  ComplianceOutputContractArtifactSet,
+  ComplianceOutputContractReviewResult,
+  ComplianceOutputContractSchema,
+  ComplianceOutputTerm,
+} from "./compliance-output-contract-review.js";
+
+export {
+  ComplianceControlReferenceSchema,
+  ComplianceGapOutputSchema,
+  ComplianceGapOutputValidationError,
+  serializeComplianceGapOutput,
+  validateComplianceGapOutput,
+} from "./compliance-output-contract.js";
+export type {
+  ComplianceControlReference,
+  ComplianceGapOutput,
+  ComplianceGapOutputOptions,
+  ComplianceGapOutputValidation,
+} from "./compliance-output-contract.js";
+
 export {
   evaluateComplianceGapPublishability,
-  renderInternalComplianceDiagnostics,
+  evaluateComplianceGapPullRequestProjection,
+  renderComplianceGapProjectionDiagnostics,
   renderComplianceGapProjectReportOutput,
+  renderComplianceGapProjectReportProjection,
   renderComplianceGapPullRequestOutput,
+  renderComplianceGapPullRequestProjection,
+  renderControlResultOutput,
+  renderControlResultPullRequestOutput,
+  renderInternalComplianceDiagnostics,
 } from "./compliance-gap-rendering.js";
-export type { ComplianceGapPublishabilityResult } from "./compliance-gap-rendering.js";
+export type {
+  CataloguedControlReference,
+  ComplianceGapPublishabilityResult,
+  ComplianceGapPullRequestProjectionEvaluationResult,
+  ComplianceGapRenderInput,
+} from "./compliance-gap-rendering.js";
+
+export {
+  buildCombinedReviewOutputModel,
+  evaluateFindingOutputContract,
+} from "./finding-output-contract.js";
+export type {
+  CombinedReviewOutputItem,
+  CombinedReviewOutputModel,
+  CombinedReviewOutputModelInput,
+  FindingOutputContractOptions,
+  FindingOutputContractResult,
+  RenderedFindingOutput,
+} from "./finding-output-contract.js";
 
 export {
   classifyResolvedComments,
