@@ -1,198 +1,186 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri contributors
 
-export type ComplianceOutputTerm = "Finding" | "ComplianceGap" | "ControlResult";
+import { z } from "zod";
 
-export interface ComplianceOutputContractSchema {
-  readonly name: ComplianceOutputTerm;
-  readonly fields: readonly string[];
-  readonly required?: readonly string[];
-  readonly categories?: readonly string[];
+const RequiredStringSchema = z.string().trim().min(1);
+const SourceUrlSchema = z.string().trim().url();
+
+const ComplianceGapInputSchema = z.strictObject({
+  id: RequiredStringSchema.optional(),
+  framework_id: RequiredStringSchema,
+  control_id: RequiredStringSchema,
+  source_url: SourceUrlSchema,
+  evidence: RequiredStringSchema,
+  status: z.enum(["WARNING", "FAIL"]),
+  severity: z.enum(["blocker", "major", "minor", "info", "nitpick"]),
+  remediation_guidance: RequiredStringSchema,
+});
+
+type ComplianceGapInput = z.infer<typeof ComplianceGapInputSchema>;
+type ComplianceGapRequiredField = Exclude<keyof ComplianceGapInput, "id">;
+
+const ComplianceGapRequiredFieldLabels = {
+  framework_id: "framework id",
+  control_id: "control id",
+  source_url: "source URL",
+  evidence: "evidence",
+  status: "status",
+  severity: "severity",
+  remediation_guidance: "remediation guidance",
+} satisfies Record<ComplianceGapRequiredField, string>;
+
+export const ComplianceControlReferenceSchema = z.strictObject({
+  framework_id: RequiredStringSchema,
+  control_id: RequiredStringSchema,
+  source_url: SourceUrlSchema,
+});
+
+export type ComplianceControlReference = z.infer<typeof ComplianceControlReferenceSchema>;
+
+export interface ComplianceGapOutputOptions {
+  readonly catalog: readonly ComplianceControlReference[];
 }
 
-export interface ComplianceOutputContractArtifactSet {
-  readonly prompts: readonly string[];
-  readonly schemas: readonly ComplianceOutputContractSchema[];
-  readonly docs: readonly string[];
+export const ComplianceGapOutputSchema = z.strictObject({
+  type: z.literal("ComplianceGap"),
+  framework_id: RequiredStringSchema,
+  control_id: RequiredStringSchema,
+  source_url: SourceUrlSchema,
+  evidence: RequiredStringSchema,
+  status: z.enum(["WARNING", "FAIL"]),
+  severity: z.enum(["blocker", "major", "minor", "info", "nitpick"]),
+  remediation_guidance: RequiredStringSchema,
+});
+
+export type ComplianceGapOutput = z.infer<typeof ComplianceGapOutputSchema>;
+
+export type ComplianceGapOutputValidation =
+  | {
+      readonly publishable: true;
+      readonly serialized: ComplianceGapOutput;
+    }
+  | {
+      readonly publishable: false;
+      readonly missing_field: string;
+    };
+
+export class ComplianceGapOutputValidationError extends Error {
+  constructor(public readonly validation: ComplianceGapOutputValidation) {
+    super("Compliance gap output is not publishable");
+    this.name = "ComplianceGapOutputValidationError";
+  }
 }
 
-export interface ComplianceOutputContractReviewResult {
-  readonly passed: boolean;
-  readonly definitions: Readonly<Record<ComplianceOutputTerm, string>>;
-  readonly failures: readonly string[];
-  readonly schema: {
-    readonly separate_contract_types: boolean;
-    readonly compliance_gap_requires_cwe: boolean;
-    readonly finding_has_compliance_category: boolean;
-  };
+export function validateComplianceGapOutput(
+  input: unknown,
+  options: ComplianceGapOutputOptions,
+): ComplianceGapOutputValidation {
+  const missingField = findMissingRequiredField(input);
+
+  if (missingField !== undefined) {
+    return { publishable: false, missing_field: missingField };
+  }
+
+  const parsed = ComplianceGapInputSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return { publishable: false, missing_field: findSchemaFieldLabel(parsed.error.issues) };
+  }
+
+  if (!isCataloguedControlReference(parsed.data, options.catalog)) {
+    return { publishable: false, missing_field: "catalogued control reference" };
+  }
+
+  return { publishable: true, serialized: buildOutput(parsed.data) };
 }
 
-const COMPLIANCE_OUTPUT_TERMS: readonly ComplianceOutputTerm[] = [
-  "Finding",
-  "ComplianceGap",
-  "ControlResult",
-];
-const REQUIRED_SCHEMA_FIELDS: Readonly<Record<ComplianceOutputTerm, string>> = {
-  Finding: "cwe",
-  ComplianceGap: "control_id",
-  ControlResult: "status",
-};
-const FINDING_CATEGORY_MISUSE_PATTERN =
-  /(?:^|\s)(?:`|\*\*)?\b(ComplianceGap|ControlResult)\b(?:`|\*\*)?\s+is\s+a\s+\bFinding\b\s+category\b(?:\s+emitted\s+by\s+PR\s+review\b)?/i;
-const FINDING_CATEGORY_MISUSE_PROHIBITION_PATTERN =
-  /\b(?:do\s+not|don't|never)\b[^.:\n]*(?:`|\*\*)?\b(?:ComplianceGap|ControlResult)\b(?:`|\*\*)?\s+is\s+a\s+\bFinding\b\s+category\b/i;
-const SOURCE_REFERENCE_REQUEST_VERB_PATTERN = /\b(?:write|provide|generate|author)\b/i;
-const SOURCE_REFERENCE_PROHIBITION_PATTERN =
-  /\b(?:do\s+not|don't|never)\s+(?:(?:ask|allow|tell)\s+(?:the\s+)?LLM\s+to\s+)?(?:write|provide|generate|author)\b/i;
-const SOURCE_URL_PATTERN = /\bsource\s+urls?\b/i;
-const COMPLIANCE_GAP_REFERENCE_PATTERN = /\bcompliance\s*gaps?\b|\bComplianceGap\b/i;
+export function serializeComplianceGapOutput(
+  input: unknown,
+  options: ComplianceGapOutputOptions,
+): ComplianceGapOutput {
+  const validation = validateComplianceGapOutput(input, options);
 
-export function reviewComplianceOutputContract(
-  artifactSet: ComplianceOutputContractArtifactSet,
-): ComplianceOutputContractReviewResult {
-  const definitions = collectDefinitions(artifactSet.docs);
-  const schema = reviewSchemaContract(artifactSet.schemas);
-  const failures = [
-    ...definitionFailures(definitions),
-    ...findingCategoryFailures(artifactSet.docs),
-    ...promptSourceReferenceFailures(artifactSet.prompts),
-    ...schemaFieldFailures(artifactSet.schemas),
-    ...schemaFailures(schema),
-  ];
+  if (!validation.publishable) {
+    throw new ComplianceGapOutputValidationError(validation);
+  }
 
+  return validation.serialized;
+}
+
+function buildOutput(input: ComplianceGapInput): ComplianceGapOutput {
   return {
-    passed: failures.length === 0,
-    definitions,
-    failures,
-    schema,
+    type: "ComplianceGap",
+    framework_id: input.framework_id,
+    control_id: input.control_id,
+    source_url: input.source_url,
+    evidence: input.evidence,
+    status: input.status,
+    severity: input.severity,
+    remediation_guidance: input.remediation_guidance,
   };
 }
 
-function collectDefinitions(
-  docs: readonly string[],
-): Readonly<Record<ComplianceOutputTerm, string>> {
-  return {
-    Finding: findDefinition(docs, "Finding"),
-    ComplianceGap: findDefinition(docs, "ComplianceGap"),
-    ControlResult: findDefinition(docs, "ControlResult"),
-  };
-}
+function findMissingRequiredField(input: unknown): string | undefined {
+  if (!isRecord(input)) {
+    return "framework id";
+  }
 
-function findDefinition(docs: readonly string[], term: ComplianceOutputTerm): string {
-  for (const doc of docs) {
-    for (const line of doc.split(/\r?\n/)) {
-      const definition = parseDefinitionLine(line, term);
-      if (definition !== undefined) {
-        return definition;
-      }
+  if (typeof input.id === "string" && input.id.trim().length === 0) {
+    return "id: must not be blank";
+  }
+
+  for (const property of ComplianceGapInputSchema.keyof().options) {
+    if (!isRequiredFieldProperty(property)) {
+      continue;
+    }
+
+    const value = input[property];
+
+    if (typeof value !== "string" || value.trim().length === 0) {
+      return ComplianceGapRequiredFieldLabels[property];
     }
   }
 
-  return "";
+  return undefined;
 }
 
-function parseDefinitionLine(line: string, term: ComplianceOutputTerm): string | undefined {
-  const marker = `${term} - `;
-  const trimmedLine = line.trim();
+function findSchemaFieldLabel(issues: readonly z.core.$ZodIssue[]): string {
+  for (const issue of issues) {
+    const pathItem = issue.path[0];
 
-  return trimmedLine.startsWith(marker) ? trimmedLine.slice(marker.length) : undefined;
-}
-
-function reviewSchemaContract(schemas: readonly ComplianceOutputContractSchema[]): {
-  readonly separate_contract_types: boolean;
-  readonly compliance_gap_requires_cwe: boolean;
-  readonly finding_has_compliance_category: boolean;
-} {
-  const schemaByName = new Map(schemas.map((schema) => [schema.name, schema]));
-  const findingSchema = schemaByName.get("Finding");
-  const complianceGapSchema = schemaByName.get("ComplianceGap");
-
-  return {
-    separate_contract_types: COMPLIANCE_OUTPUT_TERMS.every((term) => schemaByName.has(term)),
-    compliance_gap_requires_cwe: complianceGapSchema?.required?.includes("cwe") ?? false,
-    finding_has_compliance_category: findingSchema?.categories?.includes("compliance") ?? false,
-  };
-}
-
-function findingCategoryFailures(docs: readonly string[]): readonly string[] {
-  const failures: string[] = [];
-
-  for (const doc of docs) {
-    for (const line of doc.split(/\r?\n/)) {
-      if (FINDING_CATEGORY_MISUSE_PROHIBITION_PATTERN.test(line)) {
-        continue;
-      }
-
-      const match = line.match(FINDING_CATEGORY_MISUSE_PATTERN);
-      if (match?.[1] === "ComplianceGap") {
-        failures.push("ComplianceGap is project-level compliance output");
-      }
-      if (match?.[1] === "ControlResult") {
-        failures.push("ControlResult is a control evaluation result");
-      }
+    if (typeof pathItem === "string" && isRequiredFieldProperty(pathItem)) {
+      return ComplianceGapRequiredFieldLabels[pathItem];
     }
   }
 
-  return failures;
+  const firstIssue = issues[0];
+
+  if (firstIssue === undefined) {
+    return "invalid compliance gap output";
+  }
+
+  const path = firstIssue.path.map(String).join(".");
+
+  return path.length === 0 ? firstIssue.message : `${path}: ${firstIssue.message}`;
 }
 
-function promptSourceReferenceFailures(prompts: readonly string[]): readonly string[] {
-  return prompts.some((prompt) => promptRequestsSourceReference(prompt))
-    ? ["framework references and source URLs must come from the catalog"]
-    : [];
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function promptRequestsSourceReference(prompt: string): boolean {
-  return prompt
-    .split(/[.!?;\n]+/)
-    .some(
-      (segment) =>
-        !SOURCE_REFERENCE_PROHIBITION_PATTERN.test(segment) &&
-        SOURCE_REFERENCE_REQUEST_VERB_PATTERN.test(segment) &&
-        SOURCE_URL_PATTERN.test(segment) &&
-        COMPLIANCE_GAP_REFERENCE_PATTERN.test(segment),
-    );
+function isRequiredFieldProperty(property: string): property is ComplianceGapRequiredField {
+  return Object.hasOwn(ComplianceGapRequiredFieldLabels, property);
 }
 
-function definitionFailures(
-  definitions: Readonly<Record<ComplianceOutputTerm, string>>,
-): readonly string[] {
-  return COMPLIANCE_OUTPUT_TERMS.filter((term) => definitions[term] === "").map(
-    (term) => `${term} definition is required`,
+function isCataloguedControlReference(
+  gap: ComplianceGapInput,
+  catalog: readonly ComplianceControlReference[],
+): boolean {
+  return catalog.some(
+    (reference) =>
+      reference.framework_id === gap.framework_id &&
+      reference.control_id === gap.control_id &&
+      reference.source_url === gap.source_url,
   );
-}
-
-function schemaFieldFailures(
-  schemas: readonly ComplianceOutputContractSchema[],
-): readonly string[] {
-  const schemaByName = new Map(schemas.map((schema) => [schema.name, schema]));
-  const failures: string[] = [];
-
-  for (const term of COMPLIANCE_OUTPUT_TERMS) {
-    const requiredField = REQUIRED_SCHEMA_FIELDS[term];
-    const schema = schemaByName.get(term);
-    if (schema !== undefined && !schema.fields.includes(requiredField)) {
-      failures.push(`${term} schema must define field "${requiredField}"`);
-    }
-  }
-
-  return failures;
-}
-
-function schemaFailures(schema: ComplianceOutputContractReviewResult["schema"]): readonly string[] {
-  const failures: string[] = [];
-
-  if (!schema.separate_contract_types) {
-    failures.push("Finding, ComplianceGap, and ControlResult must be separate contract types");
-  }
-
-  if (schema.compliance_gap_requires_cwe) {
-    failures.push("ComplianceGap must not require a CWE");
-  }
-
-  if (schema.finding_has_compliance_category) {
-    failures.push('Finding must not define a source-of-truth "compliance" category');
-  }
-
-  return failures;
 }

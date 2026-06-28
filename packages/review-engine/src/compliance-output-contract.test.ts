@@ -3,270 +3,330 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  reviewComplianceOutputContract,
-  type ComplianceOutputContractArtifactSet,
-  type ComplianceOutputContractSchema,
-  type ComplianceOutputTerm,
-} from "./index.js";
+import * as reviewEngine from "./index.js";
 
-const VALID_CONTRACT_ARTIFACTS = {
-  prompts: [
-    "Findings are diff/code issues raised during review.",
-    "ComplianceGap output comes from project-level compliance scans, not CWE-backed review Findings.",
-    "Use catalog framework references and source URLs; never ask the LLM to author regulatory source references.",
-  ],
-  schemas: [
+const cataloguedControl = {
+  framework_id: "GDPR/ePrivacy",
+  control_id: "gdpr-eprivacy-consent-tracking",
+  source_url: "https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng",
+} as const;
+const catalog = [cataloguedControl];
+const sourceUrl = cataloguedControl.source_url;
+const remediationGuidance = "Delay non-essential analytics until consent is recorded";
+
+describe("Non-CWE compliance gaps have a complete output contract", () => {
+  it.each([
     {
-      name: "Finding",
-      fields: ["cwe", "category", "file", "line_start", "line_end"],
-      required: ["category", "file", "line_start", "line_end"],
-      categories: ["bug", "security"],
+      status: "WARNING",
+      severity: "major",
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
     },
     {
-      name: "ComplianceGap",
-      fields: ["control_id", "evidence", "status"],
-      required: ["control_id"],
+      status: "FAIL",
+      severity: "blocker",
+      evidence: "web/app/layout.tsx:18 initializes Google Tag Manager",
     },
-    {
-      name: "ControlResult",
-      fields: ["control_id", "status", "evidence"],
-      required: ["status"],
-    },
-  ],
-  docs: [
-    "Finding - diff/code issue raised during review",
-    "ComplianceGap - project-level compliance output for an unmet control or missing evidence",
-    "ControlResult - result of evaluating a control against rules and collected evidence",
-  ],
-} satisfies ComplianceOutputContractArtifactSet;
+  ])(
+    "accepts a non-CWE compliance gap with every required output field",
+    ({ status, severity, evidence }) => {
+      // Given the catalog contains control "gdpr-eprivacy-consent-tracking"
+      // And control "gdpr-eprivacy-consent-tracking" belongs to framework "GDPR/ePrivacy"
+      // And control "gdpr-eprivacy-consent-tracking" has source URL "https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng"
+      // Given a ComplianceGap "gap-tracker-consent-001"
+      // And the gap has framework id "GDPR/ePrivacy"
+      // And the gap has control id "gdpr-eprivacy-consent-tracking"
+      // And the gap has source URL "https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng"
+      // And the gap has evidence "<evidence>"
+      // And the gap has status "<status>"
+      // And the gap has severity "<severity>"
+      // And the gap has remediation guidance "Delay non-essential analytics until consent is recorded"
+      // And the gap has no CWE
+      const gap = {
+        id: "gap-tracker-consent-001",
+        ...cataloguedControl,
+        evidence,
+        status,
+        severity,
+        remediation_guidance: remediationGuidance,
+      };
 
-const TERM_MEANING_EXAMPLES = [
-  ["Finding", "diff/code issue raised during review", "project-level compliance gap"],
-  [
-    "ComplianceGap",
-    "project-level compliance output for an unmet control or missing evidence",
-    "CWE-backed review Finding",
-  ],
-  [
-    "ControlResult",
-    "result of evaluating a control against rules and collected evidence",
-    "rendered code-review category",
-  ],
-] as const satisfies readonly (readonly [ComplianceOutputTerm, string, string])[];
+      // When the compliance output contract is validated
+      const validation = expectPlainObject(
+        callExport("validateComplianceGapOutput", gap, { catalog }),
+      );
+      const serialized = expectPlainObject(Reflect.get(validation, "serialized"));
 
-describe("R-06: Prompt, schema, and docs distinguish Finding from ComplianceGap and ControlResult", () => {
-  it.each(TERM_MEANING_EXAMPLES)(
-    'describes "%s" as "%s" and not as "%s"',
-    (term, meaning, forbiddenMeaning) => {
-      // Given the contract artifact set includes prompts, schemas, and docs
-      const artifactSet = VALID_CONTRACT_ARTIFACTS;
+      // Then the gap is accepted as a ComplianceGap
+      expect(Reflect.get(validation, "publishable")).toBe(true);
+      expect(Reflect.get(serialized, "type")).toBe("ComplianceGap");
 
-      // When the contract artifact set is reviewed
-      const review = reviewComplianceOutputContract(artifactSet);
+      // And the serialized gap contains framework id, control id, source URL, evidence, status, severity, and remediation guidance
+      expect(Reflect.get(serialized, "framework_id")).toBe("GDPR/ePrivacy");
+      expect(Reflect.get(serialized, "control_id")).toBe("gdpr-eprivacy-consent-tracking");
+      expect(Reflect.get(serialized, "source_url")).toBe(sourceUrl);
+      expect(Reflect.get(serialized, "evidence")).toBe(evidence);
+      expect(Reflect.get(serialized, "status")).toBe(status);
+      expect(Reflect.get(serialized, "severity")).toBe(severity);
+      expect(Reflect.get(serialized, "remediation_guidance")).toBe(remediationGuidance);
 
-      // Then "<term>" is described as "<meaning>"
-      expect(review.definitions[term]).toBe(meaning);
-
-      // And "<term>" is not described as "<forbidden_meaning>"
-      expect(review.definitions[term]).not.toContain(forbiddenMeaning);
+      // And the serialized gap does not require a CWE field
+      expect(Object.hasOwn(serialized, "cwe")).toBe(false);
     },
   );
 
-  it("separates CWE Findings from framework/control compliance gaps", () => {
-    // Given the schema defines a Finding object with field "cwe"
-    const findingSchema = findContractSchema(VALID_CONTRACT_ARTIFACTS, "Finding");
-    expect(findingSchema.fields).toContain("cwe");
-
-    // And the schema defines a ComplianceGap object with field "control_id"
-    const complianceGapSchema = findContractSchema(VALID_CONTRACT_ARTIFACTS, "ComplianceGap");
-    expect(complianceGapSchema.fields).toContain("control_id");
-
-    // And the schema defines a ControlResult object with field "status"
-    const controlResultSchema = findContractSchema(VALID_CONTRACT_ARTIFACTS, "ControlResult");
-    expect(controlResultSchema.fields).toContain("status");
-
-    // When the schema contract is reviewed
-    const review = reviewComplianceOutputContract(VALID_CONTRACT_ARTIFACTS);
-
-    // Then Finding, ComplianceGap, and ControlResult are separate contract types
-    expect(review.schema.separate_contract_types).toBe(true);
-
-    // And the ComplianceGap type does not require a CWE
-    expect(review.schema.compliance_gap_requires_cwe).toBe(false);
-
-    // And the Finding type is not extended with a source-of-truth "compliance" category
-    expect(review.schema.finding_has_compliance_category).toBe(false);
-  });
-
-  it("rejects documentation that treats ComplianceGap as a Finding category", () => {
-    // Given the docs say "ComplianceGap is a Finding category emitted by PR review"
-    const artifactSet = replaceDocs(["ComplianceGap is a Finding category emitted by PR review"]);
-
-    // When the contract artifact set is reviewed
-    const review = reviewComplianceOutputContract(artifactSet);
-
-    // Then the contract review fails
-    expect(review.passed).toBe(false);
-
-    // And the failure explains that ComplianceGap is project-level compliance output
-    expect(review.failures.join("\n")).toContain(
-      "ComplianceGap is project-level compliance output",
-    );
-  });
-
-  it("rejects Markdown-wrapped ComplianceGap Finding-category misuse", () => {
-    const artifactSet = replaceDocs(["`ComplianceGap` is a Finding category emitted by PR review"]);
-
-    const review = reviewComplianceOutputContract(artifactSet);
-
-    expect(review.passed).toBe(false);
-    expect(review.failures.join("\n")).toContain(
-      "ComplianceGap is project-level compliance output",
-    );
-  });
-
-  it("rejects Markdown-wrapped ControlResult Finding-category misuse", () => {
-    const artifactSet = appendDocs(["`ControlResult` is a Finding category emitted by PR review"]);
-
-    const review = reviewComplianceOutputContract(artifactSet);
-
-    expect(review.passed).toBe(false);
-    expect(review.failures).toContain("ControlResult is a control evaluation result");
-  });
-
-  it("does not reject documentation that prohibits Finding-category misuse", () => {
-    const artifactSet = appendDocs([
-      "Never say `ControlResult` is a Finding category emitted by PR review.",
-    ]);
-
-    const review = reviewComplianceOutputContract(artifactSet);
-
-    expect(review.passed).toBe(true);
-  });
-
-  it("rejects missing required term definitions before passing", () => {
-    const artifactSet = replaceDocs([
-      "Finding - diff/code issue raised during review",
-      "ComplianceGap - project-level compliance output for an unmet control or missing evidence",
-    ]);
-
-    const review = reviewComplianceOutputContract(artifactSet);
-
-    expect(review.passed).toBe(false);
-    expect(review.failures).toContain("ControlResult definition is required");
-  });
-
-  it("rejects prompts that ask the LLM to author regulatory source references", () => {
-    // Given the prompt says "write the GDPR source URL for each compliance gap"
-    const artifactSet = replacePrompts(["write the GDPR source URL for each compliance gap"]);
-
-    // When the contract artifact set is reviewed
-    const review = reviewComplianceOutputContract(artifactSet);
-
-    // Then the contract review fails
-    expect(review.passed).toBe(false);
-
-    // And the failure explains that framework references and source URLs must come from the catalog
-    expect(review.failures.join("\n")).toContain(
-      "framework references and source URLs must come from the catalog",
-    );
-  });
-
   it.each([
-    "provide the GDPR source URL for each compliance gap",
-    "generate the DORA source URL for each compliance gap",
-    "For each ComplianceGap, provide its GDPR source URL",
-    "provide source URLs for compliance gaps",
-  ])("rejects equivalent prompt source-reference request: %s", (prompt) => {
-    const artifactSet = replacePrompts([prompt]);
+    {
+      framework_id: "",
+      control_id: "gdpr-eprivacy-consent-tracking",
+      source_url: sourceUrl,
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      status: "WARNING",
+      severity: "major",
+      remediation_guidance: remediationGuidance,
+      missingField: "framework id",
+    },
+    {
+      framework_id: "GDPR/ePrivacy",
+      control_id: "",
+      source_url: sourceUrl,
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      status: "WARNING",
+      severity: "major",
+      remediation_guidance: remediationGuidance,
+      missingField: "control id",
+    },
+    {
+      framework_id: "GDPR/ePrivacy",
+      control_id: "gdpr-eprivacy-consent-tracking",
+      source_url: "",
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      status: "WARNING",
+      severity: "major",
+      remediation_guidance: remediationGuidance,
+      missingField: "source URL",
+    },
+    {
+      framework_id: "GDPR/ePrivacy",
+      control_id: "gdpr-eprivacy-consent-tracking",
+      source_url: sourceUrl,
+      evidence: "",
+      status: "WARNING",
+      severity: "major",
+      remediation_guidance: remediationGuidance,
+      missingField: "evidence",
+    },
+    {
+      framework_id: "GDPR/ePrivacy",
+      control_id: "gdpr-eprivacy-consent-tracking",
+      source_url: sourceUrl,
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      status: "",
+      severity: "major",
+      remediation_guidance: remediationGuidance,
+      missingField: "status",
+    },
+    {
+      framework_id: "GDPR/ePrivacy",
+      control_id: "gdpr-eprivacy-consent-tracking",
+      source_url: sourceUrl,
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      status: "WARNING",
+      severity: "",
+      remediation_guidance: remediationGuidance,
+      missingField: "severity",
+    },
+    {
+      framework_id: "GDPR/ePrivacy",
+      control_id: "gdpr-eprivacy-consent-tracking",
+      source_url: sourceUrl,
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      status: "WARNING",
+      severity: "major",
+      remediation_guidance: "",
+      missingField: "remediation guidance",
+    },
+  ])(
+    "rejects a non-CWE gap missing $missingField",
+    ({
+      framework_id,
+      control_id,
+      source_url,
+      evidence,
+      status,
+      severity,
+      remediation_guidance,
+      missingField,
+    }) => {
+      // Given the catalog contains control "gdpr-eprivacy-consent-tracking"
+      // And control "gdpr-eprivacy-consent-tracking" belongs to framework "GDPR/ePrivacy"
+      // And control "gdpr-eprivacy-consent-tracking" has source URL "https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng"
+      // Given a ComplianceGap "gap-tracker-consent-002"
+      // And the gap has framework id "<framework_id>"
+      // And the gap has control id "<control_id>"
+      // And the gap has source URL "<source_url>"
+      // And the gap has evidence "<evidence>"
+      // And the gap has status "<status>"
+      // And the gap has severity "<severity>"
+      // And the gap has remediation guidance "<remediation>"
+      const gap = {
+        id: "gap-tracker-consent-002",
+        framework_id,
+        control_id,
+        source_url,
+        evidence,
+        status,
+        severity,
+        remediation_guidance,
+      };
 
-    const review = reviewComplianceOutputContract(artifactSet);
+      // When the compliance output contract is validated
+      const validation = expectPlainObject(
+        callExport("validateComplianceGapOutput", gap, { catalog }),
+      );
 
-    expect(review.passed).toBe(false);
-    expect(review.failures.join("\n")).toContain(
-      "framework references and source URLs must come from the catalog",
+      // Then the gap is rejected for published output
+      expect(Reflect.get(validation, "publishable")).toBe(false);
+
+      // And the rejection identifies "<missing_field>" as missing
+      expect(Reflect.get(validation, "missing_field")).toBe(missingField);
+    },
+  );
+
+  it("serializes a non-CWE compliance gap separately from the Finding contract", () => {
+    // Given the catalog contains control "gdpr-eprivacy-consent-tracking"
+    // And control "gdpr-eprivacy-consent-tracking" belongs to framework "GDPR/ePrivacy"
+    // And control "gdpr-eprivacy-consent-tracking" has source URL "https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng"
+    // Given a ComplianceGap "gap-tracker-consent-003" with control id "gdpr-eprivacy-consent-tracking"
+    // And the gap has no CWE
+    const gap = {
+      id: "gap-tracker-consent-003",
+      ...cataloguedControl,
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      status: "WARNING",
+      severity: "major",
+      remediation_guidance: remediationGuidance,
+    };
+
+    // When the compliance output contract is serialized
+    const serialized = expectPlainObject(
+      callExport("serializeComplianceGapOutput", gap, { catalog }),
     );
+
+    // Then the serialized object type is "ComplianceGap"
+    expect(Reflect.get(serialized, "type")).toBe("ComplianceGap");
+
+    // And the serialized object is not serialized as a "Finding"
+    expect(Reflect.get(serialized, "type")).not.toBe("Finding");
+
+    // And no "category: compliance" source model is required
+    expect(Object.hasOwn(serialized, "category")).toBe(false);
   });
 
-  it("does not reject prompts that prohibit LLM-authored source URLs", () => {
-    const artifactSet = replacePrompts([
-      "Do not provide source URLs for compliance gaps; use the catalog.",
-    ]);
+  it("rejects a non-CWE gap whose source URL is not catalog-backed", () => {
+    const gap = {
+      id: "gap-tracker-consent-014",
+      framework_id: "GDPR/ePrivacy",
+      control_id: "gdpr-eprivacy-consent-tracking",
+      source_url: "https://example.com/fake",
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      status: "WARNING",
+      severity: "major",
+      remediation_guidance: remediationGuidance,
+    };
 
-    const review = reviewComplianceOutputContract(artifactSet);
-
-    expect(review.passed).toBe(true);
-  });
-
-  it("does not reject unrelated authoring verbs near catalog source URL guidance", () => {
-    const artifactSet = replacePrompts([
-      "Write a concise review summary. Use catalog source URLs for compliance gaps.",
-    ]);
-
-    const review = reviewComplianceOutputContract(artifactSet);
-
-    expect(review.passed).toBe(true);
-  });
-
-  it("rejects schema artifacts that omit required distinguishing fields", () => {
-    const artifactSet = replaceSchemas([
-      {
-        name: "Finding",
-        fields: ["cwe"],
-        required: [],
-        categories: ["bug", "security"],
-      },
-      {
-        name: "ComplianceGap",
-        fields: ["evidence", "status"],
-        required: [],
-      },
-      {
-        name: "ControlResult",
-        fields: ["control_id", "evidence"],
-        required: [],
-      },
-    ]);
-
-    const review = reviewComplianceOutputContract(artifactSet);
-
-    expect(review.passed).toBe(false);
-    expect(review.failures).toEqual(
-      expect.arrayContaining([
-        'ComplianceGap schema must define field "control_id"',
-        'ControlResult schema must define field "status"',
-      ]),
+    const validation = expectPlainObject(
+      callExport("validateComplianceGapOutput", gap, { catalog }),
     );
+
+    expect(Reflect.get(validation, "publishable")).toBe(false);
+    expect(Reflect.get(validation, "missing_field")).toBe("catalogued control reference");
+  });
+
+  it("rejects a non-CWE gap with a provided blank id", () => {
+    const gap = {
+      id: " ",
+      ...cataloguedControl,
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      status: "WARNING",
+      severity: "major",
+      remediation_guidance: remediationGuidance,
+    };
+
+    const validation = expectPlainObject(
+      callExport("validateComplianceGapOutput", gap, { catalog }),
+    );
+
+    expect(Reflect.get(validation, "publishable")).toBe(false);
+    expect(Reflect.get(validation, "missing_field")).toBe("id: must not be blank");
+  });
+
+  it("rejects a CWE-bearing Finding-shaped input instead of stripping Finding fields", () => {
+    const gap = {
+      id: "gap-tracker-consent-015",
+      ...cataloguedControl,
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      status: "WARNING",
+      severity: "major",
+      remediation_guidance: remediationGuidance,
+      cwe: "CWE-79",
+      category: "security",
+    };
+
+    const validation = expectPlainObject(
+      callExport("validateComplianceGapOutput", gap, { catalog }),
+    );
+
+    expect(Reflect.get(validation, "publishable")).toBe(false);
+    expect(Reflect.get(validation, "missing_field")).toEqual(expect.stringContaining("cwe"));
+  });
+
+  it("throws a typed validation error when serializing an unpublishable gap", () => {
+    // Given a non-CWE gap whose source URL is not catalog-backed
+    const gap = {
+      id: "gap-tracker-consent-016",
+      framework_id: "GDPR/ePrivacy",
+      control_id: "gdpr-eprivacy-consent-tracking",
+      source_url: "https://example.com/fake",
+      evidence: "web/app/layout.tsx:12 imports @vercel/analytics/react",
+      status: "WARNING",
+      severity: "major",
+      remediation_guidance: remediationGuidance,
+    };
+
+    // When the unpublishable gap is serialized
+    let thrown: unknown;
+    try {
+      callExport("serializeComplianceGapOutput", gap, { catalog });
+    } catch (error) {
+      thrown = error;
+    }
+
+    // Then it throws the typed validation error carrying the non-publishable payload
+    const error = expectPlainObject(thrown);
+    expect(Reflect.get(error, "name")).toBe("ComplianceGapOutputValidationError");
+    const validation = expectPlainObject(Reflect.get(error, "validation"));
+    expect(Reflect.get(validation, "publishable")).toBe(false);
+    expect(Reflect.get(validation, "missing_field")).toBe("catalogued control reference");
   });
 });
 
-function findContractSchema(
-  artifactSet: ComplianceOutputContractArtifactSet,
-  name: ComplianceOutputTerm,
-): ComplianceOutputContractSchema {
-  const schema = artifactSet.schemas.find((candidate) => candidate.name === name);
-  if (schema === undefined) {
-    throw new Error(`Missing ${name} schema fixture`);
+function callExport(name: string, ...args: readonly unknown[]): unknown {
+  const exported: unknown = Reflect.get(reviewEngine, name);
+  expect(exported, `${name} export is missing`).toBeTypeOf("function");
+
+  if (typeof exported !== "function") {
+    throw new TypeError(`${name} export is not callable`);
   }
 
-  return schema;
+  return Reflect.apply(exported, undefined, args);
 }
 
-function replaceDocs(docs: readonly string[]): ComplianceOutputContractArtifactSet {
-  return { ...VALID_CONTRACT_ARTIFACTS, docs };
-}
+function expectPlainObject(value: unknown): object {
+  expect(value).toEqual(expect.any(Object));
 
-function appendDocs(docs: readonly string[]): ComplianceOutputContractArtifactSet {
-  return { ...VALID_CONTRACT_ARTIFACTS, docs: [...VALID_CONTRACT_ARTIFACTS.docs, ...docs] };
-}
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new TypeError("Expected a plain object");
+  }
 
-function replacePrompts(prompts: readonly string[]): ComplianceOutputContractArtifactSet {
-  return { ...VALID_CONTRACT_ARTIFACTS, prompts };
-}
-
-function replaceSchemas(
-  schemas: readonly ComplianceOutputContractSchema[],
-): ComplianceOutputContractArtifactSet {
-  return { ...VALID_CONTRACT_ARTIFACTS, schemas };
+  return value;
 }
