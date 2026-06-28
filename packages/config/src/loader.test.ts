@@ -154,7 +154,7 @@ describe("loadConfig — valid YAML", () => {
       apiKeySecret: "ANTHROPIC_API_KEY",
     });
     expect(cfg.review).toEqual({
-      mode: "full",
+      mode: "compliance",
       autoReviewDrafts: false,
       severityThreshold: "minor",
     });
@@ -171,7 +171,7 @@ describe("loadConfig — valid YAML", () => {
     const cfg = await loadConfig(root);
 
     expect(cfg.llm.baseUrl).toBe("https://api.anthropic.com");
-    expect(cfg.review.mode).toBe("bugs-only");
+    expect(cfg.review.mode).toBe("compliance");
     expect(cfg.review.autoReviewDrafts).toBe(true);
     expect(cfg.review.severityThreshold).toBe("major");
     expect(cfg.ignores).toEqual(["**/*.md", "dist/**"]);
@@ -179,7 +179,7 @@ describe("loadConfig — valid YAML", () => {
     expect(cfg.limits.maxLinesPerReview).toBe(10000);
   });
 
-  it("parses strict review mode from YAML content", () => {
+  it("parses compliance review mode from YAML content", () => {
     const cfg = parseConfigContent(
       `
 llm:
@@ -188,13 +188,32 @@ llm:
   apiKeySecret: OPENAI_API_KEY
 
 review:
-  mode: strict
+  mode: compliance
 `,
-      "strict-review.sovri.yml",
+      "compliance-review.sovri.yml",
     );
 
     expect(cfg.llm.provider).toBe("openai");
-    expect(cfg.review.mode).toBe("strict");
+    expect(cfg.review.mode).toBe("compliance");
+  });
+
+  it("rejects the legacy strict review mode from YAML content", () => {
+    // MAT-78 removed the legacy review modes; a .sovri.yml still pinning
+    // `mode: strict` must fail schema validation rather than load silently.
+    expect(() =>
+      parseConfigContent(
+        `
+llm:
+  provider: openai
+  model: gpt-5-mini
+  apiKeySecret: OPENAI_API_KEY
+
+review:
+  mode: strict
+`,
+        "strict-review.sovri.yml",
+      ),
+    ).toThrow(SovriConfigValidationError);
   });
 });
 

@@ -6,13 +6,14 @@ import { z } from "zod";
 const TRIPLE_BACKTICK = "`".repeat(3);
 export const SYSTEM_PROMPT_MAX_BYTES = 1024;
 
-// Shared reviewer contract appended to every mode. The model reviews — it does not narrate. These
-// lines (with the required `recommendation`) are the prompt half of issue #2450's defense in depth;
-// the schema enforces the same field so the contract survives prompt decay across models.
+// Shared reviewer contract. The model reviews — it does not narrate. These lines (with the required
+// `recommendation`) are the prompt half of issue #2450's defense in depth; the schema enforces the
+// same field so the contract survives prompt decay across models.
 // Sovri reviews for regulated compliance only. Every finding must be a security or correctness
 // weakness that can anchor a CWE → framework reference; the prompt no longer solicits generic bug,
-// style, performance, or maintainability review (the compliance pivot — ADR-021, MAT-76). Each mode
-// keeps the same compliance scope and varies only volume/severity.
+// style, performance, or maintainability review (the compliance pivot — ADR-021, MAT-76). There is a
+// single compliance review behaviour (MAT-78); the legacy full/bugs-only/strict/minimal modes are
+// removed.
 const REVIEWER_DIRECTIVES = [
   "Never describe what the code does; a hunk with no issue yields no finding.",
   "Each finding states the problem and its impact in `body` and the concrete fix in `recommendation`.",
@@ -21,35 +22,14 @@ const REVIEWER_DIRECTIVES = [
   "On every finding, set `cwe` to its CWE id (for example CWE-89) and `confidence` to a number between 0 and 1 reflecting your honest certainty. A resolved `cwe` maps the finding to GDPR, DORA, AI Act, and NIS2 references, so a missing one drops that compliance context.",
 ];
 
-const FULL_REVIEW_SYSTEM_TEMPLATE = [
+const COMPLIANCE_REVIEW_SYSTEM_TEMPLATE = [
   "You are Sovri's review engine.",
   "Review only the supplied pull request metadata and unified diff.",
   "Report only security and correctness weaknesses that map to a known CWE, such as injection, broken authentication or access control, secret and credential exposure, unsafe cryptography, and memory or resource safety.",
   ...REVIEWER_DIRECTIVES,
 ].join(" ");
 
-const BUGS_ONLY_REVIEW_SYSTEM_TEMPLATE = [
-  "You are Sovri's review engine.",
-  "Review only the supplied pull request metadata and unified diff.",
-  "Report only correctness weaknesses that change runtime behavior and map to a known CWE, such as unsafe input handling, missing validation, and resource-safety defects.",
-  ...REVIEWER_DIRECTIVES,
-].join(" ");
-
-const STRICT_REVIEW_SYSTEM_TEMPLATE = [
-  "You are Sovri's review engine.",
-  "Review only the supplied pull request metadata and unified diff.",
-  "Hold the diff to a high bar: report every security or correctness weakness that maps to a known CWE at blocker, major, or minor severity.",
-  ...REVIEWER_DIRECTIVES,
-].join(" ");
-
-const MINIMAL_REVIEW_SYSTEM_TEMPLATE = [
-  "You are Sovri's review engine.",
-  "Review only the supplied pull request metadata and unified diff.",
-  "Report at most 3 findings, blocker or major severity only, limited to security or correctness weaknesses that map to a known CWE.",
-  ...REVIEWER_DIRECTIVES,
-].join(" ");
-
-export const ReviewPromptModeSchema = z.enum(["full", "bugs-only", "strict", "minimal"]);
+export const ReviewPromptModeSchema = z.enum(["compliance"]);
 export type ReviewPromptMode = z.infer<typeof ReviewPromptModeSchema>;
 
 export const SystemPromptConfigSchema = z.strictObject({
@@ -110,21 +90,12 @@ export function validateSystemTemplateSize(template: string): string {
 }
 
 export function buildSystemPrompt(config: unknown): string {
-  const parsedConfig = SystemPromptConfigSchema.parse(config);
+  // Validates `mode === "compliance"` via the schema (any other value is a Zod
+  // error) and returns the single compliance template. No per-mode branching
+  // survives the compliance pivot (MAT-78).
+  SystemPromptConfigSchema.parse(config);
 
-  if (parsedConfig.mode === "bugs-only") {
-    return validateSystemTemplateSize(BUGS_ONLY_REVIEW_SYSTEM_TEMPLATE);
-  }
-
-  if (parsedConfig.mode === "strict") {
-    return validateSystemTemplateSize(STRICT_REVIEW_SYSTEM_TEMPLATE);
-  }
-
-  if (parsedConfig.mode === "minimal") {
-    return validateSystemTemplateSize(MINIMAL_REVIEW_SYSTEM_TEMPLATE);
-  }
-
-  return validateSystemTemplateSize(FULL_REVIEW_SYSTEM_TEMPLATE);
+  return validateSystemTemplateSize(COMPLIANCE_REVIEW_SYSTEM_TEMPLATE);
 }
 
 // Few-shot lives here, not in the system prompt, because the system template is capped at 1024 bytes

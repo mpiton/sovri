@@ -17,11 +17,16 @@ export {
   buildUserPrompt,
   PromptTemplateSizeError,
   PullRequestPromptContextSchema,
+  ReviewPromptModeSchema,
   SYSTEM_PROMPT_MAX_BYTES,
   SystemPromptConfigSchema,
   validateSystemTemplateSize,
 } from "./prompt/builder.js";
-export type { PullRequestPromptContext, SystemPromptConfig } from "./prompt/builder.js";
+export type {
+  PullRequestPromptContext,
+  ReviewPromptMode,
+  SystemPromptConfig,
+} from "./prompt/builder.js";
 
 export {
   attachCheckRunDescriptors,
@@ -160,7 +165,7 @@ export {
 } from "./reconcile/index.js";
 export type { PostedComment } from "./reconcile/index.js";
 
-export { reviewPullRequest, runReview } from "./orchestrator.js";
+export { ReviewPullRequestConfigModeSchema, reviewPullRequest, runReview } from "./orchestrator.js";
 export type {
   ReviewEngineResult,
   ReviewPullRequestConfig,

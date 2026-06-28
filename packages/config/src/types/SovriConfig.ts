@@ -41,7 +41,11 @@ const OpenAICompatibleModelNameMessage =
 export const ProviderSchema = z.enum(["anthropic", "mistral", "openai", "openai-compatible"]);
 export type Provider = z.infer<typeof ProviderSchema>;
 
-export const ReviewModeSchema = z.enum(["full", "bugs-only", "strict", "minimal"]);
+// Single allowed value after the compliance pivot (MAT-78). The field is kept
+// — stable, extensible config surface — but there is exactly one review
+// behaviour, compliance-only, so the enum carries a single member. The legacy
+// values `full` / `bugs-only` / `strict` / `minimal` are removed (breaking).
+export const ReviewModeSchema = z.enum(["compliance"]);
 export type ReviewMode = z.infer<typeof ReviewModeSchema>;
 
 export const SeverityThresholdSchema = z.enum(["blocker", "major", "minor"]);
@@ -95,7 +99,7 @@ const LlmSchema = z
 // duplicate every default literally on both sides of the schema.
 const ReviewSchema = z
   .strictObject({
-    mode: ReviewModeSchema.default("full"),
+    mode: ReviewModeSchema.default("compliance"),
     autoReviewDrafts: z.boolean().default(false),
     severityThreshold: SeverityThresholdSchema.default("minor"),
   })

@@ -4,6 +4,7 @@
 import type { Diff, PullRequest, Severity } from "@sovri/core";
 import type { GenerateStructuredParams, LLMProvider } from "@sovri/llm-providers";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   reviewPullRequest,
@@ -32,48 +33,43 @@ class CapturingProvider implements LLMProvider {
 }
 
 describe("reviewPullRequest review mode plumbing", () => {
-  it.each([
-    { mode: "full" },
-    { mode: "bugs-only" },
-    { mode: "strict" },
-    { mode: "minimal" },
-  ] as const)("forwards review mode $mode to prompt construction", async ({ mode }) => {
-    // Given the parsed review config has review mode <mode>.
+  it("forwards the compliance review mode to prompt construction", async () => {
+    // Given the parsed review config has review mode compliance.
     const provider = new CapturingProvider();
 
     // When the review orchestrator builds the review request.
-    await reviewPullRequest({ pullRequest, diff, config: configForMode(mode) }, { provider });
+    await reviewPullRequest(
+      { pullRequest, diff, config: configForMode("compliance") },
+      { provider },
+    );
 
-    // Then the provider receives the system prompt for mode <mode>.
-    expect(provider.systemPrompt).toBe(buildSystemPrompt({ mode }));
-    // And the provider receives the same quoted user prompt diff for mode <mode>.
+    // Then the provider receives the compliance system prompt.
+    expect(provider.systemPrompt).toBe(buildSystemPrompt({ mode: "compliance" }));
+    // And the provider receives the quoted user prompt diff.
     expect(provider.userPrompt).toContain("```diff");
     expect(provider.userPrompt).toContain("src/transfer.ts");
     expect(provider.userPrompt).toContain("if (amountCents &gt; 1000000) return true");
   });
 
-  it("defaults omitted review mode to the full-mode system prompt", async () => {
+  it("defaults omitted review mode to the compliance system prompt", async () => {
     // Given the parsed review config omitted review mode before schema defaults were applied.
     const provider = new CapturingProvider();
 
     // When the review orchestrator builds the review request.
     await reviewPullRequest({ pullRequest, diff, config: baseConfig }, { provider });
 
-    // Then the provider receives the baseline full-mode system prompt.
-    expect(provider.systemPrompt).toBe(buildSystemPrompt({ mode: "full" }));
+    // Then the provider receives the baseline compliance system prompt.
+    expect(provider.systemPrompt).toBe(buildSystemPrompt({ mode: "compliance" }));
     // And no unsupported mode fallback is used.
     expect(provider.systemPrompt).not.toContain("at most 3 findings");
   });
 
-  it("routes strict config mode to the strict-mode system prompt", async () => {
-    // Given a repository config sets `review.mode: strict`.
-    const provider = new CapturingProvider();
+  it("rejects a non-compliance review mode instead of routing it to a prompt", () => {
+    // Given a repository config sets a retired `review.mode` (here "strict").
 
-    // When the orchestrator parses the input.
-    await reviewPullRequest({ pullRequest, diff, config: configForMode("strict") }, { provider });
-
-    // Then the provider receives the strict-mode system prompt.
-    expect(provider.systemPrompt).toBe(buildSystemPrompt({ mode: "strict" }));
+    // When prompt construction validates that mode (the same enum the orchestrator config enforces).
+    // Then it is rejected rather than routed to a strict-specific template.
+    expect(() => buildSystemPrompt({ mode: "strict" })).toThrow(z.ZodError);
   });
 });
 

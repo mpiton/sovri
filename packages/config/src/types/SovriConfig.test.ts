@@ -32,7 +32,7 @@ const fullConfig: SovriConfig = {
     apiKeySecret: "ANTHROPIC_API_KEY",
   },
   review: {
-    mode: "full",
+    mode: "compliance",
     autoReviewDrafts: false,
     severityThreshold: "minor",
   },
@@ -81,19 +81,25 @@ describe("ProviderSchema", () => {
 });
 
 describe("ReviewModeSchema", () => {
-  const validModes = ["full", "bugs-only", "strict", "minimal"] satisfies readonly ReviewMode[];
+  const validMode = "compliance" satisfies ReviewMode;
+  const legacyModes = ["full", "bugs-only", "strict", "minimal"] as const;
 
-  it.each(validModes)("accepts %s", (value) => {
-    expect(ReviewModeSchema.parse(value)).toBe(value);
+  it("accepts compliance", () => {
+    expect(ReviewModeSchema.parse(validMode)).toBe(validMode);
   });
 
-  // Issue #1356, R-03 nominal (enum stays wide; config refine narrows).
+  it.each(legacyModes)("rejects the legacy mode %s (removed in MAT-78)", (value) => {
+    expect(ReviewModeSchema.safeParse(value).success).toBe(false);
+  });
+
+  // Issue #1356, R-03 nominal. The MAT-78 compliance pivot collapsed the enum
+  // to a single member.
   // Scenario:
   //   Given the exported ReviewModeSchema is loaded from @sovri/config types
   //   When the schema is inspected for its accepted enum members
-  //   Then the members are exactly ["full", "bugs-only", "strict", "minimal"]
-  it("R-03 nominal — keeps the four declared review modes in order", () => {
-    expect(ReviewModeSchema.options).toEqual(["full", "bugs-only", "strict", "minimal"]);
+  //   Then the members are exactly ["compliance"]
+  it("R-03 nominal — keeps a single compliance review mode", () => {
+    expect(ReviewModeSchema.options).toEqual(["compliance"]);
   });
 
   it("rejects an unknown mode", () => {
@@ -131,7 +137,7 @@ describe("SovriConfigSchema — happy paths", () => {
       apiKeySecret: "ANTHROPIC_API_KEY",
     });
     expect(parsed.review).toEqual({
-      mode: "full",
+      mode: "compliance",
       autoReviewDrafts: false,
       severityThreshold: "minor",
     });
@@ -231,119 +237,138 @@ describe("SovriConfigSchema — provider allow-list", () => {
 });
 
 describe("SovriConfigSchema — review mode validation", () => {
-  // Issue #1350, R-01 nominal (Scenario Outline over the enabled set).
+  const legacyModes = ["full", "bugs-only", "strict", "minimal"] as const;
+
+  // Issue #1350, R-01 nominal. After the MAT-78 compliance pivot, "compliance"
+  // is the only accepted mode.
   // Scenario:
-  //   Given the .sovri.yml has review.mode "<mode>"
+  //   Given the .sovri.yml has review.mode "compliance"
   //   When SovriConfigSchema.safeParse() runs on the config
   //   Then the result is success=true
-  //   And the parsed config has review.mode equal to "<mode>"
-  it.each(["full", "bugs-only", "strict", "minimal"] satisfies readonly ReviewMode[])(
-    "R-01 nominal — review.mode=%s passes config validation",
+  //   And the parsed config has review.mode equal to "compliance"
+  it("R-01 nominal — review.mode=compliance passes config validation", () => {
+    const result = SovriConfigSchema.safeParse({
+      ...minimalConfig,
+      review: { mode: "compliance" },
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.review.mode).toBe("compliance");
+    }
+  });
+
+  // Issue #1350, R-01 nominal (rejection half). Every legacy mode is now
+  // refused at the enum boundary.
+  it.each(legacyModes)(
+    "R-01 nominal — legacy review.mode=%s no longer passes validation",
     (mode) => {
       const result = SovriConfigSchema.safeParse({
         ...minimalConfig,
         review: { mode },
       });
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.review.mode).toBe(mode);
-      }
+      expect(result.success).toBe(false);
     },
   );
 
-  // Issue #1351, R-01 violation.
+  // Issue #1351, R-01 violation. The previously-enabled "minimal" mode now
+  // produces a review.mode issue instead of parsing cleanly.
   // Scenario:
   //   Given the .sovri.yml has review.mode "minimal"
   //   When SovriConfigSchema.safeParse() runs on the config
-  //   Then the result is success=true
-  //   And no issue has path "review.mode"
-  it("R-01 violation — enabled review modes do not produce review.mode issues", () => {
+  //   Then the result is success=false
+  //   And at least one issue has path "review.mode"
+  it("R-01 violation — the legacy minimal mode now produces a review.mode issue", () => {
     const result = SovriConfigSchema.safeParse({
       ...minimalConfig,
       review: { mode: "minimal" },
     });
 
-    expect(result.success).toBe(true);
-  });
-
-  // Issue #1352, R-01 technical.
-  // Scenario:
-  //   Given four parse attempts with review.mode values "full",
-  //     "bugs-only", "strict", and "minimal"
-  //   When SovriConfigSchema.safeParse() runs on each config
-  //   Then all four results are success=true
-  //   And every parsed config keeps llm.provider equal to "anthropic"
-  //   And every parsed config keeps review.severityThreshold equal to "minor"
-  it("R-01 technical — all enabled modes parse with the same surrounding config", () => {
-    for (const mode of ["full", "bugs-only", "strict", "minimal"] satisfies readonly ReviewMode[]) {
-      const result = SovriConfigSchema.safeParse({
-        ...minimalConfig,
-        review: { mode },
-      });
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.llm.provider).toBe("anthropic");
-        expect(result.data.review.severityThreshold).toBe("minor");
-      }
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const modeIssues = result.error.issues.filter(
+        (issue) => issue.path.join(".") === "review.mode",
+      );
+      expect(modeIssues.length).toBeGreaterThan(0);
     }
   });
 
-  // Issue #1353, R-02 violation.
+  // Issue #1352, R-01 technical. Compliance parses with the surrounding config
+  // intact, while the legacy modes no longer parse at all.
   // Scenario:
-  //   Given the .sovri.yml has review.mode "strict"
-  //   When SovriConfigSchema.safeParse() runs on the config
-  //   Then the result is success=true
-  //   And the parsed config has review.mode equal to "strict"
-  it("R-02 violation — review.mode=strict passes config validation", () => {
-    const result = SovriConfigSchema.safeParse({
-      ...minimalConfig,
-      review: { mode: "strict" },
-    });
-
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.review.mode).toBe("strict");
-    }
-  });
-
-  // Issue #1354, R-02 violation.
-  // Scenario:
-  //   Given the .sovri.yml has review.mode "strict"
-  //   When SovriConfigSchema.safeParse() runs on the config
-  //   Then the result is success=true
-  //   And the parsed config keeps review.mode equal to "strict"
-  //   And no downstream prompt mode is derived as "full"
-  it("R-02 violation — strict mode is not silently mapped to full mode", () => {
-    const result = SovriConfigSchema.safeParse({
-      ...minimalConfig,
-      review: { mode: "strict" },
-    });
-
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.review.mode).toBe("strict");
-      expect(result.data.review.mode).not.toBe("full");
-    }
-  });
-
-  // Issue #1355, R-02 technical.
-  // Scenario:
-  //   Given the .sovri.yml has review.mode "strict"
+  //   Given a parse attempt with review.mode "compliance"
   //   When SovriConfigSchema.safeParse() runs on the config
   //   Then the result is success=true
   //   And the parsed config keeps llm.provider equal to "anthropic"
-  it("R-02 technical — strict acceptance preserves surrounding config", () => {
+  //   And the parsed config keeps review.severityThreshold equal to "minor"
+  //   And every legacy mode parse attempt is success=false
+  it("R-01 technical — compliance parses with the same surrounding config", () => {
     const result = SovriConfigSchema.safeParse({
       ...minimalConfig,
-      review: { mode: "strict" },
+      review: { mode: "compliance" },
     });
 
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.llm.provider).toBe("anthropic");
-      expect(result.data.review.mode).toBe("strict");
+      expect(result.data.review.severityThreshold).toBe("minor");
+    }
+
+    for (const mode of legacyModes) {
+      expect(SovriConfigSchema.safeParse({ ...minimalConfig, review: { mode } }).success).toBe(
+        false,
+      );
+    }
+  });
+
+  // Issue #1353, R-02 violation. The legacy "strict" mode is now rejected.
+  // Scenario:
+  //   Given the .sovri.yml has review.mode "strict"
+  //   When SovriConfigSchema.safeParse() runs on the config
+  //   Then the result is success=false
+  it("R-02 violation — review.mode=strict is rejected after the compliance pivot", () => {
+    const result = SovriConfigSchema.safeParse({
+      ...minimalConfig,
+      review: { mode: "strict" },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  // Issue #1354, R-02 violation. "strict" is not silently coerced onto the
+  // surviving "compliance" mode — it is refused outright.
+  // Scenario:
+  //   Given the .sovri.yml has review.mode "strict"
+  //   When SovriConfigSchema.safeParse() runs on the config
+  //   Then the result is success=false
+  //   And no parsed config is produced that maps strict onto compliance
+  it("R-02 violation — strict mode is not silently mapped to compliance mode", () => {
+    const result = SovriConfigSchema.safeParse({
+      ...minimalConfig,
+      review: { mode: "strict" },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  // Issue #1355, R-02 technical. With "strict" gone, a compliance config still
+  // preserves the surrounding values.
+  // Scenario:
+  //   Given the .sovri.yml has review.mode "compliance"
+  //   When SovriConfigSchema.safeParse() runs on the config
+  //   Then the result is success=true
+  //   And the parsed config keeps llm.provider equal to "anthropic"
+  it("R-02 technical — compliance acceptance preserves surrounding config", () => {
+    const result = SovriConfigSchema.safeParse({
+      ...minimalConfig,
+      review: { mode: "compliance" },
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.llm.provider).toBe("anthropic");
+      expect(result.data.review.mode).toBe("compliance");
     }
   });
 
@@ -392,7 +417,7 @@ describe("SovriConfigSchema — strict mode rejects unknown keys", () => {
     expect(
       SovriConfigSchema.safeParse({
         ...minimalConfig,
-        review: { mode: "full", quirk: true },
+        review: { mode: "compliance", quirk: true },
       }).success,
     ).toBe(false);
   });
@@ -501,12 +526,12 @@ describe("SovriConfigSchema — defaults application", () => {
   // Scenario:
   //   Given the .sovri.yml omits the review block
   //   When SovriConfigSchema.parse() runs on the config
-  //   Then the parsed config has review.mode equal to "full"
+  //   Then the parsed config has review.mode equal to "compliance"
   //   And review.autoReviewDrafts equals false
   //   And review.severityThreshold equals "minor"
   it("applies defaults when review is omitted entirely", () => {
     expect(SovriConfigSchema.parse(minimalConfig).review).toEqual({
-      mode: "full",
+      mode: "compliance",
       autoReviewDrafts: false,
       severityThreshold: "minor",
     });
@@ -528,7 +553,7 @@ describe("SovriConfigSchema — defaults application", () => {
   //   Given the .sovri.yml has review.autoReviewDrafts true
   //   And the .sovri.yml omits review.mode
   //   When SovriConfigSchema.parse() runs on the config
-  //   Then the parsed config has review.mode equal to "full"
+  //   Then the parsed config has review.mode equal to "compliance"
   //   And review.autoReviewDrafts equals true
   //   And review.severityThreshold equals "minor"
   it("R-04 nominal — defaults review.mode when review is provided partially", () => {
@@ -538,7 +563,7 @@ describe("SovriConfigSchema — defaults application", () => {
     });
 
     expect(parsed.review).toEqual({
-      mode: "full",
+      mode: "compliance",
       autoReviewDrafts: true,
       severityThreshold: "minor",
     });
@@ -560,7 +585,7 @@ describe("SovriConfigSchema — defaults application", () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.review.mode).toBe("full");
+      expect(result.data.review.mode).toBe("compliance");
     }
   });
 
@@ -569,7 +594,7 @@ describe("SovriConfigSchema — defaults application", () => {
   //   Given the .sovri.yml has review.severityThreshold "major"
   //   And the .sovri.yml omits review.mode
   //   When SovriConfigSchema.parse() runs on the config
-  //   Then the parsed config has review.mode equal to "full"
+  //   Then the parsed config has review.mode equal to "compliance"
   //   And review.autoReviewDrafts equals false
   //   And review.severityThreshold equals "major"
   it("R-04 technical — review prefault still applies per-field defaults", () => {
@@ -579,7 +604,7 @@ describe("SovriConfigSchema — defaults application", () => {
     });
 
     expect(parsed.review).toEqual({
-      mode: "full",
+      mode: "compliance",
       autoReviewDrafts: false,
       severityThreshold: "major",
     });
@@ -597,18 +622,20 @@ describe("SovriConfigSchema — defaults application", () => {
     });
   });
 
-  it("preserves explicit non-default values", () => {
+  it("preserves explicitly provided review values", () => {
+    // autoReviewDrafts and severityThreshold are non-default; mode is the
+    // explicit "compliance" value and must round-trip unchanged.
     const parsed = SovriConfigSchema.parse({
       ...minimalConfig,
       review: {
-        mode: "bugs-only",
+        mode: "compliance",
         autoReviewDrafts: true,
         severityThreshold: "blocker",
       },
     });
 
     expect(parsed.review).toEqual({
-      mode: "bugs-only",
+      mode: "compliance",
       autoReviewDrafts: true,
       severityThreshold: "blocker",
     });
@@ -635,10 +662,10 @@ describe("SovriConfigSchema — type inference", () => {
   // Issue #1357, R-03 nominal.
   // Scenario:
   //   Given the type alias `ReviewMode = z.infer<typeof ReviewModeSchema>`
-  //   When the type is compared against the literal union
-  //   Then `ReviewMode` equals "full" | "bugs-only" | "strict" | "minimal"
-  it("R-03 nominal — infers ReviewMode as the schema's literal union", () => {
-    expectTypeOf<ReviewMode>().toEqualTypeOf<"full" | "bugs-only" | "strict" | "minimal">();
+  //   When the type is compared against the literal
+  //   Then `ReviewMode` equals "compliance"
+  it("R-03 nominal — infers ReviewMode as the schema's single literal", () => {
+    expectTypeOf<ReviewMode>().toEqualTypeOf<"compliance">();
   });
 
   it("infers SeverityThreshold as a subset of core Severity", () => {
@@ -828,7 +855,7 @@ describe("SovriConfigSchema — prefault block edge cases", () => {
     });
 
     expect(parsed.review).toEqual({
-      mode: "full",
+      mode: "compliance",
       autoReviewDrafts: false,
       severityThreshold: "minor",
     });
@@ -838,7 +865,7 @@ describe("SovriConfigSchema — prefault block edge cases", () => {
     const parsed = SovriConfigSchema.parse({ ...minimalConfig, review: {} });
 
     expect(parsed.review).toEqual({
-      mode: "full",
+      mode: "compliance",
       autoReviewDrafts: false,
       severityThreshold: "minor",
     });

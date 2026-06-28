@@ -116,6 +116,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Changed
 
+- `config`: `review.mode` now exposes the single allowed value `compliance` and
+  defaults to `compliance` (was `full`). The field is kept so the config surface
+  stays stable and extensible, but there is exactly one review behaviour —
+  compliance-only — matching the post-pivot product (MAT-78).
 - `review-engine`: a finding is now published only when it maps to a compliance
   framework. After enrichment, any finding left with an empty
   `compliance_references` list — its CWE resolved to no framework reference, or
@@ -128,7 +132,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   the dropped count is logged (`dropped_unmapped`) so the reduction is auditable,
   never silent (MAT-75).
 - `review-engine`: the review system prompt is recentred on regulated compliance.
-  All four modes (`full`, `bugs-only`, `strict`, `minimal`) now ask the model only
+  The review prompt now asks the model only
   for security and correctness weaknesses that map to a known CWE and no longer
   solicit generic bug, style, performance, or maintainability review. The shared
   CWE directive is now unconditional — every finding should carry a `cwe` — which
@@ -143,6 +147,15 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Removed
 
+- `config` (**breaking**): the legacy `review.mode` values `full`, `bugs-only`,
+  `strict`, and `minimal` are removed. A `.sovri.yml` setting any of them is now
+  rejected with a typed `SovriConfigValidationError`; migrate to
+  `review.mode: compliance`, or drop the key to take the new default (MAT-78).
+- `review-engine` (**breaking**): the per-mode system prompt templates and the
+  multi-value review-mode enums are removed in lock-step with `@sovri/config`.
+  `ReviewPromptModeSchema` and the orchestrator's review-mode enum collapse to the
+  single value `compliance`, and `buildSystemPrompt` now serves one compliance
+  template instead of branching on mode (MAT-78).
 - `core` (**breaking**): the `Category` enum (`CategorySchema`, exported from
   `@sovri/core`) is trimmed from seven values to the compliance-eligible set
   `"bug"` and `"security"`. The generic categories `"performance"`,
