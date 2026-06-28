@@ -21,6 +21,15 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Added
 
+- `review-engine`: add MAT-112 ATDD coverage for the non-CWE
+  `ComplianceGap` output contract required fields and `Finding` separation.
+- `review-engine`: add the MAT-112 non-CWE `ComplianceGap` validation and
+  serialization output contract.
+- `review-engine`: require non-CWE `ComplianceGap` output to match a supplied
+  catalogued control reference before publication.
+- `review-engine`: cover the non-CWE `ComplianceGap` serialization error path so
+  `serializeComplianceGapOutput` throws a typed `ComplianceGapOutputValidationError`
+  carrying the non-publishable validation payload.
 - `review-engine`: render MAT-114 control-result and ComplianceGap output
   through the MAT-112 output contract.
 - `review-engine`: add MAT-114 fixture acceptance coverage for rendering
@@ -38,7 +47,6 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   requirements.
 - `review-engine`: add catalogued `ComplianceGap` rendering helpers for project
   report and pull request output without CWE requirements.
-
 - `review-engine`: add an ATDD guard for MAT-80 project-level compliance
   vocabulary definitions across tracked ADR docs with explicit assertion
   diagnostics, ADR-022 content checks, duplicate-term detection, and
@@ -5675,6 +5683,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   `pnpm-workspace.yaml`.
 
 ### Fixed
+
+- `review-engine`: include the first schema validation issue in generic
+  `ComplianceGap` output validation failures and cover provided blank gap ids.
+- `review-engine`: reject CWE-bearing or otherwise Finding-shaped inputs from
+  the non-CWE `ComplianceGap` output contract.
 
 - `@sovri/observability`: `NODE_ENV` is now compared case-insensitively against `"production"` so mixed-case values disable the pretty transport, and `pino-pretty` resolvability is probed before enabling the transport so production-pruned installs fall back to JSON instead of crashing the worker. (#85)
 
