@@ -653,3 +653,29 @@ describe("MAT-82 R-07 — ADRs keep ComplianceGap and ControlResult distinct fro
     expect(failures).toContain("ControlResult must be distinct from the PR Finding");
   });
 });
+
+// ---------------------------------------------------------------------------
+// MAT-83 R-07 — Git owns framework catalog data
+// ---------------------------------------------------------------------------
+
+describe("MAT-83 R-07 — compliance catalog docs identify Git-owned catalog data", () => {
+  it("states Git owns framework catalog data", () => {
+    // Given the repository contains architecture docs under "sovri/docs/adr/"
+    expect(adrDocsRoot.replaceAll("\\", "/").endsWith("docs/adr")).toBe(true);
+
+    // When I read the compliance catalog docs
+    const complianceCatalogDocs = adrCorpus;
+
+    // Then the docs state that Git is the source of truth for framework catalogs
+    expect(someLineMentionsAll("Git", "source of truth", "framework", "catalogs")).toBe(true);
+
+    // And the docs state that official source URLs and descriptions live in catalog files
+    expect(
+      lineMentionsAll(complianceCatalogDocs, [
+        "official source URLs",
+        "descriptions",
+        "catalog files",
+      ]),
+    ).toBe(true);
+  });
+});

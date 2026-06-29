@@ -40,7 +40,13 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `compliance`: require explicit `rule.yaml` execution policy data while
   preserving declared values in MAT-83 ATDD coverage.
 
+### Fixed
+- `review-engine`: make MAT-83 ADR docs coverage independent of the checkout
+  directory name.
+
 ### Added
+- `review-engine`: add MAT-83 ADR coverage for Git-owned framework catalog
+  data.
 - `compliance`: add MAT-83 ATDD coverage for rejecting LLM-generated
   `control.yaml` source descriptions.
 - `compliance`: add MAT-83 ATDD coverage for rejecting `control.yaml` source
