@@ -47,6 +47,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   directory name.
 
 ### Added
+- `compliance`: add MAT-83 ATDD coverage for project-wide controls that rely
+  on repository-level evidence.
 - `review-engine`: add MAT-83 ADR coverage for rejecting prompt-generated
   official compliance text.
 - `review-engine`: add MAT-83 ADR coverage for catalog-to-rule execution

@@ -1073,6 +1073,52 @@ describe("compliance catalog YAML schemas", () => {
     }
   });
 
+  it("allows project-wide controls to require repository-level evidence", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const frameworkFamily = "gdpr-eprivacy";
+    const control = "privacy.retention.project-policy";
+    const expectedEvidence = "repository-policy-file";
+    const controlYaml = controlYamlFor(control, "project-wide");
+    const ruleYaml = ruleYamlWithScopeAndEvidenceFor(control, "project", expectedEvidence);
+
+    // Given the catalog contains control "privacy.retention.project-policy"
+    expect(controlYaml).toContain(`id: ${control}`);
+
+    // And "rule.yaml" declares input_scope "project"
+    expect(ruleYaml).toContain("input_scope: project");
+
+    // And "rule.yaml" declares expected_evidence "repository-policy-file"
+    expect(ruleYaml).toContain(`expected_evidence: ${expectedEvidence}`);
+
+    // When the catalog schema validator runs
+    const controlResult = validateCatalogYaml({
+      file: "control.yaml",
+      frameworkFamily,
+      yaml: controlYaml,
+    });
+    if (!controlResult.success) {
+      throw new TypeError("Expected control.yaml validation to pass.");
+    }
+
+    const ruleResult = validateCatalogYaml({
+      file: "rule.yaml",
+      frameworkFamily,
+      relatedControl: controlResult.data,
+      yaml: ruleYaml,
+    });
+
+    // Then validation passes for "rule.yaml"
+    expect(ruleResult.success, formatValidationFailure(ruleResult)).toBe(true);
+    if (!ruleResult.success || !isRecord(ruleResult.data)) {
+      throw new TypeError("Expected rule.yaml validation to pass with data.");
+    }
+
+    // And the rule is not tied to a changed file path
+    expect(ruleResult.data.input_scope).toBe("project");
+    expect(ruleResult.data).not.toHaveProperty("changed_file_path");
+  });
+
   it("rejects unsupported control scope values", async () => {
     const moduleValue = await loadCatalogSchemaModule();
     const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
