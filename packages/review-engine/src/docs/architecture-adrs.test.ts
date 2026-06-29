@@ -658,6 +658,10 @@ describe("MAT-82 R-07 — ADRs keep ComplianceGap and ControlResult distinct fro
 // MAT-83 R-07 — Git owns framework catalog data
 // ---------------------------------------------------------------------------
 
+function officialComplianceTextFailures(_docs: string): string[] {
+  return [];
+}
+
 describe("MAT-83 R-07 — compliance catalog docs identify Git-owned catalog data", () => {
   it("states Git owns framework catalog data", () => {
     // Given the repository contains architecture docs under "sovri/docs/adr/"
@@ -693,5 +697,21 @@ describe("MAT-83 R-07 — compliance catalog docs identify Git-owned catalog dat
     expect(
       lineMentionsAll(complianceCatalogDocs, ["rule execution", "versioned catalog data"]),
     ).toBe(true);
+  });
+
+  it("rejects prompt-generated official compliance descriptions", () => {
+    // Given the repository contains architecture docs under "sovri/docs/adr/"
+    expect(adrDocsRoot.replaceAll("\\", "/").endsWith("docs/adr")).toBe(true);
+    // And the compliance catalog docs say official compliance descriptions are generated from prompts
+    const promptGeneratedDescriptions =
+      "The official compliance descriptions are generated from prompts.";
+
+    // When the docs acceptance check runs
+    const failures = officialComplianceTextFailures(promptGeneratedDescriptions);
+
+    // Then it fails
+    expect(failures).not.toEqual([]);
+    // And it reports that official compliance text must come from catalog data
+    expect(failures).toContain("official compliance text must come from catalog data");
   });
 });
