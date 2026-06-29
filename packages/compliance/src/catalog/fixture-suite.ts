@@ -9,10 +9,15 @@ export interface CatalogFixtureSeed {
   readonly ruleYaml?: string;
 }
 
+export interface CatalogFixtureRequiredRule {
+  readonly control: string;
+  readonly rule: string;
+}
+
 export interface CatalogFixtureSuiteValidationInput {
   readonly frameworkFamily: string;
   readonly requiredControls: readonly string[];
-  readonly requiredRules?: readonly string[];
+  readonly requiredRules?: readonly CatalogFixtureRequiredRule[];
   readonly seeds: readonly CatalogFixtureSeed[];
 }
 
@@ -78,9 +83,14 @@ function ruleIdFromFixtureSeed(
 export function validateCatalogFixtureSuite(
   input: CatalogFixtureSuiteValidationInput,
 ): CatalogFixtureSuiteValidationResult {
+  const parsedSeeds = input.seeds.map((seed) => ({
+    controlId: controlIdFromFixtureSeed(seed, input.frameworkFamily),
+    name: seed.name,
+    ruleId: ruleIdFromFixtureSeed(seed, input.frameworkFamily),
+  }));
   const presentControlIds = new Set(
-    input.seeds
-      .map((seed) => controlIdFromFixtureSeed(seed, input.frameworkFamily))
+    parsedSeeds
+      .map((seed) => seed.controlId)
       .filter((controlId): controlId is string => controlId !== undefined),
   );
   const missingControlIssues = input.requiredControls
@@ -90,15 +100,20 @@ export function validateCatalogFixtureSuite(
       path: ["fixtures", requiredControl],
     }));
   const presentRuleIds = new Set(
-    input.seeds
-      .map((seed) => ruleIdFromFixtureSeed(seed, input.frameworkFamily))
+    parsedSeeds
+      .map((seed) => seed.ruleId)
       .filter((ruleId): ruleId is string => ruleId !== undefined),
   );
   const missingRuleIssues = (input.requiredRules ?? [])
-    .filter((requiredRule) => !presentRuleIds.has(requiredRule))
+    .filter(
+      (requiredRule) =>
+        !parsedSeeds.some(
+          (seed) => seed.controlId === requiredRule.control && seed.ruleId === requiredRule.rule,
+        ),
+    )
     .map((requiredRule) => ({
-      message: `missing required fixture rule "${requiredRule}"`,
-      path: ["fixtures", requiredRule],
+      message: `missing required fixture rule "${requiredRule.rule}" for control "${requiredRule.control}"`,
+      path: ["fixtures", requiredRule.control, "rules", requiredRule.rule],
     }));
   const issues = [...missingControlIssues, ...missingRuleIssues];
 

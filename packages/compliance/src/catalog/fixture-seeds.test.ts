@@ -113,7 +113,7 @@ describe("compliance catalog fixture seeds", () => {
       const fixtureSuiteResult = validateCatalogFixtureSuite({
         frameworkFamily,
         requiredControls: [example.control],
-        requiredRules: [example.rule],
+        requiredRules: [{ control: example.control, rule: example.rule }],
         seeds: [
           {
             controlYaml,
@@ -171,18 +171,27 @@ describe("compliance catalog fixture seeds", () => {
     const controlYaml = catalogFixtureYaml(consentFixtureSeed, "control.yaml");
     expect(controlYaml).toContain(`id: ${consentTrackerControl}`);
 
-    // And the fixtures do not include rule "consent.detect-trackers-without-consent-evidence"
+    // And the tracker rule fixture exists but is not attached to the consent-control seed
+    const misplacedRuleYaml = catalogFixtureYaml(consentFixtureSeed, "rule.yaml");
+    const unrelatedControlYaml = catalogFixtureYaml("cross-framework-control", "control.yaml");
+    expect(misplacedRuleYaml).toContain(`id: ${consentTrackerDetectionRule}`);
     expect(controlYaml).not.toContain(`id: ${consentTrackerDetectionRule}`);
+    expect(unrelatedControlYaml).not.toContain(`id: ${consentTrackerControl}`);
 
     // When the fixture validation suite runs
     const result = validateCatalogFixtureSuite({
       frameworkFamily,
       requiredControls: [consentTrackerControl],
-      requiredRules: [consentTrackerDetectionRule],
+      requiredRules: [{ control: consentTrackerControl, rule: consentTrackerDetectionRule }],
       seeds: [
         {
           controlYaml,
           name: consentFixtureSeed,
+        },
+        {
+          controlYaml: unrelatedControlYaml,
+          name: "cross-framework-control",
+          ruleYaml: misplacedRuleYaml,
         },
       ],
     });
@@ -191,6 +200,8 @@ describe("compliance catalog fixture seeds", () => {
     expect(result.success).toBe(false);
 
     // And the validation error names "consent.detect-trackers-without-consent-evidence"
-    expect(formatFixtureSuiteValidationResult(result)).toContain(consentTrackerDetectionRule);
+    expect(formatFixtureSuiteValidationResult(result)).toContain(
+      `fixtures.${consentTrackerControl}.rules.${consentTrackerDetectionRule}`,
+    );
   });
 });
