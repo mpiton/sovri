@@ -106,7 +106,7 @@ export const RuleCatalogSchema = z
     id: z.string().optional(),
     input_scope: z.string().optional(),
     result_policy: z.string().optional(),
-    rule_type: RuleExecutionTypeCatalogSchema.optional(),
+    rule_type: RuleExecutionTypeCatalogSchema,
   })
   .strict();
 export type RuleCatalog = z.infer<typeof RuleCatalogSchema>;

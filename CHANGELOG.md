@@ -20,6 +20,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Added
+- `compliance`: reject missing `rule.yaml` execution types with MAT-83 ATDD
+  coverage.
 - `compliance`: report type-safe exact `rule.yaml` execution type matching
   diagnostics with MAT-83 ATDD coverage.
 - `compliance`: reject unsupported `rule.yaml` execution types with MAT-83 ATDD
