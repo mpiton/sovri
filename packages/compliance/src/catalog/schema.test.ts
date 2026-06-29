@@ -436,6 +436,34 @@ describe("compliance catalog YAML schemas", () => {
     expect(formatValidationFailure(result)).toContain("framework_references");
   });
 
+  it("rejects a mapping to an unversioned framework reference", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "mapping.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const control = "consent.tracker.prior-consent";
+    const frameworkReference = "gdpr:article-6";
+    const yaml = mappingYamlFor(control, [frameworkReference]);
+
+    // Given the catalog contains control "consent.tracker.prior-consent"
+    expect(yaml).toContain(`control_id: ${control}`);
+
+    // And "mapping.yaml" maps that control to framework reference "gdpr:article-6"
+    expect(yaml).toContain(`  - ${frameworkReference}`);
+
+    // When the catalog schema validator runs
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    // Then validation fails for "mapping.yaml"
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError(`Expected ${file} validation to fail.`);
+    }
+
+    // And the validation error reports that framework references must include a version
+    expect(formatValidationFailure(result)).toContain("version");
+  });
+
   it("rejects empty YAML documents before catalog validation can pass", async () => {
     const moduleValue = await loadCatalogSchemaModule();
     const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
