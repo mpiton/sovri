@@ -20,6 +20,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Added
+- `compliance`: add MAT-83 ATDD coverage for validating one control mapped to
+  one or more versioned framework references.
 - `compliance`: export catalog YAML schemas and validation from the package
   entry point.
 - `compliance`: reject parsed-empty catalog YAML documents before schema
