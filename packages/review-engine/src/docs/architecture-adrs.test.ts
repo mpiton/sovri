@@ -658,8 +658,12 @@ describe("MAT-82 R-07 — ADRs keep ComplianceGap and ControlResult distinct fro
 // MAT-83 R-07 — Git owns framework catalog data
 // ---------------------------------------------------------------------------
 
-function gitSourceOfTruthFailures(_docs: string): string[] {
-  return [];
+function gitSourceOfTruthFailures(docs: string): string[] {
+  if (lineMentionsAll(docs, ["Git", "source of truth", "catalog"])) {
+    return [];
+  }
+
+  return ["Git source-of-truth decision is missing"];
 }
 
 function officialComplianceTextFailures(docs: string): string[] {
@@ -714,6 +718,10 @@ describe("MAT-83 R-07 — compliance catalog docs identify Git-owned catalog dat
         "catalog files",
       ]),
     ).toBe(true);
+  });
+
+  it("keeps the real ADR corpus explicit about Git as source of truth", () => {
+    expect(gitSourceOfTruthFailures(adrCorpus)).toEqual([]);
   });
 
   it("rejects docs without Git source-of-truth language", () => {

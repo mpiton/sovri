@@ -20,6 +20,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Changed
+- `review-engine`: report missing Git source-of-truth language in MAT-83 ADR
+  docs acceptance.
 - `review-engine`: reject prompt-generated official compliance text in MAT-83
   ADR docs acceptance.
 - `compliance`: normalize LLM-generated source description detection across
