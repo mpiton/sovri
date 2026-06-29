@@ -55,6 +55,7 @@ export const ControlCatalogSchema = z
     id: z.string().optional(),
     remediation: z.string(),
     severity: z.string().optional(),
+    source: SourceMetadataSchema.optional(),
     title: z.string().optional(),
     weight: z.number().optional(),
   })
