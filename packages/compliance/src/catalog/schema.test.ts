@@ -217,6 +217,10 @@ const supportedRuleExecutionTypeExamples = [
   readonly ruleType: string;
 }[];
 
+const supportedRuleExecutionTypes = supportedRuleExecutionTypeExamples.map(
+  (example) => example.ruleType,
+);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -659,6 +663,40 @@ describe("compliance catalog YAML schemas", () => {
 
       // And the rule execution type is "<rule type>"
       expect(result.data.rule_type).toBe(example.ruleType);
+    }
+  });
+
+  it("rejects unsupported rule execution types", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "rule.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const ruleId = "consent.detect-trackers";
+    const ruleType = "llm-judgement";
+    const yaml = ruleYamlFor(ruleId, ruleType);
+
+    // Given the catalog contains rule "consent.detect-trackers"
+    expect(yaml).toContain(`id: ${ruleId}`);
+
+    // And "rule.yaml" declares rule_type "llm-judgement"
+    expect(yaml).toContain(`rule_type: ${ruleType}`);
+
+    // When the catalog schema validator runs
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    // Then validation fails for "rule.yaml"
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError(`Expected ${file} validation to fail.`);
+    }
+
+    // And the validation error names "rule_type"
+    const formattedError = formatValidationFailure(result);
+    expect(formattedError).toContain("rule_type");
+
+    // And the validation error reports the supported values "automatic", "static-analysis", "manual", and "evidence-only"
+    for (const supportedRuleExecutionType of supportedRuleExecutionTypes) {
+      expect(formattedError).toContain(supportedRuleExecutionType);
     }
   });
 
