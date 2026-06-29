@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sovri contributors
+
+id: consent.tracker.prior-consent
+title: Trackers require prior consent evidence
+description: Non-essential trackers must not run before consent evidence is present.
+severity: major
+weight: 8
+remediation: Block non-essential trackers until consent evidence is recorded.
+applicability: project-wide

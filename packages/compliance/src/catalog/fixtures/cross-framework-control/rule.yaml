@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sovri contributors
+
+id: access.logging.admin-actions-present
+rule_type: evidence-only
+input_scope: project
+expected_evidence: admin-action-log-export
+execution_policy: evidence-record-only
+result_policy: fail-when-admin-action-logs-are-missing

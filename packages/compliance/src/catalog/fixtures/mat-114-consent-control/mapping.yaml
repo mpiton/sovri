@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sovri contributors
+
+control_id: consent.tracker.prior-consent
+framework_references:
+  - gdpr:2016:article-6
+  - eprivacy:2002:article-5-3
