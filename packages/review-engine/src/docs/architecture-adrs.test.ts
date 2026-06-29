@@ -62,14 +62,18 @@ function corpusHasPhrase(phrase: string): boolean {
   return normalizedCorpus.includes(normalize(phrase));
 }
 
-// True when a single ADR file mentions every phrase — used where a scenario asserts an
-// association ("describe <repo> as responsible for <responsibility>"), not just presence
-// of the two tokens somewhere in the corpus.
-function someAdrMentionsAll(...phrases: readonly string[]): boolean {
-  return adrFiles.some((adr) => {
-    const normalizedText = normalize(adr.text);
-    return phrases.every((phrase) => normalizedText.includes(normalize(phrase)));
+// True when a single line of `text` mentions every phrase. Used where a scenario asserts an
+// association ("describe <repository> as responsible for <responsibility>"): a file-level
+// co-occurrence would still pass if the ADR swapped the bullets, so the match is per line.
+function lineMentionsAll(text: string, phrases: readonly string[]): boolean {
+  return text.split(/\r?\n/).some((line) => {
+    const normalizedLine = normalize(line);
+    return phrases.every((phrase) => normalizedLine.includes(normalize(phrase)));
   });
+}
+
+function someLineMentionsAll(...phrases: readonly string[]): boolean {
+  return adrFiles.some((adr) => lineMentionsAll(adr.text, phrases));
 }
 
 function normalizedLines(docs: string): readonly string[] {
@@ -137,7 +141,7 @@ describe("MAT-82 R-01 — ADRs define repository responsibilities and integratio
     ({ repository, responsibility }) => {
       // Then the ADRs describe "<repository>" as responsible for "<responsibility>"
       expect(
-        someAdrMentionsAll(repository, responsibility),
+        someLineMentionsAll(repository, responsibility),
         `${repository} must be described as responsible for "${responsibility}"`,
       ).toBe(true);
     },
@@ -177,6 +181,25 @@ describe("MAT-82 R-01 — ADRs define repository responsibilities and integratio
 
     // Then it reports that rule execution must stay in the air-gapped "sovri-agent"
     expect(failures).toContain("rule execution must stay in the air-gapped sovri-agent");
+  });
+
+  it("does not accept swapped repository responsibilities on different lines", () => {
+    // All three names and responsibilities are present, but each bullet pairs the wrong two.
+    // A file-level co-occurrence would pass; a per-line match must not.
+    const swapped = [
+      "- sovri-agent — the Git source of truth for framework, control, and rule catalogs.",
+      "- sovri-frameworks — rule execution and local air-gap operation.",
+    ].join("\n");
+
+    expect(
+      lineMentionsAll(swapped, ["sovri-agent", "rule execution and local air-gap operation"]),
+    ).toBe(false);
+    expect(
+      lineMentionsAll(swapped, [
+        "sovri-frameworks",
+        "the Git source of truth for framework, control, and rule catalogs",
+      ]),
+    ).toBe(false);
   });
 });
 
@@ -280,21 +303,22 @@ function referenceProvenanceFailures(docs: string): string[] {
   const failures: string[] = [];
 
   for (const line of normalizedLines(docs)) {
-    const isCatalogBacked =
-      /(catalog-backed|backed by the catalog|from the catalog|never|reject)/.test(line);
+    // Only a "Rejected alternatives" bullet may name the anti-pattern. "catalog-backed" wording
+    // must not exempt a line that still routes the reference through the LLM or a hardcoded URL.
+    const namesRejectedAlternative = /reject/.test(line);
 
     const modelAuthoredReference =
       line.includes("framework reference") &&
       /(from the llm|llm-authored|model-authored|originate from the llm|authored by the llm)/.test(
         line,
       );
-    if (modelAuthoredReference && !isCatalogBacked) {
+    if (modelAuthoredReference && !namesRejectedAlternative) {
       failures.push("framework references must be catalog-backed");
     }
 
     const hardcodedUrl =
       line.includes("source url") && /(hardcoded|hard-coded|outside the catalog)/.test(line);
-    if (hardcodedUrl && !isCatalogBacked) {
+    if (hardcodedUrl && !namesRejectedAlternative) {
       failures.push("source URLs must be catalog-backed");
     }
   }
@@ -332,6 +356,15 @@ describe("MAT-82 R-03 — ADRs require framework references and source URLs to b
 
     // Then it reports that source URLs must be catalog-backed
     expect(failures).toContain("source URLs must be catalog-backed");
+  });
+
+  it("flags a catalog-backed reference that still originates from the LLM", () => {
+    // Naming "catalog-backed" must not exempt a line that routes the reference through the LLM.
+    const failures = referenceProvenanceFailures(
+      "A catalog-backed framework reference may originate from the LLM.",
+    );
+
+    expect(failures).toContain("framework references must be catalog-backed");
   });
 });
 
@@ -464,20 +497,24 @@ function llmRoleFailures(docs: string): string[] {
     if (!/\bllm\b/.test(line)) {
       continue;
     }
-    const isNegated = /(\bnot\b|\bnever\b|must not|reject)/.test(line);
+    // Match the affirmative claim that the LLM *is* the citation source; "is not an official
+    // ..." breaks the "is (the|an) official" adjacency, so an unrelated "not" elsewhere on the
+    // line cannot suppress a real violation. A "Rejected alternatives" bullet may name it.
+    const namesRejectedAlternative = /reject/.test(line);
 
-    const officialCitationSource =
-      /(official citation source|official source of regulatory citations|source of regulatory citations)/.test(
+    const claimsCitationSource =
+      /\bis (the|an)(?: only)? official (citation source|source of regulatory citations)\b/.test(
         line,
       );
-    if (officialCitationSource && !isNegated) {
+    if (claimsCitationSource && !namesRejectedAlternative) {
       failures.push("the LLM must not be an official citation source");
     }
 
     const authorsClaim =
-      /(author|authors|authoring|writes|generates?)\b/.test(line) &&
+      /\b(authors?|authoring|writes|generates?)\b/.test(line) &&
       /(regulatory claim|regulatory claims|framework text|regulatory citation)/.test(line);
-    if (authorsClaim && !isNegated) {
+    const authoringNegated = /not (be )?(llm-authored|authored by the llm|the author)/.test(line);
+    if (authorsClaim && !authoringNegated && !namesRejectedAlternative) {
       failures.push("regulatory claims must be catalog-backed, not LLM-authored");
     }
   }
@@ -526,6 +563,16 @@ describe("MAT-82 R-06 — ADRs limit the LLM to interpretation and ranking", () 
       llmRoleFailures("An ADR lets the LLM author catalog-backed regulatory claims itself."),
     ).toContain("regulatory claims must be catalog-backed, not LLM-authored");
   });
+
+  it("flags the LLM as a citation source even when the line carries an unrelated negation", () => {
+    // An affirmative "it is the official citation source" must fail even if the same line
+    // applies "not" to something else.
+    const failures = llmRoleFailures(
+      "The LLM is not merely an interpreter; it is the official citation source.",
+    );
+
+    expect(failures).toContain("the LLM must not be an official citation source");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -565,7 +612,7 @@ function complianceTypeFailures(docs: string): string[] {
 describe("MAT-82 R-07 — ADRs keep ComplianceGap and ControlResult distinct from the PR Finding", () => {
   it.each(COMPLIANCE_TYPES)("defines %s as distinct from the PR Finding", (type) => {
     // Then the ADRs describe "<type>" as distinct from the pull request "Finding"
-    expect(someAdrMentionsAll(type, "distinct from the pull-request Finding")).toBe(true);
+    expect(someLineMentionsAll(type, "distinct from the pull-request Finding")).toBe(true);
   });
 
   it("keeps the real ADR corpus free of compliance type violations", () => {

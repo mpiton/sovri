@@ -28,8 +28,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `review-engine`: add MAT-82 docs-acceptance coverage asserting the architecture
   ADRs state air-gap execution, catalog-backed references, repository boundaries,
   the compliance data flow, the LLM role, and the compliance/`Finding` type split;
-  the violation detectors reject anti-pattern wording without exempting
-  `may be required`, `only`, `catalog-backed`, or a bare `control result` mention.
+  the violation detectors match anti-patterns precisely (each repository tied to
+  its responsibility on one line, affirmative citation-source claims, reject-only
+  exemptions), so an unrelated safe term cannot suppress a real violation.
 
 - `review-engine`: add MAT-112 ATDD coverage that keeps ADR-021 and ADR-022
   aligned on the project compliance source model and PR/report output contract.
