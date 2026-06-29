@@ -33,6 +33,8 @@ const SourceMetadataSchema = z.object({
   url: z.string().optional(),
 });
 
+const SupportedControlApplicabilities = ["project-wide", "file", "diff"] as const;
+
 export const FrameworkCatalogSchema = z
   .object({
     id: z.string().optional(),
@@ -47,7 +49,7 @@ export type FrameworkCatalog = z.infer<typeof FrameworkCatalogSchema>;
 
 export const ControlCatalogSchema = z
   .object({
-    applicability: z.string().optional(),
+    applicability: z.enum(SupportedControlApplicabilities).optional(),
     description: z.string().optional(),
     id: z.string().optional(),
     remediation: z.string(),
@@ -68,6 +70,7 @@ const SupportedRuleExecutionTypeList = SupportedRuleExecutionTypes.map((ruleType
   JSON.stringify(ruleType),
 ).join(", ");
 const SupportedRuleExecutionTypeSet = new Set<string>(SupportedRuleExecutionTypes);
+const SupportedRuleInputScopes = ["project", "file", "diff"] as const;
 
 function ruleExecutionTypeError(ruleType: string): string {
   if (SupportedRuleExecutionTypeSet.has(ruleType.toLowerCase())) {
@@ -104,7 +107,7 @@ export const RuleCatalogSchema = z
     expected_evidence: z.string(),
     execution_policy: z.string(),
     id: z.string().optional(),
-    input_scope: z.string().optional(),
+    input_scope: z.enum(SupportedRuleInputScopes).optional(),
     result_policy: z.string().optional(),
     rule_type: RuleExecutionTypeCatalogSchema,
   })

@@ -20,6 +20,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Changed
+- `compliance`: restrict `control.yaml` applicability and `rule.yaml`
+  input-scope values to MAT-83 supported control scopes.
 - `compliance`: require explicit `rule.yaml` execution policy data while
   preserving declared values in MAT-83 ATDD coverage.
 
