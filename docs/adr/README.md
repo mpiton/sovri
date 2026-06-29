@@ -40,6 +40,11 @@ An ADR is not user documentation. It is a log of technical choices intended for 
 | [020](./020-deterministic-compliance-derivation.md)        | Deterministic compliance derivation                              | Accepted | 2026-06-19 |
 | [021](./021-compliance-only-review-taxonomy.md)            | Compliance-only review taxonomy and prompt                       | Accepted | 2026-06-24 |
 | [022](./022-project-level-compliance-pivot.md)             | Project-level compliance pivot vocabulary                        | Accepted | 2026-06-26 |
+| [023](./023-air-gap-execution-and-offline-verification.md) | Air-gap rule execution and offline verification                  | Accepted | 2026-06-29 |
+| [024](./024-git-source-of-truth-for-framework-catalogs.md) | Git as the source of truth for framework catalogs                | Accepted | 2026-06-29 |
+| [025](./025-repository-boundaries-and-data-flow.md)        | Compliance repository boundaries and data flow                   | Accepted | 2026-06-29 |
+| [026](./026-llm-interpretation-not-citation-source.md)     | LLM limited to interpretation and ranking, not a citation source | Accepted | 2026-06-29 |
+| [027](./027-compliancegap-controlresult-vs-finding.md)     | ComplianceGap and ControlResult are distinct from the PR Finding | Accepted | 2026-06-29 |
 
 ## Possible statuses
 
