@@ -30,10 +30,22 @@ export type CatalogYamlValidationResult =
     };
 
 const LlmGeneratedSourceDescriptionPattern = /\bgenerated\s+by\s+llm\s+from\s+the\s+prompt\b/iu;
-const OfficialSourceUrlPattern = /^https:\/\/[^\s\\/?#]+(?:[/?#][^\s\\]*)?$/iu;
+const OfficialSourceUrlPattern = /^https:\/\/[^/?#]+(?:[/?#].*)?$/iu;
+
+function hasForbiddenSourceUrlRawCharacter(sourceUrl: string): boolean {
+  for (const character of sourceUrl) {
+    const codePoint = character.codePointAt(0) ?? 0;
+
+    if (character === "\\" || character.trim() === "" || codePoint <= 0x1f || codePoint === 0x7f) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 function isOfficialSourceUrl(sourceUrl: string): boolean {
-  if (!OfficialSourceUrlPattern.test(sourceUrl)) {
+  if (hasForbiddenSourceUrlRawCharacter(sourceUrl) || !OfficialSourceUrlPattern.test(sourceUrl)) {
     return false;
   }
 

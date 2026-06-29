@@ -27,6 +27,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   before parser normalization.
 - `compliance`: reject MAT-83 catalog source URLs containing raw backslashes
   before parser normalization.
+- `compliance`: reject MAT-83 catalog source URLs containing raw control
+  characters before parser normalization.
 - `compliance`: normalize LLM-generated source description detection across
   case and whitespace variations.
 - `compliance`: reject LLM-generated source descriptions in MAT-83 catalog
