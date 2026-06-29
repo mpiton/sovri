@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sovri contributors
+
+id: mat-83-fixtures
+name: MAT-83 catalog fixture suite
+scope: compliance catalog YAML fixture validation
+version: "2026-06"
