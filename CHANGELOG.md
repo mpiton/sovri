@@ -20,6 +20,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Added
+- `compliance`: add MAT-83 ATDD coverage for rejecting `mapping.yaml` data with
+  an empty framework reference list.
 - `compliance`: add MAT-83 ATDD coverage for validating one control mapped to
   one or more versioned framework references.
 - `compliance`: export catalog YAML schemas and validation from the package
@@ -152,6 +154,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Changed
 
+- `compliance`: require non-empty `framework_references` lists in
+  `mapping.yaml` catalog data.
 - `compliance`: accept versioned `framework:version:reference` string entries
   in `mapping.yaml` catalog data.
 - `compliance`: parse catalog YAML content before schema validation and return a

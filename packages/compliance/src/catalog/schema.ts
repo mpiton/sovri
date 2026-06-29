@@ -84,7 +84,7 @@ const FrameworkReferenceCatalogSchema = z.union([
 export const MappingCatalogSchema = z
   .object({
     control_id: z.string(),
-    framework_references: z.array(FrameworkReferenceCatalogSchema).optional(),
+    framework_references: z.array(FrameworkReferenceCatalogSchema).min(1),
   })
   .strict();
 export type MappingCatalog = z.infer<typeof MappingCatalogSchema>;

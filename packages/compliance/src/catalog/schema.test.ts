@@ -409,6 +409,33 @@ describe("compliance catalog YAML schemas", () => {
     }
   });
 
+  it("rejects a mapping without framework references", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "mapping.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const control = "consent.tracker.prior-consent";
+    const yaml = [`control_id: ${control}`, "framework_references: []"].join("\n");
+
+    // Given the catalog contains control "consent.tracker.prior-consent"
+    expect(yaml).toContain(`control_id: ${control}`);
+
+    // And "mapping.yaml" maps that control to an empty framework reference list
+    expect(yaml).toContain("framework_references: []");
+
+    // When the catalog schema validator runs
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    // Then validation fails for "mapping.yaml"
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError(`Expected ${file} validation to fail.`);
+    }
+
+    // And the validation error names "framework_references"
+    expect(formatValidationFailure(result)).toContain("framework_references");
+  });
+
   it("rejects empty YAML documents before catalog validation can pass", async () => {
     const moduleValue = await loadCatalogSchemaModule();
     const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
