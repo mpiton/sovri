@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri contributors
 
+import { load as parseYaml } from "js-yaml";
+
 import { z } from "@sovri/core";
 
 export interface CatalogYamlValidationInput {
@@ -89,6 +91,10 @@ export const CatalogSchemasByFile = {
   "rule.yaml": RuleCatalogSchema,
 } as const;
 
+function isCatalogSchemaFile(file: string): file is keyof typeof CatalogSchemasByFile {
+  return Object.hasOwn(CatalogSchemasByFile, file);
+}
+
 export function validateCatalogYaml(
   input: CatalogYamlValidationInput,
 ): CatalogYamlValidationResult {
@@ -106,8 +112,69 @@ export function validateCatalogYaml(
     };
   }
 
+  let parsed: unknown;
+  try {
+    parsed = parseYaml(input.yaml, { filename: input.file });
+  } catch {
+    return {
+      error: {
+        issues: [
+          {
+            message: "invalid YAML syntax",
+            path: [input.file],
+          },
+        ],
+      },
+      success: false,
+    };
+  }
+
+  if (parsed === null || parsed === undefined) {
+    return {
+      error: {
+        issues: [
+          {
+            message: "catalog YAML cannot be empty",
+            path: [input.file],
+          },
+        ],
+      },
+      success: false,
+    };
+  }
+
+  if (!isCatalogSchemaFile(input.file)) {
+    return {
+      error: {
+        issues: [
+          {
+            message: `unsupported catalog YAML file "${input.file}"`,
+            path: [input.file],
+          },
+        ],
+      },
+      success: false,
+    };
+  }
+
+  const schema = CatalogSchemasByFile[input.file];
+  const result = schema.safeParse(parsed);
+  if (!result.success) {
+    return {
+      error: {
+        issues: result.error.issues.map((issue) => ({
+          message: issue.message,
+          path: issue.path.map((segment) =>
+            typeof segment === "number" ? segment : String(segment),
+          ),
+        })),
+      },
+      success: false,
+    };
+  }
+
   return {
-    data: input.yaml,
+    data: result.data,
     success: true,
   };
 }

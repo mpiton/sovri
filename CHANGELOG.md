@@ -20,6 +20,16 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Added
+- `compliance`: export catalog YAML schemas and validation from the package
+  entry point.
+- `compliance`: reject parsed-empty catalog YAML documents before schema
+  validation.
+- `compliance`: add structured validation failures for unsupported catalog YAML
+  file names.
+- `compliance`: add MAT-83 ATDD coverage for reporting invalid catalog YAML
+  syntax before schema validation.
+- `compliance`: add MAT-83 validator coverage for parsed YAML success and
+  schema-error paths.
 - `compliance`: add a catalog YAML validator entry point that rejects empty YAML
   documents before schema validation can pass.
 - `compliance`: add MAT-83 ATDD coverage for rejecting empty catalog YAML
@@ -140,6 +150,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Changed
 
+- `compliance`: parse catalog YAML content before schema validation and return a
+  structured `invalid YAML syntax` validation failure for malformed YAML.
 - `config`: `review.mode` now exposes the single allowed value `compliance` and
   defaults to `compliance` (was `full`). The field is kept so the config surface
   stays stable and extensible, but there is exactly one review behaviour —

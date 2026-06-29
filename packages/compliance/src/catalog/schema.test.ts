@@ -4,7 +4,13 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
+
+import {
+  CatalogSchemasByFile as PublicCatalogSchemasByFile,
+  validateCatalogYaml as publicValidateCatalogYaml,
+  type CatalogYamlValidationResult as PublicCatalogYamlValidationResult,
+} from "../index.js";
 
 interface ValidationIssue {
   readonly message: string;
@@ -362,5 +368,115 @@ describe("compliance catalog YAML schemas", () => {
       throw new TypeError("Expected empty control.yaml validation to fail.");
     }
     expect(formatValidationFailure(result)).toContain("catalog YAML cannot be empty");
+  });
+
+  it("reports invalid YAML syntax before schema validation", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "framework.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const yaml = "id: [gdpr-eprivacy-consent";
+
+    // Given the compliance catalog contains "framework.yaml" for framework family "gdpr-eprivacy"
+    expect(moduleValue.CatalogSchemasByFile[file]).toBeDefined();
+    expect(frameworkFamily).toBe("gdpr-eprivacy");
+
+    // And "framework.yaml" contains the line "id: [gdpr-eprivacy-consent"
+    expect(yaml).toContain("id: [gdpr-eprivacy-consent");
+
+    // When the catalog schema validator runs
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    // Then validation fails for "framework.yaml"
+    expect(result.success).toBe(false);
+
+    // And the validation error reports invalid YAML syntax
+    if (result.success) {
+      throw new TypeError("Expected invalid framework.yaml validation to fail.");
+    }
+    expect(formatValidationFailure(result)).toContain("invalid YAML syntax");
+  });
+
+  it("rejects parsed-empty YAML documents before catalog validation can pass", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "control.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const yaml = "---";
+
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError("Expected parsed-empty control.yaml validation to fail.");
+    }
+    expect(formatValidationFailure(result)).toContain("catalog YAML cannot be empty");
+  });
+
+  it("validates parsed YAML content against the selected catalog schema", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "framework.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const yaml = "version: 2016-2002";
+
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    expect(result.success, formatValidationFailure(result)).toBe(true);
+    if (!result.success || !isRecord(result.data)) {
+      throw new TypeError("Expected framework.yaml validation to return parsed data.");
+    }
+    expect(result.data.version).toBe("2016-2002");
+  });
+
+  it("reports schema validation errors from parsed YAML paths", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "mapping.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const yaml = [
+      "control_id: consent.tracker.prior-consent",
+      "framework_references:",
+      "  - gdpr:2016:article-6",
+    ].join("\n");
+
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError("Expected mapping.yaml schema validation to fail.");
+    }
+    expect(formatValidationFailure(result)).toContain("framework_references.0");
+  });
+
+  it("reports unsupported catalog YAML file names as validation failures", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "unexpected.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const yaml = "version: 2016-2002";
+
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError("Expected unsupported catalog YAML file validation to fail.");
+    }
+    expect(formatValidationFailure(result)).toContain("unsupported catalog YAML file");
+    expect(formatValidationFailure(result)).toContain(file);
+  });
+
+  it("publishes catalog YAML validation from the package entry point", () => {
+    expect(PublicCatalogSchemasByFile["framework.yaml"]).toBeDefined();
+    expect(publicValidateCatalogYaml).toBeTypeOf("function");
+    expectTypeOf<PublicCatalogYamlValidationResult>().not.toBeNever();
+
+    const result = publicValidateCatalogYaml({
+      file: "framework.yaml",
+      frameworkFamily: "gdpr-eprivacy",
+      yaml: "version: 2016-2002",
+    });
+
+    expect(result.success, formatValidationFailure(result)).toBe(true);
   });
 });

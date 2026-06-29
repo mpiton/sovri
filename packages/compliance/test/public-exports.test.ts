@@ -19,6 +19,12 @@ const EXPECTED_VALUE_EXPORTS = [
   "ComplianceMappingEntrySchema",
   "ComplianceReferenceApplicabilitySchema",
   "ComplianceReferenceEntrySchema",
+  "CatalogSchemasByFile",
+  "ControlCatalogSchema",
+  "FrameworkCatalogSchema",
+  "MappingCatalogSchema",
+  "RuleCatalogSchema",
+  "validateCatalogYaml",
   "AuditTrailLogicalEventSchema",
   "SignedAuditTrailEntrySchema",
   "MemoryAuditTrailSink",
@@ -31,6 +37,13 @@ const EXPECTED_TYPE_EXPORTS = [
   "ComplianceMappingEntry",
   "ComplianceReferenceApplicability",
   "ComplianceReferenceEntry",
+  "CatalogYamlValidationInput",
+  "CatalogYamlValidationIssue",
+  "CatalogYamlValidationResult",
+  "ControlCatalog",
+  "FrameworkCatalog",
+  "MappingCatalog",
+  "RuleCatalog",
   "AuditTrailLogicalEvent",
   "SignedAuditTrailEntry",
   "AuditTrailSink",
@@ -42,6 +55,7 @@ const EXPECTED_TYPE_EXPORTS = [
 const EXPECTED_SPECIFIERS = [
   "./mapping/enricher.js",
   "./mapping/schema.js",
+  "./catalog/schema.js",
   "./audit-trail/schema.js",
   "./audit-trail/sink.js",
   "./audit-trail/verifier.js",
@@ -94,12 +108,12 @@ const parsed = parseExports(indexSource);
 const expectedAll = [...EXPECTED_VALUE_EXPORTS, ...EXPECTED_TYPE_EXPORTS];
 
 describe("@sovri/compliance public export surface (R-01)", () => {
-  it("exports exactly the 20 canonical identifiers", () => {
+  it("exports exactly the 33 canonical identifiers", () => {
     expect([...parsed.names].toSorted()).toEqual([...expectedAll].toSorted());
   });
 
-  it("counts 10 value exports plus 10 type exports", () => {
-    expect(parsed.names.size).toBe(20);
+  it("counts 16 value exports plus 17 type exports", () => {
+    expect(parsed.names.size).toBe(33);
     expect(Object.keys(compliance).toSorted()).toEqual([...EXPECTED_VALUE_EXPORTS].toSorted());
   });
 });
@@ -117,7 +131,7 @@ describe("internal factories, scaffold and helpers stay internal (R-02)", () => 
 });
 
 describe("re-export specifiers are relative ESM .js (R-03)", () => {
-  it("uses exactly the six expected specifiers", () => {
+  it("uses exactly the seven expected specifiers", () => {
     expect([...parsed.specifiers].toSorted()).toEqual([...EXPECTED_SPECIFIERS].toSorted());
   });
 
@@ -143,5 +157,10 @@ describe("canonical value exports resolve at runtime (R-01)", () => {
   it("the mapping schemas expose a Zod parse method", () => {
     expect(typeof compliance.ComplianceMappingEntrySchema.parse).toBe("function");
     expect(typeof compliance.AuditTrailLogicalEventSchema.parse).toBe("function");
+    expect(typeof compliance.FrameworkCatalogSchema.parse).toBe("function");
+  });
+
+  it("the catalog YAML validator is callable from the package root", () => {
+    expect(typeof compliance.validateCatalogYaml).toBe("function");
   });
 });
