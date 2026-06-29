@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sovri contributors
+
+id: access.logging.admin-actions
+title: Admin actions require auditable access logs
+description: Administrative access changes must leave reviewable audit evidence.
+severity: major
+weight: 7
+remediation: Enable administrative access logging and retain audit evidence.
+applicability: project-wide

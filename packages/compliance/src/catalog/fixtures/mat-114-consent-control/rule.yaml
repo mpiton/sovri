@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sovri contributors
+
+id: consent.detect-trackers-without-consent-evidence
+rule_type: automatic
+input_scope: project
+expected_evidence: consent-evidence-record
+execution_policy: run-in-agent
+result_policy: fail-when-tracker-runs-without-consent-evidence

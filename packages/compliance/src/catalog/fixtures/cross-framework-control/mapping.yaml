@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Sovri contributors
+
+control_id: access.logging.admin-actions
+framework_references:
+  - iso27001:2022:a-8-15
+  - nis2:2022:article-21-2-d
