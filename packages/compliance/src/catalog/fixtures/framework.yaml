@@ -4,4 +4,7 @@
 id: mat-83-fixtures
 name: MAT-83 catalog fixture suite
 scope: compliance catalog YAML fixture validation
+source:
+  url: https://example.com/mat-83-fixtures
+  description: MAT-83 catalog fixture suite source metadata
 version: "2026-06"

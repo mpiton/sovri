@@ -42,7 +42,7 @@ export const FrameworkCatalogSchema = z
     jurisdiction: z.string().optional(),
     name: z.string().optional(),
     scope: z.string().optional(),
-    source: SourceMetadataSchema.optional(),
+    source: SourceMetadataSchema,
     version: z.string(),
   })
   .strict();

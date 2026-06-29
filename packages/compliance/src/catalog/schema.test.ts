@@ -1323,7 +1323,12 @@ describe("compliance catalog YAML schemas", () => {
     const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
     const file = "framework.yaml";
     const frameworkFamily = "gdpr-eprivacy";
-    const yaml = "version: 2016-2002";
+    const yaml = [
+      "version: 2016-2002",
+      "source:",
+      "  url: https://eur-lex.europa.eu/eli/reg/2016/679/oj",
+      "  description: General Data Protection Regulation official text",
+    ].join("\n");
 
     const result = validateCatalogYaml({ file, frameworkFamily, yaml });
 
@@ -1389,7 +1394,12 @@ describe("compliance catalog YAML schemas", () => {
     const result = publicValidateCatalogYaml({
       file: "framework.yaml",
       frameworkFamily: "gdpr-eprivacy",
-      yaml: "version: 2016-2002",
+      yaml: [
+        "version: 2016-2002",
+        "source:",
+        "  url: https://eur-lex.europa.eu/eli/reg/2016/679/oj",
+        "  description: General Data Protection Regulation official text",
+      ].join("\n"),
     });
 
     expect(result.success, formatValidationFailure(result)).toBe(true);
