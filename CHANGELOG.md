@@ -20,6 +20,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Added
+- `compliance`: add MAT-83 ATDD coverage for rejecting duplicate
+  `mapping.yaml` framework references.
 - `compliance`: add MAT-83 ATDD coverage for rejecting unversioned
   `mapping.yaml` framework references.
 - `compliance`: add MAT-83 ATDD coverage for rejecting `mapping.yaml` data with
@@ -156,6 +158,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Changed
 
+- `compliance`: reject duplicate string entries in `mapping.yaml`
+  `framework_references`.
 - `compliance`: report a version-specific validation error for unversioned
   `mapping.yaml` framework references.
 - `compliance`: require non-empty `framework_references` lists in
@@ -216,6 +220,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Fixed
 
+- `compliance`: reject duplicate object-form, scalar/object mixed-form, and embedded
+  scalar-label `mapping.yaml` framework references.
 - `compliance`: reject catalog schema data missing the required `version`,
   `remediation`, `expected_evidence`, or `control_id` fields.
 - `compliance`: reject unknown top-level fields in framework, control, rule, and

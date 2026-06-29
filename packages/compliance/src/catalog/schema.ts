@@ -70,9 +70,13 @@ export const RuleCatalogSchema = z
   .strict();
 export type RuleCatalog = z.infer<typeof RuleCatalogSchema>;
 
-const VersionedFrameworkReferenceStringSchema = z.string().regex(/^[^:\s]+:[^:\s]+:[^:\s]+$/u, {
-  error: "framework references must include a version",
-});
+const VersionedFrameworkReferencePattern = /^[^:\s]+:[^:\s]+:[^:\s]+$/u;
+
+const VersionedFrameworkReferenceStringSchema = z
+  .string()
+  .regex(VersionedFrameworkReferencePattern, {
+    error: "framework references must include a version",
+  });
 
 const FrameworkReferenceCatalogSchema = z.union([
   VersionedFrameworkReferenceStringSchema,
@@ -83,10 +87,60 @@ const FrameworkReferenceCatalogSchema = z.union([
   }),
 ]);
 
+type FrameworkReferenceCatalog = z.infer<typeof FrameworkReferenceCatalogSchema>;
+
+function frameworkReferenceComponents(
+  reference: FrameworkReferenceCatalog,
+): readonly (string | undefined)[] {
+  if (typeof reference === "string") {
+    return reference.split(":");
+  }
+
+  if (VersionedFrameworkReferencePattern.test(String(reference.reference))) {
+    return String(reference.reference).split(":");
+  }
+
+  return [reference.framework, reference.version, reference.reference];
+}
+
+function frameworkReferenceDeduplicationKey(reference: FrameworkReferenceCatalog): string {
+  return JSON.stringify(frameworkReferenceComponents(reference));
+}
+
+function frameworkReferenceDescription(reference: FrameworkReferenceCatalog): string {
+  if (typeof reference === "string") {
+    return reference;
+  }
+
+  return frameworkReferenceComponents(reference).join(":");
+}
+
+const FrameworkReferenceListCatalogSchema = z
+  .array(FrameworkReferenceCatalogSchema)
+  .min(1)
+  .superRefine((references, context) => {
+    const seenReferences = new Set<string>();
+
+    references.forEach((reference, index) => {
+      const deduplicationKey = frameworkReferenceDeduplicationKey(reference);
+
+      if (seenReferences.has(deduplicationKey)) {
+        context.addIssue({
+          code: "custom",
+          message: `duplicate framework reference "${frameworkReferenceDescription(reference)}"`,
+          path: [index],
+        });
+        return;
+      }
+
+      seenReferences.add(deduplicationKey);
+    });
+  });
+
 export const MappingCatalogSchema = z
   .object({
     control_id: z.string(),
-    framework_references: z.array(FrameworkReferenceCatalogSchema).min(1),
+    framework_references: FrameworkReferenceListCatalogSchema,
   })
   .strict();
 export type MappingCatalog = z.infer<typeof MappingCatalogSchema>;
