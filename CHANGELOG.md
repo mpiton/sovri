@@ -20,6 +20,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Changed
+- `review-engine`: detect `catalog source of truth` wording in MAT-83 ADR
+  ownership checks.
 - `review-engine`: reject conflicting non-Git catalog source-of-truth claims
   in MAT-83 ADR docs.
 - `review-engine`: normalize wrapped ADR statements before checking MAT-83

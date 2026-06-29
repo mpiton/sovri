@@ -668,9 +668,9 @@ describe("MAT-82 R-07 — ADRs keep ComplianceGap and ControlResult distinct fro
 function gitSourceOfTruthFailures(docs: string): string[] {
   const statements = normalizedStatements(docs);
   const gitSourceOfTruthPattern =
-    /\bgit( repository)?\b\s+(is|as|remains|stays)\s+(the )?source of truth\b[^.!?;:]*\bcatalog(s| data)?\b/;
+    /\bgit( repository)?\b\s+(is|as|remains|stays)\s+((the )?source of truth\b[^.!?;:]*\bcatalog(s| data)?\b|(the )?catalog(s| data)? source of truth\b)/;
   const catalogSourceOfTruthPattern =
-    /\b(is|as|remains|stays)\s+(the )?source of truth\b[^.!?;:]*\bcatalog(s| data)?\b/;
+    /\b(is|as|remains|stays)\s+((the )?source of truth\b[^.!?;:]*\bcatalog(s| data)?\b|(the )?catalog(s| data)? source of truth\b)/;
 
   const conflictingSourceOfTruth = statements.some(
     (statement) =>
@@ -779,6 +779,17 @@ describe("MAT-83 R-07 — compliance catalog docs identify Git-owned catalog dat
     const conflictingDocs = [
       "Git is the source of truth for framework catalogs.",
       "Cloud is the source of truth for catalog data.",
+    ].join("\n\n");
+
+    expect(gitSourceOfTruthFailures(conflictingDocs)).toContain(
+      "catalog source of truth must be Git",
+    );
+  });
+
+  it("rejects natural catalog-source wording owned by Cloud", () => {
+    const conflictingDocs = [
+      "Git is the source of truth for framework catalogs.",
+      "Cloud is the catalog source of truth.",
     ].join("\n\n");
 
     expect(gitSourceOfTruthFailures(conflictingDocs)).toContain(
