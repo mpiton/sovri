@@ -58,6 +58,20 @@ export const ControlCatalogSchema = z
   .strict();
 export type ControlCatalog = z.infer<typeof ControlCatalogSchema>;
 
+const SupportedRuleExecutionTypes = [
+  "automatic",
+  "static-analysis",
+  "manual",
+  "evidence-only",
+] as const;
+const SupportedRuleExecutionTypeList = SupportedRuleExecutionTypes.map((ruleType) =>
+  JSON.stringify(ruleType),
+).join(", ");
+
+const RuleExecutionTypeCatalogSchema = z.enum(SupportedRuleExecutionTypes, {
+  error: `rule_type must be one of ${SupportedRuleExecutionTypeList}`,
+});
+
 export const RuleCatalogSchema = z
   .object({
     expected_evidence: z.string(),
@@ -65,7 +79,7 @@ export const RuleCatalogSchema = z
     id: z.string().optional(),
     input_scope: z.string().optional(),
     result_policy: z.string().optional(),
-    rule_type: z.string().optional(),
+    rule_type: RuleExecutionTypeCatalogSchema.optional(),
   })
   .strict();
 export type RuleCatalog = z.infer<typeof RuleCatalogSchema>;
