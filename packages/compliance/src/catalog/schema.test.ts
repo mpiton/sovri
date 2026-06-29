@@ -195,6 +195,28 @@ const versionedFrameworkReferenceExamples = [
   readonly referenceCount: number;
 }[];
 
+const supportedRuleExecutionTypeExamples = [
+  {
+    ruleId: "consent.detect-trackers",
+    ruleType: "automatic",
+  },
+  {
+    ruleId: "source.scan-cookie-banner",
+    ruleType: "static-analysis",
+  },
+  {
+    ruleId: "privacy.review-consent-copy",
+    ruleType: "manual",
+  },
+  {
+    ruleId: "evidence.record-cmp-configuration",
+    ruleType: "evidence-only",
+  },
+] satisfies readonly {
+  readonly ruleId: string;
+  readonly ruleType: string;
+}[];
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -264,6 +286,14 @@ function mappingYamlFor(control: string, frameworkReferences: readonly string[])
     `control_id: ${control}`,
     "framework_references:",
     ...frameworkReferences.map((reference) => `  - ${reference}`),
+  ].join("\n");
+}
+
+function ruleYamlFor(ruleId: string, ruleType: string): string {
+  return [
+    `id: ${ruleId}`,
+    `rule_type: ${ruleType}`,
+    "expected_evidence: compliance-rule-evidence",
   ].join("\n");
 }
 
@@ -601,6 +631,35 @@ describe("compliance catalog YAML schemas", () => {
 
     // And the validation error names the duplicate reference "gdpr:2016:article-6"
     expect(formatValidationFailure(result)).toContain(frameworkReference);
+  });
+
+  it("validates supported rule execution types", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "rule.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+
+    for (const example of supportedRuleExecutionTypeExamples) {
+      const yaml = ruleYamlFor(example.ruleId, example.ruleType);
+
+      // Given the catalog contains rule "<rule id>"
+      expect(yaml).toContain(`id: ${example.ruleId}`);
+
+      // And "rule.yaml" declares rule_type "<rule type>"
+      expect(yaml).toContain(`rule_type: ${example.ruleType}`);
+
+      // When the catalog schema validator runs
+      const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+      // Then validation passes for "rule.yaml"
+      expect(result.success, formatValidationFailure(result)).toBe(true);
+      if (!result.success || !isRecord(result.data)) {
+        throw new TypeError(`Expected ${file} validation to pass.`);
+      }
+
+      // And the rule execution type is "<rule type>"
+      expect(result.data.rule_type).toBe(example.ruleType);
+    }
   });
 
   it("rejects empty YAML documents before catalog validation can pass", async () => {
