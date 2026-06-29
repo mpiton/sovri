@@ -5,6 +5,10 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import {
+  validateCatalogFixtureSuite,
+  type CatalogFixtureSuiteValidationResult,
+} from "./fixture-suite.js";
 import { validateCatalogYaml } from "./schema.js";
 
 const catalogFixtureSeedExamples = [
@@ -27,11 +31,36 @@ const catalogFixtureSeedExamples = [
   readonly rule: string;
 }[];
 
+const missingRequiredFixtureSeedExamples = [
+  {
+    missingControl: "consent.tracker.prior-consent",
+    presentControl: "access.logging.admin-actions",
+    presentFixtureSeed: "cross-framework-control",
+  },
+  {
+    missingControl: "access.logging.admin-actions",
+    presentControl: "consent.tracker.prior-consent",
+    presentFixtureSeed: "mat-114-consent-control",
+  },
+] satisfies readonly {
+  readonly missingControl: string;
+  readonly presentControl: string;
+  readonly presentFixtureSeed: string;
+}[];
+
 function catalogFixtureYaml(fixtureSeed: string, file: string): string {
   return readFileSync(new URL(`./fixtures/${fixtureSeed}/${file}`, import.meta.url), "utf8");
 }
 
 function formatValidationResult(result: ReturnType<typeof validateCatalogYaml>): string {
+  if (result.success) {
+    return "validation passed";
+  }
+
+  return result.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("\n");
+}
+
+function formatFixtureSuiteValidationResult(result: CatalogFixtureSuiteValidationResult): string {
   if (result.success) {
     return "validation passed";
   }
@@ -82,6 +111,37 @@ describe("compliance catalog fixture seeds", () => {
       expect(
         [controlResult, mappingResult, ruleResult].map(formatValidationResult).join("\n"),
       ).toBe("validation passed\nvalidation passed\nvalidation passed");
+    }
+  });
+
+  it("reports missing required fixture seed controls", () => {
+    const frameworkFamily = "mat-83-fixtures";
+
+    for (const example of missingRequiredFixtureSeedExamples) {
+      // Given the fixtures include control "<present control>"
+      const presentControlYaml = catalogFixtureYaml(example.presentFixtureSeed, "control.yaml");
+      expect(presentControlYaml).toContain(`id: ${example.presentControl}`);
+
+      // And the fixtures do not include control "<missing control>"
+      expect(presentControlYaml).not.toContain(`id: ${example.missingControl}`);
+
+      // When the fixture validation suite runs
+      const result = validateCatalogFixtureSuite({
+        frameworkFamily,
+        requiredControls: [example.presentControl, example.missingControl],
+        seeds: [
+          {
+            controlYaml: presentControlYaml,
+            name: example.presentFixtureSeed,
+          },
+        ],
+      });
+
+      // Then validation fails
+      expect(result.success).toBe(false);
+
+      // And the validation error names "<missing control>"
+      expect(formatFixtureSuiteValidationResult(result)).toContain(example.missingControl);
     }
   });
 });
