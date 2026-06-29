@@ -20,6 +20,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Added
+- `compliance`: add MAT-83 ATDD coverage for valid framework, control, rule, and
+  mapping catalog schema data.
 - `docs`: add architecture ADRs 023-027 (MAT-82) fixing the compliance rule
   engine's boundaries — air-gap execution with offline verification, Git as the
   source of truth for framework catalogs, the Rust repository boundaries and the
