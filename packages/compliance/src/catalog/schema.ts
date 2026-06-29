@@ -85,17 +85,20 @@ const FrameworkReferenceCatalogSchema = z.union([
 
 type FrameworkReferenceCatalog = z.infer<typeof FrameworkReferenceCatalogSchema>;
 
-function frameworkReferenceDeduplicationKey(reference: FrameworkReferenceCatalog): string {
+function frameworkReferenceComponents(
+  reference: FrameworkReferenceCatalog,
+): readonly (string | null)[] {
   if (typeof reference === "string") {
-    return JSON.stringify(["string", reference]);
+    const [framework, version, referenceId] = reference.split(":");
+
+    return [framework ?? null, version ?? null, referenceId ?? null];
   }
 
-  return JSON.stringify([
-    "object",
-    reference.framework ?? null,
-    reference.version ?? null,
-    reference.reference ?? null,
-  ]);
+  return [reference.framework ?? null, reference.version ?? null, reference.reference ?? null];
+}
+
+function frameworkReferenceDeduplicationKey(reference: FrameworkReferenceCatalog): string {
+  return JSON.stringify(frameworkReferenceComponents(reference));
 }
 
 function frameworkReferenceDescription(reference: FrameworkReferenceCatalog): string {
