@@ -37,6 +37,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   preserving declared values in MAT-83 ATDD coverage.
 
 ### Added
+- `compliance`: add MAT-83 ATDD coverage for rejecting LLM-generated
+  `control.yaml` source descriptions.
 - `compliance`: add MAT-83 ATDD coverage for rejecting `control.yaml` source
   metadata without a description.
 - `compliance`: add MAT-83 ATDD coverage for rejecting `framework.yaml`
