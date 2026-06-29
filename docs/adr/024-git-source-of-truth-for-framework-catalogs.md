@@ -17,10 +17,9 @@ We need one home for those catalogs, one format, and one provenance rule, fixed 
 ## Decision
 
 The `sovri-frameworks` Git repository is the source of truth for framework, control, and rule
-catalogs. Catalogs are stored as structured YAML — a `framework.yaml`, a `controls/` tree, the
-rules attached to each control, `mappings/` so one control can satisfy several frameworks, and
-`versions/` — so a catalog change is reviewed as a versioned source update through normal Git
-review.
+catalogs. Catalogs are stored as structured YAML — `framework.yaml`, `control.yaml`, `rule.yaml`,
+and `mapping.yaml` — under versioned catalog directories, so a catalog change is reviewed as a
+versioned source update through normal Git review.
 
 Framework references are backed by the catalog and source URLs are backed by the catalog: every
 `FrameworkReference` carries the upstream framework version or publication date and an official

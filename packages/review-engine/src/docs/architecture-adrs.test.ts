@@ -728,6 +728,23 @@ describe("MAT-83 R-07 — compliance catalog docs identify Git-owned catalog dat
     ).toBe(true);
   });
 
+  it("names the catalog schema files", () => {
+    // Given the repository contains architecture docs under "sovri/docs/adr/"
+    expect(adrDocsRoot.replaceAll("\\", "/").endsWith("docs/adr")).toBe(true);
+
+    // When I read the compliance catalog docs
+    const complianceCatalogDocs = adrCorpus;
+
+    // Then the docs mention "framework.yaml"
+    expect(complianceCatalogDocs).toContain("framework.yaml");
+    // And the docs mention "control.yaml"
+    expect(complianceCatalogDocs).toContain("control.yaml");
+    // And the docs mention "rule.yaml"
+    expect(complianceCatalogDocs).toContain("rule.yaml");
+    // And the docs mention "mapping.yaml"
+    expect(complianceCatalogDocs).toContain("mapping.yaml");
+  });
+
   it("keeps the real ADR corpus free of prompt-generated official compliance text", () => {
     expect(officialComplianceTextFailures(adrCorpus)).toEqual([]);
   });
