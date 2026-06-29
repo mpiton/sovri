@@ -204,4 +204,42 @@ describe("compliance catalog fixture seeds", () => {
       `fixtures.${consentTrackerControl}.rules.${consentTrackerDetectionRule}`,
     );
   });
+
+  it("rejects an attached rule fixture that violates its control input scope", () => {
+    const frameworkFamily = "mat-83-fixtures";
+
+    // Given the fixtures include a project-wide consent control
+    const controlYaml = catalogFixtureYaml(consentFixtureSeed, "control.yaml");
+    expect(controlYaml).toContain("applicability: project-wide");
+
+    // And the attached tracker rule fixture is scoped to a file
+    const fileScopedRuleYaml = catalogFixtureYaml(consentFixtureSeed, "rule.yaml").replace(
+      "input_scope: project",
+      "input_scope: file",
+    );
+    expect(fileScopedRuleYaml).toContain(`id: ${consentTrackerDetectionRule}`);
+    expect(fileScopedRuleYaml).toContain("input_scope: file");
+
+    // When the fixture validation suite runs
+    const result = validateCatalogFixtureSuite({
+      frameworkFamily,
+      requiredControls: [consentTrackerControl],
+      requiredRules: [{ control: consentTrackerControl, rule: consentTrackerDetectionRule }],
+      seeds: [
+        {
+          controlYaml,
+          name: consentFixtureSeed,
+          ruleYaml: fileScopedRuleYaml,
+        },
+      ],
+    });
+
+    // Then validation fails
+    expect(result.success).toBe(false);
+
+    // And the malformed attached rule is not reported as present
+    expect(formatFixtureSuiteValidationResult(result)).toContain(
+      `fixtures.${consentTrackerControl}.rules.${consentTrackerDetectionRule}`,
+    );
+  });
 });

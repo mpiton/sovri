@@ -20,8 +20,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Changed
-- `compliance`: tie required fixture seed rules to their owning control during
-  MAT-83 fixture suite validation.
+- `compliance`: tie required fixture seed rules to their owning control and
+  validate attached rules with that control context during MAT-83 fixture suite
+  validation.
 - `compliance`: reject explicit file- or diff-scoped `rule.yaml` input when the
   related `control.yaml` is project-wide.
 - `compliance`: restrict `control.yaml` applicability and `rule.yaml`

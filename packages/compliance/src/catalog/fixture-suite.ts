@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri contributors
 
-import { validateCatalogYaml } from "./schema.js";
+import { validateCatalogYaml, type ControlCatalog } from "./schema.js";
 
 export interface CatalogFixtureSeed {
   readonly controlYaml: string;
@@ -42,26 +42,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function controlIdFromFixtureSeed(
+function controlFromFixtureSeed(
   seed: CatalogFixtureSeed,
   frameworkFamily: string,
-): string | undefined {
+): ControlCatalog | undefined {
   const result = validateCatalogYaml({
     file: "control.yaml",
     frameworkFamily,
     yaml: seed.controlYaml,
   });
 
-  if (!result.success || !isRecord(result.data) || typeof result.data.id !== "string") {
+  if (!result.success || !isRecord(result.data)) {
     return undefined;
   }
 
-  return result.data.id;
+  return result.data as ControlCatalog;
 }
 
 function ruleIdFromFixtureSeed(
   seed: CatalogFixtureSeed,
   frameworkFamily: string,
+  relatedControl: ControlCatalog | undefined,
 ): string | undefined {
   if (seed.ruleYaml === undefined) {
     return undefined;
@@ -70,6 +71,7 @@ function ruleIdFromFixtureSeed(
   const result = validateCatalogYaml({
     file: "rule.yaml",
     frameworkFamily,
+    ...(relatedControl === undefined ? {} : { relatedControl }),
     yaml: seed.ruleYaml,
   });
 
@@ -83,11 +85,14 @@ function ruleIdFromFixtureSeed(
 export function validateCatalogFixtureSuite(
   input: CatalogFixtureSuiteValidationInput,
 ): CatalogFixtureSuiteValidationResult {
-  const parsedSeeds = input.seeds.map((seed) => ({
-    controlId: controlIdFromFixtureSeed(seed, input.frameworkFamily),
-    name: seed.name,
-    ruleId: ruleIdFromFixtureSeed(seed, input.frameworkFamily),
-  }));
+  const parsedSeeds = input.seeds.map((seed) => {
+    const control = controlFromFixtureSeed(seed, input.frameworkFamily);
+
+    return {
+      controlId: control?.id,
+      ruleId: ruleIdFromFixtureSeed(seed, input.frameworkFamily, control),
+    };
+  });
   const presentControlIds = new Set(
     parsedSeeds
       .map((seed) => seed.controlId)
