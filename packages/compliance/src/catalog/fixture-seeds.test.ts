@@ -110,11 +110,26 @@ describe("compliance catalog fixture seeds", () => {
         relatedControl: controlResult.success ? controlResult.data : undefined,
         yaml: ruleYaml,
       });
+      const fixtureSuiteResult = validateCatalogFixtureSuite({
+        frameworkFamily,
+        requiredControls: [example.control],
+        requiredRules: [example.rule],
+        seeds: [
+          {
+            controlYaml,
+            name: example.fixtureSeed,
+            ruleYaml,
+          },
+        ],
+      });
 
       // Then validation passes for fixture seed "<fixture seed>"
       expect(
-        [controlResult, mappingResult, ruleResult].map(formatValidationResult).join("\n"),
-      ).toBe("validation passed\nvalidation passed\nvalidation passed");
+        [
+          ...[controlResult, mappingResult, ruleResult].map(formatValidationResult),
+          formatFixtureSuiteValidationResult(fixtureSuiteResult),
+        ].join("\n"),
+      ).toBe("validation passed\nvalidation passed\nvalidation passed\nvalidation passed");
     }
   });
 
