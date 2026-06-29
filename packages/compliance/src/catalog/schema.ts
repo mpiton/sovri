@@ -30,7 +30,7 @@ export type CatalogYamlValidationResult =
     };
 
 const SourceMetadataSchema = z.object({
-  description: z.string().optional(),
+  description: z.string(),
   url: z.string().optional(),
 });
 

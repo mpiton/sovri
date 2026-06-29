@@ -422,6 +422,20 @@ function controlYamlWithSourceFor(
   ].join("\n");
 }
 
+function controlYamlWithSourceUrlOnlyFor(control: string, sourceUrl: string): string {
+  return [
+    `id: ${control}`,
+    "title: Trackers require prior consent evidence",
+    "description: Detect trackers that run before consent evidence is present.",
+    "severity: major",
+    "weight: 8",
+    "remediation: Block non-essential trackers until consent evidence is recorded.",
+    "applicability: project-wide",
+    "source:",
+    `  url: ${sourceUrl}`,
+  ].join("\n");
+}
+
 function ruleYamlFor(ruleId: string, ruleType: string): string {
   return [
     `id: ${ruleId}`,
@@ -561,6 +575,37 @@ describe("compliance catalog YAML schemas", () => {
 
     // Then validation passes for "control.yaml"
     expect(result.success, formatValidationFailure(result)).toBe(true);
+  });
+
+  it("rejects source metadata without a description", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "control.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const control = "consent.tracker.prior-consent";
+    const sourceUrl = "https://eur-lex.europa.eu/eli/dir/2002/58/oj";
+    const yaml = controlYamlWithSourceUrlOnlyFor(control, sourceUrl);
+
+    // Given the catalog contains control "consent.tracker.prior-consent"
+    expect(yaml).toContain(`id: ${control}`);
+
+    // And "control.yaml" declares source url "https://eur-lex.europa.eu/eli/dir/2002/58/oj"
+    expect(yaml).toContain(`url: ${sourceUrl}`);
+
+    // And "control.yaml" does not declare source description
+    expect(yaml).not.toContain("  description:");
+
+    // When the catalog schema validator runs
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    // Then validation fails for "control.yaml"
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError(`Expected ${file} validation to fail.`);
+    }
+
+    // And the validation error names "source.description"
+    expect(formatValidationFailure(result)).toContain("source.description");
   });
 
   it("rejects unknown schema fields", async () => {
