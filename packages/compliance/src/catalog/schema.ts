@@ -70,11 +70,14 @@ export const RuleCatalogSchema = z
   .strict();
 export type RuleCatalog = z.infer<typeof RuleCatalogSchema>;
 
-const FrameworkReferenceCatalogSchema = z.object({
-  framework: z.string().optional(),
-  reference: z.string().optional(),
-  version: z.string().optional(),
-});
+const FrameworkReferenceCatalogSchema = z.union([
+  z.string(),
+  z.object({
+    framework: z.string().optional(),
+    reference: z.string().optional(),
+    version: z.string().optional(),
+  }),
+]);
 
 export const MappingCatalogSchema = z
   .object({

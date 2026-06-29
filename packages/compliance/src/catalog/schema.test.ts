@@ -503,7 +503,7 @@ describe("compliance catalog YAML schemas", () => {
     const yaml = [
       "control_id: consent.tracker.prior-consent",
       "framework_references:",
-      "  - gdpr:2016:article-6",
+      "  - 42",
     ].join("\n");
 
     const result = validateCatalogYaml({ file, frameworkFamily, yaml });

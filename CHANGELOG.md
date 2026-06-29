@@ -152,6 +152,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 
 ### Changed
 
+- `compliance`: accept versioned framework references as string entries in
+  `mapping.yaml` catalog data.
 - `compliance`: parse catalog YAML content before schema validation and return a
   structured `invalid YAML syntax` validation failure for malformed YAML.
 - `config`: `review.mode` now exposes the single allowed value `compliance` and
