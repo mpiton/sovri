@@ -665,25 +665,29 @@ describe("MAT-82 R-07 — ADRs keep ComplianceGap and ControlResult distinct fro
 // MAT-83 R-07 — Git owns framework catalog data
 // ---------------------------------------------------------------------------
 
+function isNegatedOrRejected(statement: string): boolean {
+  return /(do not|must not|never|not |reject)/.test(statement);
+}
+
 function gitSourceOfTruthFailures(docs: string): string[] {
   const statements = normalizedStatements(docs);
   const gitSourceOfTruthPattern =
-    /\bgit( repository)?\b\s+(is|as|remains|stays)\s+((the )?source of truth\b[^.!?;:]*\bcatalog(s| data)?\b|(the )?catalog(s| data)? source of truth\b)/;
+    /(\bgit( repository)?\b\s+(is|as|remains|stays)\s+((the )?source of truth\b[^.!?;:]*\bcatalog(s| data)?\b|(the )?catalog(s| data)? source of truth\b)|\bcatalog(s| data)? source of truth\b[^.!?;:]*\b(is|as|remains|stays)\b[^.!?;:]*\bgit\b)/;
   const catalogSourceOfTruthPattern =
-    /\b(is|as|remains|stays)\s+((the )?source of truth\b[^.!?;:]*\bcatalog(s| data)?\b|(the )?catalog(s| data)? source of truth\b)/;
+    /(\b(is|as|remains|stays)\s+((the )?source of truth\b[^.!?;:]*\bcatalog(s| data)?\b|(the )?catalog(s| data)? source of truth\b)|\bcatalog(s| data)? source of truth\b[^.!?;:]*\b(is|as|remains|stays)\b)/;
 
   const conflictingSourceOfTruth = statements.some(
     (statement) =>
       catalogSourceOfTruthPattern.test(statement) &&
       !gitSourceOfTruthPattern.test(statement) &&
-      !/(must not|never|not |reject)/.test(statement),
+      !isNegatedOrRejected(statement),
   );
   if (conflictingSourceOfTruth) {
     return ["catalog source of truth must be Git"];
   }
 
-  const statesGitAsSourceOfTruth = statements.some((statement) =>
-    gitSourceOfTruthPattern.test(statement),
+  const statesGitAsSourceOfTruth = statements.some(
+    (statement) => gitSourceOfTruthPattern.test(statement) && !isNegatedOrRejected(statement),
   );
 
   if (statesGitAsSourceOfTruth) {
@@ -794,6 +798,25 @@ describe("MAT-83 R-07 — compliance catalog docs identify Git-owned catalog dat
 
     expect(gitSourceOfTruthFailures(conflictingDocs)).toContain(
       "catalog source of truth must be Git",
+    );
+  });
+
+  it("rejects catalog-source noun phrases owned by Cloud", () => {
+    const conflictingDocs = [
+      "Git is the source of truth for framework catalogs.",
+      "The catalog source of truth is Cloud.",
+    ].join("\n\n");
+
+    expect(gitSourceOfTruthFailures(conflictingDocs)).toContain(
+      "catalog source of truth must be Git",
+    );
+  });
+
+  it("rejects negated Git source-of-truth statements", () => {
+    const negatedGitDecision = "Do not use Git as the source of truth for framework catalogs.";
+
+    expect(gitSourceOfTruthFailures(negatedGitDecision)).toContain(
+      "Git source-of-truth decision is missing",
     );
   });
 
