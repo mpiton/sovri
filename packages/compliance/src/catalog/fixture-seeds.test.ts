@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri contributors
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -53,7 +53,58 @@ const consentTrackerDetectionRule = "consent.detect-trackers-without-consent-evi
 const consentFixtureSeed = "mat-114-consent-control";
 
 function catalogFixtureYaml(fixtureSeed: string, file: string): string {
-  return readFileSync(new URL(`./fixtures/${fixtureSeed}/${file}`, import.meta.url), "utf8");
+  return catalogFixtureYamlByPath(`${fixtureSeed}/${file}`);
+}
+
+function catalogFixtureYamlByPath(path: string): string {
+  return readFileSync(new URL(`./fixtures/${path}`, import.meta.url), "utf8");
+}
+
+function catalogFixtureFiles(): readonly string[] {
+  return readdirSync(new URL("./fixtures/", import.meta.url), { withFileTypes: true })
+    .flatMap((entry) => {
+      if (entry.isFile() && entry.name.endsWith(".yaml")) {
+        return [entry.name];
+      }
+
+      if (!entry.isDirectory()) {
+        return [];
+      }
+
+      return readdirSync(new URL(`./fixtures/${entry.name}/`, import.meta.url), {
+        withFileTypes: true,
+      })
+        .filter((fixtureFile) => fixtureFile.isFile() && fixtureFile.name.endsWith(".yaml"))
+        .map((fixtureFile) => `${entry.name}/${fixtureFile.name}`);
+    })
+    .toSorted();
+}
+
+function catalogFixtureFileKind(fixtureFile: string): string {
+  return fixtureFile.split("/").at(-1) ?? fixtureFile;
+}
+
+function relatedControlForFixtureFile(
+  fixtureFile: string,
+  fixtureFiles: readonly string[],
+  frameworkFamily: string,
+): unknown {
+  if (!fixtureFile.endsWith("/rule.yaml")) {
+    return undefined;
+  }
+
+  const controlFile = `${fixtureFile.slice(0, -"rule.yaml".length)}control.yaml`;
+  if (!fixtureFiles.includes(controlFile)) {
+    return undefined;
+  }
+
+  const controlResult = validateCatalogYaml({
+    file: "control.yaml",
+    frameworkFamily,
+    yaml: catalogFixtureYamlByPath(controlFile),
+  });
+
+  return controlResult.success ? controlResult.data : undefined;
 }
 
 function formatValidationResult(result: ReturnType<typeof validateCatalogYaml>): string {
@@ -73,6 +124,53 @@ function formatFixtureSuiteValidationResult(result: CatalogFixtureSuiteValidatio
 }
 
 describe("compliance catalog fixture seeds", () => {
+  it("validates every catalog YAML kind in the fixture suite", () => {
+    const frameworkFamily = "mat-83-fixtures";
+    const fixtureFiles = catalogFixtureFiles();
+
+    // Given the fixtures include "framework.yaml"
+    expect(
+      fixtureFiles.some((fixtureFile) => catalogFixtureFileKind(fixtureFile) === "framework.yaml"),
+    ).toBe(true);
+
+    // And the fixtures include "control.yaml"
+    expect(
+      fixtureFiles.some((fixtureFile) => catalogFixtureFileKind(fixtureFile) === "control.yaml"),
+    ).toBe(true);
+
+    // And the fixtures include "rule.yaml"
+    expect(
+      fixtureFiles.some((fixtureFile) => catalogFixtureFileKind(fixtureFile) === "rule.yaml"),
+    ).toBe(true);
+
+    // And the fixtures include "mapping.yaml"
+    expect(
+      fixtureFiles.some((fixtureFile) => catalogFixtureFileKind(fixtureFile) === "mapping.yaml"),
+    ).toBe(true);
+
+    // When the fixture validation suite runs
+    const validationLines = fixtureFiles.map((fixtureFile) => {
+      const relatedControl = relatedControlForFixtureFile(
+        fixtureFile,
+        fixtureFiles,
+        frameworkFamily,
+      );
+      const result = validateCatalogYaml({
+        file: catalogFixtureFileKind(fixtureFile),
+        frameworkFamily,
+        ...(relatedControl === undefined ? {} : { relatedControl }),
+        yaml: catalogFixtureYamlByPath(fixtureFile),
+      });
+
+      return `${fixtureFile}: ${formatValidationResult(result)}`;
+    });
+
+    // Then validation passes for every fixture file
+    expect(validationLines.join("\n")).toBe(
+      fixtureFiles.map((fixtureFile) => `${fixtureFile}: validation passed`).join("\n"),
+    );
+  });
+
   it("validates required catalog fixture seeds", () => {
     const frameworkFamily = "mat-83-fixtures";
 
