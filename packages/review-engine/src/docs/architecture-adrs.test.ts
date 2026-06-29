@@ -666,10 +666,24 @@ describe("MAT-82 R-07 — ADRs keep ComplianceGap and ControlResult distinct fro
 // ---------------------------------------------------------------------------
 
 function gitSourceOfTruthFailures(docs: string): string[] {
-  const statesGitAsSourceOfTruth = normalizedStatements(docs).some((statement) =>
-    /\bgit( repository)?\b\s+(is|as|remains|stays)\s+(the )?source of truth\b[^.!?;:]*\bcatalogs?\b/.test(
-      statement,
-    ),
+  const statements = normalizedStatements(docs);
+  const gitSourceOfTruthPattern =
+    /\bgit( repository)?\b\s+(is|as|remains|stays)\s+(the )?source of truth\b[^.!?;:]*\bcatalog(s| data)?\b/;
+  const catalogSourceOfTruthPattern =
+    /\b(is|as|remains|stays)\s+(the )?source of truth\b[^.!?;:]*\bcatalog(s| data)?\b/;
+
+  const conflictingSourceOfTruth = statements.some(
+    (statement) =>
+      catalogSourceOfTruthPattern.test(statement) &&
+      !gitSourceOfTruthPattern.test(statement) &&
+      !/(must not|never|not |reject)/.test(statement),
+  );
+  if (conflictingSourceOfTruth) {
+    return ["catalog source of truth must be Git"];
+  }
+
+  const statesGitAsSourceOfTruth = statements.some((statement) =>
+    gitSourceOfTruthPattern.test(statement),
   );
 
   if (statesGitAsSourceOfTruth) {
@@ -758,7 +772,18 @@ describe("MAT-83 R-07 — compliance catalog docs identify Git-owned catalog dat
 
     const failures = gitSourceOfTruthFailures(docsWithGitMirrorOnly);
 
-    expect(failures).toContain("Git source-of-truth decision is missing");
+    expect(failures).toContain("catalog source of truth must be Git");
+  });
+
+  it("rejects conflicting catalog source-of-truth claims even when Git is also named", () => {
+    const conflictingDocs = [
+      "Git is the source of truth for framework catalogs.",
+      "Cloud is the source of truth for catalog data.",
+    ].join("\n\n");
+
+    expect(gitSourceOfTruthFailures(conflictingDocs)).toContain(
+      "catalog source of truth must be Git",
+    );
   });
 
   it("accepts wrapped Git source-of-truth decision sentences", () => {
