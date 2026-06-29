@@ -32,6 +32,10 @@ export type CatalogYamlValidationResult =
 const LlmGeneratedSourceDescriptionPattern = /\bgenerated\s+by\s+llm\s+from\s+the\s+prompt\b/iu;
 
 function isOfficialSourceUrl(sourceUrl: string): boolean {
+  if (!/^https:\/\/[^/?#\s]+/iu.test(sourceUrl)) {
+    return false;
+  }
+
   try {
     return new URL(sourceUrl).protocol === "https:";
   } catch {

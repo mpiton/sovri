@@ -600,7 +600,12 @@ describe("compliance catalog YAML schemas", () => {
     const file = "framework.yaml";
     const frameworkFamily = "gdpr-eprivacy";
     const sourceDescription = "General Data Protection Regulation official text";
-    const invalidSourceUrls = ["gdpr-article-6", "ftp://example.eu", ""];
+    const invalidSourceUrls = [
+      "gdpr-article-6",
+      "ftp://example.eu",
+      "",
+      "https:eur-lex.europa.eu/eli/reg/2016/679/oj",
+    ];
 
     for (const sourceUrl of invalidSourceUrls) {
       const yaml = frameworkYamlWithSourceFor(frameworkFamily, sourceUrl, sourceDescription);
