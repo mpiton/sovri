@@ -27,8 +27,19 @@ interface CatalogSchema {
   safeParse(input: unknown): ValidationFailure | ValidationSuccess;
 }
 
+interface CatalogYamlValidationInput {
+  readonly file: string;
+  readonly frameworkFamily: string;
+  readonly yaml: string;
+}
+
+type CatalogYamlValidator = (
+  input: CatalogYamlValidationInput,
+) => ValidationFailure | ValidationSuccess;
+
 interface CatalogSchemaModule {
   readonly CatalogSchemasByFile: Readonly<Record<string, CatalogSchema>>;
+  readonly validateCatalogYaml?: CatalogYamlValidator;
 }
 
 const catalogSchemaSourcePath = fileURLToPath(new URL("./schema.ts", import.meta.url));
@@ -206,6 +217,19 @@ function exampleDataWithoutField(file: string, missingField: string): Record<str
   return data;
 }
 
+function requireCatalogYamlValidator(moduleValue: CatalogSchemaModule): CatalogYamlValidator {
+  expect(
+    typeof moduleValue.validateCatalogYaml,
+    "catalog schema module exports a YAML validator",
+  ).toBe("function");
+
+  if (typeof moduleValue.validateCatalogYaml !== "function") {
+    throw new TypeError("Expected catalog schema module to export a YAML validator.");
+  }
+
+  return moduleValue.validateCatalogYaml;
+}
+
 async function loadCatalogSchemaModule(): Promise<CatalogSchemaModule> {
   expect(
     existsSync(catalogSchemaSourcePath),
@@ -311,5 +335,32 @@ describe("compliance catalog YAML schemas", () => {
       }
       expect(formatValidationFailure(result)).toContain(example.missingField);
     }
+  });
+
+  it("rejects empty YAML documents before catalog validation can pass", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "control.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const yaml = "";
+
+    // Given the compliance catalog contains "control.yaml" for framework family "gdpr-eprivacy"
+    expect(moduleValue.CatalogSchemasByFile[file]).toBeDefined();
+    expect(frameworkFamily).toBe("gdpr-eprivacy");
+
+    // And "control.yaml" is an empty YAML document
+    expect(yaml).toBe("");
+
+    // When the catalog schema validator runs
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    // Then validation fails for "control.yaml"
+    expect(result.success).toBe(false);
+
+    // And the validation error reports that catalog YAML cannot be empty
+    if (result.success) {
+      throw new TypeError("Expected empty control.yaml validation to fail.");
+    }
+    expect(formatValidationFailure(result)).toContain("catalog YAML cannot be empty");
   });
 });

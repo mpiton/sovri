@@ -3,6 +3,29 @@
 
 import { z } from "@sovri/core";
 
+export interface CatalogYamlValidationInput {
+  readonly file: string;
+  readonly frameworkFamily: string;
+  readonly yaml: string;
+}
+
+export interface CatalogYamlValidationIssue {
+  readonly message: string;
+  readonly path: readonly (string | number)[];
+}
+
+export type CatalogYamlValidationResult =
+  | {
+      readonly data: unknown;
+      readonly success: true;
+    }
+  | {
+      readonly error: {
+        readonly issues: readonly CatalogYamlValidationIssue[];
+      };
+      readonly success: false;
+    };
+
 const SourceMetadataSchema = z.object({
   description: z.string().optional(),
   url: z.string().optional(),
@@ -65,3 +88,26 @@ export const CatalogSchemasByFile = {
   "mapping.yaml": MappingCatalogSchema,
   "rule.yaml": RuleCatalogSchema,
 } as const;
+
+export function validateCatalogYaml(
+  input: CatalogYamlValidationInput,
+): CatalogYamlValidationResult {
+  if (input.yaml.trim().length === 0) {
+    return {
+      error: {
+        issues: [
+          {
+            message: "catalog YAML cannot be empty",
+            path: [input.file],
+          },
+        ],
+      },
+      success: false,
+    };
+  }
+
+  return {
+    data: input.yaml,
+    success: true,
+  };
+}

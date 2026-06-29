@@ -20,6 +20,10 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Added
+- `compliance`: add a catalog YAML validator entry point that rejects empty YAML
+  documents before schema validation can pass.
+- `compliance`: add MAT-83 ATDD coverage for rejecting empty catalog YAML
+  documents before schema validation can pass.
 - `compliance`: add MAT-83 ATDD coverage for rejecting missing required catalog
   schema fields.
 - `compliance`: add MAT-83 ATDD coverage for rejecting unknown top-level catalog
