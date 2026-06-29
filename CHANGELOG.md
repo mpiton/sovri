@@ -20,6 +20,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Changed
+- `review-engine`: reject prompt-generated official compliance text in MAT-83
+  ADR docs acceptance.
 - `compliance`: normalize LLM-generated source description detection across
   case and whitespace variations.
 - `compliance`: reject LLM-generated source descriptions in MAT-83 catalog
@@ -45,6 +47,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   directory name.
 
 ### Added
+- `review-engine`: add MAT-83 ADR coverage for rejecting prompt-generated
+  official compliance text.
 - `review-engine`: add MAT-83 ADR coverage for catalog-to-rule execution
   documentation.
 - `review-engine`: add MAT-83 ADR coverage for Git-owned framework catalog
