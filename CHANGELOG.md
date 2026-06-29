@@ -20,6 +20,18 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Added
+- `docs`: add architecture ADRs 023-027 (MAT-82) fixing the compliance rule
+  engine's boundaries — air-gap execution with offline verification, Git as the
+  source of truth for framework catalogs, the Rust repository boundaries and the
+  catalog-to-report data flow, the LLM's interpretation-and-ranking-only role, and
+  `ComplianceGap`/`ControlResult` as types distinct from the PR `Finding`.
+- `review-engine`: add MAT-82 docs-acceptance coverage asserting the architecture
+  ADRs state air-gap execution, catalog-backed references, repository boundaries,
+  the compliance data flow, the LLM role, and the compliance/`Finding` type split;
+  the violation detectors match anti-patterns precisely (each repository tied to
+  its responsibility on one line, the data-flow order within a single sentence,
+  affirmative citation-source claims, reject-only exemptions), so stages or terms
+  from unrelated ADRs cannot satisfy or suppress a check by accident.
 
 - `review-engine`: add MAT-112 ATDD coverage that keeps ADR-021 and ADR-022
   aligned on the project compliance source model and PR/report output contract.
