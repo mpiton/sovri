@@ -374,6 +374,23 @@ function frameworkYamlWithoutSourceFor(frameworkFamily: string): string {
   ].join("\n");
 }
 
+function frameworkYamlWithSourceFor(
+  frameworkFamily: string,
+  sourceUrl: string,
+  sourceDescription: string,
+): string {
+  return [
+    `id: ${frameworkFamily}`,
+    "name: GDPR and ePrivacy consent controls",
+    "version: 2016-2002",
+    "jurisdiction: EU",
+    "scope: Project websites that process personal data and use trackers",
+    "source:",
+    `  url: ${sourceUrl}`,
+    `  description: ${sourceDescription}`,
+  ].join("\n");
+}
+
 function requireCatalogYamlValidator(moduleValue: CatalogSchemaModule): CatalogYamlValidator {
   expect(
     typeof moduleValue.validateCatalogYaml,
@@ -549,6 +566,32 @@ describe("compliance catalog YAML schemas", () => {
       // Then validation passes for "<file>"
       expect(result.success, formatValidationFailure(result)).toBe(true);
     }
+  });
+
+  it("validates framework source metadata with official URL", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "framework.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const sourceUrl = "https://eur-lex.europa.eu/eli/reg/2016/679/oj";
+    const sourceDescription = "General Data Protection Regulation official text";
+    const yaml = frameworkYamlWithSourceFor(frameworkFamily, sourceUrl, sourceDescription);
+
+    // Given the catalog contains "framework.yaml" for framework family "gdpr-eprivacy"
+    expect(file).toBe("framework.yaml");
+    expect(yaml).toContain(`id: ${frameworkFamily}`);
+
+    // And "framework.yaml" declares source url "https://eur-lex.europa.eu/eli/reg/2016/679/oj"
+    expect(yaml).toContain(`url: ${sourceUrl}`);
+
+    // And "framework.yaml" declares source description "General Data Protection Regulation official text"
+    expect(yaml).toContain(`description: ${sourceDescription}`);
+
+    // When the catalog schema validator runs
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    // Then validation passes for "framework.yaml"
+    expect(result.success, formatValidationFailure(result)).toBe(true);
   });
 
   it("validates control source metadata with official URL", async () => {

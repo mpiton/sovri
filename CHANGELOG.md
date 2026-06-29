@@ -47,6 +47,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   directory name.
 
 ### Added
+- `compliance`: add MAT-83 ATDD coverage for `framework.yaml` source metadata
+  with an official URL.
 - `review-engine`: add MAT-83 ADR coverage for naming catalog schema YAML
   files.
 - `compliance`: add MAT-83 ATDD coverage for project-wide controls that rely
