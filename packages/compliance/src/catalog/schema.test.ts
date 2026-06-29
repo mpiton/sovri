@@ -390,4 +390,40 @@ describe("compliance catalog YAML schemas", () => {
     }
     expect(formatValidationFailure(result)).toContain("invalid YAML syntax");
   });
+
+  it("validates parsed YAML content against the selected catalog schema", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "framework.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const yaml = "version: 2016-2002";
+
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    expect(result.success, formatValidationFailure(result)).toBe(true);
+    if (!result.success || !isRecord(result.data)) {
+      throw new TypeError("Expected framework.yaml validation to return parsed data.");
+    }
+    expect(result.data.version).toBe("2016-2002");
+  });
+
+  it("reports schema validation errors from parsed YAML paths", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "mapping.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const yaml = [
+      "control_id: consent.tracker.prior-consent",
+      "framework_references:",
+      "  - gdpr:2016:article-6",
+    ].join("\n");
+
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError("Expected mapping.yaml schema validation to fail.");
+    }
+    expect(formatValidationFailure(result)).toContain("framework_references.0");
+  });
 });
