@@ -391,6 +391,22 @@ describe("compliance catalog YAML schemas", () => {
     expect(formatValidationFailure(result)).toContain("invalid YAML syntax");
   });
 
+  it("rejects parsed-empty YAML documents before catalog validation can pass", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "control.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const yaml = "---";
+
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError("Expected parsed-empty control.yaml validation to fail.");
+    }
+    expect(formatValidationFailure(result)).toContain("catalog YAML cannot be empty");
+  });
+
   it("validates parsed YAML content against the selected catalog schema", async () => {
     const moduleValue = await loadCatalogSchemaModule();
     const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);

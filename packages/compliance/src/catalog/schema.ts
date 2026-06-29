@@ -129,6 +129,20 @@ export function validateCatalogYaml(
     };
   }
 
+  if (parsed === null || parsed === undefined) {
+    return {
+      error: {
+        issues: [
+          {
+            message: "catalog YAML cannot be empty",
+            path: [input.file],
+          },
+        ],
+      },
+      success: false,
+    };
+  }
+
   if (!isCatalogSchemaFile(input.file)) {
     return {
       error: {
