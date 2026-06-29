@@ -46,6 +46,7 @@ An ADR is not user documentation. It is a log of technical choices intended for 
 | [026](./026-llm-interpretation-not-citation-source.md)     | LLM limited to interpretation and ranking, not a citation source | Accepted | 2026-06-29 |
 | [027](./027-compliancegap-controlresult-vs-finding.md)     | ComplianceGap and ControlResult are distinct from the PR Finding | Accepted | 2026-06-29 |
 | [028](./028-framework-catalog-source-metadata.md)          | Framework catalog source metadata                                | Accepted | 2026-06-29 |
+| [029](./029-versioned-catalog-data-for-rule-execution.md)  | Versioned catalog data for rule execution                        | Accepted | 2026-06-29 |
 
 ## Possible statuses
 

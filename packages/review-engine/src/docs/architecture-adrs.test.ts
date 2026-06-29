@@ -678,4 +678,20 @@ describe("MAT-83 R-07 — compliance catalog docs identify Git-owned catalog dat
       ]),
     ).toBe(true);
   });
+
+  it("connects schema catalogs to deterministic rule execution", () => {
+    // Given the repository contains architecture docs under "sovri/docs/adr/"
+    expect(adrDocsRoot.replaceAll("\\", "/").endsWith("docs/adr")).toBe(true);
+
+    // When I read the compliance catalog docs
+    const complianceCatalogDocs = adrCorpus;
+
+    // Then the docs describe the catalog data flow from framework catalogs to rules
+    expect(lineMentionsAll(complianceCatalogDocs, ["framework catalogs", "rules"])).toBe(true);
+
+    // And the docs state that rule execution uses versioned catalog data
+    expect(
+      lineMentionsAll(complianceCatalogDocs, ["rule execution", "versioned catalog data"]),
+    ).toBe(true);
+  });
 });
