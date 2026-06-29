@@ -70,9 +70,13 @@ export const RuleCatalogSchema = z
   .strict();
 export type RuleCatalog = z.infer<typeof RuleCatalogSchema>;
 
-const VersionedFrameworkReferenceStringSchema = z.string().regex(/^[^:\s]+:[^:\s]+:[^:\s]+$/u, {
-  error: "framework references must include a version",
-});
+const VersionedFrameworkReferencePattern = /^[^:\s]+:[^:\s]+:[^:\s]+$/u;
+
+const VersionedFrameworkReferenceStringSchema = z
+  .string()
+  .regex(VersionedFrameworkReferencePattern, {
+    error: "framework references must include a version",
+  });
 
 const FrameworkReferenceCatalogSchema = z.union([
   VersionedFrameworkReferenceStringSchema,
@@ -90,6 +94,10 @@ function frameworkReferenceComponents(
 ): readonly (string | undefined)[] {
   if (typeof reference === "string") {
     return reference.split(":");
+  }
+
+  if (VersionedFrameworkReferencePattern.test(String(reference.reference))) {
+    return String(reference.reference).split(":");
   }
 
   return [reference.framework, reference.version, reference.reference];

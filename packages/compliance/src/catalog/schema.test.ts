@@ -568,6 +568,41 @@ describe("compliance catalog YAML schemas", () => {
     expect(formatValidationFailure(result)).toContain(frameworkReference);
   });
 
+  it("rejects duplicate mixed-form framework references with embedded scalar labels", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "mapping.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const control = "consent.tracker.prior-consent";
+    const frameworkReference = "gdpr:2016:article-6";
+    const yaml = [
+      `control_id: ${control}`,
+      "framework_references:",
+      `  - ${frameworkReference}`,
+      "  - framework: gdpr-eprivacy",
+      '    version: "2016"',
+      `    reference: ${frameworkReference}`,
+    ].join("\n");
+
+    // Given the catalog contains control "consent.tracker.prior-consent"
+    expect(yaml).toContain(`control_id: ${control}`);
+
+    // And "mapping.yaml" maps that control to the same scalar and embedded object label
+    expect(yaml.match(new RegExp(frameworkReference, "gu"))).toHaveLength(2);
+
+    // When the catalog schema validator runs
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    // Then validation fails for "mapping.yaml"
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError(`Expected ${file} validation to fail.`);
+    }
+
+    // And the validation error names the duplicate reference "gdpr:2016:article-6"
+    expect(formatValidationFailure(result)).toContain(frameworkReference);
+  });
+
   it("rejects empty YAML documents before catalog validation can pass", async () => {
     const moduleValue = await loadCatalogSchemaModule();
     const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
