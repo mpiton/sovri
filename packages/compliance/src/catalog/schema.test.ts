@@ -393,6 +393,25 @@ function controlYamlFor(control: string, applicability: string): string {
   ].join("\n");
 }
 
+function controlYamlWithSourceFor(
+  control: string,
+  sourceUrl: string,
+  sourceDescription: string,
+): string {
+  return [
+    `id: ${control}`,
+    "title: Trackers require prior consent evidence",
+    "description: Detect trackers that run before consent evidence is present.",
+    "severity: major",
+    "weight: 8",
+    "remediation: Block non-essential trackers until consent evidence is recorded.",
+    "applicability: project-wide",
+    "source:",
+    `  url: ${sourceUrl}`,
+    `  description: ${sourceDescription}`,
+  ].join("\n");
+}
+
 function ruleYamlFor(ruleId: string, ruleType: string): string {
   return [
     `id: ${ruleId}`,
@@ -506,6 +525,32 @@ describe("compliance catalog YAML schemas", () => {
       // Then validation passes for "<file>"
       expect(result.success, formatValidationFailure(result)).toBe(true);
     }
+  });
+
+  it("validates control source metadata with official URL", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "control.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const control = "consent.tracker.prior-consent";
+    const sourceUrl = "https://eur-lex.europa.eu/eli/dir/2002/58/oj";
+    const sourceDescription = "ePrivacy Directive Article 5(3) official text";
+    const yaml = controlYamlWithSourceFor(control, sourceUrl, sourceDescription);
+
+    // Given the catalog contains control "consent.tracker.prior-consent"
+    expect(yaml).toContain(`id: ${control}`);
+
+    // And "control.yaml" declares source url "https://eur-lex.europa.eu/eli/dir/2002/58/oj"
+    expect(yaml).toContain(`url: ${sourceUrl}`);
+
+    // And "control.yaml" declares source description "ePrivacy Directive Article 5(3) official text"
+    expect(yaml).toContain(`description: ${sourceDescription}`);
+
+    // When the catalog schema validator runs
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    // Then validation passes for "control.yaml"
+    expect(result.success, formatValidationFailure(result)).toBe(true);
   });
 
   it("rejects unknown schema fields", async () => {
