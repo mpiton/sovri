@@ -20,8 +20,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Changed
-- `compliance`: reject file- or diff-scoped `rule.yaml` input when the related
-  `control.yaml` is project-wide.
+- `compliance`: reject explicit file- or diff-scoped `rule.yaml` input when the
+  related `control.yaml` is project-wide.
 - `compliance`: restrict `control.yaml` applicability and `rule.yaml`
   input-scope values to MAT-83 supported control scopes.
 - `compliance`: require explicit `rule.yaml` execution policy data while

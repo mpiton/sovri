@@ -416,6 +416,15 @@ function ruleYamlWithScopeAndEvidenceFor(
   ].join("\n");
 }
 
+function ruleYamlWithoutInputScopeFor(control: string, expectedEvidence: string): string {
+  return [
+    `id: ${control}.rule`,
+    "rule_type: automatic",
+    `expected_evidence: ${expectedEvidence}`,
+    "execution_policy: run-in-agent",
+  ].join("\n");
+}
+
 function ruleYamlWithExecutionPolicyFor(
   ruleId: string,
   ruleType: string,
@@ -1001,6 +1010,33 @@ describe("compliance catalog YAML schemas", () => {
         "project-wide controls require project-level input scope",
       );
     }
+  });
+
+  it("allows project-wide controls when rule input scope is not declared", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const frameworkFamily = "gdpr-eprivacy";
+    const control = "privacy.retention.project-policy";
+    const controlYaml = controlYamlFor(control, "project-wide");
+    const ruleYaml = ruleYamlWithoutInputScopeFor(control, "retention-policy-document");
+
+    const controlResult = validateCatalogYaml({
+      file: "control.yaml",
+      frameworkFamily,
+      yaml: controlYaml,
+    });
+    if (!controlResult.success) {
+      throw new TypeError("Expected control.yaml validation to pass.");
+    }
+
+    const ruleResult = validateCatalogYaml({
+      file: "rule.yaml",
+      frameworkFamily,
+      relatedControl: controlResult.data,
+      yaml: ruleYaml,
+    });
+
+    expect(ruleResult.success, formatValidationFailure(ruleResult)).toBe(true);
   });
 
   it("rejects missing rule execution policy", async () => {

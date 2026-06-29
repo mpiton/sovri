@@ -205,7 +205,10 @@ function projectWideControlInputScopeIssue(
   rule: RuleCatalog,
   relatedControl: ControlCatalog | undefined,
 ): CatalogYamlValidationIssue | undefined {
-  if (relatedControl?.applicability !== "project-wide" || rule.input_scope === "project") {
+  if (
+    relatedControl?.applicability !== "project-wide" ||
+    (rule.input_scope !== "file" && rule.input_scope !== "diff")
+  ) {
     return undefined;
   }
 
