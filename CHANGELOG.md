@@ -31,6 +31,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   preserving declared values in MAT-83 ATDD coverage.
 
 ### Added
+- `compliance`: add MAT-83 ATDD coverage for validating `control.yaml` source
+  metadata with an official URL.
 - `compliance`: add a MAT-83 framework catalog fixture for fixture suite
   validation.
 - `compliance`: add MAT-83 fixture suite coverage for validating all catalog
