@@ -31,6 +31,14 @@ export type CatalogYamlValidationResult =
 
 const LlmGeneratedSourceDescriptionPattern = /\bgenerated\s+by\s+llm\s+from\s+the\s+prompt\b/iu;
 
+function isOfficialSourceUrl(sourceUrl: string): boolean {
+  try {
+    return new URL(sourceUrl).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 const SourceMetadataSchema = z.object({
   description: z
     .string()
@@ -38,7 +46,12 @@ const SourceMetadataSchema = z.object({
       (description) => !LlmGeneratedSourceDescriptionPattern.test(description),
       "source descriptions are catalog data, not LLM output",
     ),
-  url: z.string().optional(),
+  url: z
+    .string()
+    .optional()
+    .refine((sourceUrl) => sourceUrl === undefined || isOfficialSourceUrl(sourceUrl), {
+      message: "source.url must be an HTTPS URL",
+    }),
 });
 
 const SupportedControlApplicabilities = ["project-wide", "file", "diff"] as const;
