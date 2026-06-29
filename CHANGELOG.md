@@ -20,6 +20,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Added
+- `compliance`: add structured validation failures for unsupported catalog YAML
+  file names.
 - `compliance`: add MAT-83 ATDD coverage for reporting invalid catalog YAML
   syntax before schema validation.
 - `compliance`: add MAT-83 validator coverage for parsed YAML success and

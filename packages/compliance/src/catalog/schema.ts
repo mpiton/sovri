@@ -91,6 +91,10 @@ export const CatalogSchemasByFile = {
   "rule.yaml": RuleCatalogSchema,
 } as const;
 
+function isCatalogSchemaFile(file: string): file is keyof typeof CatalogSchemasByFile {
+  return Object.hasOwn(CatalogSchemasByFile, file);
+}
+
 export function validateCatalogYaml(
   input: CatalogYamlValidationInput,
 ): CatalogYamlValidationResult {
@@ -125,7 +129,21 @@ export function validateCatalogYaml(
     };
   }
 
-  const schema = CatalogSchemasByFile[input.file as keyof typeof CatalogSchemasByFile];
+  if (!isCatalogSchemaFile(input.file)) {
+    return {
+      error: {
+        issues: [
+          {
+            message: `unsupported catalog YAML file "${input.file}"`,
+            path: [input.file],
+          },
+        ],
+      },
+      success: false,
+    };
+  }
+
+  const schema = CatalogSchemasByFile[input.file];
   const result = schema.safeParse(parsed);
   if (!result.success) {
     return {

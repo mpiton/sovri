@@ -426,4 +426,21 @@ describe("compliance catalog YAML schemas", () => {
     }
     expect(formatValidationFailure(result)).toContain("framework_references.0");
   });
+
+  it("reports unsupported catalog YAML file names as validation failures", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "unexpected.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const yaml = "version: 2016-2002";
+
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError("Expected unsupported catalog YAML file validation to fail.");
+    }
+    expect(formatValidationFailure(result)).toContain("unsupported catalog YAML file");
+    expect(formatValidationFailure(result)).toContain(file);
+  });
 });
