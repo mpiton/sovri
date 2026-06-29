@@ -330,6 +330,10 @@ function quotedRuleYamlFor(ruleId: string, ruleType: string): string {
   ].join("\n");
 }
 
+function ruleYamlWithoutRuleTypeFor(ruleId: string): string {
+  return [`id: ${ruleId}`, "expected_evidence: compliance-rule-evidence"].join("\n");
+}
+
 async function loadCatalogSchemaModule(): Promise<CatalogSchemaModule> {
   expect(
     existsSync(catalogSchemaSourcePath),
@@ -761,6 +765,33 @@ describe("compliance catalog YAML schemas", () => {
       // And the validation error reports "<rejected reason>"
       expect(formattedError).toContain(example.rejectedReason);
     }
+  });
+
+  it("rejects missing rule execution types", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "rule.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const ruleId = "consent.detect-trackers";
+    const yaml = ruleYamlWithoutRuleTypeFor(ruleId);
+
+    // Given the catalog contains rule "consent.detect-trackers"
+    expect(yaml).toContain(`id: ${ruleId}`);
+
+    // And "rule.yaml" does not declare "rule_type"
+    expect(yaml).not.toContain("rule_type");
+
+    // When the catalog schema validator runs
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    // Then validation fails for "rule.yaml"
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError(`Expected ${file} validation to fail.`);
+    }
+
+    // And the validation error names "rule_type"
+    expect(formatValidationFailure(result)).toContain("rule_type");
   });
 
   it("rejects empty YAML documents before catalog validation can pass", async () => {
