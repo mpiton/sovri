@@ -374,6 +374,23 @@ function frameworkYamlWithoutSourceFor(frameworkFamily: string): string {
   ].join("\n");
 }
 
+function frameworkYamlWithSourceFor(
+  frameworkFamily: string,
+  sourceUrl: string,
+  sourceDescription: string,
+): string {
+  return [
+    `id: ${frameworkFamily}`,
+    "name: GDPR and ePrivacy consent controls",
+    "version: 2016-2002",
+    "jurisdiction: EU",
+    "scope: Project websites that process personal data and use trackers",
+    "source:",
+    `  url: ${JSON.stringify(sourceUrl)}`,
+    `  description: ${JSON.stringify(sourceDescription)}`,
+  ].join("\n");
+}
+
 function requireCatalogYamlValidator(moduleValue: CatalogSchemaModule): CatalogYamlValidator {
   expect(
     typeof moduleValue.validateCatalogYaml,
@@ -575,6 +592,41 @@ describe("compliance catalog YAML schemas", () => {
 
     // Then validation passes for "control.yaml"
     expect(result.success, formatValidationFailure(result)).toBe(true);
+  });
+
+  it("rejects invalid framework source URLs", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "framework.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const sourceDescription = "General Data Protection Regulation official text";
+    const invalidSourceUrls = ["gdpr-article-6", "ftp://example.eu", ""];
+
+    for (const sourceUrl of invalidSourceUrls) {
+      const yaml = frameworkYamlWithSourceFor(frameworkFamily, sourceUrl, sourceDescription);
+
+      // Given the catalog contains "framework.yaml" for framework family "gdpr-eprivacy"
+      expect(file).toBe("framework.yaml");
+      expect(yaml).toContain(`id: ${frameworkFamily}`);
+
+      // And "framework.yaml" declares source url "<source url>"
+      expect(yaml).toContain(`url: ${JSON.stringify(sourceUrl)}`);
+
+      // And "framework.yaml" declares source description "General Data Protection Regulation official text"
+      expect(yaml).toContain(`description: ${JSON.stringify(sourceDescription)}`);
+
+      // When the catalog schema validator runs
+      const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+      // Then validation fails for "framework.yaml"
+      expect(result.success).toBe(false);
+      if (result.success) {
+        throw new TypeError(`Expected ${file} validation to fail for source url ${sourceUrl}.`);
+      }
+
+      // And the validation error names "source.url"
+      expect(formatValidationFailure(result)).toContain("source.url");
+    }
   });
 
   it("rejects source metadata without a description", async () => {
