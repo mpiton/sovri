@@ -28,6 +28,20 @@ import {
   type ComplianceMappingEntry,
   type ComplianceReferenceApplicability,
   type ComplianceReferenceEntry,
+  // Catalog YAML schemas
+  CatalogSchemasByFile,
+  ControlCatalogSchema,
+  FrameworkCatalogSchema,
+  MappingCatalogSchema,
+  RuleCatalogSchema,
+  validateCatalogYaml,
+  type CatalogYamlValidationInput,
+  type CatalogYamlValidationIssue,
+  type CatalogYamlValidationResult,
+  type ControlCatalog,
+  type FrameworkCatalog,
+  type MappingCatalog,
+  type RuleCatalog,
   // Audit trail
   AuditTrailLogicalEventSchema,
   SignedAuditTrailEntrySchema,
@@ -58,6 +72,24 @@ import {
   enum (CWE, OWASP, ISO 27001, GDPR, DORA, NIS2, AI-Act, CRA).
 - `ComplianceReferenceApplicabilitySchema` / `ComplianceReferenceApplicability`:
   `applicable_if` vs `informational`.
+
+### Catalog YAML schemas
+
+- `CatalogSchemasByFile`: map from supported catalog YAML file names to their
+  Zod schema (`framework.yaml`, `control.yaml`, `rule.yaml`, `mapping.yaml`).
+- `FrameworkCatalogSchema` / `FrameworkCatalog`: framework metadata with a
+  required version.
+- `ControlCatalogSchema` / `ControlCatalog`: control metadata with required
+  remediation.
+- `RuleCatalogSchema` / `RuleCatalog`: rule metadata with required expected
+  evidence.
+- `MappingCatalogSchema` / `MappingCatalog`: control-to-framework-reference
+  mapping with required `control_id`.
+- `validateCatalogYaml(input)` / `CatalogYamlValidationInput` /
+  `CatalogYamlValidationResult`: parse one catalog YAML document, reject empty or
+  invalid YAML before schema validation, and return structured validation issues.
+- `CatalogYamlValidationIssue`: structured validation issue with message and
+  path segments.
 
 ### Audit trail
 

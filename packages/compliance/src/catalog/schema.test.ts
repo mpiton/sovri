@@ -4,7 +4,13 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
+
+import {
+  CatalogSchemasByFile as PublicCatalogSchemasByFile,
+  validateCatalogYaml as publicValidateCatalogYaml,
+  type CatalogYamlValidationResult as PublicCatalogYamlValidationResult,
+} from "../index.js";
 
 interface ValidationIssue {
   readonly message: string;
@@ -458,5 +464,19 @@ describe("compliance catalog YAML schemas", () => {
     }
     expect(formatValidationFailure(result)).toContain("unsupported catalog YAML file");
     expect(formatValidationFailure(result)).toContain(file);
+  });
+
+  it("publishes catalog YAML validation from the package entry point", () => {
+    expect(PublicCatalogSchemasByFile["framework.yaml"]).toBeDefined();
+    expect(publicValidateCatalogYaml).toBeTypeOf("function");
+    expectTypeOf<PublicCatalogYamlValidationResult>().not.toBeNever();
+
+    const result = publicValidateCatalogYaml({
+      file: "framework.yaml",
+      frameworkFamily: "gdpr-eprivacy",
+      yaml: "version: 2016-2002",
+    });
+
+    expect(result.success, formatValidationFailure(result)).toBe(true);
   });
 });

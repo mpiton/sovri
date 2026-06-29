@@ -14,6 +14,23 @@ export {
   type ComplianceReferenceEntry,
 } from "./mapping/schema.js";
 
+// Catalog schemas: YAML compliance-as-code validation for framework catalogs.
+export {
+  CatalogSchemasByFile,
+  ControlCatalogSchema,
+  FrameworkCatalogSchema,
+  MappingCatalogSchema,
+  RuleCatalogSchema,
+  validateCatalogYaml,
+  type CatalogYamlValidationInput,
+  type CatalogYamlValidationIssue,
+  type CatalogYamlValidationResult,
+  type ControlCatalog,
+  type FrameworkCatalog,
+  type MappingCatalog,
+  type RuleCatalog,
+} from "./catalog/schema.js";
+
 // Audit trail: validated event/entry schemas, the sink interface and its
 // in-memory implementation, and the offline verifier.
 export {

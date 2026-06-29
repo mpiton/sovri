@@ -20,6 +20,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Added
+- `compliance`: export catalog YAML schemas and validation from the package
+  entry point.
 - `compliance`: reject parsed-empty catalog YAML documents before schema
   validation.
 - `compliance`: add structured validation failures for unsupported catalog YAML
