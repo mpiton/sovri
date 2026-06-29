@@ -128,6 +128,33 @@ const unknownFieldExamples = [
   readonly unknownField: string;
 }[];
 
+const missingFieldExamples = [
+  {
+    file: "framework.yaml",
+    frameworkFamily: "gdpr-eprivacy",
+    missingField: "version",
+  },
+  {
+    file: "control.yaml",
+    frameworkFamily: "gdpr-eprivacy",
+    missingField: "remediation",
+  },
+  {
+    file: "rule.yaml",
+    frameworkFamily: "gdpr-eprivacy",
+    missingField: "expected_evidence",
+  },
+  {
+    file: "mapping.yaml",
+    frameworkFamily: "gdpr-eprivacy",
+    missingField: "control_id",
+  },
+] satisfies readonly {
+  readonly file: string;
+  readonly frameworkFamily: string;
+  readonly missingField: string;
+}[];
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -165,6 +192,18 @@ function exampleDataWithUnknownField(file: string, unknownField: string): Record
     ...example.data,
     [unknownField]: `unexpected value for ${unknownField}`,
   };
+}
+
+function exampleDataWithoutField(file: string, missingField: string): Record<string, unknown> {
+  const example = catalogExamples.find((catalogExample) => catalogExample.file === file);
+
+  if (example === undefined || !isRecord(example.data)) {
+    throw new TypeError(`Expected catalog example data for ${file}.`);
+  }
+
+  const data = { ...example.data };
+  Reflect.deleteProperty(data, missingField);
+  return data;
 }
 
 async function loadCatalogSchemaModule(): Promise<CatalogSchemaModule> {
@@ -240,6 +279,37 @@ describe("compliance catalog YAML schemas", () => {
         throw new TypeError(`Expected ${example.file} validation to fail.`);
       }
       expect(formatValidationFailure(result)).toContain(example.unknownField);
+    }
+  });
+
+  it("rejects missing required schema fields", async () => {
+    const { CatalogSchemasByFile } = await loadCatalogSchemaModule();
+
+    for (const example of missingFieldExamples) {
+      const schema = CatalogSchemasByFile[example.file];
+      if (schema === undefined) {
+        throw new TypeError(`Expected schema for ${example.file}.`);
+      }
+
+      // Given the compliance catalog contains "<file>" for framework family "gdpr-eprivacy"
+      expect(example.file).toMatch(/^(framework|control|rule|mapping)\.yaml$/u);
+      expect(example.frameworkFamily).toBe("gdpr-eprivacy");
+
+      // And "<file>" is missing the required field "<missing field>"
+      const data = exampleDataWithoutField(example.file, example.missingField);
+      expect(Object.hasOwn(data, example.missingField)).toBe(false);
+
+      // When the catalog schema validator runs
+      const result = schema.safeParse(data);
+
+      // Then validation fails for "<file>"
+      expect(result.success).toBe(false);
+
+      // And the validation error names the missing field "<missing field>"
+      if (result.success) {
+        throw new TypeError(`Expected ${example.file} validation to fail.`);
+      }
+      expect(formatValidationFailure(result)).toContain(example.missingField);
     }
   });
 });
