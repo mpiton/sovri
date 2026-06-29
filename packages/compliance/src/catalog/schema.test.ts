@@ -363,4 +363,31 @@ describe("compliance catalog YAML schemas", () => {
     }
     expect(formatValidationFailure(result)).toContain("catalog YAML cannot be empty");
   });
+
+  it("reports invalid YAML syntax before schema validation", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "framework.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const yaml = "id: [gdpr-eprivacy-consent";
+
+    // Given the compliance catalog contains "framework.yaml" for framework family "gdpr-eprivacy"
+    expect(moduleValue.CatalogSchemasByFile[file]).toBeDefined();
+    expect(frameworkFamily).toBe("gdpr-eprivacy");
+
+    // And "framework.yaml" contains the line "id: [gdpr-eprivacy-consent"
+    expect(yaml).toContain("id: [gdpr-eprivacy-consent");
+
+    // When the catalog schema validator runs
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    // Then validation fails for "framework.yaml"
+    expect(result.success).toBe(false);
+
+    // And the validation error reports invalid YAML syntax
+    if (result.success) {
+      throw new TypeError("Expected invalid framework.yaml validation to fail.");
+    }
+    expect(formatValidationFailure(result)).toContain("invalid YAML syntax");
+  });
 });
