@@ -20,6 +20,9 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Changed
+- `compliance`: tie required fixture seed rules to their owning control and
+  validate attached rules with that control context during MAT-83 fixture suite
+  validation.
 - `compliance`: reject explicit file- or diff-scoped `rule.yaml` input when the
   related `control.yaml` is project-wide.
 - `compliance`: restrict `control.yaml` applicability and `rule.yaml`
@@ -28,6 +31,11 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   preserving declared values in MAT-83 ATDD coverage.
 
 ### Added
+- `compliance`: cover successful fixture suite validation when required catalog
+  seed rules are present.
+- `compliance`: add fixture suite validation for required catalog seed rules.
+- `compliance`: add MAT-83 fixture suite coverage for reporting consent seed
+  fixtures missing their tracker detection rule.
 - `compliance`: add fixture suite validation for missing required catalog seed
   controls.
 - `compliance`: add MAT-83 fixture suite coverage for reporting missing

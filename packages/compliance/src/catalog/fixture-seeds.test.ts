@@ -48,6 +48,10 @@ const missingRequiredFixtureSeedExamples = [
   readonly presentFixtureSeed: string;
 }[];
 
+const consentTrackerControl = "consent.tracker.prior-consent";
+const consentTrackerDetectionRule = "consent.detect-trackers-without-consent-evidence";
+const consentFixtureSeed = "mat-114-consent-control";
+
 function catalogFixtureYaml(fixtureSeed: string, file: string): string {
   return readFileSync(new URL(`./fixtures/${fixtureSeed}/${file}`, import.meta.url), "utf8");
 }
@@ -106,11 +110,26 @@ describe("compliance catalog fixture seeds", () => {
         relatedControl: controlResult.success ? controlResult.data : undefined,
         yaml: ruleYaml,
       });
+      const fixtureSuiteResult = validateCatalogFixtureSuite({
+        frameworkFamily,
+        requiredControls: [example.control],
+        requiredRules: [{ control: example.control, rule: example.rule }],
+        seeds: [
+          {
+            controlYaml,
+            name: example.fixtureSeed,
+            ruleYaml,
+          },
+        ],
+      });
 
       // Then validation passes for fixture seed "<fixture seed>"
       expect(
-        [controlResult, mappingResult, ruleResult].map(formatValidationResult).join("\n"),
-      ).toBe("validation passed\nvalidation passed\nvalidation passed");
+        [
+          ...[controlResult, mappingResult, ruleResult].map(formatValidationResult),
+          formatFixtureSuiteValidationResult(fixtureSuiteResult),
+        ].join("\n"),
+      ).toBe("validation passed\nvalidation passed\nvalidation passed\nvalidation passed");
     }
   });
 
@@ -143,5 +162,84 @@ describe("compliance catalog fixture seeds", () => {
       // And the validation error names "<missing control>"
       expect(formatFixtureSuiteValidationResult(result)).toContain(example.missingControl);
     }
+  });
+
+  it("reports a consent-control seed missing its tracker detection rule", () => {
+    const frameworkFamily = "mat-83-fixtures";
+
+    // Given the fixtures include control "consent.tracker.prior-consent"
+    const controlYaml = catalogFixtureYaml(consentFixtureSeed, "control.yaml");
+    expect(controlYaml).toContain(`id: ${consentTrackerControl}`);
+
+    // And the tracker rule fixture exists but is not attached to the consent-control seed
+    const misplacedRuleYaml = catalogFixtureYaml(consentFixtureSeed, "rule.yaml");
+    const unrelatedControlYaml = catalogFixtureYaml("cross-framework-control", "control.yaml");
+    expect(misplacedRuleYaml).toContain(`id: ${consentTrackerDetectionRule}`);
+    expect(controlYaml).not.toContain(`id: ${consentTrackerDetectionRule}`);
+    expect(unrelatedControlYaml).not.toContain(`id: ${consentTrackerControl}`);
+
+    // When the fixture validation suite runs
+    const result = validateCatalogFixtureSuite({
+      frameworkFamily,
+      requiredControls: [consentTrackerControl],
+      requiredRules: [{ control: consentTrackerControl, rule: consentTrackerDetectionRule }],
+      seeds: [
+        {
+          controlYaml,
+          name: consentFixtureSeed,
+        },
+        {
+          controlYaml: unrelatedControlYaml,
+          name: "cross-framework-control",
+          ruleYaml: misplacedRuleYaml,
+        },
+      ],
+    });
+
+    // Then validation fails
+    expect(result.success).toBe(false);
+
+    // And the validation error names "consent.detect-trackers-without-consent-evidence"
+    expect(formatFixtureSuiteValidationResult(result)).toContain(
+      `fixtures.${consentTrackerControl}.rules.${consentTrackerDetectionRule}`,
+    );
+  });
+
+  it("rejects an attached rule fixture that violates its control input scope", () => {
+    const frameworkFamily = "mat-83-fixtures";
+
+    // Given the fixtures include a project-wide consent control
+    const controlYaml = catalogFixtureYaml(consentFixtureSeed, "control.yaml");
+    expect(controlYaml).toContain("applicability: project-wide");
+
+    // And the attached tracker rule fixture is scoped to a file
+    const fileScopedRuleYaml = catalogFixtureYaml(consentFixtureSeed, "rule.yaml").replace(
+      "input_scope: project",
+      "input_scope: file",
+    );
+    expect(fileScopedRuleYaml).toContain(`id: ${consentTrackerDetectionRule}`);
+    expect(fileScopedRuleYaml).toContain("input_scope: file");
+
+    // When the fixture validation suite runs
+    const result = validateCatalogFixtureSuite({
+      frameworkFamily,
+      requiredControls: [consentTrackerControl],
+      requiredRules: [{ control: consentTrackerControl, rule: consentTrackerDetectionRule }],
+      seeds: [
+        {
+          controlYaml,
+          name: consentFixtureSeed,
+          ruleYaml: fileScopedRuleYaml,
+        },
+      ],
+    });
+
+    // Then validation fails
+    expect(result.success).toBe(false);
+
+    // And the malformed attached rule is not reported as present
+    expect(formatFixtureSuiteValidationResult(result)).toContain(
+      `fixtures.${consentTrackerControl}.rules.${consentTrackerDetectionRule}`,
+    );
   });
 });

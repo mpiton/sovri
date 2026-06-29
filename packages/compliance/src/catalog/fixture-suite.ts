@@ -1,16 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Sovri contributors
 
-import { validateCatalogYaml } from "./schema.js";
+import { validateCatalogYaml, type ControlCatalog } from "./schema.js";
 
 export interface CatalogFixtureSeed {
   readonly controlYaml: string;
   readonly name: string;
+  readonly ruleYaml?: string;
+}
+
+export interface CatalogFixtureRequiredRule {
+  readonly control: string;
+  readonly rule: string;
 }
 
 export interface CatalogFixtureSuiteValidationInput {
   readonly frameworkFamily: string;
   readonly requiredControls: readonly string[];
+  readonly requiredRules?: readonly CatalogFixtureRequiredRule[];
   readonly seeds: readonly CatalogFixtureSeed[];
 }
 
@@ -35,14 +42,37 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function controlIdFromFixtureSeed(
+function controlFromFixtureSeed(
   seed: CatalogFixtureSeed,
   frameworkFamily: string,
-): string | undefined {
+): ControlCatalog | undefined {
   const result = validateCatalogYaml({
     file: "control.yaml",
     frameworkFamily,
     yaml: seed.controlYaml,
+  });
+
+  if (!result.success || !isRecord(result.data)) {
+    return undefined;
+  }
+
+  return result.data as ControlCatalog;
+}
+
+function ruleIdFromFixtureSeed(
+  seed: CatalogFixtureSeed,
+  frameworkFamily: string,
+  relatedControl: ControlCatalog | undefined,
+): string | undefined {
+  if (seed.ruleYaml === undefined) {
+    return undefined;
+  }
+
+  const result = validateCatalogYaml({
+    file: "rule.yaml",
+    frameworkFamily,
+    ...(relatedControl === undefined ? {} : { relatedControl }),
+    yaml: seed.ruleYaml,
   });
 
   if (!result.success || !isRecord(result.data) || typeof result.data.id !== "string") {
@@ -55,9 +85,17 @@ function controlIdFromFixtureSeed(
 export function validateCatalogFixtureSuite(
   input: CatalogFixtureSuiteValidationInput,
 ): CatalogFixtureSuiteValidationResult {
+  const parsedSeeds = input.seeds.map((seed) => {
+    const control = controlFromFixtureSeed(seed, input.frameworkFamily);
+
+    return {
+      controlId: control?.id,
+      ruleId: ruleIdFromFixtureSeed(seed, input.frameworkFamily, control),
+    };
+  });
   const presentControlIds = new Set(
-    input.seeds
-      .map((seed) => controlIdFromFixtureSeed(seed, input.frameworkFamily))
+    parsedSeeds
+      .map((seed) => seed.controlId)
       .filter((controlId): controlId is string => controlId !== undefined),
   );
   const missingControlIssues = input.requiredControls
@@ -66,11 +104,28 @@ export function validateCatalogFixtureSuite(
       message: `missing required fixture control "${requiredControl}"`,
       path: ["fixtures", requiredControl],
     }));
+  const presentRuleIds = new Set(
+    parsedSeeds
+      .map((seed) => seed.ruleId)
+      .filter((ruleId): ruleId is string => ruleId !== undefined),
+  );
+  const missingRuleIssues = (input.requiredRules ?? [])
+    .filter(
+      (requiredRule) =>
+        !parsedSeeds.some(
+          (seed) => seed.controlId === requiredRule.control && seed.ruleId === requiredRule.rule,
+        ),
+    )
+    .map((requiredRule) => ({
+      message: `missing required fixture rule "${requiredRule.rule}" for control "${requiredRule.control}"`,
+      path: ["fixtures", requiredRule.control, "rules", requiredRule.rule],
+    }));
+  const issues = [...missingControlIssues, ...missingRuleIssues];
 
-  if (missingControlIssues.length > 0) {
+  if (issues.length > 0) {
     return {
       error: {
-        issues: missingControlIssues,
+        issues,
       },
       success: false,
     };
@@ -79,6 +134,7 @@ export function validateCatalogFixtureSuite(
   return {
     data: {
       controls: [...presentControlIds],
+      rules: [...presentRuleIds],
     },
     success: true,
   };
