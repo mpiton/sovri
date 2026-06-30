@@ -55,7 +55,9 @@ function isOfficialSourceUrl(sourceUrl: string): boolean {
   }
 
   try {
-    return new URL(sourceUrl).protocol === "https:";
+    const parsedSourceUrl = new URL(sourceUrl);
+
+    return parsedSourceUrl.protocol === "https:" && parsedSourceUrl.href === sourceUrl;
   } catch {
     return false;
   }

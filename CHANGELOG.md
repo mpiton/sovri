@@ -22,7 +22,7 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Changed
 - `compliance`: require declared MAT-83 catalog source URLs to be HTTPS URLs.
 - `compliance`: reject malformed MAT-83 catalog source URLs that normalize to
-  HTTPS only after parsing.
+  HTTPS or otherwise serialize differently after parsing.
 - `compliance`: reject MAT-83 catalog source URLs containing raw whitespace
   before parser normalization.
 - `compliance`: reject MAT-83 catalog source URLs containing raw backslashes
@@ -31,6 +31,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
   characters before parser normalization.
 - `compliance`: reject MAT-83 catalog source URLs containing raw C1 control
   characters before parser normalization.
+- `review-engine`: reject prompt-generated official compliance text in MAT-83
+  ADR docs acceptance.
 - `compliance`: normalize LLM-generated source description detection across
   case and whitespace variations.
 - `compliance`: reject LLM-generated source descriptions in MAT-83 catalog
@@ -51,9 +53,25 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 - `compliance`: require explicit `rule.yaml` execution policy data while
   preserving declared values in MAT-83 ATDD coverage.
 
+### Fixed
+- `review-engine`: make MAT-83 ADR docs coverage independent of the checkout
+  directory name.
+
 ### Added
-- `compliance`: add MAT-83 ATDD coverage for rejecting invalid
-  `framework.yaml` source URLs.
+- `compliance`: add MAT-83 ATDD coverage for rejecting invalid and
+  parser-rewritten `framework.yaml` source URLs.
+- `compliance`: add MAT-83 ATDD coverage for `framework.yaml` source metadata
+  with an official URL.
+- `review-engine`: add MAT-83 ADR coverage for naming catalog schema YAML
+  files.
+- `compliance`: add MAT-83 ATDD coverage for project-wide controls that rely
+  on repository-level evidence.
+- `review-engine`: add MAT-83 ADR coverage for rejecting prompt-generated
+  official compliance text.
+- `review-engine`: add MAT-83 ADR coverage for catalog-to-rule execution
+  documentation.
+- `review-engine`: add MAT-83 ADR coverage for Git-owned framework catalog
+  data.
 - `compliance`: add MAT-83 ATDD coverage for rejecting LLM-generated
   `control.yaml` source descriptions.
 - `compliance`: add MAT-83 ATDD coverage for rejecting `control.yaml` source

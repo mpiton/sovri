@@ -568,6 +568,32 @@ describe("compliance catalog YAML schemas", () => {
     }
   });
 
+  it("validates framework source metadata with official URL", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "framework.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const sourceUrl = "https://eur-lex.europa.eu/eli/reg/2016/679/oj";
+    const sourceDescription = "General Data Protection Regulation official text";
+    const yaml = frameworkYamlWithSourceFor(frameworkFamily, sourceUrl, sourceDescription);
+
+    // Given the catalog contains "framework.yaml" for framework family "gdpr-eprivacy"
+    expect(file).toBe("framework.yaml");
+    expect(yaml).toContain(`id: ${frameworkFamily}`);
+
+    // And "framework.yaml" declares source url "https://eur-lex.europa.eu/eli/reg/2016/679/oj"
+    expect(yaml).toContain(`url: ${JSON.stringify(sourceUrl)}`);
+
+    // And "framework.yaml" declares source description "General Data Protection Regulation official text"
+    expect(yaml).toContain(`description: ${JSON.stringify(sourceDescription)}`);
+
+    // When the catalog schema validator runs
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    // Then validation passes for "framework.yaml"
+    expect(result.success, formatValidationFailure(result)).toBe(true);
+  });
+
   it("validates control source metadata with official URL", async () => {
     const moduleValue = await loadCatalogSchemaModule();
     const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
@@ -610,6 +636,7 @@ describe("compliance catalog YAML schemas", () => {
       "https://eur-lex.europa.eu\\eli/reg/2016/679/oj",
       "https://eur-lex.europa.eu/eli/reg/2016/679/oj\0",
       "https://eur-lex.europa.eu/eli/reg/2016/679/oj\u0080",
+      "https://eur-lex.europa.eu/eli/reg/2016/679/oj{draft}",
     ];
 
     for (const sourceUrl of invalidSourceUrls) {
@@ -1133,6 +1160,52 @@ describe("compliance catalog YAML schemas", () => {
       // And validation passes for "rule.yaml"
       expect(ruleResult.success, formatValidationFailure(ruleResult)).toBe(true);
     }
+  });
+
+  it("allows project-wide controls to require repository-level evidence", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const frameworkFamily = "gdpr-eprivacy";
+    const control = "privacy.retention.project-policy";
+    const expectedEvidence = "repository-policy-file";
+    const controlYaml = controlYamlFor(control, "project-wide");
+    const ruleYaml = ruleYamlWithScopeAndEvidenceFor(control, "project", expectedEvidence);
+
+    // Given the catalog contains control "privacy.retention.project-policy"
+    expect(controlYaml).toContain(`id: ${control}`);
+
+    // And "rule.yaml" declares input_scope "project"
+    expect(ruleYaml).toContain("input_scope: project");
+
+    // And "rule.yaml" declares expected_evidence "repository-policy-file"
+    expect(ruleYaml).toContain(`expected_evidence: ${expectedEvidence}`);
+
+    // When the catalog schema validator runs
+    const controlResult = validateCatalogYaml({
+      file: "control.yaml",
+      frameworkFamily,
+      yaml: controlYaml,
+    });
+    if (!controlResult.success) {
+      throw new TypeError("Expected control.yaml validation to pass.");
+    }
+
+    const ruleResult = validateCatalogYaml({
+      file: "rule.yaml",
+      frameworkFamily,
+      relatedControl: controlResult.data,
+      yaml: ruleYaml,
+    });
+
+    // Then validation passes for "rule.yaml"
+    expect(ruleResult.success, formatValidationFailure(ruleResult)).toBe(true);
+    if (!ruleResult.success || !isRecord(ruleResult.data)) {
+      throw new TypeError("Expected rule.yaml validation to pass with data.");
+    }
+
+    // And the rule is not tied to a changed file path
+    expect(ruleResult.data.input_scope).toBe("project");
+    expect(ruleResult.data).not.toHaveProperty("changed_file_path");
   });
 
   it("rejects unsupported control scope values", async () => {

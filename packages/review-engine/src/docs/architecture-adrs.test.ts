@@ -653,3 +653,115 @@ describe("MAT-82 R-07 — ADRs keep ComplianceGap and ControlResult distinct fro
     expect(failures).toContain("ControlResult must be distinct from the PR Finding");
   });
 });
+
+// ---------------------------------------------------------------------------
+// MAT-83 R-07 — Git owns framework catalog data
+// ---------------------------------------------------------------------------
+
+function officialComplianceTextFailures(docs: string): string[] {
+  const failures: string[] = [];
+  let inRejectedAlternatives = false;
+
+  for (const rawLine of docs.split(/\r?\n/)) {
+    const line = normalize(rawLine);
+
+    if (/^#+ rejected alternatives\b/.test(line)) {
+      inRejectedAlternatives = true;
+      continue;
+    }
+    if (/^#+ /.test(line)) {
+      inRejectedAlternatives = false;
+    }
+
+    const mentionsOfficialComplianceText =
+      /\bofficial\b/.test(line) &&
+      /(compliance|regulatory|source)/.test(line) &&
+      /(descriptions?|text|claims?)/.test(line);
+    const generatedFromPrompts =
+      /\b(generated?|generates?|generating)\b.*\bfrom prompts?\b/.test(line) ||
+      /\bprompt-generated\b/.test(line);
+    const generationIsRejected =
+      inRejectedAlternatives || /(must not|never|not |reject)/.test(line);
+
+    if (mentionsOfficialComplianceText && generatedFromPrompts && !generationIsRejected) {
+      failures.push("official compliance text must come from catalog data");
+    }
+  }
+
+  return failures;
+}
+
+describe("MAT-83 R-07 — compliance catalog docs identify Git-owned catalog data", () => {
+  it("states Git owns framework catalog data", () => {
+    // Given the repository contains architecture docs under "sovri/docs/adr/"
+    expect(adrDocsRoot.replaceAll("\\", "/").endsWith("docs/adr")).toBe(true);
+
+    // When I read the compliance catalog docs
+    const complianceCatalogDocs = adrCorpus;
+
+    // Then the docs state that Git is the source of truth for framework catalogs
+    expect(someLineMentionsAll("Git", "source of truth", "framework", "catalogs")).toBe(true);
+
+    // And the docs state that official source URLs and descriptions live in catalog files
+    expect(
+      lineMentionsAll(complianceCatalogDocs, [
+        "official source URLs",
+        "descriptions",
+        "catalog files",
+      ]),
+    ).toBe(true);
+  });
+
+  it("connects schema catalogs to deterministic rule execution", () => {
+    // Given the repository contains architecture docs under "sovri/docs/adr/"
+    expect(adrDocsRoot.replaceAll("\\", "/").endsWith("docs/adr")).toBe(true);
+
+    // When I read the compliance catalog docs
+    const complianceCatalogDocs = adrCorpus;
+
+    // Then the docs describe the catalog data flow from framework catalogs to rules
+    expect(lineMentionsAll(complianceCatalogDocs, ["framework catalogs", "rules"])).toBe(true);
+
+    // And the docs state that rule execution uses versioned catalog data
+    expect(
+      lineMentionsAll(complianceCatalogDocs, ["rule execution", "versioned catalog data"]),
+    ).toBe(true);
+  });
+
+  it("names the catalog schema files", () => {
+    // Given the repository contains architecture docs under "sovri/docs/adr/"
+    expect(adrDocsRoot.replaceAll("\\", "/").endsWith("docs/adr")).toBe(true);
+
+    // When I read the compliance catalog docs
+    const complianceCatalogDocs = adrCorpus;
+
+    // Then the docs mention "framework.yaml"
+    expect(complianceCatalogDocs).toContain("framework.yaml");
+    // And the docs mention "control.yaml"
+    expect(complianceCatalogDocs).toContain("control.yaml");
+    // And the docs mention "rule.yaml"
+    expect(complianceCatalogDocs).toContain("rule.yaml");
+    // And the docs mention "mapping.yaml"
+    expect(complianceCatalogDocs).toContain("mapping.yaml");
+  });
+
+  it("keeps the real ADR corpus free of prompt-generated official compliance text", () => {
+    expect(officialComplianceTextFailures(adrCorpus)).toEqual([]);
+  });
+
+  it("rejects prompt-generated official compliance descriptions", () => {
+    // Given the repository contains architecture docs under "sovri/docs/adr/"
+    expect(adrDocsRoot.replaceAll("\\", "/").endsWith("docs/adr")).toBe(true);
+    // And the compliance catalog docs say official compliance descriptions are generated from prompts
+    const promptGeneratedDescriptions =
+      "The official compliance descriptions are generated from prompts.";
+
+    // When the docs acceptance check runs
+    const failures = officialComplianceTextFailures(promptGeneratedDescriptions);
+
+    // Then it fails
+    expect(failures).not.toEqual([]);
+    // And it reports that official compliance text must come from catalog data
+    expect(failures).toContain("official compliance text must come from catalog data");
+  });
+});
