@@ -120,7 +120,7 @@ const SupportedControlApplicabilities = ["project-wide", "file", "diff"] as cons
 
 export const FrameworkCatalogSchema = z
   .object({
-    id: z.string().optional(),
+    id: z.string(),
     jurisdiction: z.string().optional(),
     name: z.string().optional(),
     scope: z.string().optional(),
@@ -206,15 +206,33 @@ const VersionedFrameworkReferenceStringSchema = z
     error: "framework references must include a version",
   });
 
+const FrameworkReferenceCatalogObjectSchema = z
+  .object({
+    framework: z.string().min(1),
+    reference: z.string().min(1),
+    version: z.string().min(1),
+  })
+  .strict()
+  .superRefine((reference, context) => {
+    if (!VersionedFrameworkReferencePattern.test(reference.reference)) {
+      return;
+    }
+
+    const [, embeddedVersion] = reference.reference.split(":");
+    if (embeddedVersion === reference.version) {
+      return;
+    }
+
+    context.addIssue({
+      code: "custom",
+      message: "framework reference version must match version",
+      path: ["reference"],
+    });
+  });
+
 const FrameworkReferenceCatalogSchema = z.union([
   VersionedFrameworkReferenceStringSchema,
-  z
-    .object({
-      framework: z.string().min(1),
-      reference: z.string().min(1),
-      version: z.string().min(1),
-    })
-    .strict(),
+  FrameworkReferenceCatalogObjectSchema,
 ]);
 
 type FrameworkReferenceCatalog = z.infer<typeof FrameworkReferenceCatalogSchema>;
@@ -307,7 +325,7 @@ function frameworkFamilyIdIssue(
   framework: FrameworkCatalog,
   frameworkFamily: string,
 ): CatalogYamlValidationIssue | undefined {
-  if (framework.id === undefined || framework.id === frameworkFamily) {
+  if (framework.id === frameworkFamily) {
     return undefined;
   }
 

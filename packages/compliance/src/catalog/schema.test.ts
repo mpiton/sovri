@@ -655,6 +655,37 @@ describe("compliance catalog YAML schemas", () => {
     expect(formatValidationFailure(result)).toContain(frameworkFamily);
   });
 
+  it("rejects framework source metadata without a framework family id", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "framework.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const sourceUrl = "https://eur-lex.europa.eu/eli/reg/2016/679/oj";
+    const sourceDescription = "General Data Protection Regulation official text";
+    const yaml = frameworkYamlWithSourceFor(frameworkFamily, sourceUrl, sourceDescription).replace(
+      /^id:.*\n/mu,
+      "",
+    );
+
+    // Given the caller validates a known framework family
+    expect(frameworkFamily).toBe("gdpr-eprivacy");
+
+    // And the catalog YAML does not declare a framework id
+    expect(yaml).not.toContain("id:");
+
+    // When the catalog schema validator runs
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    // Then validation fails for "framework.yaml"
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError(`Expected ${file} validation to fail.`);
+    }
+
+    // And the validation error names the missing id
+    expect(formatValidationFailure(result)).toContain("id");
+  });
+
   it("validates control source metadata with official URL", async () => {
     const moduleValue = await loadCatalogSchemaModule();
     const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
@@ -1016,6 +1047,37 @@ describe("compliance catalog YAML schemas", () => {
     }
 
     // And the validation error reports that framework references must include a version
+    expect(formatValidationFailure(result)).toContain("version");
+  });
+
+  it("rejects object-form framework references with conflicting embedded versions", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "mapping.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const control = "consent.tracker.prior-consent";
+    const yaml = [
+      `control_id: ${control}`,
+      "framework_references:",
+      "  - framework: gdpr",
+      '    version: "2022"',
+      "    reference: gdpr:2016:article-6",
+    ].join("\n");
+
+    // Given "mapping.yaml" declares one version and embeds a different version in reference
+    expect(yaml).toContain('version: "2022"');
+    expect(yaml).toContain("reference: gdpr:2016:article-6");
+
+    // When the catalog schema validator runs
+    const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+    // Then validation fails for "mapping.yaml"
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new TypeError(`Expected ${file} validation to fail.`);
+    }
+
+    // And the validation error names the version conflict
     expect(formatValidationFailure(result)).toContain("version");
   });
 
@@ -1692,6 +1754,7 @@ describe("compliance catalog YAML schemas", () => {
     const file = "framework.yaml";
     const frameworkFamily = "gdpr-eprivacy";
     const yaml = [
+      `id: ${frameworkFamily}`,
       "version: 2016-2002",
       "source:",
       "  url: https://eur-lex.europa.eu/eli/reg/2016/679/oj",
@@ -1763,6 +1826,7 @@ describe("compliance catalog YAML schemas", () => {
       file: "framework.yaml",
       frameworkFamily: "gdpr-eprivacy",
       yaml: [
+        "id: gdpr-eprivacy",
         "version: 2016-2002",
         "source:",
         "  url: https://eur-lex.europa.eu/eli/reg/2016/679/oj",

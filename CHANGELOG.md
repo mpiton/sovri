@@ -22,6 +22,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ### Changed
 - `compliance`: reject `framework.yaml` ids that do not match the requested
   MAT-83 framework family.
+- `compliance`: require `framework.yaml` ids and reject conflicting embedded
+  object-reference versions in MAT-83 mappings.
 - `compliance`: surface fixture seed validation errors and strict-parse MAT-83
   source metadata and object-form framework references.
 - `review-engine`: parse prompt-generation ADR checks through source-of-truth

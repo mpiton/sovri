@@ -268,7 +268,7 @@ describe("compliance catalog fixture seeds", () => {
     const invalidNonRequiredControlYaml = catalogFixtureYaml(
       "cross-framework-control",
       "control.yaml",
-    ).replace("remediation: Enable administrative access logging and retain audit evidence.\n", "");
+    ).replace(/^remediation:.*\n/mu, "");
 
     // Given the required fixture seed is valid
     expect(requiredControlYaml).toContain(`id: ${consentTrackerControl}`);
