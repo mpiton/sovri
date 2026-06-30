@@ -88,9 +88,15 @@ function normalizedLines(docs: string): readonly string[] {
     .filter((line) => line.length > 0);
 }
 
+function markdownHeadingDepth(line: string): number | undefined {
+  const match = /^(#+) /.exec(line);
+  return match === null ? undefined : (match[1]?.length ?? 0);
+}
+
 function sourceOfTruthClauses(docs: string): readonly SourceOfTruthClause[] {
   const clauses: SourceOfTruthClause[] = [];
   let inRejectedAlternatives = false;
+  let rejectedAlternativesDepth: number | undefined;
   let currentBlockLines: string[] = [];
   let currentBlockIsRejectedAlternative = false;
 
@@ -119,21 +125,26 @@ function sourceOfTruthClauses(docs: string): readonly SourceOfTruthClause[] {
 
   for (const rawLine of docs.split(/\r?\n/)) {
     const line = normalize(rawLine).trim();
+    const headingDepth = markdownHeadingDepth(line);
 
     if (line.length === 0) {
       flushCurrentBlock();
       continue;
     }
 
-    if (/^#+ rejected alternatives\b/.test(line)) {
+    if (headingDepth !== undefined) {
       flushCurrentBlock();
-      inRejectedAlternatives = true;
-      continue;
-    }
 
-    if (/^#+ /.test(line)) {
-      flushCurrentBlock();
-      inRejectedAlternatives = false;
+      if (/^#+ rejected alternatives\b/.test(line)) {
+        inRejectedAlternatives = true;
+        rejectedAlternativesDepth = headingDepth;
+        continue;
+      }
+
+      if (rejectedAlternativesDepth !== undefined && headingDepth <= rejectedAlternativesDepth) {
+        inRejectedAlternatives = false;
+        rejectedAlternativesDepth = undefined;
+      }
       continue;
     }
 
@@ -724,8 +735,23 @@ describe("MAT-82 R-07 — ADRs keep ComplianceGap and ControlResult distinct fro
 
 function isNegatedOrRejected(statement: string): boolean {
   return (
-    /\b(do not|must not|never|reject)\b/.test(statement) ||
+    /\b(do not|must not|never|reject|rejected)\b/.test(statement) ||
     /\bgit\b\s+(is|as|remains|stays)\s+not\b/.test(statement)
+  );
+}
+
+function mentionsCatalogSourceOfTruth(statement: string): boolean {
+  return (
+    /\bsource of truth\b[^.!?;:]*\bcatalog(s| data)?\b/.test(statement) ||
+    /\bcatalog(s| data)? source of truth\b/.test(statement)
+  );
+}
+
+function negatesGitSourceOfTruthDecision(statement: string): boolean {
+  return (
+    mentionsCatalogSourceOfTruth(statement) &&
+    (/\b(do not|must not|never)\b[^.!?;:]*\bgit\b/.test(statement) ||
+      /\bgit\b\s+(is|as|remains|stays)\s+not\b/.test(statement))
   );
 }
 
@@ -748,11 +774,12 @@ function gitSourceOfTruthFailures(docs: string): string[] {
       !isAffirmativeGitSourceOfTruth(statement) &&
       !isNegatedOrRejected(statement),
   );
-  if (conflictingSourceOfTruth) {
+  const statesGitAsSourceOfTruth = activeStatements.some(isAffirmativeGitSourceOfTruth);
+  const hasActiveGitSourceOfTruthNegation = activeStatements.some(negatesGitSourceOfTruthDecision);
+
+  if (conflictingSourceOfTruth || (statesGitAsSourceOfTruth && hasActiveGitSourceOfTruthNegation)) {
     return ["catalog source of truth must be Git"];
   }
-
-  const statesGitAsSourceOfTruth = activeStatements.some(isAffirmativeGitSourceOfTruth);
 
   if (statesGitAsSourceOfTruth) {
     return [];
@@ -920,6 +947,45 @@ describe("MAT-83 R-07 — compliance catalog docs identify Git-owned catalog dat
     ].join("\n");
 
     expect(gitSourceOfTruthFailures(docsWithRejectedAlternative)).toEqual([]);
+  });
+
+  it("keeps nested headings inside rejected alternatives", () => {
+    const docsWithNestedRejectedAlternative = [
+      "Git is the source of truth for framework catalogs.",
+      "## Rejected alternatives",
+      "### Cloud-owned catalog",
+      "- Cloud is the source of truth for catalog data.",
+    ].join("\n");
+
+    expect(gitSourceOfTruthFailures(docsWithNestedRejectedAlternative)).toEqual([]);
+  });
+
+  it("treats sibling headings after rejected alternatives as active", () => {
+    const docsWithActiveClaimAfterRejectedAlternatives = [
+      "Git is the source of truth for framework catalogs.",
+      "## Rejected alternatives",
+      "### Cloud-owned catalog",
+      "- Cloud is the source of truth for catalog data.",
+      "## Decision",
+      "Cloud is the source of truth for catalog data.",
+    ].join("\n");
+
+    expect(gitSourceOfTruthFailures(docsWithActiveClaimAfterRejectedAlternatives)).toContain(
+      "catalog source of truth must be Git",
+    );
+  });
+
+  it.each([
+    "Git is not the source of truth for framework catalogs.",
+    "Do not use Git as the source of truth for framework catalogs.",
+  ])("rejects active Git source-of-truth negations even when Git is affirmed: %s", (negation) => {
+    const conflictingDocs = ["Git is the source of truth for framework catalogs.", negation].join(
+      "\n\n",
+    );
+
+    expect(gitSourceOfTruthFailures(conflictingDocs)).toContain(
+      "catalog source of truth must be Git",
+    );
   });
 
   it("rejects negated Git source-of-truth statements", () => {

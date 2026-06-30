@@ -20,6 +20,8 @@ The proprietary Cloud edition (`apps/cloud-api/`) has its own internal changelog
 ## [Unreleased]
 
 ### Changed
+- `review-engine`: reject active negated Git catalog source-of-truth ADR
+  statements while preserving nested rejected alternatives.
 - `review-engine`: ignore rejected-alternative catalog source-of-truth
   anti-patterns while rejecting noun-phrase non-Git MAT-83 ownership claims.
 - `review-engine`: reject same-statement and contrasting non-Git catalog
