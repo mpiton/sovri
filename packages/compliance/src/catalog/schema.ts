@@ -31,6 +31,7 @@ export type CatalogYamlValidationResult =
 
 const LlmGeneratedSourceDescriptionPattern = /\bgenerated\s+by\s+llm\s+from\s+the\s+prompt\b/iu;
 const OfficialSourceUrlPattern = /^https:\/\/[^/?#]+(?:[/?#].*)?$/iu;
+const PathlessOfficialSourceUrlPattern = /^(https:\/\/[^/?#]+)([?#].*)?$/iu;
 
 function hasForbiddenSourceUrlRawCharacter(sourceUrl: string): boolean {
   for (const character of sourceUrl) {
@@ -57,10 +58,27 @@ function isOfficialSourceUrl(sourceUrl: string): boolean {
   try {
     const parsedSourceUrl = new URL(sourceUrl);
 
-    return parsedSourceUrl.protocol === "https:" && parsedSourceUrl.href === sourceUrl;
+    return (
+      parsedSourceUrl.protocol === "https:" &&
+      isSameSourceUrlAfterParsing(sourceUrl, parsedSourceUrl)
+    );
   } catch {
     return false;
   }
+}
+
+function isSameSourceUrlAfterParsing(sourceUrl: string, parsedSourceUrl: URL): boolean {
+  if (parsedSourceUrl.href === sourceUrl) {
+    return true;
+  }
+
+  const pathlessSourceUrlMatch = PathlessOfficialSourceUrlPattern.exec(sourceUrl);
+  if (pathlessSourceUrlMatch === null) {
+    return false;
+  }
+
+  const [, origin, suffix = ""] = pathlessSourceUrlMatch;
+  return parsedSourceUrl.href === `${origin}/${suffix}`;
 }
 
 const SourceMetadataSchema = z.object({

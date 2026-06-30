@@ -594,6 +594,32 @@ describe("compliance catalog YAML schemas", () => {
     expect(result.success, formatValidationFailure(result)).toBe(true);
   });
 
+  it("validates pathless framework source URLs", async () => {
+    const moduleValue = await loadCatalogSchemaModule();
+    const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
+    const file = "framework.yaml";
+    const frameworkFamily = "gdpr-eprivacy";
+    const sourceDescription = "European Data Protection Board official source";
+    const sourceUrls = ["https://edpb.europa.eu", "https://example.eu?doc=1"];
+
+    for (const sourceUrl of sourceUrls) {
+      const yaml = frameworkYamlWithSourceFor(frameworkFamily, sourceUrl, sourceDescription);
+
+      // Given the catalog contains "framework.yaml" for framework family "gdpr-eprivacy"
+      expect(file).toBe("framework.yaml");
+      expect(yaml).toContain(`id: ${frameworkFamily}`);
+
+      // And "framework.yaml" declares pathless source url "<source url>"
+      expect(yaml).toContain(`url: ${JSON.stringify(sourceUrl)}`);
+
+      // When the catalog schema validator runs
+      const result = validateCatalogYaml({ file, frameworkFamily, yaml });
+
+      // Then validation passes for "framework.yaml"
+      expect(result.success, formatValidationFailure(result)).toBe(true);
+    }
+  });
+
   it("validates control source metadata with official URL", async () => {
     const moduleValue = await loadCatalogSchemaModule();
     const validateCatalogYaml = requireCatalogYamlValidator(moduleValue);
